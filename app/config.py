@@ -1,0 +1,83 @@
+"""Central configuration. Every value is read from the environment with a safe
+default so the app runs end to end even with nothing set. The decision logic is
+deterministic and never depends on any of the LLM settings below."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load a local .env if present. On the deployment host the values are injected
+# as platform secrets, so this is a no-op there.
+load_dotenv()
+
+# Repository root (the directory that contains the app/ package).
+ROOT_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(__file__).resolve().parent / "data"
+
+
+def _get(name: str, default: str) -> str:
+    value = os.environ.get(name)
+    return value if value not in (None, "") else default
+
+
+def _get_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _get_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+# --- LLM provider (Groq, OpenAI-compatible) -------------------------------
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+GROQ_BASE_URL = _get("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+GEN_MODEL = _get("GEN_MODEL", "llama-3.3-70b-versatile")
+JUDGE_MODEL = _get("JUDGE_MODEL", "llama-3.1-8b-instant")
+LLM_TIMEOUT_SECONDS = _get_float("LLM_TIMEOUT_SECONDS", 8.0)
+USE_LLM_JUDGE = _get("USE_LLM_JUDGE", "true").lower() in ("1", "true", "yes")
+
+# --- Embeddings + retrieval ------------------------------------------------
+EMBED_MODEL = _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+TOP_K = _get_int("TOP_K", 4)
+RETRIEVAL_MIN_SCORE = _get_float("RETRIEVAL_MIN_SCORE", 0.30)
+GROUNDING_MIN = _get_float("GROUNDING_MIN", 0.45)
+
+# --- Paths -----------------------------------------------------------------
+INDEX_DIR = ROOT_DIR / _get("INDEX_DIR", "index")
+CORPUS_PATH = DATA_DIR / "corpus.json"
+EXAMPLES_PATH = DATA_DIR / "examples.json"
+EVAL_SUMMARY_PATH = ROOT_DIR / "eval" / "eval_summary.json"
+
+# --- Input guard limits ----------------------------------------------------
+MAX_QUERY_CHARS = 400
+# Requests per minute, enforced per client IP (see guards_input). Protects a
+# public deployment from a single client draining the LLM quota.
+RATE_LIMIT_PER_MINUTE = _get_int("RATE_LIMIT_PER_MINUTE", 30)
+
+# Force extractive mode even when an API key is present. Use this to expose a
+# public demo without spending the LLM quota; run the live model from localhost.
+FORCE_EXTRACTIVE = _get("FORCE_EXTRACTIVE", "false").lower() in ("1", "true", "yes")
+
+# --- Audit -----------------------------------------------------------------
+AUDIT_RING_SIZE = 50
+# Append-only audit log. Defaults to a writable path under the repo; override
+# with AUDIT_LOG_PATH. Persistence is best-effort: if the path is not writable
+# (for example a read-only container), the app falls back to memory-only and
+# never errors. Set AUDIT_PERSIST=false to disable disk persistence entirely.
+AUDIT_LOG_PATH = Path(_get("AUDIT_LOG_PATH", str(ROOT_DIR / "audit" / "audit_log.jsonl")))
+AUDIT_PERSIST = _get("AUDIT_PERSIST", "true").lower() in ("1", "true", "yes")
+
+
+def llm_configured() -> bool:
+    """True if a live LLM should be used: a key is present and extractive mode
+    is not being forced. The app runs fully either way."""
+    return bool(GROQ_API_KEY) and not FORCE_EXTRACTIVE

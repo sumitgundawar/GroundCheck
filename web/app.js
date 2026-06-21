@@ -1,0 +1,1053 @@
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let DEFAULTS = null;
+let llmAvailable = false;
+let lastRetrievedIds = [];
+
+// Static stage list for the "How it works" panel. The authoritative,
+// per-run descriptions come from the trace itself; this mirrors them for the
+// explainer shown before any question is asked.
+const PIPELINE_STAGES = [
+  ["input guards", "Redact PII, reject injection and out-of-scope input, rate limit."],
+  ["embed + retrieve", "Embed the query and pull the top-k most similar passages from the FAISS index, with cosine scores."],
+  ["retrieval gate", "If the best passage is below threshold, refuse now, before any generation."],
+  ["source coverage", "Check the question's entities actually appear in the retrieved sources."],
+  ["generate", "LLM returns structured, cited claims. Extractive fallback if no LLM is available."],
+  ["schema validate", "Validate the output against a strict schema. Retry once, then fall back."],
+  ["grounding check", "Deterministic claim-to-source similarity, with an LLM judge as corroboration."],
+  ["dosage guard", "Every value with a clinical unit must appear verbatim in a source, or refuse."],
+  ["decision", "Answer with citations, or refuse with a specific reason and route for review."],
+];
+
+// Plain-language explanation shown in the refusal callout, keyed by a stable
+// phrase found in the refusal reason.
+function refusalExplanation(reason) {
+  const r = (reason || "").toLowerCase();
+  if (r.includes("not appear in any trusted source") || r.includes("do not cover"))
+    return "The question names something the trusted sources never mention, so there is nothing to ground an answer on.";
+  if (r.includes("no sufficiently relevant source"))
+    return "No document was similar enough to the question to be trustworthy, so the system refused before generating anything.";
+  if (r.includes("not supported by any source"))
+    return "The answer contained a value with a clinical unit that does not appear, character for character, in any retrieved source.";
+  if (r.includes("could not be grounded"))
+    return "A statement in the draft answer was not sufficiently supported by its cited source.";
+  if (r.includes("enough information"))
+    return "The retrieved sources did not contain enough to answer safely.";
+  if (r.includes("input guard") || r.includes("blocked"))
+    return "The query was stopped by an input guard before reaching the pipeline.";
+  if (r.includes("rate limit"))
+    return "Too many requests in a short window. This protects the live service.";
+  return "The pipeline could not produce a fully grounded answer, so it declined.";
+}
+
+// ---------- Boot ----------
+document.addEventListener("DOMContentLoaded", () => {
+  loadLogo();
+  loadHealth();
+  loadExamples();
+  loadSettings();
+  loadEvalSummary();
+  loadCorpus();
+  renderHowStages();
+  wireForm();
+  wireCollapsibles();
+});
+
+async function loadLogo() {
+  try { $("brand-mark").innerHTML = await (await fetch("/assets/logo.svg")).text(); }
+  catch (_) {}
+}
+
+async function loadHealth() {
+  const dot = $("provider-dot"), label = $("provider-label");
+  try {
+    const data = await (await fetch("/api/health")).json();
+    llmAvailable = !!data.llm;
+    if (data.llm) { dot.className = "dot ok"; label.textContent = "llm: groq"; }
+    else { dot.className = "dot warn"; label.textContent = "llm: extractive"; }
+    if (typeof data.corpus === "number") $("corpus-count").textContent = data.corpus.toLocaleString();
+  } catch (_) { dot.className = "dot warn"; label.textContent = "llm: extractive"; }
+}
+
+// ---------- Examples (grouped) ----------
+async function loadExamples() {
+  try {
+    const examples = await (await fetch("/api/examples")).json();
+    const wrap = $("chips");
+    wrap.innerHTML = "";
+    const groups = [];
+    const byGroup = {};
+    examples.forEach((ex) => {
+      const g = ex.group || "Examples";
+      if (!byGroup[g]) { byGroup[g] = []; groups.push(g); }
+      byGroup[g].push(ex);
+    });
+    groups.forEach((g) => {
+      const row = document.createElement("div");
+      row.className = "chip-group";
+      const label = document.createElement("span");
+      label.className = "chip-group-label eyebrow";
+      label.textContent = g;
+      row.appendChild(label);
+      const chips = document.createElement("div");
+      chips.className = "chips-row";
+      byGroup[g].forEach((ex) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip";
+        chip.textContent = ex.label;
+        chip.title = ex.query;
+        chip.addEventListener("click", () => { $("query").value = ex.query; submitQuery(ex.query); });
+        chips.appendChild(chip);
+      });
+      row.appendChild(chips);
+      wrap.appendChild(row);
+    });
+  } catch (_) {}
+}
+
+// ---------- Tuning ----------
+const RANGE_CONTROLS = [
+  { id: "set-retrieval", key: "retrieval_min_score", out: "set-retrieval-val", fixed: 2 },
+  { id: "set-grounding", key: "grounding_min", out: "set-grounding-val", fixed: 2 },
+  { id: "set-topk", key: "top_k", out: "set-topk-val", fixed: 0 },
+];
+const TOGGLE_CONTROLS = [
+  { id: "set-coverage", key: "enable_coverage_guard" },
+  { id: "set-grounding-guard", key: "enable_grounding_guard" },
+  { id: "set-dosage", key: "enable_dosage_guard" },
+  { id: "set-judge", key: "use_llm_judge" },
+];
+
+async function loadSettings() {
+  try {
+    const data = await (await fetch("/api/settings")).json();
+    DEFAULTS = data.defaults;
+    llmAvailable = !!data.llm_available;
+    RANGE_CONTROLS.forEach((c) => {
+      const el = $(c.id);
+      const b = (data.bounds || {})[c.key];
+      if (b) { el.min = b.min; el.max = b.max; el.step = b.step; }
+      el.value = DEFAULTS[c.key];
+      syncRangeOutput(c);
+      el.addEventListener("input", () => { syncRangeOutput(c); updateTuningStatus(); });
+    });
+    TOGGLE_CONTROLS.forEach((c) => {
+      const el = $(c.id);
+      el.checked = !!DEFAULTS[c.key];
+      el.addEventListener("change", updateTuningStatus);
+    });
+    if (!llmAvailable) {
+      const sw = $("judge-switch");
+      sw.classList.add("disabled");
+      sw.title = "Available only when a live LLM provider is configured.";
+      $("set-judge").checked = false;
+      $("set-judge").disabled = true;
+    }
+    $("tuning-reset").addEventListener("click", resetSettings);
+    updateTuningStatus();
+  } catch (_) {}
+}
+
+function syncRangeOutput(c) { $(c.out).textContent = Number($(c.id).value).toFixed(c.fixed); }
+
+function readSettings() {
+  const s = {};
+  RANGE_CONTROLS.forEach((c) => { s[c.key] = c.fixed === 0 ? parseInt($(c.id).value, 10) : parseFloat($(c.id).value); });
+  TOGGLE_CONTROLS.forEach((c) => { s[c.key] = $(c.id).checked; });
+  return s;
+}
+
+function isDefault() {
+  if (!DEFAULTS) return true;
+  const s = readSettings();
+  return Object.keys(s).every((k) => typeof s[k] === "number"
+    ? Math.abs(s[k] - DEFAULTS[k]) < 1e-9 : s[k] === DEFAULTS[k]);
+}
+
+function updateTuningStatus() {
+  const el = $("tuning-status");
+  if (isDefault()) { el.textContent = "defaults"; el.classList.remove("modified"); }
+  else { el.textContent = "modified"; el.classList.add("modified"); }
+}
+
+function resetSettings() {
+  if (!DEFAULTS) return;
+  RANGE_CONTROLS.forEach((c) => { $(c.id).value = DEFAULTS[c.key]; syncRangeOutput(c); });
+  TOGGLE_CONTROLS.forEach((c) => {
+    if (c.key === "use_llm_judge" && !llmAvailable) return;
+    $(c.id).checked = !!DEFAULTS[c.key];
+  });
+  updateTuningStatus();
+}
+
+// ---------- Ask ----------
+function wireForm() {
+  $("ask-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = $("query").value.trim();
+    if (q) submitQuery(q);
+  });
+}
+
+let inflight = false;
+async function submitQuery(query) {
+  if (inflight) return;
+  inflight = true;
+  setLoading(true);
+  try {
+    const res = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, settings: readSettings() }),
+    });
+    render(await res.json());
+  } catch (_) {
+    render({ decision: "refuse", answer_text: "The service is unreachable. Please try again.",
+      refused_reason: "network error", claims: [], sources: [], trace: [], audit_id: "", total_ms: 0, llm_used: false });
+  } finally { setLoading(false); inflight = false; }
+}
+
+function setLoading(on) {
+  $("ask-btn").disabled = on;
+  $("spinner").hidden = !on;
+  $("ask-btn").querySelector(".btn-label").textContent = on ? "Asking" : "Ask";
+}
+
+// ---------- Render ----------
+function render(data) {
+  renderDecision(data);
+  renderSources(data);
+  renderTrace(data.trace || []);
+  renderAudit(data.audit_id);
+  lastRetrievedIds = (data.sources || []).map((s) => s.id);
+  highlightCorpus(lastRetrievedIds);
+  $("results-grid").hidden = false;
+  $("decision-panel").scrollIntoView({ behavior: REDUCED_MOTION ? "auto" : "smooth", block: "nearest" });
+}
+
+function renderDecision(data) {
+  $("decision-panel").hidden = false;
+  const chip = $("decision-chip"), reason = $("decision-reason");
+  const body = $("answer-body"), callout = $("refuse-callout");
+  body.innerHTML = "";
+  if (data.decision === "answer") {
+    chip.className = "status-chip answer";
+    chip.textContent = "ANSWER";
+    const ids = citedIds(data);
+    reason.textContent = ids.length ? `Grounded in ${ids.join(", ")}.` : "Grounded in cited sources.";
+    body.appendChild(renderAnswerWithCitations(data.answer_text));
+    callout.hidden = true;
+  } else {
+    chip.className = "status-chip refuse";
+    chip.textContent = "REFUSED";
+    reason.textContent = data.refused_reason ? capitalize(data.refused_reason) : "";
+    callout.hidden = false;
+    $("refuse-detail").textContent = data.refused_reason || "No grounded answer available.";
+    $("refuse-explain").textContent = refusalExplanation(data.refused_reason);
+  }
+}
+
+function citedIds(data) {
+  const ids = new Set();
+  (data.claims || []).forEach((c) => (c.source_ids || []).forEach((id) => ids.add(id)));
+  return [...ids];
+}
+
+function renderAnswerWithCitations(text) {
+  const frag = document.createDocumentFragment();
+  const re = /\[([A-Z]+-[A-Za-z0-9]+)\]/g;
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+    const id = m[1];
+    const a = document.createElement("a");
+    a.className = "citation";
+    a.textContent = `[${id}]`;
+    a.href = `#src-${id}`;
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const card = $(`src-${id}`);
+      if (card) { card.scrollIntoView({ behavior: REDUCED_MOTION ? "auto" : "smooth", block: "center" }); flash(card); }
+    });
+    frag.appendChild(a);
+    last = re.lastIndex;
+  }
+  if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  return frag;
+}
+
+function flash(el) { el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 800); }
+
+const KIND_LABEL = { condition: "condition", drug: "drug", reference: "reference" };
+
+function renderSources(data) {
+  const wrap = $("sources");
+  wrap.innerHTML = "";
+  const cited = new Set(citedIds(data));
+  const sources = data.sources || [];
+  if (!sources.length) {
+    const p = document.createElement("p");
+    p.className = "source-snippet";
+    p.textContent = "No sources retrieved for this question.";
+    wrap.appendChild(p);
+    return;
+  }
+  sources.forEach((s) => {
+    const card = document.createElement("div");
+    card.className = "source-card" + (cited.has(s.id) ? " cited" : "");
+    card.id = `src-${s.id}`;
+
+    const head = document.createElement("div");
+    head.className = "source-card-head";
+    const left = document.createElement("div");
+    left.className = "source-id-row";
+    const rank = document.createElement("span");
+    rank.className = "source-rank";
+    rank.textContent = `#${s.rank || "?"}`;
+    const id = document.createElement("span");
+    id.className = "source-id";
+    id.textContent = s.id;
+    left.append(rank, id);
+    if (cited.has(s.id)) {
+      const badge = document.createElement("span");
+      badge.className = "src-badge cited-badge";
+      badge.textContent = "cited";
+      left.appendChild(badge);
+    }
+    if (s.above_gate === false) {
+      const badge = document.createElement("span");
+      badge.className = "src-badge below-gate";
+      badge.textContent = "below gate";
+      left.appendChild(badge);
+    }
+    const score = document.createElement("span");
+    score.className = "source-score-tag";
+    score.textContent = (s.score ?? 0).toFixed(2);
+    head.append(left, score);
+
+    const title = document.createElement("div");
+    title.className = "source-title-row";
+    title.textContent = s.title;
+
+    const meta = document.createElement("div");
+    meta.className = "source-meta";
+    if (s.kind) meta.appendChild(tag(KIND_LABEL[s.kind] || s.kind, "tag-kind"));
+    if (s.section) meta.appendChild(tag(s.section, "tag-section"));
+    if (s.topic) meta.appendChild(tag(s.topic, "tag-topic"));
+
+    const snippet = document.createElement("p");
+    snippet.className = "source-snippet";
+    snippet.textContent = s.snippet;
+
+    const scoreRow = document.createElement("div");
+    scoreRow.className = "score-row";
+    const bar = document.createElement("div");
+    bar.className = "score-bar";
+    const fill = document.createElement("div");
+    fill.className = "score-bar-fill";
+    fill.style.width = `${Math.round(Math.max(0, Math.min(1, s.score)) * 100)}%`;
+    bar.appendChild(fill);
+    const num = document.createElement("span");
+    num.className = "score-num";
+    num.textContent = "cosine";
+    scoreRow.append(bar, num);
+
+    card.append(head, title, meta, snippet, scoreRow);
+    wrap.appendChild(card);
+  });
+}
+
+function tag(text, cls) {
+  const el = document.createElement("span");
+  el.className = `meta-tag ${cls || ""}`;
+  el.textContent = text;
+  return el;
+}
+
+// ---------- Trace (clickable, explained) ----------
+function renderTrace(steps) {
+  const list = $("trace");
+  list.innerHTML = "";
+  steps.forEach((step, i) => {
+    const li = document.createElement("li");
+    li.className = `trace-item ${step.status}`;
+    if (!REDUCED_MOTION) li.style.animationDelay = `${i * 60}ms`;
+
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "trace-row";
+    row.setAttribute("aria-expanded", "false");
+
+    const glyph = document.createElement("span");
+    glyph.className = `trace-glyph ${step.status}`;
+    const main = document.createElement("div");
+    main.className = "trace-main";
+    const name = document.createElement("div");
+    name.className = "trace-name";
+    name.textContent = step.name;
+    const detail = document.createElement("div");
+    detail.className = "trace-detail";
+    detail.textContent = step.detail;
+    main.append(name, detail);
+    const right = document.createElement("div");
+    right.className = "trace-right";
+    const ms = document.createElement("span");
+    ms.className = "trace-ms";
+    ms.textContent = `${step.ms} ms`;
+    const caret = document.createElement("span");
+    caret.className = "trace-caret";
+    caret.textContent = "▸";
+    right.append(ms, caret);
+    row.append(glyph, main, right);
+
+    const panel = document.createElement("div");
+    panel.className = "trace-expand";
+    panel.hidden = true;
+    panel.appendChild(buildStageDetail(step));
+
+    row.addEventListener("click", () => {
+      const open = row.getAttribute("aria-expanded") === "true";
+      row.setAttribute("aria-expanded", String(!open));
+      panel.hidden = open;
+      li.classList.toggle("open", !open);
+    });
+
+    li.append(row, panel);
+    list.appendChild(li);
+  });
+}
+
+function buildStageDetail(step) {
+  const frag = document.createDocumentFragment();
+  if (step.explain) {
+    const p = document.createElement("p");
+    p.className = "stage-explain";
+    p.textContent = step.explain;
+    frag.appendChild(p);
+  }
+  const d = step.data;
+  if (!d) return frag;
+
+  if (Array.isArray(d.results)) frag.appendChild(retrieveDetail(d.results));
+  if (Array.isArray(d.claims)) frag.appendChild(groundingDetail(d));
+  if (d.detected_values) frag.appendChild(dosageDetail(d));
+  return frag;
+}
+
+function retrieveDetail(results) {
+  const wrap = document.createElement("div");
+  wrap.className = "stage-data";
+  results.forEach((r) => {
+    const row = document.createElement("div");
+    row.className = "data-line";
+    const id = document.createElement("span");
+    id.className = "mono strong";
+    id.textContent = r.id;
+    const t = document.createElement("span");
+    t.className = "data-muted";
+    t.textContent = r.title;
+    const sc = document.createElement("span");
+    sc.className = "mono data-score";
+    sc.textContent = (r.score ?? 0).toFixed(3);
+    row.append(id, t, sc);
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
+function groundingDetail(d) {
+  const wrap = document.createElement("div");
+  wrap.className = "stage-data";
+
+  const method = document.createElement("p");
+  method.className = "data-note";
+  method.textContent = `Method: ${d.method}. Judge: ${d.judge_summary}` +
+    (d.judge_model ? ` (${d.judge_model}).` : ".");
+  wrap.appendChild(method);
+
+  d.claims.forEach((c) => {
+    const box = document.createElement("div");
+    box.className = "claim-box";
+
+    const claim = document.createElement("p");
+    claim.className = "claim-text";
+    claim.textContent = `"${c.claim}"`;
+    box.appendChild(claim);
+
+    const meta = document.createElement("div");
+    meta.className = "claim-meta";
+    meta.appendChild(tag(`cites ${c.source_ids.join(", ") || "nothing"}`, "tag-topic"));
+    const det = document.createElement("span");
+    det.className = "claim-stat " + (c.grounded ? "ok" : "bad");
+    det.textContent = `similarity ${c.deterministic_score.toFixed(2)} vs ${c.threshold.toFixed(2)} ${c.grounded ? "PASS" : "FAIL"}`;
+    meta.appendChild(det);
+    box.appendChild(meta);
+
+    if (c.judge) {
+      const judge = document.createElement("div");
+      judge.className = "judge-row";
+      const verdict = document.createElement("span");
+      verdict.className = "judge-verdict " + (c.judge.supported ? "ok" : "bad");
+      verdict.textContent = c.judge.supported ? "judge: supported" : "judge: not supported";
+      judge.appendChild(verdict);
+      if (c.judge.reason) {
+        const reason = document.createElement("span");
+        reason.className = "judge-reason";
+        reason.textContent = c.judge.reason;
+        judge.appendChild(reason);
+      }
+      box.appendChild(judge);
+    } else {
+      const none = document.createElement("p");
+      none.className = "data-muted small";
+      none.textContent = "LLM judge not run (no live provider, or judge disabled). Deterministic check is authoritative.";
+      box.appendChild(none);
+    }
+    wrap.appendChild(box);
+  });
+  return wrap;
+}
+
+function dosageDetail(d) {
+  const wrap = document.createElement("div");
+  wrap.className = "stage-data";
+  const rule = document.createElement("p");
+  rule.className = "data-note";
+  rule.textContent = d.rule ? `Rule: ${d.rule}.` : "Dosage guard disabled.";
+  wrap.appendChild(rule);
+
+  if (!d.detected_values.length) {
+    const none = document.createElement("p");
+    none.className = "data-muted";
+    none.textContent = "No values with clinical units were present in the answer, so nothing to verify.";
+    wrap.appendChild(none);
+    return wrap;
+  }
+  d.detected_values.forEach((v) => {
+    const row = document.createElement("div");
+    row.className = "data-line";
+    const val = document.createElement("span");
+    val.className = "mono strong";
+    val.textContent = v;
+    const verified = (d.verified || []).includes(v);
+    const status = document.createElement("span");
+    status.className = "claim-stat " + (verified ? "ok" : "bad");
+    status.textContent = verified ? "verbatim in a source" : "NOT found in any source";
+    row.append(val, status);
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
+// ---------- Audit ----------
+let currentAuditId = null;
+function renderAudit(auditId) {
+  const panel = $("audit-panel");
+  if (!auditId) { panel.hidden = true; return; }
+  panel.hidden = false;
+  currentAuditId = auditId;
+  $("audit-toggle").setAttribute("aria-expanded", "false");
+  const pre = $("audit-json");
+  pre.hidden = true; pre.textContent = "";
+}
+async function fetchAudit() {
+  if (!currentAuditId) return;
+  const pre = $("audit-json");
+  try { pre.textContent = JSON.stringify(await (await fetch(`/api/audit/${currentAuditId}`)).json(), null, 2); }
+  catch (_) { pre.textContent = "Audit record unavailable."; }
+}
+
+// ---------- How it works ----------
+function renderHowStages() {
+  const list = $("how-stages");
+  if (!list) return;
+  list.innerHTML = "";
+  PIPELINE_STAGES.forEach(([name, desc], i) => {
+    const li = document.createElement("li");
+    li.className = "how-stage";
+    const n = document.createElement("span");
+    n.className = "how-stage-num mono";
+    n.textContent = String(i + 1).padStart(2, "0");
+    const body = document.createElement("div");
+    const t = document.createElement("div");
+    t.className = "how-stage-name mono";
+    t.textContent = name;
+    const d = document.createElement("div");
+    d.className = "how-stage-desc";
+    d.textContent = desc;
+    body.append(t, d);
+    li.append(n, body);
+    list.appendChild(li);
+  });
+}
+
+// ---------- Corpus map (3D canvas) ----------
+const KIND_COLOR = {
+  condition: "#8f8f8f", drug: "#0969da", reference: "#9a6700",
+  marker: "#0d9488", procedure: "#8250df",
+};
+// Concrete colours for the canvas (CSS vars are not available to canvas calls).
+const KIND_HEX = {
+  condition: "#8f8f8f", drug: "#0969da", reference: "#9a6700",
+  marker: "#0d9488", procedure: "#8250df",
+};
+const HIT_HEX = "#171717";
+
+const map3d = {
+  points: [],            // [{x,y,z,kind,id,title,section}]
+  proj: [],              // last projected screen positions, for hover hit-testing
+  hits: new Set(),       // retrieved ids to highlight
+  hoverId: null,         // id currently under the cursor
+  rotX: -0.45, rotY: 0.6,
+  dragging: false, lastX: 0, lastY: 0,
+  auto: !REDUCED_MOTION,
+  raf: null,
+};
+
+async function loadCorpus() {
+  try {
+    const data = await (await fetch("/api/corpus")).json();
+    renderCorpusTiles(data.stats);
+    setupCorpusCanvas(data.points);
+    renderCorpusLegend(data.stats);
+    renderSectionBars(data.stats);
+    $("corpus-summary").textContent =
+      `${data.stats.total.toLocaleString()} documents, ${data.stats.topics} topics, 3D`;
+  } catch (_) { $("corpus-summary").textContent = "unavailable"; }
+}
+
+let corpusTopicList = [];
+
+function renderCorpusTiles(stats) {
+  const wrap = $("corpus-tiles");
+  wrap.innerHTML = "";
+  corpusTopicList = stats.topic_list || [];
+  const tiles = [
+    ["documents", stats.total, false],
+    ["conditions", stats.by_kind.condition || 0, false],
+    ["drug labels", stats.by_kind.drug || 0, false],
+    ["lab markers", stats.by_kind.marker || 0, false],
+    ["procedures", stats.by_kind.procedure || 0, false],
+    ["topics", stats.topics, true],   // clickable: reveals the topic list
+  ];
+  tiles.forEach(([label, value, clickable]) => {
+    const t = document.createElement("div");
+    t.className = "corpus-tile" + (clickable ? " clickable" : "");
+    const v = document.createElement("div");
+    v.className = "tile-value mono";
+    v.textContent = Number(value).toLocaleString();
+    const l = document.createElement("div");
+    l.className = "tile-label";
+    l.textContent = clickable ? `${label} (click to view)` : label;
+    t.append(v, l);
+    if (clickable) {
+      t.setAttribute("role", "button");
+      t.setAttribute("tabindex", "0");
+      t.addEventListener("click", toggleTopicList);
+      t.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleTopicList(); } });
+    }
+    wrap.appendChild(t);
+  });
+}
+
+function toggleTopicList() {
+  let panel = $("topic-list-panel");
+  if (panel) { panel.remove(); return; }
+  panel = document.createElement("div");
+  panel.id = "topic-list-panel";
+  panel.className = "topic-list-panel";
+  const head = document.createElement("div");
+  head.className = "topic-list-head eyebrow";
+  head.textContent = `${corpusTopicList.length} topics (each topic is one fictional entity, with several documents)`;
+  panel.appendChild(head);
+  const grid = document.createElement("div");
+  grid.className = "topic-list-grid";
+  corpusTopicList.forEach((t) => {
+    const item = document.createElement("div");
+    item.className = "topic-item";
+    const dot = document.createElement("span");
+    dot.className = "topic-dot";
+    dot.style.background = KIND_COLOR[t.kind] || "#8f8f8f";
+    const name = document.createElement("span");
+    name.className = "topic-name";
+    name.textContent = t.topic;
+    const count = document.createElement("span");
+    count.className = "topic-count mono";
+    count.textContent = `${t.count}`;
+    item.append(dot, name, count);
+    grid.appendChild(item);
+  });
+  panel.appendChild(grid);
+  $("corpus-tiles").insertAdjacentElement("afterend", panel);
+  panel.scrollIntoView({ behavior: REDUCED_MOTION ? "auto" : "smooth", block: "nearest" });
+}
+
+function setupCorpusCanvas(points) {
+  map3d.points = points.map((p) => ({
+    x: p.x, y: p.y, z: p.z ?? 0, kind: p.kind, id: p.id,
+    title: p.title || "", section: p.section || "",
+  }));
+  const canvas = $("corpus-canvas");
+  if (!canvas) return;
+
+  const resize = () => {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    // If the panel is collapsed the canvas has no width; skip until it is shown.
+    if (rect.width < 2) return;
+    const size = Math.max(1, Math.round(rect.width));
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    map3d.css = size;
+    drawCorpus();
+  };
+  // Exposed so the collapsible toggle can resize once the panel becomes visible.
+  map3d.resize = resize;
+
+  // Drag to rotate (mouse + touch).
+  const start = (x, y) => { map3d.dragging = true; map3d.auto = false; map3d.lastX = x; map3d.lastY = y;
+    const h = $("corpus-drag-hint"); if (h) h.style.opacity = "0"; };
+  const move = (x, y) => {
+    if (!map3d.dragging) return;
+    map3d.rotY += (x - map3d.lastX) * 0.01;
+    map3d.rotX += (y - map3d.lastY) * 0.01;
+    map3d.rotX = Math.max(-1.4, Math.min(1.4, map3d.rotX));
+    map3d.lastX = x; map3d.lastY = y;
+    drawCorpus();
+  };
+  const end = () => { map3d.dragging = false; };
+
+  // Hover hit-testing: find the nearest projected point under the cursor and
+  // show a tooltip. Auto-rotation pauses while the cursor is over the map.
+  const hover = (e) => {
+    if (map3d.dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let best = null, bestD = 64;  // within ~8px
+    for (const q of map3d.proj) {
+      const dx = q.sx - mx, dy = q.sy - my, d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = q; }
+    }
+    map3d.hoverId = best ? best.id : null;
+    showCorpusTooltip(best, mx, my, rect);
+  };
+
+  canvas.addEventListener("mousedown", (e) => start(e.clientX, e.clientY));
+  window.addEventListener("mousemove", (e) => move(e.clientX, e.clientY));
+  window.addEventListener("mouseup", end);
+  canvas.addEventListener("mousemove", hover);
+  canvas.addEventListener("mouseenter", () => { map3d.auto = false; });
+  canvas.addEventListener("mouseleave", () => {
+    map3d.auto = !REDUCED_MOTION; map3d.hoverId = null;
+    const tt = $("corpus-tooltip"); if (tt) tt.hidden = true;
+    drawCorpus();
+  });
+  canvas.addEventListener("touchstart", (e) => { const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
+  canvas.addEventListener("touchmove", (e) => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
+  canvas.addEventListener("touchend", end);
+
+  window.addEventListener("resize", resize);
+
+  // Fullscreen: expand the canvas wrap, and resize the drawing buffer to match.
+  const wrapEl = $("corpus-canvas-wrap");
+  const fsBtn = $("corpus-fs-btn");
+  if (fsBtn && wrapEl) {
+    fsBtn.addEventListener("click", () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (wrapEl.requestFullscreen) wrapEl.requestFullscreen();
+    });
+    document.addEventListener("fullscreenchange", () => {
+      const on = document.fullscreenElement === wrapEl;
+      wrapEl.classList.toggle("fullscreen", on);
+      fsBtn.textContent = on ? "⤡" : "⤢";
+      // Let layout settle, then resize the canvas buffer to the new size.
+      requestAnimationFrame(() => requestAnimationFrame(resize));
+    });
+  }
+
+  resize();
+  startCorpusLoop();
+}
+
+function startCorpusLoop() {
+  if (map3d.raf) cancelAnimationFrame(map3d.raf);
+  const tick = () => {
+    if (map3d.auto && !map3d.dragging) { map3d.rotY += 0.0025; drawCorpus(); }
+    map3d.raf = requestAnimationFrame(tick);
+  };
+  map3d.raf = requestAnimationFrame(tick);
+}
+
+function drawCorpus() {
+  const canvas = $("corpus-canvas");
+  if (!canvas || !map3d.points.length) return;
+  const ctx = canvas.getContext("2d");
+  const size = map3d.css || canvas.width;
+  ctx.clearRect(0, 0, size, size);
+
+  const cx = size / 2, cy = size / 2, scale = size * 0.34;
+  const cosY = Math.cos(map3d.rotY), sinY = Math.sin(map3d.rotY);
+  const cosX = Math.cos(map3d.rotX), sinX = Math.sin(map3d.rotX);
+
+  // Project every point; collect with depth for painter's-algorithm ordering.
+  const proj = [];
+  for (const p of map3d.points) {
+    // rotate around Y then X
+    let x = p.x * cosY - p.z * sinY;
+    let z = p.x * sinY + p.z * cosY;
+    let y = p.y * cosX - z * sinX;
+    z = p.y * sinX + z * cosX;
+    const depth = (z + 1.6) / 3.2;            // 0 (far) .. 1 (near)
+    const persp = 1 / (1.8 - z * 0.45);        // gentle perspective
+    proj.push({
+      sx: cx + x * scale * persp,
+      sy: cy + y * scale * persp,
+      depth, kind: p.kind, id: p.id, title: p.title, section: p.section,
+      hit: map3d.hits.has(p.id),
+    });
+  }
+  proj.sort((a, b) => a.depth - b.depth);       // far first
+  map3d.proj = proj;                            // kept for hover hit-testing
+
+  for (const q of proj) {
+    if (q.hit || q.id === map3d.hoverId) continue;   // draw hits/hover on top
+    const r = (0.8 + q.depth * 1.4);
+    ctx.globalAlpha = 0.25 + q.depth * 0.5;
+    ctx.fillStyle = KIND_HEX[q.kind] || "#8f8f8f";
+    ctx.beginPath();
+    ctx.arc(q.sx, q.sy, r, 0, 6.2832);
+    ctx.fill();
+  }
+  for (const q of proj) {
+    if (!q.hit) continue;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = HIT_HEX;
+    ctx.beginPath();
+    ctx.arc(q.sx, q.sy, 3.6 + q.depth * 1.6, 0, 6.2832);
+    ctx.fill();
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "#fff";
+    ctx.stroke();
+  }
+  // Hovered point: a ring in its category colour, drawn last so it is visible.
+  const hp = map3d.hoverId && proj.find((q) => q.id === map3d.hoverId);
+  if (hp) {
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = KIND_HEX[hp.kind] || "#8f8f8f";
+    ctx.beginPath();
+    ctx.arc(hp.sx, hp.sy, 4.5, 0, 6.2832);
+    ctx.fill();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = "#171717";
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function showCorpusTooltip(point, mx, my, rect) {
+  const tt = $("corpus-tooltip");
+  if (!tt) return;
+  if (!point) { tt.hidden = true; return; }
+  tt.innerHTML = "";
+  const id = document.createElement("span");
+  id.className = "tt-id mono";
+  id.textContent = point.id;
+  const kind = document.createElement("span");
+  kind.className = "tt-kind";
+  kind.textContent = point.kind;
+  kind.style.color = KIND_HEX[point.kind] || "#8f8f8f";
+  const title = document.createElement("div");
+  title.className = "tt-title";
+  title.textContent = point.title || "(document)";
+  const head = document.createElement("div");
+  head.className = "tt-head";
+  head.append(id, kind);
+  tt.append(head, title);
+  // Position near the cursor, clamped inside the canvas.
+  const pad = 12;
+  let left = mx + pad, top = my + pad;
+  if (left > rect.width - 180) left = mx - 180;
+  if (top > rect.height - 60) top = my - 60;
+  tt.style.left = `${Math.max(0, left)}px`;
+  tt.style.top = `${Math.max(0, top)}px`;
+  tt.hidden = false;
+}
+
+function highlightCorpus(ids) {
+  map3d.hits = new Set(ids || []);
+  drawCorpus();
+}
+
+function renderCorpusLegend(stats) {
+  const wrap = $("corpus-legend");
+  wrap.innerHTML = "";
+  const items = [
+    ["condition pages (illnesses)", KIND_COLOR.condition, stats.by_kind.condition || 0],
+    ["drug label pages (medications)", KIND_COLOR.drug, stats.by_kind.drug || 0],
+    ["lab marker pages", KIND_COLOR.marker, stats.by_kind.marker || 0],
+    ["diagnostic procedure pages", KIND_COLOR.procedure, stats.by_kind.procedure || 0],
+    ["general reference notes", KIND_COLOR.reference, stats.by_kind.reference || 0],
+    ["retrieved for your question", "#171717", null],
+  ];
+  items.forEach(([label, color, count]) => {
+    const el = document.createElement("span");
+    el.className = "legend-item";
+    const dot = document.createElement("span");
+    dot.className = "legend-dot";
+    dot.style.background = color;
+    const txt = document.createElement("span");
+    txt.textContent = count === null ? label : `${label}: ${count.toLocaleString()}`;
+    el.append(dot, txt);
+    wrap.appendChild(el);
+  });
+}
+
+function renderSectionBars(stats) {
+  const wrap = $("corpus-section-bars");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const entries = Object.entries(stats.by_section || {});
+  if (!entries.length) return;
+  const max = Math.max(...entries.map(([, v]) => v));
+  const title = document.createElement("div");
+  title.className = "eyebrow section-bars-title";
+  title.textContent = "Documents by section";
+  wrap.appendChild(title);
+  entries.forEach(([name, count]) => {
+    const row = document.createElement("div");
+    row.className = "section-bar-row";
+    const label = document.createElement("span");
+    label.className = "section-bar-label";
+    label.textContent = name;
+    const track = document.createElement("div");
+    track.className = "section-bar-track";
+    const fill = document.createElement("div");
+    fill.className = "section-bar-fill";
+    fill.style.width = `${Math.round((count / max) * 100)}%`;
+    track.appendChild(fill);
+    const num = document.createElement("span");
+    num.className = "section-bar-num mono";
+    num.textContent = count.toLocaleString();
+    row.append(label, track, num);
+    wrap.appendChild(row);
+  });
+}
+
+// ---------- Collapsibles ----------
+function wireCollapsibles() {
+  wireToggle("how-toggle", "how-body");
+  wireToggle("tuning-toggle", "tuning-body");
+  wireToggle("corpus-toggle", "corpus-body");
+  // When the corpus panel opens, the canvas finally has a width, so size and
+  // draw it then (it cannot size correctly while collapsed).
+  $("corpus-toggle").addEventListener("click", () => {
+    if (!$("corpus-body").hidden && map3d.resize) requestAnimationFrame(map3d.resize);
+  });
+  wireToggle("eval-toggle", "eval-body");
+  const auditToggle = $("audit-toggle");
+  auditToggle.addEventListener("click", () => {
+    const expanded = auditToggle.getAttribute("aria-expanded") === "true";
+    auditToggle.setAttribute("aria-expanded", String(!expanded));
+    const pre = $("audit-json");
+    pre.hidden = expanded;
+    if (!expanded && !pre.textContent) fetchAudit();
+  });
+}
+function wireToggle(toggleId, bodyId) {
+  const toggle = $(toggleId);
+  if (!toggle) return;
+  toggle.addEventListener("click", () => {
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    $(bodyId).hidden = expanded;
+  });
+}
+
+// ---------- Evaluation ----------
+async function loadEvalSummary() {
+  try {
+    const data = await (await fetch("/api/eval-summary")).json();
+    const inline = $("eval-summary-inline");
+    if (!data.total) { inline.textContent = data.note || "not run yet"; return; }
+    const ansC = data.answerable_correct, ansT = data.answerable_total ?? ansC;
+    const refC = data.must_refuse_correct, refT = data.must_refuse_total ?? refC;
+    inline.textContent = `${data.passed.toLocaleString()} of ${data.total.toLocaleString()} cases pass`;
+    const pct = Math.round((data.passed / data.total) * 100);
+    $("eval-bar-fill").style.width = `${pct}%`;
+    $("eval-bar-fill").style.background = pct === 100 ? "var(--ok)" : "var(--warn)";
+    $("eval-caption").textContent =
+      `${ansC.toLocaleString()} of ${ansT.toLocaleString()} answerable correct, ` +
+      `${refC.toLocaleString()} of ${refT.toLocaleString()} must-refuse correct. ` +
+      `Run offline in extractive mode for reproducibility.`;
+    const list = $("eval-cases");
+    list.innerHTML = "";
+    (data.cases || data.sample_cases || []).forEach((c) => {
+      const li = document.createElement("li");
+      li.className = "eval-case";
+      const g = document.createElement("span");
+      g.className = `glyph ${c.ok ? "ok" : "bad"}`;
+      const q = document.createElement("span");
+      q.className = "q"; q.textContent = c.query;
+      const v = document.createElement("span");
+      v.className = "verdict"; v.textContent = `expect ${c.expect} / got ${c.got}`;
+      li.append(g, q, v);
+      list.appendChild(li);
+    });
+    const shown = (data.cases || data.sample_cases || []).length;
+    let foot = data.total > shown
+      ? `Showing a sample of ${shown}. Full suite of ${data.total.toLocaleString()} runs in the build.`
+      : "";
+    renderAdversarial(data.adversarial);
+    $("eval-foot").textContent = foot;
+  } catch (_) { $("eval-summary-inline").textContent = "unavailable"; }
+}
+
+function renderAdversarial(adv) {
+  const wrap = $("adversarial-block");
+  if (!wrap) return;
+  if (!adv || !adv.total) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  wrap.innerHTML = "";
+  const head = document.createElement("div");
+  head.className = "adv-head";
+  const title = document.createElement("span");
+  title.className = "eyebrow";
+  title.textContent = "Adversarial probes";
+  const score = document.createElement("span");
+  score.className = "adv-score";
+  score.textContent = `${adv.passed} of ${adv.total} behaved as intended`;
+  head.append(title, score);
+  const note = document.createElement("p");
+  note.className = "adv-note";
+  note.textContent = "Hand-written traps: leading questions, prompt injection, " +
+    "near-miss spellings, and missing-context cases. Reported honestly and not " +
+    "used to gate the build, so a known limitation is shown rather than hidden.";
+  wrap.append(head, note);
+  const list = document.createElement("ul");
+  list.className = "eval-cases";
+  adv.cases.forEach((c) => {
+    const li = document.createElement("li");
+    li.className = "eval-case";
+    const g = document.createElement("span");
+    g.className = `glyph ${c.ok ? "ok" : "bad"}`;
+    const q = document.createElement("span");
+    q.className = "q";
+    q.textContent = c.query;
+    q.title = c.note || "";
+    const v = document.createElement("span");
+    v.className = "verdict";
+    v.textContent = c.ok ? `${c.got} ✓` : `want ${c.expect}, got ${c.got}`;
+    li.append(g, q, v);
+    list.appendChild(li);
+  });
+  wrap.appendChild(list);
+}
+
+// ---------- Utils ----------
+function capitalize(s) { return s && s.length ? s.charAt(0).toUpperCase() + s.slice(1) : s; }

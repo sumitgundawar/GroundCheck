@@ -1,0 +1,18 @@
+# Render.com blueprint (alternative host to Hugging Face Spaces).
+# Render reads this file on a "New > Blueprint" deploy from the GitHub repo.
+# The Docker image builds the FAISS index and runs the eval at build time, then
+# serves on the port Render injects via $PORT.
+services:
+  - type: web
+    name: groundcheck
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      # Set this in the Render dashboard as a secret, not here.
+      - key: GROQ_API_KEY
+        sync: false
+      # Uncomment to expose a public demo without spending LLM quota:
+      # - key: FORCE_EXTRACTIVE
+      #   value: "true"

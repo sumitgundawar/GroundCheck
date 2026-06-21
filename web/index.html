@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GroundCheck</title>
+  <meta name="description" content="A clinical retrieval demo that refuses to guess. Synthetic data only. Not medical advice." />
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz@0,6..72;1,6..72&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="GroundCheck home">
+        <span class="brand-mark" id="brand-mark"></span>
+        <span class="brand-word">groundcheck</span>
+      </a>
+      <div class="header-right">
+        <span class="pill provider" id="provider-pill" title="Live provider state">
+          <span class="dot" id="provider-dot"></span>
+          <span id="provider-label">llm: …</span>
+        </span>
+        <span class="pill corpus-pill" id="corpus-pill" title="Indexed source documents">
+          corpus: <span id="corpus-count">…</span>
+        </span>
+        <span class="tag-synthetic">synthetic demo</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer" role="note">
+    Synthetic demonstration data. All conditions, medications, and dosages are fictional. Not medical advice.
+  </div>
+
+  <main class="container">
+    <!-- Hero -->
+    <section class="hero">
+      <h1 class="hero-line">Grounded answers, or none at all.</h1>
+      <p class="hero-sub">
+        GroundCheck answers clinical-style questions only from its trusted sources,
+        and refuses when it cannot ground a response. Watch the pipeline decide,
+        then tune the thresholds and guards and watch the decision change.
+      </p>
+    </section>
+
+    <!-- How it works (collapsible) -->
+    <section class="panel collapsible howitworks-panel" id="how-panel">
+      <button class="collapsible-toggle" id="how-toggle" aria-expanded="false">
+        <span class="eyebrow">How it works</span>
+        <span class="how-summary">The pipeline, stage by stage</span>
+        <span class="chevron">▸</span>
+      </button>
+      <div class="how-body" id="how-body" hidden>
+        <p class="how-intro">
+          Every question runs through a fixed pipeline. The decision to answer or
+          refuse is deterministic and never depends on a live model call, so the
+          system behaves the same with or without an LLM. Each stage below records
+          a status and a timing. After you ask, the <strong>Pipeline trace</strong>
+          shows the real run, and every step there is clickable for the detail of
+          what happened, including the LLM judge's verdict on each claim.
+        </p>
+        <ol class="how-stages" id="how-stages"></ol>
+        <div class="how-judge">
+          <h3 class="how-judge-title">The LLM as a judge</h3>
+          <p>
+            Grounding is decided in two layers. First, a deterministic embedding
+            similarity between each claim and its cited source must clear a
+            threshold. This is authoritative and reproducible. Second, when a live
+            provider is configured, a separate, cheaper model is shown only the
+            claim and its cited source and asked, strictly, whether the source
+            supports the claim. It returns JSON: <code>{"supported": bool,
+            "reason": string}</code>. The judge is corroboration, recorded in the
+            trace, never the deciding vote. So a flaky model can never turn a
+            refusal into an answer. Open the grounding step in the trace to read
+            the judge's verdict and reasoning for each claim.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ask panel -->
+    <section class="panel ask-panel">
+      <form id="ask-form" class="ask-form" autocomplete="off">
+        <label for="query" class="eyebrow">Ask a question</label>
+        <div class="ask-row">
+          <input
+            type="text"
+            id="query"
+            name="query"
+            class="ask-input"
+            placeholder="How is Veltris syndrome treated?"
+            maxlength="400"
+            required
+          />
+          <button type="submit" class="btn btn-primary" id="ask-btn">
+            <span class="btn-label">Ask</span>
+            <span class="spinner" id="spinner" hidden></span>
+          </button>
+        </div>
+        <div class="chips" id="chips" aria-label="Example queries"></div>
+      </form>
+    </section>
+
+    <!-- Tuning panel (collapsible) -->
+    <section class="panel collapsible tuning-panel" id="tuning-panel">
+      <button class="collapsible-toggle" id="tuning-toggle" aria-expanded="false">
+        <span class="toggle-icon" id="tuning-icon"></span>
+        <span class="eyebrow">Tuning</span>
+        <span class="tuning-status" id="tuning-status">defaults</span>
+        <span class="chevron">▸</span>
+      </button>
+      <div class="tuning-body" id="tuning-body" hidden>
+        <p class="tuning-hint">
+          Adjust the pipeline, then ask again. Lower the gate to answer more often,
+          raise it to refuse more. Switch a guard off to see what an ungoverned
+          system would have returned.
+        </p>
+
+        <div class="tuning-grid">
+          <div class="control">
+            <div class="control-head">
+              <label for="set-retrieval">Retrieval gate</label>
+              <output id="set-retrieval-val" class="control-val">0.30</output>
+            </div>
+            <input type="range" id="set-retrieval" min="0" max="1" step="0.01" value="0.30" />
+            <p class="control-note">Minimum source similarity. Below this, refuse before generating.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-head">
+              <label for="set-grounding">Grounding threshold</label>
+              <output id="set-grounding-val" class="control-val">0.45</output>
+            </div>
+            <input type="range" id="set-grounding" min="0" max="1" step="0.01" value="0.45" />
+            <p class="control-note">How strongly each claim must match its cited source.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-head">
+              <label for="set-topk">Sources retrieved</label>
+              <output id="set-topk-val" class="control-val">4</output>
+            </div>
+            <input type="range" id="set-topk" min="1" max="12" step="1" value="4" />
+            <p class="control-note">How many passages the retriever returns (top-k).</p>
+          </div>
+        </div>
+
+        <div class="toggles">
+          <label class="switch">
+            <input type="checkbox" id="set-coverage" checked />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">Source coverage guard</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="set-grounding-guard" checked />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">Grounding guard</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="set-dosage" checked />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">Dosage guard</span>
+          </label>
+          <label class="switch" id="judge-switch">
+            <input type="checkbox" id="set-judge" checked />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">LLM grounding judge</span>
+          </label>
+        </div>
+
+        <div class="tuning-actions">
+          <button type="button" class="btn btn-ghost" id="tuning-reset">Reset to defaults</button>
+          <span class="tuning-applies">Changes apply to your next question.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Decision -->
+    <section class="panel decision-panel" id="decision-panel" hidden>
+      <div class="decision-head">
+        <span class="status-chip" id="decision-chip"></span>
+        <span class="decision-reason" id="decision-reason"></span>
+      </div>
+      <div class="answer-body" id="answer-body"></div>
+      <div class="refuse-callout" id="refuse-callout" hidden>
+        <span class="eyebrow">Why it refused</span>
+        <p id="refuse-detail"></p>
+        <p class="refuse-explain" id="refuse-explain"></p>
+        <span class="routed" id="routed-line">
+          No answer is shown. The question has been routed for review.
+        </span>
+      </div>
+    </section>
+
+    <!-- Two column: sources + trace -->
+    <div class="grid-2" id="results-grid" hidden>
+      <section class="panel" id="sources-panel">
+        <h2 class="panel-title eyebrow">Retrieved sources</h2>
+        <div class="sources" id="sources"></div>
+      </section>
+
+      <section class="panel" id="trace-panel">
+        <h2 class="panel-title eyebrow">Pipeline trace</h2>
+        <ol class="trace" id="trace"></ol>
+      </section>
+    </div>
+
+    <!-- Audit (collapsible) -->
+    <section class="panel collapsible" id="audit-panel" hidden>
+      <button class="collapsible-toggle" id="audit-toggle" aria-expanded="false">
+        <span class="eyebrow">View audit record</span>
+        <span class="chevron">▸</span>
+      </button>
+      <pre class="audit-json" id="audit-json" hidden></pre>
+    </section>
+
+    <!-- Corpus map (collapsible) -->
+    <section class="panel collapsible" id="corpus-panel">
+      <button class="collapsible-toggle" id="corpus-toggle" aria-expanded="false">
+        <span class="eyebrow">Corpus map</span>
+        <span class="corpus-summary" id="corpus-summary">loading…</span>
+        <span class="chevron">▸</span>
+      </button>
+      <div class="corpus-body" id="corpus-body" hidden>
+        <p class="corpus-hint">
+          Every document, embedded and projected to three dimensions with PCA, so
+          similar documents sit near each other. This is the space the retriever
+          searches. Drag to rotate. Ask a question and the retrieved sources light
+          up in black, so you can see where in the corpus the answer came from.
+        </p>
+        <div class="corpus-tiles" id="corpus-tiles"></div>
+        <div class="corpus-map-wrap">
+          <div class="corpus-canvas-wrap" id="corpus-canvas-wrap">
+            <canvas id="corpus-canvas" class="corpus-canvas" aria-label="3D corpus embedding map"></canvas>
+            <span class="corpus-drag-hint" id="corpus-drag-hint">drag to rotate, hover a point</span>
+            <button type="button" class="corpus-fs-btn" id="corpus-fs-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">⤢</button>
+            <div class="corpus-tooltip" id="corpus-tooltip" hidden></div>
+          </div>
+          <div class="corpus-legend" id="corpus-legend"></div>
+        </div>
+        <div class="corpus-section-bars" id="corpus-section-bars"></div>
+        <div class="dataset-note" id="dataset-note">
+          <span class="eyebrow">Dataset provenance</span>
+          <p>
+            This corpus is <strong>fully synthetic</strong>. Every condition,
+            medication, lab marker, dosage, and procedure is invented for this
+            demonstration. Nothing here is real and nothing is medical advice.
+          </p>
+          <p>
+            The document <em>structure</em> mirrors two real, public reference
+            formats so that retrieval and grounding are exercised realistically:
+            disease entries follow the
+            <a href="https://github.com/abachaa/MedQuAD" target="_blank" rel="noopener">MedQuAD</a>
+            question-type taxonomy (information, causes, symptoms, treatment,
+            monitoring, prognosis), and drug entries follow the FDA Structured
+            Product Labeling sections used by
+            <a href="https://dailymed.nlm.nih.gov" target="_blank" rel="noopener">DailyMed</a>
+            (indications, dosage, contraindications, interactions, adverse
+            reactions). The records themselves are generated procedurally by
+            <code>scripts/generate_corpus.py</code>, seeded so the corpus is
+            reproducible.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Evaluation strip (collapsible) -->
+    <section class="panel collapsible" id="eval-panel">
+      <button class="collapsible-toggle" id="eval-toggle" aria-expanded="false">
+        <span class="eyebrow">Evaluation</span>
+        <span class="eval-summary" id="eval-summary-inline">loading…</span>
+        <span class="chevron">▸</span>
+      </button>
+      <div class="eval-body" id="eval-body" hidden>
+        <div class="eval-bar"><span class="eval-bar-fill" id="eval-bar-fill"></span></div>
+        <p class="eval-caption" id="eval-caption"></p>
+        <ul class="eval-cases" id="eval-cases"></ul>
+        <p class="eval-foot" id="eval-foot"></p>
+        <div class="adversarial-block" id="adversarial-block" hidden></div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>GroundCheck. Synthetic demo. Built to refuse rather than guess.</div>
+      <div class="footer-note">
+        Synthetic corpus, structured after MedQuAD and FDA / DailyMed labelling.
+        Generation by Groq. Embeddings by sentence-transformers, retrieval by FAISS.
+      </div>
+    </footer>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

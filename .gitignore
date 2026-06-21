@@ -1,0 +1,9 @@
+.venv/
+index/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+eval/eval_summary.json
+audit/
+.DS_Store

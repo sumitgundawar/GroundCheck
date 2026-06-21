@@ -1,0 +1,10 @@
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+pydantic==2.*
+sentence-transformers==3.*
+faiss-cpu==1.9.*
+numpy==2.*
+openai==1.*
+httpx==0.27.*
+python-dotenv==1.*
+pytest==8.*

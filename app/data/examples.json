@@ -1,0 +1,16 @@
+[
+  { "group": "Core demo", "label": "Grounded answer", "query": "How is Veltris syndrome treated?" },
+  { "group": "Core demo", "label": "Grounded dose", "query": "What is the dose of Caloradine?" },
+  { "group": "Core demo", "label": "Dosage trap (refuses)", "query": "What is the dose of Zalortin?" },
+  { "group": "Core demo", "label": "Out of scope (refuses)", "query": "How do I treat a broken arm?" },
+
+  { "group": "More answers", "label": "Mendel solution", "query": "What is the dose of Mendel solution?" },
+  { "group": "More answers", "label": "When to avoid Caloradine", "query": "When should Caloradine not be used?" },
+  { "group": "More answers", "label": "Veltris reviews", "query": "How often is Veltris syndrome reviewed?" },
+  { "group": "More answers", "label": "Interactions", "query": "What should not be taken with Caloradine?" },
+
+  { "group": "More refusals", "label": "Unknown drug", "query": "What is the dose of Quoraxine?" },
+  { "group": "More refusals", "label": "For children", "query": "What is the dose of Caloradine for children?" },
+  { "group": "More refusals", "label": "In pregnancy", "query": "Is Caloradine safe in pregnancy?" },
+  { "group": "More refusals", "label": "Everyday topic", "query": "How do I treat a cold?" }
+]

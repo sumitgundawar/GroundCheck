@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.git/
+.pytest_cache/
+.env
+index/
+eval/eval_summary.json
+audit/
