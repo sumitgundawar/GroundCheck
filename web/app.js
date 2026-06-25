@@ -114,8 +114,12 @@ const RANGE_CONTROLS = [
   { id: "set-retrieval", key: "retrieval_min_score", out: "set-retrieval-val", fixed: 2 },
   { id: "set-grounding", key: "grounding_min", out: "set-grounding-val", fixed: 2 },
   { id: "set-topk", key: "top_k", out: "set-topk-val", fixed: 0 },
+  { id: "set-temperature", key: "temperature", out: "set-temperature-val", fixed: 1 },
 ];
 const TOGGLE_CONTROLS = [
+  { id: "set-extractive", key: "force_extractive" },
+  { id: "set-pii", key: "enable_pii_redaction" },
+  { id: "set-injection", key: "enable_injection_guard" },
   { id: "set-coverage", key: "enable_coverage_guard" },
   { id: "set-grounding-guard", key: "enable_grounding_guard" },
   { id: "set-dosage", key: "enable_dosage_guard" },
@@ -432,10 +436,29 @@ function buildStageDetail(step) {
   const d = step.data;
   if (!d) return frag;
 
-  if (Array.isArray(d.results)) frag.appendChild(retrieveDetail(d.results));
-  if (Array.isArray(d.claims)) frag.appendChild(groundingDetail(d));
-  if (d.detected_values) frag.appendChild(dosageDetail(d));
+  if (Array.isArray(d.results)) { frag.appendChild(retrieveDetail(d.results)); return frag; }
+  if (Array.isArray(d.claims)) { frag.appendChild(groundingDetail(d)); return frag; }
+  if (d.detected_values) { frag.appendChild(dosageDetail(d)); return frag; }
+  // Generic key/value detail for any other stage data (gate, coverage, etc.).
+  frag.appendChild(kvDetail(d));
   return frag;
+}
+
+function kvDetail(obj) {
+  const wrap = document.createElement("div");
+  wrap.className = "stage-data";
+  for (const [k, v] of Object.entries(obj)) {
+    const row = document.createElement("div");
+    row.className = "data-line";
+    const key = document.createElement("span");
+    key.className = "mono strong"; key.textContent = k.replace(/_/g, " ");
+    const val = document.createElement("span");
+    val.className = "data-muted";
+    val.textContent = Array.isArray(v) ? (v.length ? v.join(", ") : "(none)") : String(v);
+    row.append(key, val);
+    wrap.appendChild(row);
+  }
+  return wrap;
 }
 
 function retrieveDetail(results) {
@@ -554,11 +577,54 @@ function renderAudit(auditId) {
   const pre = $("audit-json");
   pre.hidden = true; pre.textContent = "";
 }
+let currentAuditData = null;
 async function fetchAudit() {
   if (!currentAuditId) return;
-  const pre = $("audit-json");
-  try { pre.textContent = JSON.stringify(await (await fetch(`/api/audit/${currentAuditId}`)).json(), null, 2); }
-  catch (_) { pre.textContent = "Audit record unavailable."; }
+  const wrap = $("audit-json");
+  try {
+    currentAuditData = await (await fetch(`/api/audit/${currentAuditId}`)).json();
+    wrap.innerHTML = "";
+    wrap.appendChild(jsonNode(currentAuditData, null, true));
+    $("audit-controls").hidden = false;
+  } catch (_) { wrap.textContent = "Audit record unavailable."; }
+}
+
+// Render a JSON value as a collapsible tree. Objects/arrays use <details> so
+// each level can be folded; the top two levels start open.
+function jsonNode(value, key, open, depth = 0) {
+  const isObj = value && typeof value === "object";
+  if (!isObj) {
+    const line = document.createElement("div");
+    line.className = "j-line";
+    if (key !== null) {
+      const k = document.createElement("span"); k.className = "j-key"; k.textContent = key + ": ";
+      line.appendChild(k);
+    }
+    const v = document.createElement("span");
+    v.className = "j-val j-" + (value === null ? "null" : typeof value);
+    v.textContent = typeof value === "string" ? `"${value}"` : String(value);
+    line.appendChild(v);
+    return line;
+  }
+  const arr = Array.isArray(value);
+  const entries = arr ? value.map((v, i) => [i, v]) : Object.entries(value);
+  const det = document.createElement("details");
+  det.className = "j-node";
+  if (open && depth < 2) det.open = true;
+  const sum = document.createElement("summary");
+  sum.className = "j-summary";
+  const label = key !== null ? `${key}` : (arr ? "array" : "object");
+  sum.innerHTML = `<span class="j-key">${label}</span> <span class="j-meta">${arr ? "[" + entries.length + "]" : "{" + entries.length + "}"}</span>`;
+  det.appendChild(sum);
+  const body = document.createElement("div");
+  body.className = "j-body";
+  for (const [k, v] of entries) body.appendChild(jsonNode(v, String(k), open, depth + 1));
+  det.appendChild(body);
+  return det;
+}
+
+function setAllAuditOpen(open) {
+  $("audit-json").querySelectorAll("details").forEach((d) => { d.open = open; });
 }
 
 // ---------- How it works ----------
@@ -752,6 +818,18 @@ function setupCorpusCanvas(points) {
   canvas.addEventListener("touchmove", (e) => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
   canvas.addEventListener("touchend", end);
 
+  // Scroll to zoom; double-click to reset the view.
+  if (map3d.zoom === undefined) map3d.zoom = 1;
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    map3d.zoom = Math.max(0.6, Math.min(6, map3d.zoom * factor));
+    drawCorpus();
+  }, { passive: false });
+  canvas.addEventListener("dblclick", () => {
+    map3d.zoom = 1; map3d.rotX = -0.45; map3d.rotY = 0.6; drawCorpus();
+  });
+
   window.addEventListener("resize", resize);
 
   // Fullscreen: expand the canvas wrap, and resize the drawing buffer to match.
@@ -791,7 +869,7 @@ function drawCorpus() {
   const size = map3d.css || canvas.width;
   ctx.clearRect(0, 0, size, size);
 
-  const cx = size / 2, cy = size / 2, scale = size * 0.34;
+  const cx = size / 2, cy = size / 2, scale = size * 0.34 * (map3d.zoom || 1);
   const cosY = Math.cos(map3d.rotY), sinY = Math.sin(map3d.rotY);
   const cosX = Math.cos(map3d.rotX), sinX = Math.sin(map3d.rotX);
 
@@ -824,8 +902,10 @@ function drawCorpus() {
     ctx.arc(q.sx, q.sy, r, 0, 6.2832);
     ctx.fill();
   }
+  let hitCount = 0;
   for (const q of proj) {
     if (!q.hit) continue;
+    hitCount++;
     ctx.globalAlpha = 1;
     ctx.fillStyle = HIT_HEX;
     ctx.beginPath();
@@ -834,6 +914,19 @@ function drawCorpus() {
     ctx.lineWidth = 1.4;
     ctx.strokeStyle = "#fff";
     ctx.stroke();
+    // Label each retrieved point with its id (white halo for legibility).
+    ctx.font = "600 10px ui-monospace, monospace";
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.92)";
+    ctx.strokeText(q.id, q.sx + 7, q.sy - 6);
+    ctx.fillStyle = HIT_HEX;
+    ctx.fillText(q.id, q.sx + 7, q.sy - 6);
+  }
+  // Caption: how many points are highlighted for the current answer.
+  if (hitCount) {
+    ctx.globalAlpha = 1;
+    ctx.font = "600 11px ui-monospace, monospace";
+    ctx.fillStyle = HIT_HEX;
+    ctx.fillText(`${hitCount} sources retrieved (highlighted)`, 8, size - 8);
   }
   // Hovered point: a ring in its category colour, drawn last so it is visible.
   const hp = map3d.hoverId && proj.find((q) => q.id === map3d.hoverId);
@@ -869,6 +962,18 @@ function showCorpusTooltip(point, mx, my, rect) {
   head.className = "tt-head";
   head.append(id, kind);
   tt.append(head, title);
+  if (point.section) {
+    const sec = document.createElement("div");
+    sec.className = "tt-section";
+    sec.textContent = "section: " + point.section;
+    tt.append(sec);
+  }
+  if (map3d.hits.has(point.id)) {
+    const ret = document.createElement("div");
+    ret.className = "tt-retrieved";
+    ret.textContent = "● retrieved for this answer";
+    tt.append(ret);
+  }
   // Position near the cursor, clamped inside the canvas.
   const pad = 12;
   let left = mx + pad, top = my + pad;
@@ -954,9 +1059,16 @@ function wireCollapsibles() {
   auditToggle.addEventListener("click", () => {
     const expanded = auditToggle.getAttribute("aria-expanded") === "true";
     auditToggle.setAttribute("aria-expanded", String(!expanded));
-    const pre = $("audit-json");
-    pre.hidden = expanded;
-    if (!expanded && !pre.textContent) fetchAudit();
+    const wrap = $("audit-json");
+    wrap.hidden = expanded;
+    $("audit-controls").hidden = expanded || !wrap.childElementCount;
+    if (!expanded && !wrap.childElementCount) fetchAudit();
+  });
+  $("audit-expand").addEventListener("click", () => setAllAuditOpen(true));
+  $("audit-collapse").addEventListener("click", () => setAllAuditOpen(false));
+  $("audit-copy").addEventListener("click", () => {
+    if (currentAuditData) navigator.clipboard.writeText(JSON.stringify(currentAuditData, null, 2));
+    const b = $("audit-copy"); const t = b.textContent; b.textContent = "Copied"; setTimeout(() => b.textContent = t, 1200);
   });
 }
 function wireToggle(toggleId, bodyId) {

@@ -23,10 +23,18 @@ class Settings(BaseModel):
     retrieval_min_score: float = Field(default=config.RETRIEVAL_MIN_SCORE, ge=0.0, le=1.0)
     grounding_min: float = Field(default=config.GROUNDING_MIN, ge=0.0, le=1.0)
     top_k: int = Field(default=config.TOP_K, ge=1, le=12)
+    temperature: float = Field(default=0.0, ge=0.0, le=1.5)
     use_llm_judge: bool = config.USE_LLM_JUDGE
+    enable_pii_redaction: bool = True
+    enable_injection_guard: bool = True
     enable_coverage_guard: bool = True
     enable_grounding_guard: bool = True
     enable_dosage_guard: bool = True
+    # Bypass the LLM and use the naive extractive generator (stitches together
+    # retrieved sentences). Lets the demo show what an ungoverned, naive RAG
+    # system returns: a well-aligned model often refuses on its own, so the
+    # guards' value is clearest against the naive generator.
+    force_extractive: bool = False
 
 
 class AskRequest(BaseModel):

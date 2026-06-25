@@ -59,6 +59,28 @@ _STOPWORDS = {
     "cause", "causes", "diagnosis", "diagnosed", "prognosis", "prevention",
     "usage", "used", "managementof", "first", "second", "first-line",
     "line", "second-line", "oral", "topical", "supervised",
+    # Generic English and clinical-process words. The coverage guard exists to
+    # catch an unknown ENTITY (an invented drug) or an absent QUALIFIER
+    # ("children", "pregnancy"), not to demand that ordinary words appear
+    # verbatim in the corpus. Without these, naturally-phrased multi-step
+    # questions ("what is the next step if conservative care fails?") refuse for
+    # the wrong reason. Deliberately EXCLUDES entity/qualifier words.
+    "next", "step", "steps", "follow", "following", "fail", "fails", "failed",
+    "failing", "failure", "together", "maximum", "minimum", "max", "min",
+    "needs", "needed", "take", "takes", "taking", "get", "getting", "make",
+    "makes", "made", "work", "works", "working", "help", "helps", "start",
+    "starts", "starting", "begin", "begins", "stop", "stops", "increase",
+    "increased", "increasing", "decrease", "decreased", "reduce", "reduced",
+    "change", "changed", "compare", "comparison", "versus", "difference",
+    "different", "same", "instead", "alongside", "plus", "add", "added",
+    "consider", "considered", "appropriate", "suitable", "option", "options",
+    "available", "usual", "usually", "typical", "typically", "normal",
+    "normally", "initial", "ongoing", "continue", "continued", "persist",
+    "persists", "persistent", "remain", "remains", "raised", "result",
+    "results", "finding", "findings", "current", "currently", "week", "weeks",
+    "day", "days", "time", "times", "point", "stage", "stages", "phase",
+    "manageme", "approach", "recommended", "next-step", "regarding", "about",
+    "around", "still", "already", "yet", "soon", "later", "early", "long",
 }
 
 
@@ -99,6 +121,20 @@ def _covered(term: str, vocab: set[str]) -> bool:
         if _shared_prefix_len(term, word) >= threshold and threshold >= 4:
             return True
     return False
+
+
+def coverage_report(query: str, sources: list[dict]) -> dict:
+    """Detail for the trace: which salient question terms were checked, and which
+    were found in the retrieved sources versus missing."""
+    vocab: set[str] = set()
+    for record in sources:
+        vocab |= _source_vocabulary(record.get("text", ""))
+        vocab |= _source_vocabulary(record.get("title", ""))
+        vocab |= _source_vocabulary(record.get("section", ""))
+    terms = _salient_terms(query)
+    covered = [t for t in terms if _covered(t, vocab)]
+    uncovered = [t for t in terms if not _covered(t, vocab)]
+    return {"checked_terms": terms, "covered": covered, "uncovered": uncovered}
 
 
 def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:

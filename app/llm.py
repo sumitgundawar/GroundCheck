@@ -60,7 +60,8 @@ def _parse_llm_answer(content: str) -> LLMAnswer:
     return LLMAnswer.model_validate(data)
 
 
-def generate_llm(query: str, sources: list[dict]) -> LLMAnswer | None:
+def generate_llm(query: str, sources: list[dict],
+                 temperature: float = 0.0) -> LLMAnswer | None:
     """Call the generation model with one retry. Returns None on any failure,
     which signals the pipeline to use the extractive fallback."""
     if not LLM_AVAILABLE:
@@ -79,7 +80,7 @@ def generate_llm(query: str, sources: list[dict]) -> LLMAnswer | None:
                     {"role": "system", "content": GEN_SYSTEM_PROMPT},
                     {"role": "user", "content": user_message},
                 ],
-                temperature=0.0,
+                temperature=temperature,
                 response_format={"type": "json_object"},
             )
             content = response.choices[0].message.content or ""

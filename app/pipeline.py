@@ -165,16 +165,18 @@ def run(raw_query: str, settings: "Settings | None" = None,
     extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump()}
 
     # --- 1. Input guards ---------------------------------------------------
-    redacted, did_redact = guards_input.redact_pii(raw_query)
+    if cfg.enable_pii_redaction:
+        redacted, did_redact = guards_input.redact_pii(raw_query)
+        pii_status = "warn" if did_redact else "pass"
+        pii_detail = "redacted sensitive tokens" if did_redact else "no PII detected"
+    else:
+        redacted, did_redact = raw_query, False
+        pii_status, pii_detail = "skip", "guard disabled"
     extras["redacted_query"] = redacted
-    trace.append(TraceStep(
-        name="pii redaction",
-        status="warn" if did_redact else "pass",
-        detail="redacted sensitive tokens" if did_redact else "no PII detected",
-        ms=timer.lap_ms(),
-    ))
+    trace.append(TraceStep(name="pii redaction", status=pii_status,
+                           detail=pii_detail, ms=timer.lap_ms()))
 
-    scope = guards_input.check_scope_and_injection(redacted)
+    scope = guards_input.check_scope_and_injection(redacted, cfg.enable_injection_guard)
     trace.append(TraceStep(
         name="scope check",
         status="pass" if scope.ok else "fail",
@@ -231,13 +233,16 @@ def run(raw_query: str, settings: "Settings | None" = None,
     ))
 
     # --- 3. Retrieval gate -------------------------------------------------
+    gate_data = {"best_score": round(top_score, 4),
+                 "threshold": cfg.retrieval_min_score,
+                 "cleared": top_score >= cfg.retrieval_min_score}
     if top_score < cfg.retrieval_min_score:
         reason = "no sufficiently relevant source was found"
         trace.append(TraceStep(
             name="retrieval gate", status="fail",
             detail=f"best score {top_score:.2f} below threshold "
                    f"{cfg.retrieval_min_score:.2f}",
-            ms=timer.lap_ms(),
+            ms=timer.lap_ms(), data=gate_data,
         ))
         _skip_after(trace, "retrieval gate")
         return _finish(decision="refuse",
@@ -249,7 +254,7 @@ def run(raw_query: str, settings: "Settings | None" = None,
         name="retrieval gate", status="pass",
         detail=f"best score {top_score:.2f} clears threshold "
                f"{cfg.retrieval_min_score:.2f}",
-        ms=timer.lap_ms(),
+        ms=timer.lap_ms(), data=gate_data,
     ))
 
     # --- 4. Source coverage -----------------------------------------------
@@ -263,6 +268,7 @@ def run(raw_query: str, settings: "Settings | None" = None,
             name="source coverage",
             status="pass" if covered else "fail",
             detail=cover_detail,
+            data=guards_output.coverage_report(query, source_records),
             ms=timer.lap_ms(),
         ))
     if not covered:
@@ -276,7 +282,8 @@ def run(raw_query: str, settings: "Settings | None" = None,
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
     # --- 5. Generate -------------------------------------------------------
-    llm_answer = llm.generate_llm(query, source_records)
+    llm_answer = None if cfg.force_extractive else llm.generate_llm(
+        query, source_records, cfg.temperature)
     llm_used = llm_answer is not None
     if not llm_used:
         llm_answer = llm.generate_extractive(query, results, cfg.retrieval_min_score)
@@ -284,7 +291,9 @@ def run(raw_query: str, settings: "Settings | None" = None,
     trace.append(TraceStep(
         name="generate",
         status="pass" if llm_used else "info",
-        detail="llm produced cited claims" if llm_used else "extractive fallback",
+        detail=("llm produced cited claims" if llm_used
+                else ("naive extractive, model bypassed" if cfg.force_extractive
+                      else "extractive fallback")),
         ms=timer.lap_ms(),
     ))
 

@@ -46,7 +46,7 @@ class GuardResult:
     detail: str = ""
 
 
-def check_scope_and_injection(text: str) -> GuardResult:
+def check_scope_and_injection(text: str, check_injection: bool = True) -> GuardResult:
     stripped = text.strip()
     if not stripped:
         return GuardResult(False, "The request was empty after input guards.",
@@ -54,10 +54,11 @@ def check_scope_and_injection(text: str) -> GuardResult:
     if len(stripped) > config.MAX_QUERY_CHARS:
         return GuardResult(False, "This request was blocked by an input guard.",
                            "query exceeds maximum length")
-    if _INJECTION.search(stripped):
+    if check_injection and _INJECTION.search(stripped):
         return GuardResult(False, "This request was blocked by an input guard.",
                            "instruction-override pattern detected")
-    return GuardResult(True, detail="no scope or injection issues")
+    detail = "no scope or injection issues" if check_injection else "injection guard disabled"
+    return GuardResult(True, detail=detail)
 
 
 # --- Rate limiting ---------------------------------------------------------

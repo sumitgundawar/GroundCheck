@@ -54,6 +54,7 @@ def settings_defaults() -> JSONResponse:
             "retrieval_min_score": {"min": 0.0, "max": 1.0, "step": 0.01},
             "grounding_min": {"min": 0.0, "max": 1.0, "step": 0.01},
             "top_k": {"min": 1, "max": 12, "step": 1},
+            "temperature": {"min": 0.0, "max": 1.5, "step": 0.1},
         },
     })
 

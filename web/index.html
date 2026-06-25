@@ -46,6 +46,13 @@
         and refuses when it cannot ground a response. Watch the pipeline decide,
         then tune the thresholds and guards and watch the decision change.
       </p>
+      <p class="hero-dataset">
+        Synthetic corpus. Document structure modelled on
+        <a href="https://github.com/abachaa/MedQuAD" target="_blank" rel="noopener">MedQuAD</a>
+        (NIH medical Q&amp;A) and the FDA
+        <a href="https://dailymed.nlm.nih.gov" target="_blank" rel="noopener">DailyMed</a>
+        drug-label format. Every condition, drug, and dose is invented.
+      </p>
     </section>
 
     <!-- How it works (collapsible) -->
@@ -148,9 +155,33 @@
             <input type="range" id="set-topk" min="1" max="12" step="1" value="4" />
             <p class="control-note">How many passages the retriever returns (top-k).</p>
           </div>
+
+          <div class="control">
+            <div class="control-head">
+              <label for="set-temperature">Model temperature</label>
+              <output id="set-temperature-val" class="control-val">0.0</output>
+            </div>
+            <input type="range" id="set-temperature" min="0" max="1.5" step="0.1" value="0.0" />
+            <p class="control-note">0 is deterministic. Higher makes the model's wording vary between runs.</p>
+          </div>
         </div>
 
         <div class="toggles">
+          <label class="switch">
+            <input type="checkbox" id="set-extractive" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">Bypass model (naive retrieval)</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="set-pii" checked />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">PII redaction (input)</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="set-injection" checked />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span class="switch-label">Injection guard (input)</span>
+          </label>
           <label class="switch">
             <input type="checkbox" id="set-coverage" checked />
             <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -216,7 +247,12 @@
         <span class="eyebrow">View audit record</span>
         <span class="chevron">▸</span>
       </button>
-      <pre class="audit-json" id="audit-json" hidden></pre>
+      <div class="audit-controls" id="audit-controls" hidden>
+        <button type="button" class="btn btn-ghost btn-sm" id="audit-expand">Expand all</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="audit-collapse">Collapse all</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="audit-copy">Copy JSON</button>
+      </div>
+      <div class="audit-tree" id="audit-json" hidden></div>
     </section>
 
     <!-- Corpus map (collapsible) -->
