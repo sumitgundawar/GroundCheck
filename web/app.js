@@ -1558,8 +1558,228 @@ function showLocalAIError(text) {
   msg.classList.add("error");
 }
 
+// ---------- Documents ----------
+const STATUS_LABELS = { pending: "Pending review", approved: "Approved", rejected: "Rejected", retired: "Retired" };
+let indexPoll = null;
+
+function isoDateToIso(value) { return value ? `${value}T00:00:00` : ""; }
+function shortDate(iso) { return iso ? new Date(iso).toLocaleDateString() : ""; }
+
+async function loadDocuments() {
+  let data;
+  try { data = await api("/api/sources"); }
+  catch (err) {
+    showMessage("documents-message", err.message, true);
+    $("upload-form").hidden = true;
+    return;
+  }
+  $("upload-form").hidden = false;
+  renderIndexStatus(data.index);
+  const rows = $("documents-body-rows");
+  rows.textContent = "";
+  $("documents-empty").hidden = data.sources.length > 0;
+  const approved = data.sources.filter((d) => d.status === "approved").length;
+  const pending = data.sources.filter((d) => d.status === "pending").length;
+  $("documents-summary").textContent = `${approved} approved, ${pending} pending review`;
+
+  data.sources.forEach((d) => {
+    const tr = document.createElement("tr");
+    const doc = document.createElement("td");
+    const name = document.createElement("div");
+    name.className = "user-name";
+    name.textContent = d.title;
+    const meta = document.createElement("div");
+    meta.className = "user-email mono";
+    meta.textContent = `v${d.version}  ${d.filename}`;
+    doc.append(name, meta);
+
+    const status = document.createElement("td");
+    const chip = document.createElement("span");
+    chip.className = `status-pill status-${d.status}`;
+    chip.textContent = STATUS_LABELS[d.status] || d.status;
+    status.appendChild(chip);
+
+    const owner = document.createElement("td");
+    owner.textContent = d.owner || "";
+
+    const force = document.createElement("td");
+    const range = [d.effective_from ? `from ${shortDate(d.effective_from)}` : "", d.expires_on ? `until ${shortDate(d.expires_on)}` : ""].filter(Boolean).join(" ");
+    force.textContent = d.status === "approved" ? `${d.in_force ? "Yes" : "No"}${range ? `, ${range}` : ""}` : (range || "");
+
+    const sections = document.createElement("td");
+    sections.className = "mono";
+    sections.textContent = d.chunks;
+
+    const actionsCell = document.createElement("td");
+    const actions = document.createElement("div");
+    actions.className = "document-actions";
+    actionsCell.appendChild(actions);
+    actions.appendChild(button("View", "btn-ghost", false, () => openDocument(d.id)));
+    if (d.status === "pending") {
+      actions.appendChild(button("Approve", "btn-primary", false, () => reviewDocument(d, "approve")));
+      actions.appendChild(button("Reject", "btn-ghost", false, () => reviewDocument(d, "reject")));
+    }
+    if (d.status === "approved") {
+      if (d.in_force) actions.appendChild(button("Evaluate", "btn-ghost", false, (e) => evaluateDocument(d, e.currentTarget)));
+      actions.appendChild(button("Retire", "btn-ghost", false, () => reviewDocument(d, "retire")));
+    }
+    tr.append(doc, status, owner, force, sections, actionsCell);
+    rows.appendChild(tr);
+  });
+}
+
+function renderIndexStatus(index) {
+  const text = $("index-status-text");
+  if (index.state === "running") text.textContent = "Rebuilding the index…";
+  else if (index.state === "failed") text.textContent = `Index rebuild failed: ${index.error}`;
+  else if (index.finished_at) text.textContent = `Index rebuilt ${new Date(index.finished_at).toLocaleString()}: ${index.documents.toLocaleString()} passages (${index.embedded} newly embedded).`;
+  else text.textContent = "The index was built when the app started.";
+  $("index-status").classList.toggle("failed", index.state === "failed");
+  $("index-rebuild").disabled = index.state === "running";
+  if (index.state === "running" && !indexPoll) {
+    indexPoll = setInterval(async () => {
+      try {
+        const data = await api("/api/index");
+        if (data.index.state !== "running") {
+          clearInterval(indexPoll);
+          indexPoll = null;
+          await Promise.all([loadDocuments(), loadHealth()]);
+        } else {
+          renderIndexStatus(data.index);
+        }
+      } catch (_) { clearInterval(indexPoll); indexPoll = null; }
+    }, 1500);
+  }
+}
+
+async function reviewDocument(d, decision) {
+  const verbs = { approve: "Approve", reject: "Reject", retire: "Retire" };
+  const prompts = {
+    approve: `Approve “${d.title}” version ${d.version}? It will be cited in answers.`,
+    reject: `Reject “${d.title}” version ${d.version}? Add a note for the uploader (optional):`,
+    retire: `Retire “${d.title}” version ${d.version}? It will stop being cited.`,
+  };
+  let note = "";
+  if (decision === "reject") {
+    const answer = window.prompt(prompts.reject, "");
+    if (answer === null) return;
+    note = answer;
+  } else if (!window.confirm(prompts[decision])) {
+    return;
+  }
+  try {
+    const data = await api(`/api/sources/${d.id}/${decision}`, { method: "POST", body: { note } });
+    showMessage("documents-message", `${verbs[decision]}d “${d.title}”.${decision !== "reject" ? " Rebuilding the index." : ""}`);
+    renderIndexStatus(data.index);
+  } catch (err) { showMessage("documents-message", err.message, true); }
+  await loadDocuments();
+}
+
+async function evaluateDocument(d, trigger) {
+  trigger.disabled = true;
+  trigger.textContent = "Evaluating…";
+  try {
+    const data = await api(`/api/sources/${d.id}/evaluate`, { method: "POST" });
+    const e = data.evaluation;
+    showMessage("documents-message", `“${d.title}”: ${e.passed} of ${e.total} test questions behaved as intended, ${e.unsafe_answers} unsafe answers.`, e.unsafe_answers > 0);
+    await openDocument(d.id);
+  } catch (err) { showMessage("documents-message", err.message, true); }
+  await loadDocuments();
+}
+
+async function openDocument(id) {
+  let data;
+  try { data = await api(`/api/sources/${id}`); }
+  catch (err) { showMessage("documents-message", err.message, true); return; }
+  const d = data.source;
+  $("document-dialog-title").textContent = `${d.title}, version ${d.version}`;
+  const bits = [STATUS_LABELS[d.status] || d.status, d.owner && `Owner: ${d.owner}`, d.filename,
+    d.review_note && `Note: ${d.review_note}`].filter(Boolean);
+  $("document-meta").textContent = bits.join(". ") + ".";
+
+  const list = $("document-sections");
+  list.textContent = "";
+  d.sections.forEach((s) => {
+    const li = document.createElement("li");
+    const head = document.createElement("div");
+    head.className = "document-section-head";
+    const id = document.createElement("code");
+    id.textContent = s.chunk_id;
+    const title = document.createElement("strong");
+    title.textContent = s.section;
+    head.append(id, title);
+    const body = document.createElement("p");
+    body.textContent = s.text;
+    li.append(head, body);
+    list.appendChild(li);
+  });
+
+  const evalSection = $("document-eval-section");
+  evalSection.hidden = !d.evaluation;
+  if (d.evaluation) {
+    const e = d.evaluation;
+    $("document-eval-summary").textContent = `${e.passed} of ${e.total} behaved as intended, ${e.unsafe_answers} unsafe answers, run ${new Date(e.ran_at).toLocaleString()}.`;
+    const cases = $("document-eval-cases");
+    cases.textContent = "";
+    e.cases.forEach((c) => {
+      const li = document.createElement("li");
+      li.className = "eval-case";
+      const glyph = document.createElement("span");
+      glyph.className = `glyph ${c.ok ? "ok" : "bad"}`;
+      const q = document.createElement("span");
+      q.className = "eval-q";
+      q.textContent = c.query;
+      const r = document.createElement("span");
+      r.className = "eval-r mono";
+      r.textContent = `expect ${c.expect} / got ${c.got}`;
+      li.append(glyph, q, r);
+      cases.appendChild(li);
+    });
+  }
+  $("document-dialog").showModal();
+}
+
+function wireDocuments() {
+  $("documents-toggle").addEventListener("click", () => {
+    if (!$("documents-body").hidden) loadDocuments();
+  });
+  $("index-rebuild").addEventListener("click", async () => {
+    try {
+      const data = await api("/api/index/rebuild", { method: "POST" });
+      renderIndexStatus({ ...data.index, state: "running" });
+    } catch (err) { showMessage("documents-message", err.message, true); }
+  });
+  $("upload-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const file = $("upload-file").files[0];
+    if (!file) { showMessage("documents-message", "Choose a file to upload.", true); return; }
+    const body = new FormData();
+    body.append("file", file);
+    body.append("title", $("upload-title").value);
+    body.append("owner", $("upload-owner").value);
+    body.append("effective_from", isoDateToIso($("upload-effective").value));
+    body.append("expires_on", isoDateToIso($("upload-expires").value));
+    formBusy(form, true);
+    $("upload-button").textContent = "Uploading…";
+    try {
+      const res = await fetch("/api/sources", { method: "POST", body });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Upload failed (${res.status}).`);
+      form.reset();
+      showMessage("documents-message", `Uploaded “${data.source.title}” as version ${data.source.version}, with ${data.source.chunks} sections. It needs approval before it’s cited.`);
+      await loadDocuments();
+    } catch (err) { showMessage("documents-message", err.message, true); }
+    formBusy(form, false);
+    $("upload-button").textContent = "Upload for review";
+  });
+}
+
 // ---------- Collapsibles ----------
 function wireCollapsibles() {
+  // The panel toggle must be wired first, so loaders below see it open.
+  wireToggle("documents-toggle", "documents-body");
+  wireDocuments();
   wireToggle("how-toggle", "how-body");
   wireToggle("tuning-toggle", "tuning-body");
   wireToggle("local-ai-toggle", "local-ai-body");

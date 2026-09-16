@@ -125,6 +125,24 @@
     <p class="modal-message" id="account-message" role="status" hidden></p>
   </dialog>
 
+  <!-- Document detail -->
+  <dialog class="modal modal-wide" id="document-dialog" aria-labelledby="document-dialog-title">
+    <div class="modal-head">
+      <h2 id="document-dialog-title">Document</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="modal-status" id="document-meta"></p>
+    <section class="modal-section" id="document-eval-section" hidden aria-labelledby="document-eval-title">
+      <h3 id="document-eval-title">Evaluation</h3>
+      <p class="modal-status" id="document-eval-summary"></p>
+      <ul class="eval-cases document-eval-cases" id="document-eval-cases"></ul>
+    </section>
+    <section class="modal-section" aria-labelledby="document-sections-title">
+      <h3 id="document-sections-title">Sections and citation IDs</h3>
+      <ol class="document-sections" id="document-sections"></ol>
+    </section>
+  </dialog>
+
   <!-- User management (admins) -->
   <dialog class="modal modal-wide" id="users-dialog" aria-labelledby="users-dialog-title">
     <div class="modal-head">
@@ -329,6 +347,63 @@
           <button type="button" class="btn btn-ghost" id="tuning-reset">Reset to defaults</button>
           <span class="tuning-applies">Changes apply to your next question.</span>
         </div>
+      </div>
+    </section>
+
+    <!-- Documents (collapsible) -->
+    <section class="panel collapsible documents-panel" id="documents-panel">
+      <button class="collapsible-toggle" id="documents-toggle" aria-expanded="false">
+        <span class="eyebrow">Documents</span>
+        <span class="local-ai-summary" id="documents-summary">your organisation’s sources</span>
+        <span class="chevron">▸</span>
+      </button>
+      <div class="documents-body" id="documents-body" hidden>
+        <p class="tuning-hint">
+          Import your own guidelines, formularies and protocols. A document is cited only
+          after someone other than the uploader approves it, and only between its
+          effective and expiry dates.
+        </p>
+        <p class="modal-message" id="documents-message" role="status" hidden></p>
+
+        <form class="upload-form" id="upload-form" novalidate>
+          <div class="upload-field upload-file">
+            <label for="upload-file">File</label>
+            <input id="upload-file" type="file" accept=".pdf,.docx,.html,.htm,.md,.markdown,.txt" required>
+            <span class="auth-hint">PDF, Word (.docx), HTML, Markdown or text, up to 25 MB.</span>
+          </div>
+          <div class="upload-field">
+            <label for="upload-title">Title <span class="optional">optional</span></label>
+            <input id="upload-title" placeholder="Taken from the document">
+          </div>
+          <div class="upload-field">
+            <label for="upload-owner">Owner</label>
+            <input id="upload-owner" placeholder="e.g. Pharmacy">
+          </div>
+          <div class="upload-field">
+            <label for="upload-effective">Effective from <span class="optional">optional</span></label>
+            <input id="upload-effective" type="date">
+          </div>
+          <div class="upload-field">
+            <label for="upload-expires">Expires on <span class="optional">optional</span></label>
+            <input id="upload-expires" type="date">
+          </div>
+          <div class="upload-actions">
+            <button type="submit" class="btn btn-primary" id="upload-button">Upload for review</button>
+          </div>
+        </form>
+
+        <div class="index-status" id="index-status">
+          <span id="index-status-text">Index status unknown</span>
+          <button type="button" class="btn btn-sm btn-ghost" id="index-rebuild">Rebuild index</button>
+        </div>
+
+        <div class="users-table-wrap">
+          <table class="users-table documents-table">
+            <thead><tr><th scope="col">Document</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col">In force</th><th scope="col">Sections</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+            <tbody id="documents-body-rows"></tbody>
+          </table>
+        </div>
+        <p class="auth-hint" id="documents-empty" hidden>No documents yet. Upload one to start.</p>
       </div>
     </section>
 

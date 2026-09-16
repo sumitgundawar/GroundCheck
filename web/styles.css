@@ -733,3 +733,31 @@ details[open] > .j-summary::before { content: "▾"; }
 .users-table .user-name { font-weight: 500; }
 .users-table .user-email { font-size: 12px; color: var(--text-muted); }
 .add-user-form { max-width: 420px; }
+
+/* ---------- Documents ---------- */
+.upload-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3) var(--space-4);
+  padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-subtle); margin-bottom: var(--space-4); }
+.upload-field { display: grid; gap: 4px; align-content: start; }
+.upload-field label { font-size: 13px; font-weight: 500; }
+.upload-field input { font: inherit; font-size: 14px; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); min-height: 38px; }
+.upload-file { grid-column: 1 / -1; }
+.upload-file input { padding: 6px; }
+.upload-actions { grid-column: 1 / -1; }
+.optional { font-weight: 400; color: var(--text-muted); font-size: 12px; }
+.index-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4);
+  font-size: 13px; color: var(--text-secondary); margin-bottom: var(--space-3); }
+.index-status.failed { color: var(--danger); }
+.status-pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border-strong); white-space: nowrap; }
+.status-approved { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-border); }
+.status-pending { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-border); }
+.status-rejected { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border); }
+.status-retired { color: var(--text-muted); }
+.documents-table td { white-space: normal; }
+.document-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+.document-sections { margin: 0; padding-left: 0; list-style: none; display: grid; gap: var(--space-3); max-height: 50vh; overflow: auto; }
+.document-sections li { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-3); }
+.document-section-head { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; margin-bottom: 4px; }
+.document-section-head code { font-size: 12px; background: var(--bg-inset); padding: 1px 6px; border-radius: 4px; }
+.document-sections p { margin: 0; font-size: 13.5px; color: var(--text-secondary); }
+.document-eval-cases { max-height: 30vh; overflow: auto; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
