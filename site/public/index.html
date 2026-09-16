@@ -648,6 +648,8 @@
               <div><dt><code>GET /api/eval-summary</code></dt><dd>The latest evaluation results</dd></div>
               <div><dt><code>GET /api/corpus</code></dt><dd>Corpus statistics and the 3D map</dd></div>
               <div><dt><code>GET /api/health</code></dt><dd>Status, model mode and corpus size</dd></div>
+              <div><dt><code>POST /api/auth/login</code></dt><dd>Sign in, when accounts are required</dd></div>
+              <div><dt><code>GET /api/local-ai</code></dt><dd>Hardware, Ollama status and model fit</dd></div>
             </dl>
 
             <h3>Built with</h3>
@@ -774,17 +776,23 @@ docker run -p 7860:7860 groundcheck</code></pre>
             </details>
           </li>
 
-          <li class="phase-card spotlight" data-state="planned">
+          <li class="phase-card spotlight" data-state="available">
             <div class="phase-head">
               <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#database"/></svg></span>
-              <span class="state">Planned</span>
+              <span class="state">Available now</span>
             </div>
             <h3>Accounts and data foundation</h3>
-            <p class="phase-goal">Give every user, source and decision a durable, queryable home.</p>
+            <p class="phase-goal">Every user, decision and passage in a durable, queryable home.</p>
             <details class="phase-details">
               <summary>What’s included</summary>
               <ul>
-                <li>Relational database: SQLite for a single machine, PostgreSQL or MySQL in production, with versioned migrations</li>
+                <li>SQLite by default, PostgreSQL or MySQL in production, with automatic migrations</li>
+                <li>Pluggable vector store: exact local search, or Qdrant at scale</li>
+                <li>Sign-in with Argon2id-hashed passwords, lockout, and authenticator-app two-factor</li>
+                <li>Clinician, reviewer and admin roles, with every audit record tied to a user</li>
+              </ul>
+            </details>
+          </li>
                 <li>Pluggable vector database: exact local search, or Qdrant at scale</li>
                 <li>Sign-in with securely hashed passwords, multi-factor authentication and session management</li>
                 <li>Clinician, reviewer and admin roles, with every audit record tied to a user</li>
