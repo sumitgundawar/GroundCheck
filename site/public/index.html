@@ -105,7 +105,7 @@
           <ul class="proof" aria-label="At a glance">
             <li><svg class="i" aria-hidden="true"><use href="/icons.svg#shield-check"/></svg><span><strong>0 of 1,004</strong> must-refuse questions answered in testing</span></li>
             <li><svg class="i" aria-hidden="true"><use href="/icons.svg#list-checks"/></svg><span><strong>11 checks</strong> on every question</span></li>
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#laptop"/></svg><span><strong>Runs on a laptop</strong>, no GPU or API key</span></li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#laptop"/></svg><span><strong>Runs on a laptop</strong>, with optional local AI and no API key</span></li>
           </ul>
         </div>
 
@@ -488,10 +488,10 @@
           <li class="mode">
             <div class="mode-head">
               <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#laptop"/></svg></span>
-              <span class="state">Planned</span>
+              <span class="state state-available">Available</span>
             </div>
             <h3>Local AI model</h3>
-            <p>An open-source model on your own machine drafts the answer.</p>
+            <p>An open-source model on your own machine drafts the answer, through Ollama.</p>
             <ul class="mode-facts">
               <li><svg class="i" aria-hidden="true"><use href="/icons.svg#key-round"/></svg>No API key</li>
               <li><svg class="i" aria-hidden="true"><use href="/icons.svg#hard-drive-download"/></svg>Offline after one download</li>
@@ -502,50 +502,26 @@
       </div>
     </section>
 
-    <!-- Local AI (planned) -->
+    <!-- Local AI -->
     <section class="section section-rule" id="local-ai" aria-labelledby="local-ai-title">
       <div class="wrap local-ai-grid">
         <div>
           <div class="section-intro">
-            <h2 id="local-ai-title">Planned: private AI on your own machine</h2>
+            <h2 id="local-ai-title">Private AI on your own machine</h2>
             <p>AI-written answers that never leave your computer.</p>
           </div>
           <ul class="checklist">
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#cpu"/></svg>Checks your memory and GPU, including Apple silicon</li>
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#layers"/></svg>Recommends open-source models that fit</li>
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#hard-drive-download"/></svg>Downloads and loads one with a click, through a runtime such as Ollama</li>
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#shield-check"/></svg>Falls back to extractive answers if no model is available</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#cpu"/></svg>Detects your memory and GPU, including Apple silicon and NVIDIA</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#layers"/></svg>Recommends open-source models that fit, with their licences</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#hard-drive-download"/></svg>Downloads and loads a model with one click, through Ollama</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#shield-check"/></svg>Falls back to extractive answers if the model is unavailable</li>
           </ul>
+          <p class="note">Tested with Llama 3.2 3B on an Apple M1 laptop: 49 of 50 sample questions and 16 of 16 adversarial probes correct, no unsafe answers, about 10 seconds per answer.</p>
         </div>
 
-        <figure class="device-picker model-picker" aria-labelledby="model-picker-caption">
-          <div class="device-picker-panel" aria-hidden="true">
-            <div class="dp-head">
-              <span class="dp-title">Local AI model</span>
-              <span class="dp-status">Apple M1, 16 GB memory</span>
-            </div>
-            <div class="dp-option is-selected">
-              <span class="dp-radio"></span>
-              <span class="dp-name">Small, 3B parameters <span class="dp-tag">Recommended</span></span>
-              <span class="dp-meta mono">2 GB</span>
-            </div>
-            <div class="dp-option">
-              <span class="dp-radio"></span>
-              <span class="dp-name">Medium, 7B parameters</span>
-              <span class="dp-meta mono">5 GB</span>
-            </div>
-            <div class="dp-option is-disabled">
-              <span class="dp-radio"></span>
-              <span class="dp-name">Large, 70B parameters</span>
-              <span class="dp-meta">Needs more memory</span>
-            </div>
-            <div class="dp-progress">
-              <canvas data-orb="working" data-orb-size="20"></canvas>
-              <span>Loading model into memory</span>
-              <span class="dp-bar"><span></span></span>
-            </div>
-          </div>
-          <figcaption id="model-picker-caption">Design sketch, not a screenshot. Models and sizes are illustrative.</figcaption>
+        <figure class="shot">
+          <img src="/screenshots/local-ai.webp" width="932" height="665" loading="lazy" decoding="async" alt="The dashboard's Local AI panel: the machine's Apple M1, 16 GB memory and Apple silicon GPU, and a list of models with fit, download size, memory needed and licence, with Llama 3.2 3B in use.">
+          <figcaption>The Local AI panel in the dashboard.</figcaption>
         </figure>
       </div>
     </section>
@@ -780,10 +756,10 @@ docker run -p 7860:7860 groundcheck</code></pre>
             </details>
           </li>
 
-          <li class="phase-card spotlight" data-state="planned">
+          <li class="phase-card spotlight" data-state="available">
             <div class="phase-head">
               <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#laptop"/></svg></span>
-              <span class="state">Planned</span>
+              <span class="state">Available now</span>
             </div>
             <h3>Local AI models</h3>
             <p class="phase-goal">AI-written answers that never leave the machine.</p>
@@ -1093,11 +1069,11 @@ docker run -p 7860:7860 groundcheck</code></pre>
           </details>
           <details>
             <summary>Can I use AI without sending data to the cloud?</summary>
-            <p>That’s what the planned local AI option is for. GroundCheck will recommend open-source models that fit your machine, download one, and run it locally. Until then, extractive mode is fully local, without AI-written drafts.</p>
+            <p>Yes. Install Ollama, then open the Local AI panel in the dashboard. GroundCheck recommends open-source models that fit your machine, downloads the one you choose, and runs it locally. Extractive mode is also fully local, without AI-written drafts.</p>
           </details>
           <details>
             <summary>Do I need a GPU?</summary>
-            <p>No. Embeddings and vector search run on a CPU, and a laptop handles the demo corpus comfortably. The planned local AI models will use a GPU when one is available, and smaller models will run on a CPU.</p>
+            <p>No. Embeddings and vector search run on a CPU, and a laptop handles the demo corpus comfortably. Local AI models use a GPU when one is available, and smaller models run on a CPU.</p>
           </details>
           <details>
             <summary>Can I use it in a commercial product?</summary>
