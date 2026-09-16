@@ -87,20 +87,21 @@ Full instructions, including configuration and Windows, are in
 8. [The dashboard](#the-dashboard)
 9. [Live tuning](#live-tuning)
 10. [Local AI models](#local-ai-models)
-11. [Using the API](#using-the-api)
-12. [Using your own documents](#using-your-own-documents)
-13. [Configuration](#configuration)
-14. [Local development](#local-development)
-15. [Running the checks](#running-the-checks)
-16. [Troubleshooting](#troubleshooting)
-17. [Deployment](#deployment)
-18. [Project layout](#project-layout)
-19. [Honest limitations](#honest-limitations)
-20. [Reporting issues](#reporting-issues)
-21. [Contributing](#contributing)
-22. [Security](#security)
-23. [License](#license)
-24. [Credits](#credits)
+11. [Accounts and databases](#accounts-and-databases)
+12. [Using the API](#using-the-api)
+13. [Using your own documents](#using-your-own-documents)
+14. [Configuration](#configuration)
+15. [Local development](#local-development)
+16. [Running the checks](#running-the-checks)
+17. [Troubleshooting](#troubleshooting)
+18. [Deployment](#deployment)
+19. [Project layout](#project-layout)
+20. [Honest limitations](#honest-limitations)
+21. [Reporting issues](#reporting-issues)
+22. [Contributing](#contributing)
+23. [Security](#security)
+24. [License](#license)
+25. [Credits](#credits)
 
 ---
 
@@ -362,6 +363,71 @@ when a small model drafts claims the grounding check can't verify.
 
 ---
 
+## Accounts and databases
+
+By default GroundCheck runs as an open demo: no sign-in, and everything is
+stored in a SQLite file at `data/groundcheck.db`, created on first run.
+
+### Requiring sign-in
+
+For any deployment with real users, set `AUTH_REQUIRED=true`. Every API
+request then needs a signed-in session, except health checks and sign-in
+itself, and each user has a role:
+
+| Role | Can |
+| --- | --- |
+| `clinician` | Ask questions and see their own audit records |
+| `reviewer` | Also read every audit record |
+| `admin` | Also manage users and local AI models |
+
+Create the first admin from the machine running GroundCheck, either in the
+dashboard (it offers this while no users exist) or on the command line:
+
+```bash
+python -m app.cli create-user --email you@example.org --role admin
+```
+
+Passwords are hashed with Argon2id and must be at least 12 characters. Users
+can turn on two-factor authentication with any authenticator app. Five failed
+sign-ins lock an account for 15 minutes. Sessions last 12 hours and are
+stored only as hashes.
+
+Other commands: `python -m app.cli set-password`, `list-users`,
+`purge-sessions` and `migrate`. Passwords are always prompted for, never
+passed as arguments.
+
+### Using PostgreSQL or MySQL
+
+Set `DATABASE_URL` and install the driver:
+
+| Database | `DATABASE_URL` | Driver |
+| --- | --- | --- |
+| SQLite (default) | `sqlite:///data/groundcheck.db` | built in |
+| PostgreSQL | `postgresql+psycopg://user:password@host:5432/groundcheck` | `pip install "psycopg[binary]"` |
+| MySQL or MariaDB | `mysql+pymysql://user:password@host:3306/groundcheck` | `pip install pymysql` |
+
+The schema is created and upgraded automatically on startup with Alembic
+migrations (turn this off with `DB_AUTO_MIGRATE=false` and run
+`python -m app.cli migrate` yourself). The test suite runs against SQLite and,
+with `TEST_POSTGRES_URL` set, PostgreSQL. MySQL is supported through
+SQLAlchemy but hasn't yet been verified against a live server.
+
+Audit records are stored in the database with the user who asked. The
+original question is never stored, only the PII-redacted version.
+
+### Vector stores
+
+| `VECTOR_STORE` | Where embeddings live | Use it for |
+| --- | --- | --- |
+| `local` (default) | `index/vectors.npy`, exact search in the app | Up to roughly a million passages on one machine |
+| `qdrant` | A Qdrant server (`QDRANT_URL`) or embedded Qdrant (`QDRANT_PATH`) | Larger collections, or several app instances sharing one index |
+
+After changing the store, rebuild the index with
+`python scripts/build_index.py`. Both stores give identical results on the
+full evaluation.
+
+---
+
 ## Using the API
 
 The dashboard is a client of a small JSON API. You can call it directly.
@@ -442,6 +508,13 @@ The only one you may want to set is `GROQ_API_KEY`.
 | --- | --- | --- |
 | `GROQ_API_KEY` | _empty_ | Enables the live LLM. Empty means extractive mode. |
 | `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Any OpenAI-compatible endpoint that supports JSON output mode. |
+| `DATABASE_URL` | `sqlite:///data/groundcheck.db` | Where users, sessions and audit records are stored. |
+| `AUTH_REQUIRED` | `false` | Require sign-in for every API request. |
+| `SESSION_HOURS` | `12` | How long a sign-in lasts. |
+| `SESSION_COOKIE_SECURE` | `true` | Send the session cookie over HTTPS only. Set `false` for plain-HTTP local use with sign-in. |
+| `VECTOR_STORE` | `local` | `local` or `qdrant`. |
+| `QDRANT_URL` | _empty_ | A Qdrant server, for example `http://localhost:6333`. |
+| `QDRANT_PATH` | `index/qdrant` | Embedded Qdrant storage, when no URL is set. |
 | `OLLAMA_HOST` | `http://localhost:11434` | Where the Ollama server runs. |
 | `LOCAL_MODEL` | _empty_ | A local model to use at startup, if none was chosen in the dashboard. |
 | `LOCAL_AI_TIMEOUT_SECONDS` | `60` | Timeout for a local model call before falling back. |
