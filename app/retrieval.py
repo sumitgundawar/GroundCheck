@@ -236,6 +236,27 @@ def best_sentence(query: str, passage_text: str) -> str:
     return sentences[int(np.argmax(sims))]
 
 
+@lru_cache(maxsize=1)
+def _topic_names() -> dict[str, str]:
+    """Each corpus topic keyed by its distinctive first word, for example
+    "caloradine" or "veltris". Reference topics are generic and skipped."""
+    names: dict[str, str] = {}
+    for record in all_metadata():
+        if record.get("kind") == "reference":
+            continue
+        topic = record.get("topic", "").lower()
+        words = tokenize(topic)
+        if words and len(words[0]) >= 4:
+            names.setdefault(words[0], topic)
+    return names
+
+
+def topics_mentioned(query: str) -> dict[str, str]:
+    """Corpus topics a question names, as {name word: topic}."""
+    names = _topic_names()
+    return {w: names[w] for w in set(tokenize(query)) if w in names}
+
+
 def corpus_text_for(source_id: str) -> str | None:
     _ensure_loaded()
     for record in _metadata:

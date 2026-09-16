@@ -7,6 +7,7 @@ the decision logic never depends on a live call succeeding."""
 from __future__ import annotations
 
 import json
+import re
 
 from . import config, retrieval
 from .schemas import LLMAnswer, LLMClaim
@@ -126,6 +127,19 @@ def generate_extractive(query: str, scored_sources: list[tuple[dict, float]],
     retrieval threshold, using that passage's most query-relevant sentence.
     This path goes through the same grounding and dosage guards."""
     threshold = config.RETRIEVAL_MIN_SCORE if min_score is None else min_score
+
+    # When the question names drugs or conditions, keep only passages about
+    # them or that mention them. Otherwise nearby passages about other drugs
+    # would be stitched into the answer.
+    named = retrieval.topics_mentioned(query)
+    if named:
+        on_topic = [
+            (record, score) for record, score in scored_sources
+            if record.get("topic", "").lower() in named.values()
+            or any(re.search(rf"\b{re.escape(word)}\b", record["text"], re.IGNORECASE) for word in named)
+        ]
+        scored_sources = on_topic or scored_sources
+
     claims: list[LLMClaim] = []
     for record, score in scored_sources:
         if score < threshold:

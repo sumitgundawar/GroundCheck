@@ -123,23 +123,26 @@ def _covered(term: str, vocab: set[str]) -> bool:
     return False
 
 
-def coverage_report(query: str, sources: list[dict]) -> dict:
-    """Detail for the trace: which salient question terms were checked, and which
-    were found in the retrieved sources versus missing."""
-    vocab: set[str] = set()
-    for record in sources:
-        vocab |= _source_vocabulary(record.get("text", ""))
-        vocab |= _source_vocabulary(record.get("title", ""))
-        vocab |= _source_vocabulary(record.get("section", ""))
-    terms = _salient_terms(query)
-    covered = [t for t in terms if _covered(t, vocab)]
-    uncovered = [t for t in terms if not _covered(t, vocab)]
-    return {"checked_terms": terms, "covered": covered, "uncovered": uncovered}
+# Qualifiers that change what a correct answer is. When one of these is
+# missing from the sources, it is the most important reason to give, so it is
+# reported ahead of other uncovered terms.
+_QUALIFIER_TERMS = {
+    "child", "children", "childs", "kid", "kids", "infant", "infants", "baby",
+    "babies", "newborn", "newborns", "neonate", "neonates", "toddler",
+    "toddlers", "adolescent", "adolescents", "teen", "teenager", "teenagers",
+    "paediatric", "pediatric", "elderly", "geriatric", "pregnant", "pregnancy",
+    "breastfeeding", "lactation", "lactating", "nursing", "alcohol", "kidney",
+    "renal", "liver", "hepatic", "surgery", "dialysis", "weight", "overdose",
+}
 
+# Population words that show a source addresses an age group.
+_CHILD_TERMS = {
+    "child", "children", "paediatric", "pediatric", "infant", "infants",
+    "adolescent", "adolescents", "neonate", "neonates", "newborn", "newborns",
+}
+_OLDER_TERMS = {"elderly", "older", "geriatric"}
 
-def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:
-    """Return (covered, detail). If a salient term is uncovered, the second
-    element names it for the refusal reason."""
+def _source_vocab(sources: list[dict]) -> set[str]:
     vocab: set[str] = set()
     for record in sources:
         # Scan the body, the title, and the section label. A question word may
@@ -148,10 +151,146 @@ def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:
         vocab |= _source_vocabulary(record.get("text", ""))
         vocab |= _source_vocabulary(record.get("title", ""))
         vocab |= _source_vocabulary(record.get("section", ""))
-    uncovered = [t for t in _salient_terms(query) if not _covered(t, vocab)]
-    if uncovered:
-        offending = uncovered[0]
-        return False, f"the term '{offending}' does not appear in any trusted source"
+    return vocab
+
+
+def _stated_age(query: str) -> tuple[float, str] | None:
+    """The age a question is about, as (years, phrase), or None."""
+    m = _AGE_RE.search(query)
+    if not m:
+        return None
+    raw = m.group(1) or m.group(3)
+    number = _word_to_number(raw)
+    if number is None:
+        return None
+    unit = "year" if m.group(3) else re.sub(r"s$", "", (m.group(2) or "year").lower())
+    unit = {"yr": "year"}.get(unit, unit)
+    years = number if unit == "year" else 0.0
+    return years, f"{_fmt_num(number)}-{unit}-old"
+
+
+def _with_article(phrase: str) -> str:
+    """ "a 6-year-old", but "an 8-year-old", "an 11-", "an 18-month-old"."""
+    starts_with_vowel_sound = phrase.startswith("8") or re.match(r"1[18](?:\D|$)", phrase)
+    return ("an " if starts_with_vowel_sound else "a ") + phrase
+
+
+# Questions that ask for a dose limit. A source only answers them if it states
+# a limit; a starting dose is not a maximum.
+_LIMIT_QUESTION = re.compile(
+    r"\b(?:(max(?:imum)?|highest|upper limit|most)|(min(?:imum)?|lowest|least))\b[^?.]*\b(?:dose|dosage|amount)\b"
+    r"|\b(?:dose|dosage)\b[^?.]*\b(?:(max(?:imum)?|highest|upper limit)|(min(?:imum)?|lowest))\b",
+    re.IGNORECASE,
+)
+_MAX_WORDS = ("maximum", "max", "highest", "exceed", "not more than", "no more than", "up to", "upper limit")
+_MIN_WORDS = ("minimum", "lowest", "at least", "no less than")
+
+# Questions that ask for a dose to use in combination: "combine X with Y at
+# what dose", "the dose of X when taken together with Y".
+_COMBINED_DOSE_QUESTION = re.compile(
+    r"\bcombin\w*\b[^?.]*\bat what dos"
+    r"|\bcombined dos"
+    r"|\b(?:dose|dosage)\b[^?.,;]*\b(?:together with|in combination with|when combined with|if combined with)\b",
+    re.IGNORECASE,
+)
+_DO_NOT_COMBINE = re.compile(
+    r"\b(?:must|should)\s+not\s+be\s+combined\b|\bnot\s+be\s+combined\b|\bavoid\w*\s+combin",
+    re.IGNORECASE,
+)
+
+
+def _unanswerable_request(query: str, sources: list[dict]) -> str | None:
+    """A reason the sources can't answer what the question asks for, even
+    though they mention its subject, or None."""
+    text = " ".join(r.get("text", "") for r in sources).lower()
+
+    m = _LIMIT_QUESTION.search(query)
+    if m:
+        wants_max = bool(m.group(1) or m.group(3))
+        words = _MAX_WORDS if wants_max else _MIN_WORDS
+        if not any(w in text for w in words):
+            kind = "maximum" if wants_max else "minimum"
+            return f"no trusted source states a {kind} dose"
+
+    if _COMBINED_DOSE_QUESTION.search(query) and _DO_NOT_COMBINE.search(text):
+        return "the trusted sources say these must not be combined, so no combined dose can be given"
+
+    return None
+
+
+def _prioritise(terms: list[str], query: str) -> list[str]:
+    """Order uncovered terms by how much they matter: clinical qualifiers
+    first, then names written with a capital letter, then everything else."""
+    capitalised = {w.lower() for w in re.findall(r"\b[A-Z][a-zA-Z'-]+", query)}
+    def rank(term: str) -> int:
+        if term in _QUALIFIER_TERMS:
+            return 0
+        if term in capitalised:
+            return 1
+        return 2
+    return sorted(terms, key=rank)
+
+
+def coverage_report(query: str, sources: list[dict]) -> dict:
+    """Everything the coverage check looked at, for the trace: question terms
+    found or missing in the retrieved sources, doses stated in the question,
+    and any age the question is about."""
+    vocab = _source_vocab(sources)
+    terms = _salient_terms(query)
+    covered = [t for t in terms if _covered(t, vocab)]
+    uncovered = _prioritise([t for t in terms if not _covered(t, vocab)], query)
+
+    source_values: set[str] = set()
+    for record in sources:
+        source_values |= _canonical_pairs(record.get("text", ""))
+    question_values = sorted(_canonical_pairs(query))
+    unsupported_values = [v for v in question_values if v not in source_values]
+
+    age = _stated_age(query)
+    age_report = None
+    if age is not None:
+        years, phrase = age
+        if years < 18:
+            group, needed = "children", _CHILD_TERMS
+        elif years >= 65:
+            group, needed = "older adults", _OLDER_TERMS
+        else:
+            group, needed = "adults", set()
+        age_report = {
+            "phrase": phrase,
+            "years": years,
+            "group": group,
+            "covered": not needed or bool(needed & vocab),
+        }
+
+    return {
+        "checked_terms": terms,
+        "covered": covered,
+        "uncovered": uncovered,
+        "question_values": question_values,
+        "unsupported_values": unsupported_values,
+        "age": age_report,
+        "unanswerable_request": _unanswerable_request(query, sources),
+    }
+
+
+def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:
+    """Return (covered, detail). The detail names the most important gap:
+    a dose the question states that no source supports, then an age group no
+    source addresses, then the most significant missing term, then a request
+    the sources can't answer (a dose limit or a combined dose they don't give)."""
+    report = coverage_report(query, sources)
+    if report["unsupported_values"]:
+        value = report["unsupported_values"][0]
+        return False, f"the value '{value}' in the question does not appear in any trusted source"
+    age = report["age"]
+    if age and not age["covered"]:
+        return False, (f"the question is about {_with_article(age['phrase'])}, and no "
+                       f"trusted source covers {age['group']}")
+    if report["uncovered"]:
+        return False, f"the term '{report['uncovered'][0]}' does not appear in any trusted source"
+    if report["unanswerable_request"]:
+        return False, report["unanswerable_request"]
     return True, "all question terms are represented in the retrieved sources"
 
 
@@ -248,6 +387,17 @@ _QTY = rf"(?:\d+(?:\.\d+)?|(?:{_NUMWORD_ALT})(?:[\s-]+(?:{_NUMWORD_ALT}))?)"
 _RANGE_SEP = r"(?:\s*(?:to|-|–|—|or)\s*)"
 _VALUE_RE = re.compile(
     rf"\b({_QTY})(?:{_RANGE_SEP}({_QTY}))?\s*({_UNIT_ALT})\b",
+    re.IGNORECASE,
+)
+
+
+# Ages a question can state: "6 year old", "six-year-old", "18 months old",
+# "aged 70", "age 4". Group 1 is the number and group 2 the unit for the "old"
+# forms; group 3 is the number for the "aged" forms.
+_AGE_QTY = rf"(?:\d{{1,3}}|(?:{_NUMWORD_ALT})(?:[\s-]+(?:{_NUMWORD_ALT}))?)"
+_AGE_RE = re.compile(
+    rf"\b({_AGE_QTY})[\s-]*(years?|yrs?|months?|weeks?|days?)[\s-]*old\b"
+    rf"|\baged?\s+({_AGE_QTY})\b",
     re.IGNORECASE,
 )
 

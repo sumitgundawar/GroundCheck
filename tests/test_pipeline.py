@@ -119,3 +119,31 @@ def test_disabled_guards_are_marked_skip_not_pass():
 def test_default_settings_match_no_settings():
     q = "What is the standard dose of Caloradine?"
     assert pipeline.run(q).decision == pipeline.run(q, Settings()).decision
+
+
+# --- Extractive answers stay on the question's topic ------------------------
+
+def test_extractive_answer_only_uses_passages_about_the_named_drug():
+    r = pipeline.run("What is the standard dose of Caloradine?")
+    assert r.decision == "answer"
+    for claim in r.claims:
+        text = retrieval.corpus_text_for(claim.source_ids[0]).lower()
+        assert "caloradine" in text
+
+
+def test_core_demo_dose_and_interaction_question_still_answers():
+    r = pipeline.run("What is the dose of Caloradine, and can it be combined with Mendel solution?")
+    assert r.decision == "answer"
+    assert "15 mg" in r.answer_text
+
+
+@pytest.mark.parametrize("query, reason_part", [
+    ("Caloradine is 50 mg once daily, correct?", "50 mg"),
+    ("My email is a@b.com, what is the dose of Caloradine for a 5 year old?", "5-year-old"),
+    ("What is the maximum dose of Caloradine?", "maximum dose"),
+    ("Combine Caloradine with Orrin-blockers at what dose?", "must not be combined"),
+])
+def test_refusals_give_the_right_reason(query, reason_part):
+    r = pipeline.run(query)
+    assert r.decision == "refuse"
+    assert reason_part in r.refused_reason

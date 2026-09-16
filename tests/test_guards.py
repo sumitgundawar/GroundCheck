@@ -137,3 +137,71 @@ def test_dosage_range_endpoints_checked():
 def test_dosage_no_values_passes():
     ok, detail, checked = guards_output.dosage_guard("No numbers here.", SRC)
     assert ok is True and checked == []
+
+
+# --- Coverage: doses, ages, dose limits, combinations, reason priority -------
+
+def _sources(*ids):
+    return [r for r in retrieval.all_metadata() if r["id"] in ids]
+
+
+def test_dose_stated_in_question_must_be_in_sources():
+    ok, detail = guards_output.coverage_check(
+        "Caloradine is 50 mg once daily, correct?", _sources("CALO-001", "VELT-002"))
+    assert not ok
+    assert "50 mg" in detail
+
+
+def test_dose_stated_in_question_that_sources_support_passes_value_check():
+    report = guards_output.coverage_report(
+        "Is Caloradine started at 15 mg once daily?", _sources("CALO-001", "VELT-002"))
+    assert report["question_values"] == ["15 mg"]
+    assert report["unsupported_values"] == []
+
+
+@pytest.mark.parametrize("query, phrase, group", [
+    ("What is the dose of Caloradine for a 6 year old child?", "a 6-year-old", "children"),
+    ("What is the dose of Caloradine for a six-year-old?", "a 6-year-old", "children"),
+    ("Dose of Caloradine for an 18 month old?", "an 18-month-old", "children"),
+    ("What is the dose of Caloradine for an 8 year old?", "an 8-year-old", "children"),
+    ("What dose of Caloradine is used for a patient aged 70?", "a 70-year-old", "older adults"),
+])
+def test_stated_age_needs_sources_for_that_age_group(query, phrase, group):
+    ok, detail = guards_output.coverage_check(query, _sources("CALO-001", "VELT-002"))
+    assert not ok
+    assert detail == f"the question is about {phrase}, and no trusted source covers {group}"
+
+
+def test_adult_age_does_not_require_population_terms():
+    report = guards_output.coverage_report(
+        "What is the dose of Caloradine for a 40 year old?", _sources("CALO-001"))
+    assert report["age"]["group"] == "adults"
+    assert report["age"]["covered"] is True
+
+
+def test_qualifier_is_reported_before_everyday_words():
+    ok, detail = guards_output.coverage_check(
+        "Honestly, what dose of Caloradine suits children?", _sources("CALO-001"))
+    assert not ok
+    assert "'children'" in detail
+
+
+def test_maximum_dose_refuses_when_sources_state_no_limit():
+    ok, detail = guards_output.coverage_check(
+        "What is the maximum dose of Caloradine?", _sources("CALO-001", "VELT-002"))
+    assert not ok
+    assert detail == "no trusted source states a maximum dose"
+
+
+def test_combined_dose_refuses_when_sources_forbid_the_combination():
+    ok, detail = guards_output.coverage_check(
+        "Combine Caloradine with Orrin-blockers at what dose?", _sources("CALO-001", "INTR-001"))
+    assert not ok
+    assert "must not be combined" in detail
+
+
+def test_asking_whether_drugs_combine_is_not_a_combined_dose_request():
+    report = guards_output.coverage_report(
+        "What is the dose of Caloradine, and can it be combined with Mendel solution?",
+        _sources("CALO-001", "INTR-001", "MEND-001"))
+    assert report["unanswerable_request"] is None
