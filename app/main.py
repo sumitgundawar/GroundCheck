@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audit, auth, config, db, governance, llm, local_ai, pipeline, retrieval
+from . import audit, auth, config, db, encryption, governance, integrity, llm, local_ai, pipeline, retrieval, retention
 from .schemas import AskRequest, AskResponse, Settings
 
 WEB_DIR = config.ROOT_DIR / "web"
@@ -22,6 +22,10 @@ WEB_DIR = config.ROOT_DIR / "web"
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Refuse to start with a malformed encryption or signing key, rather than
+    # run without the protection that was asked for.
+    encryption.keyring()
+    integrity.signing_summary()
     # Warm the model and load the prebuilt index before serving traffic.
     retrieval.get_model()
     retrieval.load_index()
@@ -287,6 +291,14 @@ def users_update(user_id: int, body: UserUpdateRequest, admin: auth.Principal = 
             auth.set_password(user_id, body.password)
         return {"user": auth.update_user(user_id, role=body.role, is_active=body.is_active,
                                          name=body.name, acting_user_id=admin.id)}
+    except auth.AuthError as exc:
+        raise _auth_error(exc) from exc
+
+
+@app.delete("/api/users/{user_id}")
+def users_delete(user_id: int, admin: auth.Principal = Depends(_admin)) -> dict:
+    try:
+        return {"user": auth.delete_user(user_id, acting_user_id=admin.id)}
     except auth.AuthError as exc:
         raise _auth_error(exc) from exc
 
@@ -790,6 +802,31 @@ def governance_safety_case(request: Request, days: int = 30) -> Response:
         raise _governance_error(exc) from exc
     return Response(text, media_type="text/markdown; charset=utf-8", headers={
         "Content-Disposition": 'attachment; filename="groundcheck-safety-case.md"'})
+
+
+# --- Data protection -----------------------------------------------------------
+
+@app.get("/api/data-protection")
+def data_protection(request: Request) -> dict:
+    """Encryption, audit signing and retention status. Key ids only, never keys."""
+    require_manager(request, "admin")
+    _require_database()
+    return {"encryption": encryption.keyring().summary(), "audit_signing": integrity.signing_summary(),
+            "audit_chain": integrity.head(), "retention": retention.plan()}
+
+
+@app.post("/api/audit/verify")
+async def audit_verify(request: Request) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    return await run_in_threadpool(integrity.verify)
+
+
+@app.post("/api/retention/run")
+def retention_run(request: Request) -> dict:
+    user = require_manager(request, "admin")
+    _require_database()
+    return {"run": retention.apply(user.id if user else None), "retention": retention.plan()}
 
 
 # Static assets (logo, fonts, css, js). Mounted last so API routes win.

@@ -145,6 +145,30 @@ def update_user(user_id: int, *, role: str | None = None, is_active: bool | None
         return {"id": user.id, "email": user.email, "role": user.role, "is_active": user.is_active}
 
 
+def delete_user(user_id: int, acting_user_id: int | None = None) -> dict:
+    """Delete a person's account and personal details. Their audit records and
+    reviews stay, attributed to an anonymous account number, because clinical
+    records must be kept; retention deletes those in time."""
+    with db.session() as s:
+        user = s.get(User, user_id)
+        if user is None:
+            raise AuthError("No such user.")
+        if acting_user_id == user_id:
+            raise AuthError("You can't delete your own account.")
+        if user.role == "admin" and user.is_active and _active_admins(s) <= 1:
+            raise AuthError("Keep at least one active admin.")
+        s.execute(delete(AuthSession).where(AuthSession.user_id == user_id))
+        user.email = f"deleted-user-{user.id}@deleted.invalid"
+        user.name = ""
+        user.password_hash = "!"  # matches no password
+        user.mfa_secret = None
+        user.mfa_enabled = False
+        user.is_active = False
+        user.failed_logins = 0
+        user.locked_until = None
+        return {"id": user.id, "email": user.email, "deleted": True}
+
+
 def set_password(user_id: int, new_password: str, current_password: str | None = None) -> None:
     """Change a password. Users changing their own must give the current one.
     Every other session for the user is signed out."""

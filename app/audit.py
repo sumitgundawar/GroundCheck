@@ -23,7 +23,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 
-from . import config, db
+from . import config, db, integrity
 from .schemas import AskResponse
 
 log = logging.getLogger("groundcheck.audit")
@@ -95,8 +95,8 @@ class AuditStore:
         backend = self.backend()
         if backend == "database":
             try:
-                with db.session() as s:
-                    s.add(db.AuditRecord(
+                with integrity.write_lock, db.session() as s:
+                    integrity.append(s, db.AuditRecord(
                         audit_id=audit_id,
                         user_id=user_id,
                         decision=response.decision,

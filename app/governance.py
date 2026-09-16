@@ -17,7 +17,6 @@ Nothing here decides an answer. It records and routes what the pipeline did."""
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import statistics
@@ -25,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 
-from . import __version__, config, db
+from . import __version__, config, db, encryption
 from .db import AuditRecord, EvalCase, Hazard, ReviewCase, ReviewEvent, Source, User, utcnow
 
 OUTCOMES = {
@@ -46,7 +45,7 @@ class GovernanceError(ValueError):
 
 def _key(query: str) -> str:
     normalised = re.sub(r"\s+", " ", query.strip().lower())
-    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
+    return encryption.keyring().lookup_hash(normalised)
 
 
 def categorise(reason: str) -> str:

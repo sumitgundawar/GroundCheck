@@ -13,6 +13,7 @@ new install and an upgrade both need no manual step."""
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from contextlib import contextmanager
@@ -36,7 +37,7 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
-from . import config
+from . import config, encryption
 
 log = logging.getLogger("groundcheck.db")
 
@@ -66,6 +67,51 @@ class UTCDateTime(TypeDecorator):
         return value
 
 
+class EncryptedText(TypeDecorator):
+    """Text encrypted with DATA_ENCRYPTION_KEYS when it's set (app/encryption.py).
+    The context names the column and is bound to the ciphertext."""
+
+    impl = Text
+    cache_ok = True
+
+    def __init__(self, context: str):
+        super().__init__()
+        self.context = context
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return encryption.keyring().encrypt(value, self.context)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return encryption.keyring().decrypt(value, self.context)
+
+
+class EncryptedJSON(TypeDecorator):
+    """A JSON document, stored as an encrypted string when DATA_ENCRYPTION_KEYS
+    is set, and as plain JSON otherwise."""
+
+    impl = JSON
+    cache_ok = True
+
+    def __init__(self, context: str):
+        super().__init__()
+        self.context = context
+
+    def process_bind_param(self, value, dialect):
+        ring = encryption.keyring()
+        if value is None or not ring.enabled:
+            return value
+        return ring.encrypt(json.dumps(value, ensure_ascii=False, separators=(",", ":")), self.context)
+
+    def process_result_value(self, value, dialect):
+        if encryption.is_encrypted(value):
+            return json.loads(encryption.keyring().decrypt(value, self.context))
+        return value
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -79,7 +125,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="clinician")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mfa_secret: Mapped[str | None] = mapped_column(EncryptedText("users.mfa_secret"), nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     failed_logins: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
@@ -121,15 +167,51 @@ class AuditRecord(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     decision: Mapped[str] = mapped_column(String(10), nullable=False)
-    query: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    query: Mapped[str] = mapped_column(EncryptedText("audit_records.query"), nullable=False, default="")
     total_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     llm_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    record: Mapped[dict] = mapped_column(JSON, nullable=False)
+    record: Mapped[dict] = mapped_column(EncryptedJSON("audit_records.record"), nullable=False)
+    # Tamper-evident chain (app/integrity.py). Null only for records written
+    # before the chain existed and not yet backfilled.
+    seq: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True)
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    entry_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chain_alg: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     __table_args__ = (
         Index("ix_audit_records_created_at", "created_at"),
         Index("ix_audit_records_user_id", "user_id"),
     )
+
+
+class RetentionRun(Base):
+    """A record of each time retention deleted data: what, up to when, and who."""
+
+    __tablename__ = "retention_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ran_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    ran_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    audit_cutoff: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    audit_deleted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    anchor_seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    review_cutoff: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    reviews_deleted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sessions_deleted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class AuditChain(Base):
+    """The audit chain's head: the last number and hash written, and the anchor
+    the remaining records start from after retention removes older ones."""
+
+    __tablename__ = "audit_chain"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    anchor_seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    anchor_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
 
 
 class Source(Base):
@@ -191,9 +273,9 @@ class ReviewCase(Base):
     kind: Mapped[str] = mapped_column(String(20), nullable=False)          # refusal, flagged
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")  # open, resolved, dismissed
     priority: Mapped[str] = mapped_column(String(10), nullable=False, default="normal")  # normal, high
-    query: Mapped[str] = mapped_column(Text, nullable=False)
+    query: Mapped[str] = mapped_column(EncryptedText("review_cases.query"), nullable=False)
     query_key: Mapped[str] = mapped_column(String(64), nullable=False)
-    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    reason: Mapped[str] = mapped_column(EncryptedText("review_cases.reason"), nullable=False, default="")
     reason_category: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     first_audit_id: Mapped[str] = mapped_column(String(16), nullable=False)
     last_audit_id: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -207,7 +289,7 @@ class ReviewCase(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     outcome: Mapped[str] = mapped_column(String(30), nullable=False, default="")
-    outcome_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    outcome_note: Mapped[str] = mapped_column(EncryptedText("review_cases.outcome_note"), nullable=False, default="")
 
     events: Mapped[list["ReviewEvent"]] = relationship(
         back_populates="case", cascade="all, delete-orphan", order_by="ReviewEvent.id")
@@ -229,7 +311,7 @@ class ReviewEvent(Base):
     at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action: Mapped[str] = mapped_column(String(20), nullable=False)
-    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    note: Mapped[str] = mapped_column(EncryptedText("review_events.note"), nullable=False, default="")
 
     case: Mapped[ReviewCase] = relationship(back_populates="events")
 
@@ -242,9 +324,9 @@ class EvalCase(Base):
     __tablename__ = "eval_cases"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    query: Mapped[str] = mapped_column(Text, nullable=False)
+    query: Mapped[str] = mapped_column(EncryptedText("eval_cases.query"), nullable=False)
     expect: Mapped[str] = mapped_column(String(10), nullable=False)
-    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    note: Mapped[str] = mapped_column(EncryptedText("eval_cases.note"), nullable=False, default="")
     from_case_id: Mapped[int | None] = mapped_column(ForeignKey("review_cases.id", ondelete="SET NULL"), nullable=True)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)

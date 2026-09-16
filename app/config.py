@@ -131,6 +131,19 @@ AUDIT_RING_SIZE = 50
 AUDIT_LOG_PATH = Path(_get("AUDIT_LOG_PATH", str(ROOT_DIR / "audit" / "audit_log.jsonl")))
 AUDIT_PERSIST = _get("AUDIT_PERSIST", "true").lower() in ("1", "true", "yes")
 
+# --- Protecting stored data (see app/encryption.py and app/integrity.py) ---
+# Secrets: read from the environment only, never from a file in the repository.
+# Comma-separated base64 keys; the first encrypts, all decrypt.
+DATA_ENCRYPTION_KEYS = os.environ.get("DATA_ENCRYPTION_KEYS", "").strip()
+# Comma-separated base64 keys that only decrypt, for rotation or turning encryption off.
+DATA_ENCRYPTION_RETIRED_KEYS = os.environ.get("DATA_ENCRYPTION_RETIRED_KEYS", "").strip()
+# Comma-separated base64 keys; the first signs the audit chain, all verify.
+AUDIT_SIGNING_KEYS = os.environ.get("AUDIT_SIGNING_KEYS", "").strip()
+
+# --- Retention (see app/retention.py). 0 keeps records for ever. ---
+AUDIT_RETENTION_DAYS = _get_int("AUDIT_RETENTION_DAYS", 0)
+REVIEW_RETENTION_DAYS = _get_int("REVIEW_RETENTION_DAYS", 0)
+
 
 def llm_configured() -> bool:
     """True if a live LLM should be used: a key is present and extractive mode
