@@ -1,0 +1,60 @@
+name: Unsafe answer
+description: GroundCheck answered a question it should have refused.
+title: "[Unsafe answer]: "
+labels: ["bug", "safety"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most important kind of report. Thank you.
+
+        **Do not include real patient data.** If your question came from a real case, rewrite it with invented details that still reproduce the problem.
+
+        If you found a general technique that bypasses a guard, report it privately through [SECURITY.md](https://github.com/sumitgundawar/GroundCheck/blob/main/SECURITY.md) instead.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: The exact text you asked.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: answer
+    attributes:
+      label: What GroundCheck answered
+      description: The answer text and its citations, as shown.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it should have refused
+      description: For example, the sources don't state this dose, or the question names something the corpus doesn't cover.
+    validations:
+      required: true
+  - type: input
+    id: audit
+    attributes:
+      label: Audit ID
+      description: Shown with the decision. Helps trace the exact run.
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Generation mode
+      options:
+        - Extractive (no API key)
+        - Live model
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Tuning settings changed from the defaults
+      description: Thresholds, top-k or guards you switched off, if any.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Commit hash, or "live demo".
