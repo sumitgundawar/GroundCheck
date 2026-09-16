@@ -1,0 +1,53 @@
+name: Bug report
+description: Something is broken, or a question was refused that should have been answered.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search [existing issues](https://github.com/sumitgundawar/GroundCheck/issues) first. **Do not include real patient data or API keys.**
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `uvicorn app.main:app --port 8000`
+        2. Ask "..."
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, trace or error output
+      description: Paste the relevant output. Remove any secrets first.
+      render: text
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running GroundCheck?
+      options:
+        - Python (local virtual environment)
+        - Docker
+        - Hugging Face Spaces
+        - Render
+        - Live demo
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, and commit hash.
+      placeholder: macOS 15, Python 3.12.4, 2595086
+    validations:
+      required: true

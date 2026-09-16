@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/sumitgundawar/GroundCheck/security/advisories/new
+    about: Report vulnerabilities privately. Please don't open a public issue.
+  - name: Read the contributing guide
+    url: https://github.com/sumitgundawar/GroundCheck/blob/main/CONTRIBUTING.md
+    about: Setup, checks, and what a pull request needs.
