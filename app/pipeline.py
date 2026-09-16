@@ -107,9 +107,10 @@ ROUTED = "The question has been routed for review."
 # step. These make the pipeline self-documenting on the frontend.
 STAGE_EXPLAIN = {
     "pii redaction":
-        "Before anything is logged, embedded, or sent to a model, the query is "
-        "scanned for emails and long digit sequences, which are replaced with "
-        "[redacted]. Illustrative, deliberately simple.",
+        "Before anything is logged, embedded, or sent to a model, names, dates, "
+        "record and NHS numbers, phone numbers, email and street addresses and "
+        "postcodes are replaced with placeholders such as [NAME] and [DATE]. "
+        "Ages over 89 become 90. Rule-based: a safety net, not a guarantee.",
     "scope check":
         "Rejects empty or over-long queries and obvious prompt-injection "
         "patterns such as 'ignore previous instructions'. A blocked query "
@@ -175,11 +176,12 @@ def run(raw_query: str, settings: "Settings | None" = None,
 
     # --- 1. Input guards ---------------------------------------------------
     if cfg.enable_pii_redaction:
-        redacted, did_redact = guards_input.redact_pii(raw_query)
-        pii_status = "warn" if did_redact else "pass"
-        pii_detail = "redacted sensitive tokens" if did_redact else "no PII detected"
+        cleaned = guards_input.deidentify(raw_query)
+        redacted = cleaned.text
+        pii_status = "warn" if cleaned.changed else "pass"
+        pii_detail = cleaned.summary()
     else:
-        redacted, did_redact = raw_query, False
+        redacted = raw_query
         pii_status, pii_detail = "skip", "guard disabled"
     extras["redacted_query"] = redacted
     trace.append(TraceStep(name="pii redaction", status=pii_status,

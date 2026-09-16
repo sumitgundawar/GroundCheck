@@ -9,20 +9,22 @@ import time
 from collections import deque
 from dataclasses import dataclass
 
-from . import config
+from . import config, deid
 
-# --- PII redaction ---------------------------------------------------------
-_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-# Phone-like or long digit runs (7 or more digits, optionally spaced/dashed).
-_LONG_DIGITS = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
+# --- De-identification (see app/deid.py) ------------------------------------
+
+def deidentify(text: str) -> deid.Result:
+    """Replace names, dates, record numbers and contact details with
+    placeholders. Words the document index knows are never treated as names."""
+    from . import retrieval
+
+    return deid.deidentify(text, retrieval.is_known_term)
 
 
 def redact_pii(text: str) -> tuple[str, bool]:
-    """Replace emails and long digit sequences with [redacted].
-    Returns the cleaned text and whether anything was redacted."""
-    redacted = _EMAIL.sub("[redacted]", text)
-    redacted = _LONG_DIGITS.sub("[redacted]", redacted)
-    return redacted, redacted != text
+    """De-identify text. Returns the cleaned text and whether anything changed."""
+    result = deidentify(text)
+    return result.text, result.changed
 
 
 # --- Injection / scope -----------------------------------------------------

@@ -162,6 +162,11 @@ def _ensure_loaded() -> None:
 _TOKEN = re.compile(r"[a-z][a-z0-9'-]*")
 
 
+def is_known_term(word: str) -> bool:
+    """Whether a word appears in the indexed documents."""
+    return _lexical is not None and word.lower() in _lexical.postings
+
+
 def tokenize(text: str) -> list[str]:
     return _TOKEN.findall(text.lower())
 

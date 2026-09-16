@@ -104,6 +104,9 @@ _CONTRACTION = re.compile(r"(?:'s|'re|'ve|'ll|'d|'m|n't)$")
 
 
 def _salient_terms(query: str) -> list[str]:
+    from .deid import PLACEHOLDER
+
+    query = PLACEHOLDER.sub(" ", query)  # [NAME], [DATE]: removed identifiers, not topics
     terms = []
     for match in _WORD.finditer(query.lower().replace("’", "'")):
         word = _CONTRACTION.sub("", match.group(0))

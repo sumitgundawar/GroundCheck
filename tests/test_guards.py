@@ -35,7 +35,7 @@ def test_pii_redacts_email_and_long_digits():
     assert changed
     assert "a@b.com" not in text
     assert "0123456789" not in text
-    assert "[redacted]" in text
+    assert "[EMAIL]" in text
 
 
 def test_pii_leaves_clean_text_untouched():
