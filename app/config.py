@@ -48,6 +48,12 @@ USE_LLM_JUDGE = _get("USE_LLM_JUDGE", "true").lower() in ("1", "true", "yes")
 # --- Embeddings + retrieval ------------------------------------------------
 EMBED_MODEL = _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 TOP_K = _get_int("TOP_K", 4)
+# Combine keyword (BM25) and embedding search. Keyword matching keeps rare,
+# look-alike names such as drug names from being confused with each other.
+HYBRID_RETRIEVAL = _get("HYBRID_RETRIEVAL", "true").lower() in ("1", "true", "yes")
+# Weight of the embedding score in hybrid ranking (0 to 1); the keyword score
+# gets the rest.
+HYBRID_ALPHA = min(1.0, max(0.0, _get_float("HYBRID_ALPHA", 0.5)))
 RETRIEVAL_MIN_SCORE = _get_float("RETRIEVAL_MIN_SCORE", 0.30)
 GROUNDING_MIN = _get_float("GROUNDING_MIN", 0.45)
 

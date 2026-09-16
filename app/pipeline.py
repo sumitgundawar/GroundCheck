@@ -208,7 +208,9 @@ def run(raw_query: str, settings: "Settings | None" = None,
 
     # --- 2. Retrieve -------------------------------------------------------
     results = retrieval.search(query, cfg.top_k)
-    top_score = results[0][1] if results else 0.0
+    # Hybrid results are in fused-rank order, so take the best cosine score
+    # explicitly rather than the first result's.
+    top_score = max((s for _, s in results), default=0.0)
     source_records = [r for r, _ in results]
     sources = [
         Source(
@@ -223,7 +225,9 @@ def run(raw_query: str, settings: "Settings | None" = None,
     trace.append(TraceStep(
         name="retrieve",
         status="pass",
-        detail=f"top-{len(results)} from corpus, best score {top_score:.2f}",
+        detail=(f"top-{len(results)} from corpus "
+                f"({'keyword + embedding' if config.HYBRID_RETRIEVAL else 'embedding'}), "
+                f"best score {top_score:.2f}"),
         ms=timer.lap_ms(),
         data={"results": [
             {"id": r["id"], "title": r["title"], "score": round(s, 4),

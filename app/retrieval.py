@@ -1,13 +1,21 @@
-"""Embeddings and FAISS retrieval.
+"""Embeddings, FAISS and hybrid retrieval.
 
 The embedding model is loaded once and reused. The FAISS index is built ahead of
 time by scripts/build_index.py and loaded at app startup. Vectors are
-L2-normalised, so the inner-product index returns cosine similarity directly."""
+L2-normalised, so the inner-product index returns cosine similarity directly.
+
+Retrieval is hybrid by default. Embeddings capture meaning but blur rare,
+look-alike names (invented or real drug names), so a BM25 keyword index runs
+alongside and each passage is ranked by a weighted blend of the two scores.
+The score reported for each passage is always its cosine similarity, so the
+retrieval gate keeps its meaning."""
 
 from __future__ import annotations
 
 import json
+import math
 import re
+from collections import Counter, defaultdict
 from functools import lru_cache
 from pathlib import Path
 
@@ -19,6 +27,10 @@ from . import config
 # A parallel list of corpus records, populated when the index is loaded.
 _metadata: list[dict] = []
 _index: faiss.Index | None = None
+# Document vectors (row i belongs to _metadata[i]), for cosine scores of
+# passages found by keyword search.
+_vectors: np.ndarray | None = None
+_lexical: "LexicalIndex | None" = None
 
 
 @lru_cache(maxsize=1)
@@ -105,9 +117,12 @@ def load_index() -> None:
         raise FileNotFoundError(
             "Index not found. Run scripts/build_index.py before starting the app."
         )
+    global _vectors, _lexical
     _index = faiss.read_index(str(index_path))
     with open(meta_path, "r", encoding="utf-8") as fh:
         _metadata = json.load(fh)
+    _vectors = _index.reconstruct_n(0, _index.ntotal)
+    _lexical = LexicalIndex([f"{r['title']} {r['text']}" for r in _metadata])
 
 
 def _ensure_loaded() -> None:
@@ -115,21 +130,89 @@ def _ensure_loaded() -> None:
         load_index()
 
 
-def search(query: str, k: int | None = None) -> list[tuple[dict, float]]:
-    """Return up to k (record, cosine_score) pairs, highest score first."""
+_TOKEN = re.compile(r"[a-z][a-z0-9'-]*")
+
+
+def tokenize(text: str) -> list[str]:
+    return _TOKEN.findall(text.lower())
+
+
+class LexicalIndex:
+    """A small BM25 index over the corpus, kept in memory.
+
+    BM25 weights a term by how rare it is across the corpus, so a question that
+    names "Remdodaprex" strongly prefers the passages that contain that exact
+    name, even when an embedding model sees several similar names as close."""
+
+    def __init__(self, documents: list[str], k1: float = 1.2, b: float = 0.75):
+        self.k1 = k1
+        self.b = b
+        self.n = len(documents)
+        self.postings: dict[str, list[tuple[int, int]]] = defaultdict(list)
+        self.lengths = np.zeros(self.n, dtype="float32")
+        for i, doc in enumerate(documents):
+            counts = Counter(tokenize(doc))
+            self.lengths[i] = sum(counts.values())
+            for term, tf in counts.items():
+                self.postings[term].append((i, tf))
+        self.avg_length = float(self.lengths.mean()) if self.n else 0.0
+
+    def idf(self, term: str) -> float:
+        df = len(self.postings.get(term, ()))
+        return math.log(1 + (self.n - df + 0.5) / (df + 0.5)) if df else 0.0
+
+    def scores(self, query: str) -> np.ndarray:
+        """BM25 with squared IDF. Plain BM25 lets two common words ("side
+        effects") outweigh one rare name ("Remdodaprex"), so every drug's
+        side-effect page scores alike. Squaring IDF makes distinctive terms,
+        which are usually the names a question is about, dominate."""
+        scores = np.zeros(self.n, dtype="float32")
+        for term in set(tokenize(query)):
+            postings = self.postings.get(term)
+            if not postings:
+                continue
+            idf = self.idf(term) ** 2
+            for doc, tf in postings:
+                norm = self.k1 * (1 - self.b + self.b * self.lengths[doc] / self.avg_length)
+                scores[doc] += idf * tf * (self.k1 + 1) / (tf + norm)
+        return scores
+
+
+def _cosine(value: float) -> float:
+    # Cosine on normalised vectors is in [-1, 1]; clamp to [0, 1] for a clean
+    # similarity score in the UI and the retrieval gate.
+    return float(max(0.0, min(1.0, value)))
+
+
+def search(query: str, k: int | None = None,
+           hybrid: bool | None = None) -> list[tuple[dict, float]]:
+    """Return up to k (record, cosine_score) pairs.
+
+    Embedding-only search is ordered by cosine score. Hybrid search ranks by a
+    blend of cosine score and keyword score, so the first result is not always
+    the highest-scoring one; callers that need the best score should take the
+    maximum."""
     _ensure_loaded()
-    assert _index is not None
+    assert _index is not None and _vectors is not None and _lexical is not None
     k = k or config.TOP_K
+    hybrid = config.HYBRID_RETRIEVAL if hybrid is None else hybrid
     query_vec = embed([query])
-    scores, idxs = _index.search(query_vec, min(k, len(_metadata)))
-    results: list[tuple[dict, float]] = []
-    for score, idx in zip(scores[0], idxs[0]):
-        if idx < 0:
-            continue
-        # Cosine on normalised vectors is already in [-1, 1]; clamp to [0, 1]
-        # for a clean similarity score in the UI.
-        results.append((_metadata[idx], float(max(0.0, min(1.0, score)))))
-    return results
+
+    if not hybrid:
+        scores, idxs = _index.search(query_vec, min(k, len(_metadata)))
+        return [(_metadata[i], _cosine(s)) for s, i in zip(scores[0], idxs[0]) if i >= 0]
+
+    # Score every passage: exact for a flat index, and cheap at corpus scale.
+    cosines = _vectors @ query_vec[0]
+    keyword = _lexical.scores(query)
+    peak = float(keyword.max())
+    keyword_norm = keyword / peak if peak > 0 else keyword
+    alpha = config.HYBRID_ALPHA
+    blended = alpha * np.clip(cosines, 0.0, 1.0) + (1.0 - alpha) * keyword_norm
+
+    # Ties break on cosine score, then corpus order, so results are stable.
+    order = np.lexsort((np.arange(len(blended)), -cosines, -blended))[:k]
+    return [(_metadata[int(i)], _cosine(cosines[i])) for i in order]
 
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")

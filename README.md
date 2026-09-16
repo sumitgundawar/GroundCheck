@@ -170,7 +170,8 @@ plain-English explanation, and stage-specific data). The whole pipeline is in
 question
   -> input guards     redact PII, check scope and injection, rate limit (per IP)
   -> embed query      sentence-transformers, all-MiniLM-L6-v2
-  -> retrieve         FAISS top-k passages from the corpus, with cosine scores
+  -> retrieve         hybrid: FAISS embeddings + BM25 keywords, top-k passages
+                      ranked by a blend, reported with cosine scores
   -> retrieval gate   if top score < threshold: REFUSE now, before any generation
   -> source coverage  if a question term appears in no source: REFUSE
   -> generate         LLM returns structured claims, each citing a source id
@@ -403,6 +404,8 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `RETRIEVAL_MIN_SCORE` | `0.30` | Cosine threshold for the retrieval gate. |
 | `GROUNDING_MIN` | `0.45` | Claim-to-source threshold. |
 | `TOP_K` | `4` | Passages retrieved per query. |
+| `HYBRID_RETRIEVAL` | `true` | Combine keyword (BM25) and embedding search, so rare look-alike names aren't confused. `false` uses embeddings only. |
+| `HYBRID_ALPHA` | `0.5` | Weight of the embedding score in hybrid ranking, from 0 to 1. |
 | `LLM_TIMEOUT_SECONDS` | `8` | Outbound call timeout. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests per minute, per client IP. |
 | `AUDIT_PERSIST` | `true` | Persist the audit trail to disk. |
