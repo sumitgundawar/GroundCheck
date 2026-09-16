@@ -84,11 +84,29 @@ _STOPWORDS = {
 }
 
 
+# Conversational words: greetings, hedges and politeness. They carry no
+# clinical meaning and are never the name of a drug or condition, so a
+# question phrased casually is not refused because of them. Kept explicit and
+# short on purpose: a word that could name something clinical does not belong.
+_CONVERSATIONAL = {
+    "hello", "hey", "thanks", "thank", "cheers", "okay", "kindly",
+    "honestly", "actually", "basically", "really", "simply", "exactly",
+    "quick", "quickly", "question", "questions", "wondering", "wonder",
+    "curious", "know", "think", "sure", "maybe", "perhaps", "wanted",
+    "someone", "anyone", "somebody", "anything", "something", "whether",
+    "correct", "true", "wrong", "confirm", "clarify", "understand",
+}
+
+# Contractions attach to words the check would otherwise treat as unknown
+# ("what's", "doesn't"). The base word is what matters.
+_CONTRACTION = re.compile(r"(?:'s|'re|'ve|'ll|'d|'m|n't)$")
+
+
 def _salient_terms(query: str) -> list[str]:
     terms = []
-    for match in _WORD.finditer(query.lower()):
-        word = match.group(0)
-        if len(word) < 4 or word in _STOPWORDS:
+    for match in _WORD.finditer(query.lower().replace("’", "'")):
+        word = _CONTRACTION.sub("", match.group(0))
+        if len(word) < 4 or word in _STOPWORDS or word in _CONVERSATIONAL:
             continue
         terms.append(word)
     # Preserve order, drop duplicates.

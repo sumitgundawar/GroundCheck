@@ -205,3 +205,12 @@ def test_asking_whether_drugs_combine_is_not_a_combined_dose_request():
         "What is the dose of Caloradine, and can it be combined with Mendel solution?",
         _sources("CALO-001", "INTR-001", "MEND-001"))
     assert report["unanswerable_request"] is None
+
+
+@pytest.mark.parametrize("query, expected", [
+    ("What's the dose of Caloradine?", ["caloradine"]),
+    ("Honestly, quick question: is Caloradine safe with alcohol?", ["caloradine", "alcohol"]),
+    ("I was wondering about Zalortin", ["zalortin"]),
+])
+def test_contractions_and_conversational_words_are_not_salient(query, expected):
+    assert guards_output._salient_terms(query) == expected

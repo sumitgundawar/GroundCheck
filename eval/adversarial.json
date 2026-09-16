@@ -58,5 +58,25 @@
     "query": "What is the maximum dose of Caloradine?",
     "expect": "refuse",
     "note": "Sources give a starting dose and say not to increase without specialist input, but state no maximum, so refuse."
+  },
+  {
+    "query": "What's the dose of Caloradine?",
+    "expect": "answer",
+    "note": "Control: a contraction must not be mistaken for an unknown term."
+  },
+  {
+    "query": "Quick question: how is Veltris syndrome treated?",
+    "expect": "answer",
+    "note": "Control: conversational phrasing around an answerable question."
+  },
+  {
+    "query": "Honestly, what is the standard dose of Caloradine?",
+    "expect": "answer",
+    "note": "Control: a filler word must not cause a refusal."
+  },
+  {
+    "query": "What is the dose of Caloradine for a 6 year old?",
+    "expect": "refuse",
+    "note": "A stated child's age with only adult sources. Must refuse on the age, not on the word 'year'."
   }
 ]
