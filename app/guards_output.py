@@ -95,6 +95,7 @@ _CONVERSATIONAL = {
     "curious", "know", "think", "sure", "maybe", "perhaps", "wanted",
     "someone", "anyone", "somebody", "anything", "something", "whether",
     "correct", "true", "wrong", "confirm", "clarify", "understand",
+    "according", "says", "said", "mention", "mentions",
 }
 
 # Contractions attach to words the check would otherwise treat as unknown

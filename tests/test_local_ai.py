@@ -176,7 +176,7 @@ def test_managing_models_is_refused_from_another_machine(client):
 
 
 def test_management_can_be_disabled(client, monkeypatch):
-    monkeypatch.setattr(config, "LOCAL_AI_ADMIN", "none")
+    monkeypatch.setattr(config, "ADMIN_ACCESS", "none")
     assert client.post("/api/local-ai/select", json={"model": None}).status_code == 403
 
 

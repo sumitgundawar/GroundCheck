@@ -16,6 +16,8 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
+from datetime import datetime
 from collections import Counter, defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -28,6 +30,8 @@ from . import config, vectorstore
 # of the vector store is _metadata[i].
 _metadata: list[dict] = []
 _store: "vectorstore.VectorStore | None" = None
+_not_before: np.ndarray = np.zeros(0)
+_not_after: np.ndarray = np.zeros(0)
 _lexical: "LexicalIndex | None" = None
 
 
@@ -53,18 +57,34 @@ def embed(texts: list[str]) -> np.ndarray:
     return np.asarray(vectors, dtype="float32")
 
 
-def load_corpus() -> list[dict]:
+def load_demo_corpus() -> list[dict]:
     with open(config.CORPUS_PATH, "r", encoding="utf-8") as fh:
         return json.load(fh)
 
 
+def load_corpus() -> list[dict]:
+    """Everything the index is built from: the demo corpus (unless
+    INCLUDE_DEMO_CORPUS is false) and every approved imported document."""
+    from . import knowledge  # imported here to avoid a cycle
+
+    demo = load_demo_corpus() if config.INCLUDE_DEMO_CORPUS else []
+    return demo + knowledge.approved_records()
+
+
 def build_index() -> None:
-    """Embed every corpus text into the configured vector store and write the
-    metadata that maps store rows to passages."""
-    corpus = load_corpus()
-    vectors = embed([record["text"] for record in corpus])
-    metadata = [
-        {
+    """Embed the corpus into the configured vector store and write the
+    metadata that maps store rows to passages. Embeddings are cached, so a
+    rebuild only embeds new text."""
+    from . import knowledge
+
+    knowledge.rebuild_index()
+
+
+def write_index(records: list[dict], vectors: np.ndarray) -> None:
+    """Replace the stored index with these records and their vectors."""
+    metadata = []
+    for r in records:
+        entry = {
             "id": r["id"],
             "title": r["title"],
             "topic": r["topic"],
@@ -72,14 +92,17 @@ def build_index() -> None:
             "kind": classify_kind(r),
             "text": r["text"],
         }
-        for r in corpus
-    ]
+        for extra in ("source_id", "source_version", "effective_from", "expires_on"):
+            if r.get(extra) is not None:
+                entry[extra] = r[extra]
+        metadata.append(entry)
+
     store = vectorstore.create()
     store.build(vectors, [{"doc_id": m["id"], "title": m["title"]} for m in metadata])
-
     config.INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    with open(config.INDEX_DIR / "metadata.json", "w", encoding="utf-8") as fh:
-        json.dump(metadata, fh, indent=2)
+    tmp = config.INDEX_DIR / "metadata.tmp.json"
+    tmp.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    tmp.replace(config.INDEX_DIR / "metadata.json")
 
 
 # Sections that identify a drug-label record versus a disease record. Used to
@@ -122,8 +145,13 @@ def load_index() -> None:
             f"The {store.name} store has {store.count()} vectors but the metadata lists "
             f"{len(metadata)} passages. Run scripts/build_index.py again."
         )
+    global _not_before, _not_after
     _store, _metadata = store, metadata
     _lexical = LexicalIndex([f"{r['title']} {r['text']}" for r in _metadata])
+    # Effective and expiry dates as timestamps (NaN when unset), so search can
+    # skip documents that aren't in force without a rebuild.
+    _not_before = np.array([_timestamp(r.get("effective_from")) for r in metadata], dtype="float64")
+    _not_after = np.array([_timestamp(r.get("expires_on")) for r in metadata], dtype="float64")
 
 
 def _ensure_loaded() -> None:
@@ -156,13 +184,15 @@ class LexicalIndex:
             self.lengths[i] = sum(counts.values())
             for term, tf in counts.items():
                 self.postings[term].append((i, tf))
-        self.avg_length = float(self.lengths.mean()) if self.n else 0.0
+        self.avg_length = float(self.lengths.mean()) if self.n else 1.0
 
     def idf(self, term: str) -> float:
         df = len(self.postings.get(term, ()))
         return math.log(1 + (self.n - df + 0.5) / (df + 0.5)) if df else 0.0
 
     def scores(self, query: str) -> np.ndarray:
+        if self.n == 0:
+            return np.zeros(0, dtype="float32")
         """BM25 with squared IDF. Plain BM25 lets two common words ("side
         effects") outweigh one rare name ("Remdodaprex"), so every drug's
         side-effect page scores alike. Squaring IDF makes distinctive terms,
@@ -177,6 +207,19 @@ class LexicalIndex:
                 norm = self.k1 * (1 - self.b + self.b * self.lengths[doc] / self.avg_length)
                 scores[doc] += idf * tf * (self.k1 + 1) / (tf + norm)
         return scores
+
+
+def _timestamp(iso: str | None) -> float:
+    if not iso:
+        return float("nan")
+    return datetime.fromisoformat(iso).timestamp()
+
+
+def _in_force(rows: np.ndarray) -> np.ndarray:
+    """Which rows' documents are within their effective and expiry dates now."""
+    now = time.time()
+    before, after = _not_before[rows], _not_after[rows]
+    return (np.isnan(before) | (before <= now)) & (np.isnan(after) | (after > now))
 
 
 def _cosine(value: float) -> float:
@@ -200,7 +243,10 @@ def search(query: str, k: int | None = None,
     query_vec = embed([query])[0]
 
     if not hybrid:
-        return [(_metadata[row], _cosine(score)) for row, score in _store.search(query_vec, k)]
+        hits = _store.search(query_vec, k * 3)
+        rows = np.array([row for row, _ in hits], dtype=int)
+        keep = _in_force(rows) if len(rows) else np.zeros(0, dtype=bool)
+        return [(_metadata[row], _cosine(score)) for (row, score), ok in zip(hits, keep) if ok][:k]
 
     # Candidates: the nearest passages by meaning and the best by keywords.
     # Every store can answer this, and at corpus scale it matches a full scan.
@@ -215,6 +261,10 @@ def search(query: str, k: int | None = None,
 
     rows = np.fromiter(nearest.keys(), dtype=int)
     cosines = np.fromiter(nearest.values(), dtype="float32")
+    keep = _in_force(rows)
+    rows, cosines = rows[keep], cosines[keep]
+    if len(rows) == 0:
+        return []
     peak = float(keyword.max())
     keyword_norm = keyword[rows] / peak if peak > 0 else keyword[rows]
     alpha = config.HYBRID_ALPHA
@@ -297,6 +347,8 @@ def corpus_projection(dims: int = 3) -> list[dict]:
     rather than re-embedding. Each axis is scaled independently into [-1, 1].
     Returns x, y, and (for 3D) z, so the frontend can render either."""
     _ensure_loaded()
+    if not _metadata:
+        return []
     assert _store is not None
     vectors = _store.vectors()  # (n, dim), already L2-normalised
 

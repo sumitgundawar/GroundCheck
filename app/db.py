@@ -132,6 +132,55 @@ class AuditRecord(Base):
     )
 
 
+class Source(Base):
+    """One version of a document imported by the organisation. A new upload of
+    the same document key becomes the next version; approving it retires the
+    previous approved version."""
+
+    __tablename__ = "sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    filename: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    media_type: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    owner: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    effective_from: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    expires_on: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    uploaded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    review_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    evaluation: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    chunks: Mapped[list["SourceChunk"]] = relationship(
+        back_populates="source", cascade="all, delete-orphan", order_by="SourceChunk.position")
+
+    __table_args__ = (
+        Index("ix_sources_document_key", "document_key"),
+        Index("ix_sources_status", "status"),
+    )
+
+
+class SourceChunk(Base):
+    __tablename__ = "source_chunks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_id: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    section: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    source: Mapped[Source] = relationship(back_populates="chunks")
+
+    __table_args__ = (Index("ix_source_chunks_source_id", "source_id"),)
+
+
 # --------------------------------------------------------------------------
 # Engine and sessions
 # --------------------------------------------------------------------------

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pyotp
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["GROQ_API_KEY"] = ""
@@ -26,28 +26,6 @@ from app import audit, auth, config, db, retrieval  # noqa: E402
 
 PASSWORD = "correct horse battery staple"
 
-BACKENDS = ["sqlite"]
-if os.environ.get("TEST_POSTGRES_URL"):
-    BACKENDS.append("postgresql")
-
-
-@pytest.fixture(params=BACKENDS)
-def database(request, monkeypatch, tmp_path):
-    """A fresh, migrated database per test."""
-    if request.param == "sqlite":
-        url = f"sqlite:///{tmp_path / 'accounts.db'}"
-    else:
-        url = os.environ["TEST_POSTGRES_URL"]
-    monkeypatch.setattr(config, "DATABASE_URL", url)
-    db.reset_engine()
-    monkeypatch.setattr(db, "_ready", False)
-    if request.param == "postgresql":
-        with db.engine().begin() as conn:
-            conn.execute(text("DROP TABLE IF EXISTS audit_records, auth_sessions, users, alembic_version CASCADE"))
-    assert db.ready()
-    yield request.param
-    db.reset_engine()
-    monkeypatch.setattr(db, "_ready", False)
 
 
 # --- Users and passwords ------------------------------------------------------

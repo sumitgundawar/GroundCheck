@@ -52,9 +52,12 @@ USE_LLM_JUDGE = _get("USE_LLM_JUDGE", "true").lower() in ("1", "true", "yes")
 OLLAMA_HOST = _get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 LOCAL_MODEL = _get("LOCAL_MODEL", "")
 LOCAL_AI_TIMEOUT_SECONDS = _get_float("LOCAL_AI_TIMEOUT_SECONDS", 60.0)
-# Who may download and switch local models through the API: "local" (requests
-# from this machine only, the default), "all", or "none".
-LOCAL_AI_ADMIN = _get("LOCAL_AI_ADMIN", "local").lower()
+# In the open demo (AUTH_REQUIRED=false) there are no admins, so management
+# actions (downloading and switching local models, importing and approving
+# documents) are allowed from: "local" (this machine only, the default), "all",
+# or "none". With AUTH_REQUIRED=true, the admin role decides instead.
+# LOCAL_AI_ADMIN is the earlier name and still works.
+ADMIN_ACCESS = _get("ADMIN_ACCESS", _get("LOCAL_AI_ADMIN", "local")).lower()
 LOCAL_AI_STATE_PATH = ROOT_DIR / _get("LOCAL_AI_STATE_PATH", "local_ai.json")
 
 # --- Embeddings + retrieval ------------------------------------------------
@@ -78,6 +81,9 @@ GROUNDING_MIN = _get_float("GROUNDING_MIN", 0.45)
 
 # --- Paths -----------------------------------------------------------------
 INDEX_DIR = ROOT_DIR / _get("INDEX_DIR", "index")
+# Include the synthetic demo corpus in the index alongside approved documents.
+# Set false for a deployment that should answer only from its own documents.
+INCLUDE_DEMO_CORPUS = _get("INCLUDE_DEMO_CORPUS", "true").lower() in ("1", "true", "yes")
 CORPUS_PATH = DATA_DIR / "corpus.json"
 EXAMPLES_PATH = DATA_DIR / "examples.json"
 EVAL_SUMMARY_PATH = ROOT_DIR / "eval" / "eval_summary.json"

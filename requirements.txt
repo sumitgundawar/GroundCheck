@@ -16,3 +16,6 @@ segno==1.*
 # Optional database drivers: install the one for your DATABASE_URL.
 #   PostgreSQL: psycopg[binary]==3.*
 #   MySQL/MariaDB: pymysql==1.*
+pypdf==6.*
+python-docx==1.*
+python-multipart==0.0.*

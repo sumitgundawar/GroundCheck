@@ -383,7 +383,7 @@ def corpus_map() -> JSONResponse:
 
 @app.get("/api/health")
 def health() -> JSONResponse:
-    corpus = retrieval.load_corpus()
+    corpus = retrieval.all_metadata()
     provider = llm.active_provider()
     return JSONResponse({
         "status": "ok",
@@ -412,20 +412,22 @@ def _is_local_request(request: Request) -> bool:
         return False
 
 
-def _require_local_ai_admin(request: Request) -> None:
-    """Downloading and switching models changes the server for everyone, so by
-    default only requests from this machine may do it. With accounts required,
-    only admins may, from anywhere the policy allows."""
+def require_manager(request: Request, role: str = "admin") -> auth.Principal | None:
+    """Guard for actions that change the service for everyone. With accounts
+    required, the user needs the role. In the open demo, ADMIN_ACCESS decides
+    where requests may come from."""
     if config.AUTH_REQUIRED:
         principal = auth.session_principal(_session_token(request)) if db.ready() else None
-        if principal is None or not principal.can("admin"):
-            raise HTTPException(status_code=403, detail="Only admins can manage local models.")
-    policy = config.LOCAL_AI_ADMIN
-    if policy == "all":
-        return
-    if policy == "local" and _is_local_request(request):
-        return
-    raise HTTPException(status_code=403, detail="Managing local models is only allowed from this machine.")
+        if principal is None or not principal.can(role):
+            raise HTTPException(status_code=403, detail="Your role doesn't allow this.")
+        return principal
+    if config.ADMIN_ACCESS == "all" or (config.ADMIN_ACCESS == "local" and _is_local_request(request)):
+        return None
+    raise HTTPException(status_code=403, detail="This is only allowed from the machine running GroundCheck.")
+
+
+def _require_local_ai_admin(request: Request) -> None:
+    require_manager(request, "admin")
 
 
 @app.get("/api/local-ai")
@@ -484,6 +486,128 @@ async def local_ai_select(body: LocalModelRequest, request: Request) -> JSONResp
     if previous and previous != body.model:
         await run_in_threadpool(local_ai.unload, previous)
     return JSONResponse({"selected": body.model, "provider": llm.active_provider()})
+
+
+# --- Organisation documents -------------------------------------------------
+#
+# Upload needs a reviewer; approving, rejecting, retiring, rebuilding the index
+# and running a document's evaluation need an admin. An approval by the person
+# who uploaded the document is refused when accounts are required.
+
+class ReviewRequest(BaseModel):
+    note: str = ""
+
+
+def _parse_date(value: str | None, name: str):
+    from datetime import datetime, timezone
+
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"{name} must be a date like 2026-10-01.") from exc
+
+
+def _knowledge_error(exc: Exception) -> HTTPException:
+    from . import documents, knowledge
+
+    if isinstance(exc, (documents.DocumentError, knowledge.KnowledgeError)):
+        return HTTPException(status_code=400, detail=str(exc))
+    raise exc
+
+
+@app.post("/api/sources")
+async def sources_upload(request: Request) -> dict:
+    from . import documents, knowledge
+
+    user = require_manager(request, "reviewer")
+    _require_database()
+    form = await request.form()
+    upload = form.get("file")
+    if upload is None or not hasattr(upload, "read"):
+        raise HTTPException(status_code=400, detail="Choose a file to upload.")
+    data = await upload.read(documents.MAX_FILE_BYTES + 1)
+    try:
+        return {"source": await run_in_threadpool(
+            knowledge.import_document, upload.filename or "", data,
+            title=str(form.get("title") or "") or None,
+            owner=str(form.get("owner") or ""),
+            effective_from=_parse_date(str(form.get("effective_from") or ""), "Effective date"),
+            expires_on=_parse_date(str(form.get("expires_on") or ""), "Expiry date"),
+            uploaded_by=user.id if user else None,
+        )}
+    except Exception as exc:  # noqa: BLE001 - mapped to a 400 or re-raised
+        raise _knowledge_error(exc) from exc
+
+
+@app.get("/api/sources")
+def sources_list(request: Request) -> dict:
+    from . import knowledge
+
+    require_manager(request, "reviewer")
+    _require_database()
+    return {"sources": knowledge.list_sources(), "index": knowledge.index_status(),
+            "include_demo_corpus": config.INCLUDE_DEMO_CORPUS}
+
+
+@app.get("/api/sources/{source_id}")
+def sources_get(source_id: int, request: Request) -> dict:
+    from . import knowledge
+
+    require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return {"source": knowledge.get_source(source_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _knowledge_error(exc) from exc
+
+
+@app.post("/api/sources/{source_id}/evaluate")
+async def sources_evaluate(source_id: int, request: Request) -> dict:
+    from . import knowledge
+
+    require_manager(request, "admin")
+    _require_database()
+    try:
+        return {"evaluation": await run_in_threadpool(knowledge.evaluate_source, source_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _knowledge_error(exc) from exc
+
+
+@app.post("/api/sources/{source_id}/{decision}")
+def sources_review(source_id: int, decision: str, body: ReviewRequest, request: Request) -> dict:
+    from . import knowledge
+
+    if decision not in ("approve", "reject", "retire"):
+        raise HTTPException(status_code=404, detail="Not found")
+    user = require_manager(request, "admin")
+    _require_database()
+    try:
+        source = knowledge.review(source_id, decision, user.id if user else None, body.note,
+                                  allow_self_approval=not config.AUTH_REQUIRED)
+    except Exception as exc:  # noqa: BLE001
+        raise _knowledge_error(exc) from exc
+    if decision in ("approve", "retire"):
+        knowledge.rebuild_index_in_background()
+    return {"source": source, "index": knowledge.index_status()}
+
+
+@app.post("/api/index/rebuild")
+def index_rebuild(request: Request) -> dict:
+    from . import knowledge
+
+    require_manager(request, "admin")
+    knowledge.rebuild_index_in_background()
+    return {"index": knowledge.index_status()}
+
+
+@app.get("/api/index")
+def index_get(request: Request) -> dict:
+    from . import knowledge
+
+    require_manager(request, "reviewer")
+    return {"index": knowledge.index_status(), "passages": len(retrieval.all_metadata())}
 
 
 # Static assets (logo, fonts, css, js). Mounted last so API routes win.
