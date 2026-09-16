@@ -535,6 +535,7 @@
           <button type="button" role="tab" class="review-tab" id="tab-queue" aria-controls="review-queue" aria-selected="true">Queue</button>
           <button type="button" role="tab" class="review-tab" id="tab-hazards" aria-controls="review-hazards" aria-selected="false" tabindex="-1">Hazard log</button>
           <button type="button" role="tab" class="review-tab" id="tab-report" aria-controls="review-report" aria-selected="false" tabindex="-1">Report</button>
+          <button type="button" role="tab" class="review-tab" id="tab-protection" aria-controls="review-protection" aria-selected="false" tabindex="-1">Data protection</button>
         </div>
         <p class="modal-message" id="review-message" role="status" hidden></p>
 
@@ -595,6 +596,30 @@
             </div>
             <p class="auth-hint" id="review-tests-summary"></p>
             <ul class="eval-cases" id="review-tests-list"></ul>
+          </div>
+        </div>
+
+        <div role="tabpanel" id="review-protection" aria-labelledby="tab-protection" hidden>
+          <section class="protection-block" aria-labelledby="audit-integrity-title">
+            <div class="review-toolbar">
+              <h3 id="audit-integrity-title">Audit trail integrity</h3>
+              <button type="button" class="btn btn-sm btn-primary" id="audit-verify">Verify audit trail</button>
+            </div>
+            <p class="auth-hint">Every audit record is chained to the one before it. Verifying checks that none has been changed, removed or reordered.</p>
+            <div class="verify-result" id="verify-result" hidden></div>
+          </section>
+          <div id="protection-admin" hidden>
+            <section class="protection-block" aria-labelledby="protection-status-title">
+              <h3 id="protection-status-title">Stored data</h3>
+              <dl class="protection-list" id="protection-list"></dl>
+            </section>
+            <section class="protection-block" aria-labelledby="retention-title">
+              <div class="review-toolbar">
+                <h3 id="retention-title">Retention</h3>
+                <button type="button" class="btn btn-sm btn-ghost" id="retention-run">Delete expired records</button>
+              </div>
+              <p class="auth-hint" id="retention-summary"></p>
+            </section>
           </div>
         </div>
       </div>

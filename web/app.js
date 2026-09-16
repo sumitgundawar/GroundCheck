@@ -358,11 +358,33 @@ async function loadUsers() {
     toggle.textContent = u.is_active ? "Deactivate" : "Reactivate";
     toggle.disabled = account.user && u.id === account.user.id;
     toggle.addEventListener("click", () => updateUser(u.id, { is_active: !u.is_active }));
-    status.append(document.createTextNode(u.is_active ? "Active " : "Inactive "), toggle);
+    const deleted = u.email.endsWith("@deleted.invalid");
+    status.append(document.createTextNode(deleted ? "Deleted " : u.is_active ? "Active " : "Inactive "));
+    if (!deleted) {
+      status.appendChild(toggle);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn btn-sm btn-ghost";
+      remove.textContent = "Delete";
+      remove.disabled = account.user && u.id === account.user.id;
+      remove.addEventListener("click", () => deleteUser(u));
+      status.append(" ", remove);
+    } else {
+      select.disabled = true;
+    }
 
     tr.append(who, roleCell, mfa, last, status);
     body.appendChild(tr);
   });
+}
+
+async function deleteUser(u) {
+  if (!window.confirm(`Delete ${u.email}? Their name, email and sign-in details are removed. Their audit records stay, under an anonymous account number.`)) return;
+  try {
+    await api(`/api/users/${u.id}`, { method: "DELETE" });
+    showMessage("users-message", "Deleted.");
+  } catch (err) { showMessage("users-message", err.message, true); }
+  await loadUsers();
 }
 
 async function updateUser(id, changes, revert) {
@@ -1807,7 +1829,7 @@ const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`
 
 function selectTab(name) {
   review.tab = name;
-  for (const tab of ["queue", "hazards", "report"]) {
+  for (const tab of ["queue", "hazards", "report", "protection"]) {
     const on = tab === name;
     $(`tab-${tab}`).setAttribute("aria-selected", String(on));
     $(`tab-${tab}`).tabIndex = on ? 0 : -1;
@@ -1820,6 +1842,7 @@ function selectTab(name) {
 function loadReviewTab() {
   if (review.tab === "queue") return loadReviews();
   if (review.tab === "hazards") return loadHazards();
+  if (review.tab === "protection") return loadProtection();
   return loadReport();
 }
 
@@ -2157,6 +2180,89 @@ async function loadReviewTests() {
   } catch (_) { /* shown by the report */ }
 }
 
+async function verifyAudit() {
+  const trigger = $("audit-verify");
+  const out = $("verify-result");
+  trigger.disabled = true;
+  trigger.textContent = "Verifying…";
+  try {
+    const r = await api("/api/audit/verify", { method: "POST" });
+    out.hidden = false;
+    out.className = `verify-result ${r.ok ? "ok" : "bad"}`;
+    out.textContent = "";
+    const head = document.createElement("strong");
+    head.textContent = !r.complete ? "Couldn’t check the whole audit trail"
+      : r.ok ? "Intact" : `${plural(r.problem_count, "problem")} found`;
+    const detail = document.createElement("p");
+    detail.textContent = `${plural(r.checked, "record")} checked${r.anchor_seq ? ` from number ${r.anchor_seq + 1}` : ""}, `
+      + `${r.signed ? "signed with a key held outside the database" : "not signed with a key"}. `
+      + `Chain head ${r.head.seq}: ${r.head.hash.slice(0, 16)}…`;
+    out.append(head, detail);
+    if (r.error) {
+      const e = document.createElement("p");
+      e.textContent = r.error;
+      out.appendChild(e);
+    }
+    if (r.problems.length) {
+      const list = document.createElement("ul");
+      r.problems.forEach((p) => {
+        const li = document.createElement("li");
+        li.textContent = `Record ${p.seq}${p.audit_id ? ` (${p.audit_id})` : ""}: ${p.problem}`;
+        list.appendChild(li);
+      });
+      out.appendChild(list);
+    }
+  } catch (err) { showMessage("review-message", err.message, true); }
+  trigger.disabled = false;
+  trigger.textContent = "Verify audit trail";
+}
+
+async function loadProtection() {
+  let data;
+  try { data = await api("/api/data-protection"); }
+  catch (_) { $("protection-admin").hidden = true; return; }  // admins only
+  $("protection-admin").hidden = false;
+  const e = data.encryption, sig = data.audit_signing, ret = data.retention;
+  const rows = [
+    ["Encryption at rest", e.enabled
+      ? `On, AES-256-GCM with key ${e.primary_key_id}${e.decrypt_key_ids.length ? `. Older keys still readable: ${e.decrypt_key_ids.join(", ")}` : ""}`
+      : "Off. Set DATA_ENCRYPTION_KEYS to encrypt questions, answers and review notes."],
+    ["Audit signing", sig.enabled ? `On, HMAC-SHA256 with key ${sig.primary_key_id}` : "Off. Set AUDIT_SIGNING_KEYS so the chain can't be rewritten from inside the database."],
+    ["Audit chain head", `${data.audit_chain.seq.toLocaleString()} records written. Last hash ${data.audit_chain.hash.slice(0, 16)}…`],
+  ];
+  const list = $("protection-list");
+  list.textContent = "";
+  rows.forEach(([term, value]) => {
+    const dt = document.createElement("dt"); dt.textContent = term;
+    const dd = document.createElement("dd"); dd.textContent = value;
+    if (value.startsWith("Off")) dd.className = "muted";
+    list.append(dt, dd);
+  });
+  renderRetention(ret);
+}
+
+function renderRetention(ret) {
+  const periods = [
+    ret.audit_retention_days ? `audit records for ${plural(ret.audit_retention_days, "day")}` : "audit records for ever",
+    ret.review_retention_days ? `resolved reviews for ${plural(ret.review_retention_days, "day")}` : "resolved reviews for ever",
+  ];
+  const due = ret.audit_records_to_delete + ret.review_cases_to_delete;
+  const last = ret.last_run ? ` Last run ${new Date(ret.last_run.ran_at).toLocaleString()}: ${plural(ret.last_run.audit_deleted, "audit record")} and ${plural(ret.last_run.reviews_deleted, "review")} deleted.` : "";
+  $("retention-summary").textContent = `Keeping ${periods.join(" and ")}. `
+    + (due ? `${plural(ret.audit_records_to_delete, "audit record")} and ${plural(ret.review_cases_to_delete, "resolved review")} are past their period.` : "Nothing is past its retention period.")
+    + last;
+  $("retention-run").disabled = due === 0;
+}
+
+async function runRetention() {
+  if (!window.confirm("Permanently delete every record past its retention period? This can’t be undone.")) return;
+  try {
+    const data = await api("/api/retention/run", { method: "POST" });
+    showMessage("review-message", `Deleted ${plural(data.run.audit_deleted, "audit record")} and ${plural(data.run.reviews_deleted, "review case")}.`);
+    renderRetention(data.retention);
+  } catch (err) { showMessage("review-message", err.message, true); }
+}
+
 function resetFlag(auditId) {
   $("flag-row").hidden = !auditId;
   $("flag-row").dataset.auditId = auditId || "";
@@ -2170,7 +2276,7 @@ function wireReview() {
   $("review-toggle").addEventListener("click", () => {
     if (!$("review-body").hidden) loadReviewTab();
   });
-  const tabs = ["queue", "hazards", "report"];
+  const tabs = ["queue", "hazards", "report", "protection"];
   tabs.forEach((name, i) => {
     const tab = $(`tab-${name}`);
     tab.addEventListener("click", () => selectTab(name));
@@ -2249,6 +2355,9 @@ function wireReview() {
     trigger.disabled = false;
     trigger.textContent = "Run tests";
   });
+
+  $("audit-verify").addEventListener("click", verifyAudit);
+  $("retention-run").addEventListener("click", runRetention);
 
   $("flag-open").addEventListener("click", () => {
     $("flag-open").hidden = true;
