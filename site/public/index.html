@@ -719,8 +719,8 @@ docker run -p 7860:7860 groundcheck</code></pre>
           <li><strong>Basic PII redaction</strong>Emails and long numbers only. Not de-identification.</li>
           <li><strong>Synthetic tuning</strong>Thresholds need re-tuning for real documents.</li>
           <li><strong>Self-referential tests</strong>Answerable cases come from the corpus itself.</li>
-          <li><strong>Local audit log</strong>Several instances would need a shared store.</li>
-          <li><strong>No review queue yet</strong>“Routed for review” is a record, not a workflow.</li>
+          <li><strong>Text-layer documents only</strong>Scanned PDFs need OCR before import.</li>
+          <li><strong>Not a certified device</strong>Safety reports support your own clinical safety sign-off.</li>
         </ul>
       </div>
     </section>
@@ -811,28 +811,22 @@ docker run -p 7860:7860 groundcheck</code></pre>
               </ul>
             </details>
           </li>
-                <li>Source ownership, versions, effective dates and expiry</li>
-                <li>Approval workflow before content can be cited</li>
-                <li>Automatic re-indexing, and evaluation cases generated from each source</li>
-                </ul>
-            </details>
-          </li>
 
-          <li class="phase-card spotlight" data-state="planned">
+          <li class="phase-card spotlight" data-state="available">
             <div class="phase-head">
               <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#user-check"/></svg></span>
-              <span class="state">Planned</span>
+              <span class="state">Available now</span>
             </div>
             <h3>Clinician review and governance</h3>
             <p class="phase-goal">Turn every refusal and flagged answer into a reviewed, closed case.</p>
             <details class="phase-details">
               <summary>What’s included</summary>
               <ul>
-                <li>Review queue with assignment, escalation and service-level timers</li>
-                <li>Clinician feedback that becomes new sources or evaluation cases</li>
-                <li>Clinical safety case and hazard log for each release</li>
-                <li>Usage, refusal and override reports for governance committees</li>
-                </ul>
+                <li>A review queue for every refusal and flagged answer, with assignment, due dates and escalation</li>
+                <li>Resolved cases that become permanent test questions, so a mistake is caught from then on</li>
+                <li>A hazard log scored by severity and likelihood, before and after controls</li>
+                <li>Usage, refusal and review reports, and a safety case summary to download</li>
+              </ul>
             </details>
           </li>
 

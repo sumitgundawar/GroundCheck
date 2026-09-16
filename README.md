@@ -90,18 +90,19 @@ Full instructions, including configuration and Windows, are in
 11. [Accounts and databases](#accounts-and-databases)
 12. [Using the API](#using-the-api)
 13. [Using your own documents](#using-your-own-documents)
-14. [Configuration](#configuration)
-15. [Local development](#local-development)
-16. [Running the checks](#running-the-checks)
-17. [Troubleshooting](#troubleshooting)
-18. [Deployment](#deployment)
-19. [Project layout](#project-layout)
-20. [Honest limitations](#honest-limitations)
-21. [Reporting issues](#reporting-issues)
-22. [Contributing](#contributing)
-23. [Security](#security)
-24. [License](#license)
-25. [Credits](#credits)
+14. [Clinical review and governance](#clinical-review-and-governance)
+15. [Configuration](#configuration)
+16. [Local development](#local-development)
+17. [Running the checks](#running-the-checks)
+18. [Troubleshooting](#troubleshooting)
+19. [Deployment](#deployment)
+20. [Project layout](#project-layout)
+21. [Honest limitations](#honest-limitations)
+22. [Reporting issues](#reporting-issues)
+23. [Contributing](#contributing)
+24. [Security](#security)
+25. [License](#license)
+26. [Credits](#credits)
 
 ---
 
@@ -290,6 +291,8 @@ panel is built from vanilla HTML, CSS, and JavaScript, with no build step.
 - **How it works** panel: the pipeline explained stage by stage, including how
   the LLM-as-a-judge layer works.
 - **Tuning** panel (see below).
+- **Documents** and **Review** panels for your own sources and the review
+  queue, hazard log and reports.
 - **Decision** panel: a large ANSWER or REFUSED chip, the grounded answer with
   clickable citation chips, or a plain-English explanation of why it refused.
 - **Retrieved sources**: rich cards showing rank, id, kind, section, topic,
@@ -297,6 +300,7 @@ panel is built from vanilla HTML, CSS, and JavaScript, with no build step.
   highlighted.
 - **Pipeline trace**: every stage, clickable to reveal a plain-English
   description plus the stage's data, including the judge's per-claim verdict.
+- **Flag this answer**: send an answer that looks wrong to the review queue.
 - **Audit record**: the full JSON for the last request, persisted to disk.
 - **Corpus map**: an interactive 3D PCA projection of every document embedding.
   Drag to rotate, hover a point for its title, toggle fullscreen, click the
@@ -377,9 +381,9 @@ itself, and each user has a role:
 
 | Role | Can |
 | --- | --- |
-| `clinician` | Ask questions and see their own audit records |
-| `reviewer` | Also read every audit record |
-| `admin` | Also manage users and local AI models |
+| `clinician` | Ask questions, see their own audit records, and flag answers |
+| `reviewer` | Also read every audit record, work the review queue and read reports |
+| `admin` | Also manage users, documents, local AI models and the hazard log |
 
 Create the first admin from the machine running GroundCheck, either in the
 dashboard (it offers this while no users exist) or on the command line:
@@ -394,7 +398,7 @@ sign-ins lock an account for 15 minutes. Sessions last 12 hours and are
 stored only as hashes.
 
 Other commands: `python -m app.cli set-password`, `list-users`,
-`purge-sessions` and `migrate`. Passwords are always prompted for, never
+`purge-sessions`, `escalate-reviews` and `migrate`. Passwords are always prompted for, never
 passed as arguments.
 
 ### Using PostgreSQL or MySQL
@@ -451,6 +455,14 @@ The dashboard is a client of a small JSON API. You can call it directly.
 | `GET /api/local-ai` | Hardware, Ollama status, and the model catalogue with fit |
 | `POST /api/local-ai/pull` | Download a catalogue model (streams progress as NDJSON) |
 | `POST /api/local-ai/select` | Use a downloaded model, or `null` to stop using one |
+| `POST /api/audit/{id}/flag` | Flag an answer for review (`{"note": "..."}`) |
+| `GET /api/reviews` | The review queue (`status`, `mine`, `overdue`) |
+| `GET /api/reviews/{id}` | One case, with its timeline and what was shown |
+| `POST /api/reviews/{id}/assign` | Assign, `/comment`, `/resolve` or `/reopen` a case |
+| `GET /api/review-tests` | Tests added from resolved cases; `POST /api/review-tests/run` runs them |
+| `GET /api/hazards` | The hazard log; `POST` adds and `PUT /api/hazards/{id}` updates a hazard |
+| `GET /api/governance/report` | Usage, refusal and review figures for the last `days` |
+| `GET /api/governance/safety-case` | A clinical safety case summary, as Markdown |
 
 ```bash
 curl -X POST http://localhost:8000/api/ask \
@@ -503,6 +515,37 @@ records in the same format and run `python scripts/build_index.py`.
 
 ---
 
+## Clinical review and governance
+
+A refusal protects the patient, but it also means a clinician didn't get an
+answer. The **Review** panel makes sure each one is looked at. It needs the
+database (the default).
+
+- **Review queue.** Every refusal opens a case. Asking the same question again
+  while the case is open adds to it, so a reviewer sees how often it happens.
+  Anyone can flag an answer that looks wrong, which opens a high-priority case.
+- **Due dates and escalation.** Refusals are due within 72 hours and flagged
+  answers within 24. Overdue cases are escalated to high priority when the
+  queue is opened, or on a schedule with `python -m app.cli escalate-reviews`.
+- **Closing the loop.** Reviewers assign cases, comment, and resolve them with
+  an outcome: the refusal was correct, a document is needed, a check needs
+  fixing, no action, or **add as a test**. A test keeps the question and the
+  decision the reviewer says is correct, and runs from the Report tab, so the
+  same mistake is caught from then on.
+- **Hazard log.** Admins record what could go wrong, its cause, effect and
+  controls, scored by severity and likelihood (1 to 5 each) before and after
+  controls, in the shape DCB0129 and ISO 14971 expect.
+- **Reports.** Questions, refusal rate and reasons, questions asked with a
+  check switched off, review performance and documents approved, for a chosen
+  period. **Download safety case** produces a Markdown summary of the
+  evaluation, review figures and hazard log for a release.
+
+Evaluation runs and document tests are kept in the audit trail but don't open
+cases or count as use. The safety case summary supports, and doesn't replace,
+sign-off by your clinical safety officer.
+
+---
+
 ## Configuration
 
 All settings are read from the environment with safe defaults (`app/config.py`).
@@ -535,6 +578,9 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `LLM_TIMEOUT_SECONDS` | `8` | Outbound call timeout. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests per minute, per client IP. |
 | `AUDIT_PERSIST` | `true` | Persist the audit trail to disk. |
+| `REVIEW_QUEUE` | `true` | Open a review case for every refusal. |
+| `REVIEW_SLA_HOURS` | `72` | When a refusal case is due. |
+| `FLAGGED_SLA_HOURS` | `24` | When a flagged answer case is due. |
 | `AUDIT_LOG_PATH` | `audit/audit_log.jsonl` | Where the audit trail is written. |
 
 No secret is ever committed. The key is read from the environment only.
@@ -681,16 +727,16 @@ In the spirit of the demo, these are real and worth knowing:
   guards, not the model.
 - Thresholds are tuned to this synthetic corpus, not derived from first
   principles.
-- The audit trail persists to a local file; a multi-instance deployment would
-  use a shared store.
+- The audit trail is stored in the database. Several instances need a shared
+  database such as PostgreSQL.
 - The dosage guard handles digits and written-out numbers up to common ranges,
   but not every exotic format.
 - The coverage guard works on words. Contractions and common conversational
   words are handled, but unusual phrasing can still cause a refusal.
 - PII redaction covers email addresses and long digit runs only. It is not
   de-identification.
-- "Routed for review" is recorded in the audit trail, but there is no review
-  queue yet.
+- The safety case summary and hazard log are tools for your own clinical
+  safety process. GroundCheck is not a certified medical device.
 
 ---
 
