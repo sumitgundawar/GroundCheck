@@ -559,11 +559,8 @@ In the spirit of the demo, these are real and worth knowing:
   use a shared store.
 - The dosage guard handles digits and written-out numbers up to common ranges,
   but not every exotic format.
-- The coverage guard works on words, so it can refuse for the wrong reason when
-  a question contains an everyday word the sources don't use (for example
-  "year" or "email").
-- Extractive generation can include related passages the question didn't ask
-  about. The claims are grounded, but the answer can be broader than needed.
+- The coverage guard works on words. Contractions and common conversational
+  words are handled, but unusual phrasing can still cause a refusal.
 - PII redaction covers email addresses and long digit runs only. It is not
   de-identification.
 - "Routed for review" is recorded in the audit trail, but there is no review

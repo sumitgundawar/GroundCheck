@@ -1581,3 +1581,6 @@ code, .mono{ font-family: var(--font-mono); font-size: 0.9em; }
   background-clip: text;
   user-select: none;
 }
+
+.misses.fixed { border-left-color: var(--pass); }
+.misses.fixed h3 .i { color: var(--pass); }
