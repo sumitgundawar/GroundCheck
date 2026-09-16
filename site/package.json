@@ -1,0 +1,20 @@
+{
+  "name": "groundcheckhealth",
+  "private": true,
+  "description": "The GroundCheck website, served from Cloudflare Workers static assets.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "check": "node scripts/check.mjs",
+    "preview": "wrangler dev",
+    "deploy": "npm run check && wrangler deploy",
+    "deploy:www": "wrangler deploy --config www-redirect/wrangler.jsonc"
+  },
+  "devDependencies": {
+    "wrangler": "4.132.0"
+  }
+}
