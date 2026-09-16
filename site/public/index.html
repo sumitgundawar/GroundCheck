@@ -672,17 +672,11 @@
         <div class="adapt-grid">
           <article class="adapt">
             <h3><svg class="i" aria-hidden="true"><use href="/icons.svg#book-open-check"/></svg>Use your own documents</h3>
-            <p>Replace <code>app/data/corpus.json</code> and rebuild the index.</p>
-            <pre class="code" tabindex="0"><code>[
-  {
-    "id": "FORM-042",
-    "title": "Amoxicillin: dosage",
-    "topic": "amoxicillin",
-    "section": "Dosage and Administration",
-    "kind": "drug",
-    "text": "…"
-  }
-]</code></pre>
+            <p>Upload PDFs, Word files or web pages, approve them, and they’re searchable with citations.</p>
+            <pre class="code" tabindex="0"><code>curl -X POST http://localhost:8000/api/sources \
+  -F file=@sepsis_protocol.pdf \
+  -F owner=Pharmacy \
+  -F expires_on=2027-09-30</code></pre>
           </article>
 
           <article class="adapt">
@@ -800,17 +794,23 @@ docker run -p 7860:7860 groundcheck</code></pre>
             </details>
           </li>
 
-          <li class="phase-card spotlight" data-state="planned">
+          <li class="phase-card spotlight" data-state="available">
             <div class="phase-head">
               <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#book-open-check"/></svg></span>
-              <span class="state">Planned</span>
+              <span class="state">Available now</span>
             </div>
             <h3>Your organisation’s knowledge</h3>
             <p class="phase-goal">Answer from a hospital’s own approved guidelines, formularies and protocols.</p>
             <details class="phase-details">
               <summary>What’s included</summary>
               <ul>
-                <li>Import PDF, Word and HTML, with section-aware chunking</li>
+                <li>Import PDF, Word, HTML and Markdown, split into sections by their own headings</li>
+                <li>Owners, versions, and effective and expiry dates checked on every search</li>
+                <li>Approval by someone other than the uploader before anything is cited</li>
+                <li>Automatic re-indexing, and test questions generated from each document</li>
+              </ul>
+            </details>
+          </li>
                 <li>Source ownership, versions, effective dates and expiry</li>
                 <li>Approval workflow before content can be cited</li>
                 <li>Automatic re-indexing, and evaluation cases generated from each source</li>

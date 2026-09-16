@@ -353,9 +353,10 @@ A selected local model takes precedence over a cloud model. You can also set
 one without the dashboard: `ollama pull llama3.2:3b`, then
 `LOCAL_MODEL=llama3.2:3b`.
 
-Downloading and switching models changes the server for everyone, so by
-default it is allowed only from the machine running GroundCheck. Set
-`LOCAL_AI_ADMIN=all` to allow it from anywhere, or `none` to lock the choice.
+Downloading and switching models changes the server for everyone. With
+sign-in required, only admins can do it. Without sign-in, it's allowed only
+from the machine running GroundCheck; set `ADMIN_ACCESS=all` to allow it from
+anywhere, or `none` to lock the choice.
 
 Small local models are slower and less capable than large cloud models. Expect
 several seconds to tens of seconds per answer on a laptop, and more refusals
@@ -442,6 +443,11 @@ The dashboard is a client of a small JSON API. You can call it directly.
 | `GET /api/eval-summary` | The latest evaluation results |
 | `GET /api/corpus` | Corpus statistics and the 3D projection |
 | `GET /api/health` | Status, the model drafting answers, and corpus size |
+| `POST /api/sources` | Upload a document for review (multipart form: `file`, `title`, `owner`, `effective_from`, `expires_on`) |
+| `GET /api/sources` | Every document version, with status and index status |
+| `POST /api/sources/{id}/approve` | Approve, `/reject` or `/retire` a document version |
+| `POST /api/sources/{id}/evaluate` | Generate and run a document's evaluation |
+| `POST /api/index/rebuild` | Rebuild the search index |
 | `GET /api/local-ai` | Hardware, Ollama status, and the model catalogue with fit |
 | `POST /api/local-ai/pull` | Download a catalogue model (streams progress as NDJSON) |
 | `POST /api/local-ai/select` | Use a downloaded model, or `null` to stop using one |
@@ -465,37 +471,35 @@ object, for example `{"query": "...", "settings": {"top_k": 6,
 
 ## Using your own documents
 
-The pipeline has no demo-specific logic, so you can point it at your own
-content:
+Import your organisation's guidelines, formularies and protocols in the
+dashboard's **Documents** panel, or through the API.
 
-1. Replace `app/data/corpus.json` with a JSON array of records:
+1. **Upload** a PDF, Word (.docx), HTML, Markdown or text file, up to 25 MB,
+   with an owner and optional effective and expiry dates. GroundCheck splits it
+   into sections using the document's own headings, so every citation keeps
+   its heading. Uploading a new file with the same title creates the next
+   version.
+2. **Approve** it. Until then nothing in it can be cited. When sign-in is
+   required, the person who uploaded a document can't approve it. Approving a
+   version retires the previous one, and the search index rebuilds in the
+   background, embedding only new text.
+3. **Evaluate** it. GroundCheck generates a question for each section, which
+   must be answered citing the document, and the same question about an
+   invented document, which must be refused.
 
-   ```json
-   [
-     {
-       "id": "FORM-042",
-       "title": "Amoxicillin: dosage",
-       "topic": "amoxicillin",
-       "section": "Dosage and Administration",
-       "kind": "drug",
-       "text": "The full passage text."
-     }
-   ]
-   ```
+An approved document is cited only between its effective and expiry dates,
+checked on every search. **Retire** a document to stop citing it. Set
+`INCLUDE_DEMO_CORPUS=false` to answer only from your own documents.
 
-   `id`, `title`, and `text` are what retrieval and citation rely on. `topic`,
-   `section`, and `kind` drive the source cards and corpus map.
+Scanned PDFs need OCR first: GroundCheck reads the text layer only. Never put
+real patient data in a document.
 
-2. Rebuild the index: `python scripts/build_index.py`.
-3. Re-tune `RETRIEVAL_MIN_SCORE` and `GROUNDING_MIN`. The defaults were tuned on
-   the synthetic corpus.
-4. Write evaluation cases for your content. `scripts/generate_golden.py` builds
-   cases from the synthetic corpus specifically, so treat it as a template
-   rather than something to run unchanged.
-5. Update `app/data/examples.json` with example questions for your content.
+The thresholds were tuned on the synthetic corpus, so re-tune
+`RETRIEVAL_MIN_SCORE` and `GROUNDING_MIN` for your content, and check each
+document's evaluation after approving it.
 
-**Never put real patient data in the corpus**, and remember that GroundCheck
-is not validated for clinical use.
+You can still replace `app/data/corpus.json` (the demo corpus) with your own
+records in the same format and run `python scripts/build_index.py`.
 
 ---
 
@@ -518,7 +522,8 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `OLLAMA_HOST` | `http://localhost:11434` | Where the Ollama server runs. |
 | `LOCAL_MODEL` | _empty_ | A local model to use at startup, if none was chosen in the dashboard. |
 | `LOCAL_AI_TIMEOUT_SECONDS` | `60` | Timeout for a local model call before falling back. |
-| `LOCAL_AI_ADMIN` | `local` | Who may download and switch local models: `local`, `all`, or `none`. |
+| `ADMIN_ACCESS` | `local` | Without sign-in, where management actions (local models, documents) are allowed from: `local`, `all`, or `none`. |
+| `INCLUDE_DEMO_CORPUS` | `true` | Include the synthetic demo corpus in the index alongside approved documents. |
 | `FORCE_EXTRACTIVE` | `false` | Force extractive mode even with a key set. Use to run a public demo without spending quota. |
 | `GEN_MODEL` | `llama-3.3-70b-versatile` | Generation model. |
 | `JUDGE_MODEL` | `llama-3.1-8b-instant` | Optional grounding-judge model. |
