@@ -5,6 +5,7 @@
     python -m app.cli set-password --email you@example.org
     python -m app.cli list-users
     python -m app.cli purge-sessions
+    python -m app.cli escalate-reviews
 
 Passwords are always prompted for, never passed as arguments, so they don't
 end up in shell history."""
@@ -37,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     reset.add_argument("--email", required=True)
     sub.add_parser("list-users", help="List users")
     sub.add_parser("purge-sessions", help="Delete expired sign-in sessions")
+    sub.add_parser("escalate-reviews", help="Escalate review cases past their due date")
     args = parser.parse_args(argv)
 
     try:
@@ -62,6 +64,10 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{u['email']:<40} {u['role']:<10} {status:<9} {mfa}")
         elif args.command == "purge-sessions":
             print(f"Deleted {auth.purge_expired_sessions()} expired sessions.")
+        elif args.command == "escalate-reviews":
+            from . import governance
+
+            print(f"Escalated {governance.escalate_overdue()} overdue review cases.")
     except auth.AuthError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

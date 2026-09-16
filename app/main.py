@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audit, auth, config, db, llm, local_ai, pipeline, retrieval
+from . import audit, auth, config, db, governance, llm, local_ai, pipeline, retrieval
 from .schemas import AskRequest, AskResponse, Settings
 
 WEB_DIR = config.ROOT_DIR / "web"
@@ -608,6 +608,188 @@ def index_get(request: Request) -> dict:
 
     require_manager(request, "reviewer")
     return {"index": knowledge.index_status(), "passages": len(retrieval.all_metadata())}
+
+
+# --- Review and governance ------------------------------------------------------
+#
+# Any signed-in user can flag an answer. Reviewers work the queue and read
+# reports; admins also edit the hazard log.
+
+class FlagRequest(BaseModel):
+    note: str
+
+
+class AssignRequest(BaseModel):
+    user_id: int | None = None
+
+
+class CommentRequest(BaseModel):
+    note: str
+
+
+class ResolveRequest(BaseModel):
+    outcome: str
+    note: str = ""
+    expected_decision: str | None = None
+
+
+class HazardRequest(BaseModel):
+    title: str
+    cause: str = ""
+    effect: str = ""
+    severity: int
+    likelihood: int
+    controls: str = ""
+    residual_severity: int
+    residual_likelihood: int
+    status: str = "open"
+    owner: str = ""
+    related_case_id: int | None = None
+
+
+def _governance_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, governance.GovernanceError):
+        return HTTPException(status_code=400, detail=str(exc))
+    raise exc
+
+
+@app.post("/api/audit/{audit_id}/flag")
+def flag_answer(audit_id: str, body: FlagRequest, request: Request,
+                user: auth.Principal | None = Depends(current_user)) -> dict:
+    _require_database()
+    if not config.AUTH_REQUIRED:
+        require_manager(request, "clinician")
+    try:
+        return {"case": governance.flag_answer(audit_id, body.note, user.id if user else None)}
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.get("/api/reviews")
+def reviews_list(request: Request, status: str = "open", mine: bool = False, overdue: bool = False) -> dict:
+    user = require_manager(request, "reviewer")
+    _require_database()
+    if status not in ("open", "resolved", "dismissed", "all"):
+        raise HTTPException(status_code=400, detail="Status must be open, resolved, dismissed or all.")
+    reviewers = [{"id": u["id"], "name": u["name"] or u["email"]} for u in auth.list_users()
+                 if u["is_active"] and u["role"] in ("reviewer", "admin")]
+    return {**governance.list_cases(status, assigned_to=user.id if (mine and user) else None,
+                                    overdue_only=overdue),
+            "reviewers": reviewers, "me": user.id if user else None}
+
+
+@app.get("/api/reviews/{case_id}")
+def reviews_get(case_id: int, request: Request) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return {"case": governance.get_case(case_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.post("/api/reviews/{case_id}/assign")
+def reviews_assign(case_id: int, body: AssignRequest, request: Request) -> dict:
+    user = require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return {"case": governance.assign(case_id, body.user_id, user.id if user else None)}
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.post("/api/reviews/{case_id}/comment")
+def reviews_comment(case_id: int, body: CommentRequest, request: Request) -> dict:
+    user = require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return {"case": governance.comment(case_id, body.note, user.id if user else None)}
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.post("/api/reviews/{case_id}/resolve")
+def reviews_resolve(case_id: int, body: ResolveRequest, request: Request) -> dict:
+    user = require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return {"case": governance.resolve(case_id, body.outcome, body.note, user.id if user else None,
+                                           body.expected_decision)}
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.post("/api/reviews/{case_id}/reopen")
+def reviews_reopen(case_id: int, body: CommentRequest, request: Request) -> dict:
+    user = require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return {"case": governance.reopen(case_id, body.note, user.id if user else None)}
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.get("/api/review-tests")
+def review_tests_list(request: Request) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    return {"cases": governance.list_eval_cases()}
+
+
+@app.post("/api/review-tests/run")
+async def review_tests_run(request: Request) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    return await run_in_threadpool(governance.run_eval_cases)
+
+
+@app.get("/api/hazards")
+def hazards_list(request: Request) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    return {"hazards": governance.list_hazards()}
+
+
+@app.post("/api/hazards")
+def hazards_create(body: HazardRequest, request: Request) -> dict:
+    user = require_manager(request, "admin")
+    _require_database()
+    try:
+        return {"hazard": governance.save_hazard(body.model_dump(), user.id if user else None)}
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.put("/api/hazards/{hazard_id}")
+def hazards_update(hazard_id: int, body: HazardRequest, request: Request) -> dict:
+    user = require_manager(request, "admin")
+    _require_database()
+    try:
+        return {"hazard": governance.save_hazard(body.model_dump(), user.id if user else None, hazard_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.get("/api/governance/report")
+def governance_report(request: Request, days: int = 30) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return governance.report(days)
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.get("/api/governance/safety-case")
+def governance_safety_case(request: Request, days: int = 30) -> Response:
+    require_manager(request, "reviewer")
+    _require_database()
+    try:
+        text = governance.safety_case_markdown(days)
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+    return Response(text, media_type="text/markdown; charset=utf-8", headers={
+        "Content-Disposition": 'attachment; filename="groundcheck-safety-case.md"'})
 
 
 # Static assets (logo, fonts, css, js). Mounted last so API routes win.

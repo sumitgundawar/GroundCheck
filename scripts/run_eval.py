@@ -19,6 +19,10 @@ from pathlib import Path
 os.environ["GROQ_API_KEY"] = ""
 os.environ["FORCE_EXTRACTIVE"] = "true"  # also ignores any selected local model
 os.environ["RATE_LIMIT_PER_MINUTE"] = "1000000"
+# Evaluation questions aren't real use: keep them out of the audit trail and
+# the review queue.
+os.environ["AUDIT_PERSIST"] = "false"
+os.environ["REVIEW_QUEUE"] = "false"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

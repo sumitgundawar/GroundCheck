@@ -116,6 +116,12 @@ LOGIN_MAX_FAILURES = _get_int("LOGIN_MAX_FAILURES", 5)
 LOGIN_LOCKOUT_MINUTES = _get_float("LOGIN_LOCKOUT_MINUTES", 15.0)
 PASSWORD_MIN_LENGTH = _get_int("PASSWORD_MIN_LENGTH", 12)
 
+# --- Review and governance ------------------------------------------------------
+# Open a review case for every refusal (repeats of an open question are grouped).
+REVIEW_QUEUE = _get("REVIEW_QUEUE", "true").lower() in ("1", "true", "yes")
+REVIEW_SLA_HOURS = _get_float("REVIEW_SLA_HOURS", 72.0)
+FLAGGED_SLA_HOURS = _get_float("FLAGGED_SLA_HOURS", 24.0)
+
 # --- Audit -----------------------------------------------------------------
 AUDIT_RING_SIZE = 50
 # Append-only audit log. Defaults to a writable path under the repo; override

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 
-from . import audit, config, guards_input, guards_output, llm, retrieval
+from . import audit, config, governance, guards_input, guards_output, llm, retrieval
 from .schemas import AskResponse, Claim, Settings, Source, TraceStep
 
 # The full ordered set of stage names, used to render skipped stages after an
@@ -91,8 +91,10 @@ def _finish(
         total_ms=timer.total_ms(),
         llm_used=llm_used,
     )
-    audit.store.save(audit_id, response, {k: v for k, v in extras.items() if k != "user_id"},
+    audit.store.save(audit_id, response, {k: v for k, v in extras.items() if k not in ("user_id", "review")},
                      user_id=extras.get("user_id"))
+    if decision == "refuse" and extras.get("review", True) and audit.store.backend() == "database":
+        governance.record_refusal(audit_id, str(extras.get("redacted_query", "")), refused_reason or "")
     return response
 
 
@@ -158,12 +160,16 @@ STAGE_EXPLAIN = {
 
 
 def run(raw_query: str, settings: "Settings | None" = None,
-        client_id: str = "global", user_id: int | None = None) -> AskResponse:
+        client_id: str = "global", user_id: int | None = None,
+        review: bool = True) -> AskResponse:
+    """Run a question through the pipeline. review=False keeps a refusal out of
+    the review queue, for generated test questions."""
     # Effective settings: an explicit object, or the configured defaults.
     cfg = settings or Settings()
     timer = _Timer()
     trace: list[TraceStep] = []
-    extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump(), "user_id": user_id}
+    extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump(), "user_id": user_id,
+                    "review": review}
 
     # --- 1. Input guards ---------------------------------------------------
     if cfg.enable_pii_redaction:

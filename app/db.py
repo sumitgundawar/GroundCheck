@@ -181,6 +181,98 @@ class SourceChunk(Base):
     __table_args__ = (Index("ix_source_chunks_source_id", "source_id"),)
 
 
+class ReviewCase(Base):
+    """A refusal or a flagged answer that a clinician needs to look at.
+    Repeats of the same open question are grouped into one case."""
+
+    __tablename__ = "review_cases"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)          # refusal, flagged
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")  # open, resolved, dismissed
+    priority: Mapped[str] = mapped_column(String(10), nullable=False, default="normal")  # normal, high
+    query: Mapped[str] = mapped_column(Text, nullable=False)
+    query_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    reason_category: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    first_audit_id: Mapped[str] = mapped_column(String(16), nullable=False)
+    last_audit_id: Mapped[str] = mapped_column(String(16), nullable=False)
+    occurrences: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    due_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    escalated_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    assigned_to: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    flagged_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    outcome: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    outcome_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    events: Mapped[list["ReviewEvent"]] = relationship(
+        back_populates="case", cascade="all, delete-orphan", order_by="ReviewEvent.id")
+
+    __table_args__ = (
+        Index("ix_review_cases_status", "status"),
+        Index("ix_review_cases_query_key", "query_key"),
+        Index("ix_review_cases_created_at", "created_at"),
+    )
+
+
+class ReviewEvent(Base):
+    """One entry in a case's timeline."""
+
+    __tablename__ = "review_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("review_cases.id", ondelete="CASCADE"), nullable=False)
+    at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    action: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    case: Mapped[ReviewCase] = relationship(back_populates="events")
+
+    __table_args__ = (Index("ix_review_events_case_id", "case_id"),)
+
+
+class EvalCase(Base):
+    """A test question added from a review, run alongside the golden set."""
+
+    __tablename__ = "eval_cases"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    query: Mapped[str] = mapped_column(Text, nullable=False)
+    expect: Mapped[str] = mapped_column(String(10), nullable=False)
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    from_case_id: Mapped[int | None] = mapped_column(ForeignKey("review_cases.id", ondelete="SET NULL"), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+
+
+class Hazard(Base):
+    """An entry in the clinical hazard log (DCB0129 / ISO 14971 style): what
+    could go wrong, how bad and how likely, the controls, and the risk left."""
+
+    __tablename__ = "hazards"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    cause: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    effect: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    severity: Mapped[int] = mapped_column(Integer, nullable=False)
+    likelihood: Mapped[int] = mapped_column(Integer, nullable=False)
+    controls: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    residual_severity: Mapped[int] = mapped_column(Integer, nullable=False)
+    residual_likelihood: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")  # open, mitigated, closed
+    owner: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    related_case_id: Mapped[int | None] = mapped_column(ForeignKey("review_cases.id", ondelete="SET NULL"), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+
+
 # --------------------------------------------------------------------------
 # Engine and sessions
 # --------------------------------------------------------------------------

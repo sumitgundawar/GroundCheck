@@ -24,6 +24,7 @@ from pathlib import Path
 os.environ["GROQ_API_KEY"] = ""
 os.environ["RATE_LIMIT_PER_MINUTE"] = "1000000"
 os.environ["AUDIT_PERSIST"] = "false"
+os.environ["REVIEW_QUEUE"] = "false"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import config, llm, local_ai, pipeline, retrieval  # noqa: E402

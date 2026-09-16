@@ -345,7 +345,7 @@ def evaluate_source(source_id: int, limit: int = 10) -> dict:
     rows = []
     settings = None
     for case in cases:
-        response = pipeline.run(case["query"], settings, client_id="document-eval")
+        response = pipeline.run(case["query"], settings, client_id="document-eval", review=False)
         cited = sorted({sid for claim in response.claims for sid in claim.source_ids})
         ok = response.decision == case["expect"]
         if case["expect"] == "answer" and ok:
