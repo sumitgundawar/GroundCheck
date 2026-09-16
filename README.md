@@ -12,7 +12,16 @@ pinned: false
 
 **Grounded answers, or none at all.**
 
-GroundCheck is a small clinical-style retrieval application that answers
+[![CI](https://github.com/sumitgundawar/GroundCheck/actions/workflows/ci.yml/badge.svg)](https://github.com/sumitgundawar/GroundCheck/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+
+[Website](https://groundcheckhealth.com) ·
+[Live demo](https://huggingface.co/spaces/sumitgundawar/groundcheck) ·
+[Report an issue](https://github.com/sumitgundawar/GroundCheck/issues/new/choose) ·
+[Contributing](CONTRIBUTING.md)
+
+GroundCheck is an open-source clinical-style retrieval application that answers
 questions only from a trusted set of source documents, and refuses when it
 cannot ground its response. It is a demonstration of trustworthy AI
 engineering: the model is the easy part, and everything around it (retrieval,
@@ -22,28 +31,75 @@ actual work.
 The single idea it makes visible: **a system that refuses to answer when it is
 not sure is safer than one that always answers.**
 
-> All data is synthetic. Every condition, medication, lab marker, dosage, and
-> procedure is fictional and invented for this demo. Nothing here is medical
-> advice.
+> **Not a medical device and not medical advice.** GroundCheck is research and
+> engineering software. It has not been clinically validated or cleared by any
+> regulator. All demo data is synthetic: every condition, medication, lab
+> marker, dosage, and procedure is fictional.
+
+![The GroundCheck dashboard](site/public/screenshots/overview.webp)
+
+---
+
+## Quick start
+
+Requires Python 3.12 (3.11 also works) or Docker. No API key and no GPU needed.
+
+**With Python**
+
+```bash
+git clone https://github.com/sumitgundawar/GroundCheck.git
+cd GroundCheck
+python3.12 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python scripts/build_index.py    # downloads the embedding model once
+uvicorn app.main:app --port 8000
+```
+
+Open http://localhost:8000.
+
+**With Docker**
+
+```bash
+git clone https://github.com/sumitgundawar/GroundCheck.git
+cd GroundCheck
+docker build -t groundcheck .
+docker run -p 7860:7860 groundcheck
+```
+
+Open http://localhost:7860. The image builds the index and runs the evaluation
+while it builds, so it starts instantly.
+
+Full instructions, including configuration and Windows, are in
+[Local development](#local-development).
 
 ---
 
 ## Table of contents
 
-1. [What it does](#what-it-does)
-2. [The request lifecycle](#the-request-lifecycle)
-3. [The guards in detail](#the-guards-in-detail)
-4. [The synthetic corpus](#the-synthetic-corpus)
-5. [The evaluation](#the-evaluation)
-6. [The dashboard](#the-dashboard)
-7. [Live tuning](#live-tuning)
-8. [Configuration](#configuration)
-9. [Local development](#local-development)
-10. [Running the checks](#running-the-checks)
-11. [Deployment](#deployment)
-12. [Project layout](#project-layout)
-13. [Honest limitations](#honest-limitations)
-14. [Credits](#credits)
+1. [Quick start](#quick-start)
+2. [What it does](#what-it-does)
+3. [Screenshots](#screenshots)
+4. [The request lifecycle](#the-request-lifecycle)
+5. [The guards in detail](#the-guards-in-detail)
+6. [The synthetic corpus](#the-synthetic-corpus)
+7. [The evaluation](#the-evaluation)
+8. [The dashboard](#the-dashboard)
+9. [Live tuning](#live-tuning)
+10. [Using the API](#using-the-api)
+11. [Using your own documents](#using-your-own-documents)
+12. [Configuration](#configuration)
+13. [Local development](#local-development)
+14. [Running the checks](#running-the-checks)
+15. [Troubleshooting](#troubleshooting)
+16. [Deployment](#deployment)
+17. [Project layout](#project-layout)
+18. [Honest limitations](#honest-limitations)
+19. [Reporting issues](#reporting-issues)
+20. [Contributing](#contributing)
+21. [Security](#security)
+22. [License](#license)
+23. [Credits](#credits)
 
 ---
 
@@ -60,6 +116,47 @@ The decision to answer or refuse is **deterministic** and never depends on a
 live model call. If no API key is set, or a call fails or times out, the app
 falls back to extractive generation and still works end to end. The demo cannot
 break on stage.
+
+---
+
+## Screenshots
+
+These are unedited screenshots of the dashboard running locally in extractive
+mode (no API key).
+
+**A cited answer.** Every claim is tagged with the source it came from.
+
+![An answer with source citations](site/public/screenshots/answer.webp)
+
+**A refusal, with its reason.** The trace shows exactly which stage stopped the
+run; later stages are marked not reached.
+
+![A refused question and its pipeline trace](site/public/screenshots/refusal.webp)
+
+<details>
+<summary>More screenshots: evidence, tuning, corpus map, audit record, evaluation</summary>
+
+**Retrieved sources and the pipeline trace**
+
+![Retrieved sources with similarity scores beside the pipeline trace](site/public/screenshots/sources-trace.webp)
+
+**Tuning panel**
+
+![Sliders for thresholds and switches for each guard](site/public/screenshots/tuning.webp)
+
+**Corpus map**
+
+![A 3D map of document embeddings with retrieved sources highlighted](site/public/screenshots/corpus-map.webp)
+
+**Audit record**
+
+![A collapsible JSON audit record](site/public/screenshots/audit.webp)
+
+**Evaluation**
+
+![Golden-set results and adversarial probes](site/public/screenshots/evaluation.webp)
+
+</details>
 
 ---
 
@@ -223,6 +320,74 @@ are never changed.
 
 ---
 
+## Using the API
+
+The dashboard is a client of a small JSON API. You can call it directly.
+
+| Method and path | Purpose |
+| --- | --- |
+| `POST /api/ask` | Run a question through the pipeline |
+| `GET /api/audit` | Recent audit records |
+| `GET /api/audit/{id}` | One full audit record |
+| `GET /api/settings` | Default settings and their allowed ranges |
+| `GET /api/examples` | The example questions shown in the dashboard |
+| `GET /api/eval-summary` | The latest evaluation results |
+| `GET /api/corpus` | Corpus statistics and the 3D projection |
+| `GET /api/health` | Status, model mode, and corpus size |
+
+```bash
+curl -X POST http://localhost:8000/api/ask \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is the recommended dose of Zalortin?"}'
+```
+
+The response contains `decision` (`answer` or `refuse`), `answer_text`,
+`refused_reason`, `claims` (each with `source_ids` and a grounding score),
+`sources`, the full `trace`, `audit_id`, `total_ms`, and `llm_used`. The schemas
+are in `app/schemas.py`, and FastAPI serves interactive docs at `/docs`.
+
+To override thresholds or switch guards for a single request, add a `settings`
+object, for example `{"query": "...", "settings": {"top_k": 6,
+"enable_dosage_guard": false}}`. Configured defaults are never changed.
+
+---
+
+## Using your own documents
+
+The pipeline has no demo-specific logic, so you can point it at your own
+content:
+
+1. Replace `app/data/corpus.json` with a JSON array of records:
+
+   ```json
+   [
+     {
+       "id": "FORM-042",
+       "title": "Amoxicillin: dosage",
+       "topic": "amoxicillin",
+       "section": "Dosage and Administration",
+       "kind": "drug",
+       "text": "The full passage text."
+     }
+   ]
+   ```
+
+   `id`, `title`, and `text` are what retrieval and citation rely on. `topic`,
+   `section`, and `kind` drive the source cards and corpus map.
+
+2. Rebuild the index: `python scripts/build_index.py`.
+3. Re-tune `RETRIEVAL_MIN_SCORE` and `GROUNDING_MIN`. The defaults were tuned on
+   the synthetic corpus.
+4. Write evaluation cases for your content. `scripts/generate_golden.py` builds
+   cases from the synthetic corpus specifically, so treat it as a template
+   rather than something to run unchanged.
+5. Update `app/data/examples.json` with example questions for your content.
+
+**Never put real patient data in the corpus**, and remember that GroundCheck
+is not validated for clinical use.
+
+---
+
 ## Configuration
 
 All settings are read from the environment with safe defaults (`app/config.py`).
@@ -231,6 +396,7 @@ The only one you may want to set is `GROQ_API_KEY`.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GROQ_API_KEY` | _empty_ | Enables the live LLM. Empty means extractive mode. |
+| `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Any OpenAI-compatible endpoint that supports JSON output mode. |
 | `FORCE_EXTRACTIVE` | `false` | Force extractive mode even with a key set. Use to run a public demo without spending quota. |
 | `GEN_MODEL` | `llama-3.3-70b-versatile` | Generation model. |
 | `JUDGE_MODEL` | `llama-3.1-8b-instant` | Optional grounding-judge model. |
@@ -304,14 +470,28 @@ test suite on every push and pull request.
 
 ---
 
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `FileNotFoundError` for the index on startup | Run `python scripts/build_index.py` first. The index is not committed. |
+| The first index build is slow or fails offline | It downloads `all-MiniLM-L6-v2` from Hugging Face once. Run it with network access, then it works offline. |
+| `faiss-cpu` fails to install | Use Python 3.11 or 3.12 with an up-to-date `pip`. On Windows, use Docker if the wheel is unavailable. |
+| The header shows `llm: extractive` although a key is set | Check that `FORCE_EXTRACTIVE` is not `true`, and that the key is exported in the same shell or set in `.env`. |
+| Every question is refused | Check you haven't raised `RETRIEVAL_MIN_SCORE` or `GROUNDING_MIN`, or switched the corpus without rebuilding the index. |
+| Refusals with a failed `rate limit` stage in the trace | You hit the per-IP rate limit. Raise `RATE_LIMIT_PER_MINUTE` for local testing or batch runs. |
+
+---
+
 ## Deployment
 
 The app is one container that listens on the port given by `app_port` (7860 on
 Hugging Face Spaces). The FAISS index and evaluation are built inside the image,
 so startup is instant and no model download happens at runtime.
 
-See the deployment section of the project notes for step-by-step instructions
-for Hugging Face Spaces (recommended, free) and Render. In short:
+It runs on Hugging Face Spaces (Docker SDK; the front matter at the top of this
+file is the Space configuration) and on Render (`render.yaml` is a Blueprint).
+In short:
 
 1. Push this repository to the host.
 2. Add `GROQ_API_KEY` as a platform secret (never in code). Without it the app
@@ -351,7 +531,10 @@ groundcheck/
     adversarial.json    hand-written adversarial probes
   web/                  vanilla HTML, CSS, JS dashboard (no build step)
   tests/                pipeline, API, and guard tests (offline)
-  Dockerfile, requirements.txt, .github/workflows/ci.yml
+  site/                 the groundcheckhealth.com website (static, Cloudflare)
+  .github/              CI workflow, issue forms, pull request template
+  Dockerfile, requirements.txt, render.yaml
+  CONTRIBUTING.md, SECURITY.md, LICENSE
 ```
 
 ---
@@ -373,6 +556,55 @@ In the spirit of the demo, these are real and worth knowing:
   use a shared store.
 - The dosage guard handles digits and written-out numbers up to common ranges,
   but not every exotic format.
+- The coverage guard works on words, so it can refuse for the wrong reason when
+  a question contains an everyday word the sources don't use (for example
+  "year" or "email").
+- Extractive generation can include related passages the question didn't ask
+  about. The claims are grounded, but the answer can be broader than needed.
+- PII redaction covers email addresses and long digit runs only. It is not
+  de-identification.
+- "Routed for review" is recorded in the audit trail, but there is no review
+  queue yet.
+
+---
+
+## Reporting issues
+
+Use the issue forms at
+[github.com/sumitgundawar/GroundCheck/issues/new/choose](https://github.com/sumitgundawar/GroundCheck/issues/new/choose):
+
+- **Unsafe answer**: GroundCheck answered a question it should have refused.
+  This is the most valuable report you can file. Include the exact question,
+  the answer, and the audit ID.
+- **Bug report**: something is broken, or a question was wrongly refused.
+- **Feature request**: an improvement or a new capability.
+
+Search existing issues first, and **never include real patient data or API
+keys**.
+
+## Contributing
+
+Contributions are welcome: code, evaluation cases, adversarial probes, and
+documentation. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the checks
+every pull request must pass, and the extra rules for changes to the guards.
+The short version:
+
+1. Open or comment on an issue before starting anything large.
+2. Branch from `main` and keep the change focused.
+3. Run `python scripts/run_eval.py` (zero must-refuse cases answered) and
+   `pytest -q`.
+4. Open a pull request using the template.
+
+## Security
+
+Please don't report vulnerabilities in public issues. Follow
+[SECURITY.md](SECURITY.md) to report privately.
+
+## License
+
+[MIT](LICENSE). You may use, modify, and distribute GroundCheck, including
+commercially. Any clinical use, and the regulatory approvals and validation it
+requires, is your responsibility.
 
 ---
 

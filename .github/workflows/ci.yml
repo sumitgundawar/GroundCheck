@@ -31,3 +31,20 @@ jobs:
 
       - name: Run the test suite (no network)
         run: pytest -q
+
+  site:
+    name: Website checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: site/.nvmrc
+
+      - name: Check pages, links, and CSP compatibility
+        run: npm run check
