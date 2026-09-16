@@ -1,4 +1,8 @@
-"""LLM integration (Groq, OpenAI-compatible) plus the extractive fallback.
+"""LLM integration plus the extractive fallback.
+
+Two providers can draft answers: a local open-source model through Ollama
+(app/local_ai.py), or a cloud model through any OpenAI-compatible API (Groq by
+default). A local model, when one is selected and available, takes precedence.
 
 Every live call is wrapped so that any error, timeout, or malformed output
 silently falls back to extractive generation. The user never sees an error and
@@ -9,10 +13,51 @@ from __future__ import annotations
 import json
 import re
 
-from . import config, retrieval
+from . import config, local_ai, retrieval
 from .schemas import LLMAnswer, LLMClaim
 
+# Whether a cloud model is configured. Fixed at startup, since it depends only
+# on the environment.
 LLM_AVAILABLE = config.llm_configured()
+
+
+def active_provider() -> dict | None:
+    """The model that will draft the next answer, as
+    {"kind": "local" | "cloud", "model": name}, or None for extractive mode."""
+    if config.FORCE_EXTRACTIVE:
+        return None
+    local = local_ai.active_model()
+    if local:
+        return {"kind": "local", "model": local}
+    if LLM_AVAILABLE:
+        return {"kind": "cloud", "model": config.GEN_MODEL}
+    return None
+
+
+def llm_available() -> bool:
+    return active_provider() is not None
+
+
+def _complete_json(system: str, user: str, temperature: float,
+                   provider: dict, judge: bool = False) -> str:
+    """One JSON completion from the given provider. Raises on failure."""
+    if provider["kind"] == "local":
+        if not judge and system == GEN_SYSTEM_PROMPT:
+            system = LOCAL_GEN_SYSTEM_PROMPT
+        content = local_ai.chat_json(system, user, temperature, model=provider["model"],
+                                     schema=JUDGE_SCHEMA if judge else GEN_SCHEMA)
+        if content is None:
+            raise RuntimeError("local model call failed")
+        return content
+    client = _get_client()
+    response = client.chat.completions.create(
+        model=config.JUDGE_MODEL if judge else config.GEN_MODEL,
+        messages=[{"role": "system", "content": system},
+                  {"role": "user", "content": user}],
+        temperature=temperature,
+        response_format={"type": "json_object"},
+    )
+    return response.choices[0].message.content or ""
 
 _client = None
 
@@ -42,6 +87,45 @@ Rules:
 Return ONLY valid JSON matching this schema:
 {"insufficient_context": boolean, "claims": [{"text": string, "source_ids": [string]}]}"""
 
+# Small local models refuse too readily with the prompt above ("insufficient
+# context" when a source states the answer outright). Explicit steps and a
+# JSON schema keep them on task. Grounding and dosage checks apply unchanged.
+LOCAL_GEN_SYSTEM_PROMPT = """You answer clinical questions using ONLY the numbered SOURCES.
+
+Steps:
+1. Find every sentence in the SOURCES that answers the QUESTION.
+2. For each, write one short claim that restates it, and cite the id of the source it came from, exactly as shown in square brackets, for example "CALO-001".
+3. Copy every number and unit exactly as written in the source.
+4. Set insufficient_context to true ONLY if no source sentence answers the question. If any source answers it, insufficient_context is false.
+
+Do not use outside knowledge. Do not add advice or caveats."""
+
+GEN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "insufficient_context": {"type": "boolean"},
+        "claims": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "source_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
+                },
+                "required": ["text", "source_ids"],
+            },
+        },
+    },
+    "required": ["insufficient_context", "claims"],
+}
+
+JUDGE_SCHEMA = {
+    "type": "object",
+    "properties": {"supported": {"type": "boolean"}, "reason": {"type": "string"}},
+    "required": ["supported", "reason"],
+}
+
 JUDGE_SYSTEM_PROMPT = """You verify grounding. Given a CLAIM and its CITED SOURCE text, decide if every statement in the claim is directly supported by the source.
 Return ONLY JSON: {"supported": boolean, "reason": string}.
 Be strict. If the claim adds any detail not present in the source, supported is false."""
@@ -63,9 +147,10 @@ def _parse_llm_answer(content: str) -> LLMAnswer:
 
 def generate_llm(query: str, sources: list[dict],
                  temperature: float = 0.0) -> LLMAnswer | None:
-    """Call the generation model with one retry. Returns None on any failure,
+    """Call the drafting model with one retry. Returns None on any failure,
     which signals the pipeline to use the extractive fallback."""
-    if not LLM_AVAILABLE:
+    provider = active_provider()
+    if provider is None:
         return None
 
     user_message = (
@@ -74,17 +159,7 @@ def generate_llm(query: str, sources: list[dict],
     )
     for attempt in range(2):
         try:
-            client = _get_client()
-            response = client.chat.completions.create(
-                model=config.GEN_MODEL,
-                messages=[
-                    {"role": "system", "content": GEN_SYSTEM_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=temperature,
-                response_format={"type": "json_object"},
-            )
-            content = response.choices[0].message.content or ""
+            content = _complete_json(GEN_SYSTEM_PROMPT, user_message, temperature, provider)
             return _parse_llm_answer(content)
         except Exception:
             # On the first failure, retry once with a firmer nudge; on the
@@ -100,21 +175,12 @@ def judge_claim(claim_text: str, source_text: str,
                 use_judge: bool | None = None) -> dict | None:
     """Optional corroboration of a single claim. Never authoritative."""
     enabled = config.USE_LLM_JUDGE if use_judge is None else use_judge
-    if not (LLM_AVAILABLE and enabled):
+    provider = active_provider() if enabled else None
+    if provider is None:
         return None
     user_message = f"CLAIM:\n{claim_text}\n\nCITED SOURCE:\n{source_text}"
     try:
-        client = _get_client()
-        response = client.chat.completions.create(
-            model=config.JUDGE_MODEL,
-            messages=[
-                {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=0.0,
-            response_format={"type": "json_object"},
-        )
-        content = response.choices[0].message.content or ""
+        content = _complete_json(JUDGE_SYSTEM_PROMPT, user_message, 0.0, provider, judge=True)
         data = json.loads(content)
         return {"supported": bool(data.get("supported")), "reason": str(data.get("reason", ""))}
     except Exception:

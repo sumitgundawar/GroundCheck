@@ -45,6 +45,18 @@ JUDGE_MODEL = _get("JUDGE_MODEL", "llama-3.1-8b-instant")
 LLM_TIMEOUT_SECONDS = _get_float("LLM_TIMEOUT_SECONDS", 8.0)
 USE_LLM_JUDGE = _get("USE_LLM_JUDGE", "true").lower() in ("1", "true", "yes")
 
+# --- Local AI (Ollama) ------------------------------------------------------
+# An open-source model on this machine can draft answers instead of a cloud
+# model. It is chosen in the dashboard (or with LOCAL_MODEL) and takes
+# precedence over the cloud model when Ollama is running and has it installed.
+OLLAMA_HOST = _get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+LOCAL_MODEL = _get("LOCAL_MODEL", "")
+LOCAL_AI_TIMEOUT_SECONDS = _get_float("LOCAL_AI_TIMEOUT_SECONDS", 60.0)
+# Who may download and switch local models through the API: "local" (requests
+# from this machine only, the default), "all", or "none".
+LOCAL_AI_ADMIN = _get("LOCAL_AI_ADMIN", "local").lower()
+LOCAL_AI_STATE_PATH = ROOT_DIR / _get("LOCAL_AI_STATE_PATH", "local_ai.json")
+
 # --- Embeddings + retrieval ------------------------------------------------
 EMBED_MODEL = _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 TOP_K = _get_int("TOP_K", 4)

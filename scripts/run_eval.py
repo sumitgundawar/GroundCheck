@@ -17,6 +17,7 @@ from pathlib import Path
 # the per-process rate limit, which exists to protect a live endpoint and would
 # otherwise throttle a batch run of thousands of cases.
 os.environ["GROQ_API_KEY"] = ""
+os.environ["FORCE_EXTRACTIVE"] = "true"  # also ignores any selected local model
 os.environ["RATE_LIMIT_PER_MINUTE"] = "1000000"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

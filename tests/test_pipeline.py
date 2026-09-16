@@ -12,6 +12,8 @@ import pytest
 # Force extractive mode, lift the rate limit for the batch, and make the app
 # package importable.
 os.environ["GROQ_API_KEY"] = ""
+# Deterministic: never draft with a cloud or a selected local model.
+os.environ["FORCE_EXTRACTIVE"] = "true"
 os.environ["RATE_LIMIT_PER_MINUTE"] = "1000000"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

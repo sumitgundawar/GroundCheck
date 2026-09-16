@@ -47,6 +47,7 @@ function refusalExplanation(reason) {
 document.addEventListener("DOMContentLoaded", () => {
   loadLogo();
   loadHealth();
+  loadLocalAI();
   loadExamples();
   loadSettings();
   loadEvalSummary();
@@ -66,7 +67,9 @@ async function loadHealth() {
   try {
     const data = await (await fetch("/api/health")).json();
     llmAvailable = !!data.llm;
-    if (data.llm) { dot.className = "dot ok"; label.textContent = "llm: groq"; }
+    const provider = data.provider;
+    if (provider && provider.kind === "local") { dot.className = "dot ok"; label.textContent = `llm: local ${provider.model}`; }
+    else if (provider) { dot.className = "dot ok"; label.textContent = `llm: ${provider.model}`; }
     else { dot.className = "dot warn"; label.textContent = "llm: extractive"; }
     if (typeof data.corpus === "number") $("corpus-count").textContent = data.corpus.toLocaleString();
   } catch (_) { dot.className = "dot warn"; label.textContent = "llm: extractive"; }
@@ -1049,10 +1052,207 @@ function renderSectionBars(stats) {
   });
 }
 
+// ---------- Local AI ----------
+const localAI = { status: null, downloading: new Map(), busy: null };
+
+function formatGb(gb) { return `${gb.toFixed(gb < 10 ? 1 : 0)} GB`; }
+
+async function loadLocalAI() {
+  try {
+    const res = await fetch("/api/local-ai");
+    localAI.status = await res.json();
+  } catch (_) {
+    localAI.status = null;
+  }
+  renderLocalAI();
+}
+
+function renderLocalAI() {
+  const s = localAI.status;
+  const summary = $("local-ai-summary");
+  const hw = $("local-ai-hw");
+  const msg = $("local-ai-message");
+  const list = $("local-ai-models");
+  hw.textContent = "";
+  list.textContent = "";
+  msg.hidden = true;
+
+  if (!s) { summary.textContent = "unavailable"; return; }
+
+  const active = s.models.find((m) => m.name === s.active);
+  summary.textContent = active ? `using ${active.label}`
+    : s.ollama.running ? "no model selected" : "Ollama not running";
+
+  const h = s.hardware;
+  const accel = { "apple-silicon": "Apple silicon GPU", nvidia: "NVIDIA GPU", cpu: "CPU only" }[h.accelerator] || h.accelerator;
+  const facts = [
+    h.cpu,
+    `${formatGb(h.memory_gb)} memory`,
+    ...h.gpus.map((g) => `${g.name}, ${formatGb(g.memory_gb)}`),
+    accel,
+    `${formatGb(h.model_memory_gb)} available for a model`,
+  ];
+  facts.forEach((text) => {
+    const pill = document.createElement("span");
+    pill.className = "pill";
+    pill.textContent = text;
+    hw.appendChild(pill);
+  });
+
+  if (!s.ollama.running) {
+    msg.hidden = false;
+    msg.textContent = "";
+    msg.append("Ollama isn't running at ", Object.assign(document.createElement("code"), { textContent: s.ollama.host }),
+      ". Install it from ", Object.assign(document.createElement("a"), { href: "https://ollama.com/download", textContent: "ollama.com", target: "_blank", rel: "noopener" }),
+      ", start it, then reopen this panel.");
+  } else if (!s.can_manage) {
+    msg.hidden = false;
+    msg.textContent = "Models can only be downloaded or switched from the machine running GroundCheck.";
+  }
+
+  s.models.forEach((m) => list.appendChild(renderModelRow(m, s)));
+}
+
+function renderModelRow(m, s) {
+  const li = document.createElement("li");
+  li.className = `local-ai-model fit-${m.fit}`;
+
+  const main = document.createElement("div");
+  main.className = "local-ai-model-main";
+  const name = document.createElement("span");
+  name.className = "local-ai-model-name";
+  name.textContent = m.label;
+  main.appendChild(name);
+  if (m.recommended) main.appendChild(badge("Recommended", "recommended"));
+  main.appendChild(badge({ good: "Good fit", tight: "Tight fit", "too-large": "Too large" }[m.fit], `fit ${m.fit}`));
+
+  const meta = document.createElement("div");
+  meta.className = "local-ai-model-meta mono";
+  meta.textContent = `${m.name}  ${m.parameters}  download ${formatGb(m.download_gb)}  needs ${formatGb(m.memory_needed_gb)}`;
+  const licence = document.createElement("div");
+  licence.className = "local-ai-model-licence";
+  licence.textContent = m.licence;
+
+  const actions = document.createElement("div");
+  actions.className = "local-ai-model-actions";
+  const progress = localAI.downloading.get(m.name);
+  const disabled = !s.ollama.running || !s.can_manage || localAI.busy !== null;
+
+  if (progress) {
+    const bar = document.createElement("div");
+    bar.className = "local-ai-progress";
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    bar.setAttribute("aria-valuenow", String(progress.percent));
+    bar.setAttribute("aria-label", `Downloading ${m.label}`);
+    const fill = document.createElement("span");
+    fill.style.width = `${progress.percent}%`;
+    bar.appendChild(fill);
+    const label = document.createElement("span");
+    label.className = "local-ai-progress-label mono";
+    label.textContent = progress.label;
+    actions.append(bar, label);
+  } else if (!m.installed) {
+    actions.appendChild(button(`Download ${formatGb(m.download_gb)}`, "btn-ghost",
+      disabled || m.fit === "too-large", () => downloadModel(m)));
+  } else if (s.selected === m.name) {
+    const inUse = badge(localAI.busy === m.name ? "Loading…" : "In use", "in-use");
+    actions.append(inUse, button("Stop using", "btn-ghost", disabled, () => selectModel(null)));
+  } else {
+    actions.appendChild(button(localAI.busy === m.name ? "Loading…" : "Use this model", "btn-primary",
+      disabled, () => selectModel(m.name)));
+  }
+
+  li.append(main, meta, licence, actions);
+  return li;
+}
+
+function badge(text, kind) {
+  const el = document.createElement("span");
+  el.className = `local-ai-badge ${kind}`;
+  el.textContent = text;
+  return el;
+}
+
+function button(text, style, disabled, onClick) {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = `btn btn-sm ${style}`;
+  el.textContent = text;
+  el.disabled = disabled;
+  el.addEventListener("click", onClick);
+  return el;
+}
+
+async function downloadModel(m) {
+  localAI.downloading.set(m.name, { percent: 0, label: "starting…" });
+  renderLocalAI();
+  let error = null;
+  try {
+    const res = await fetch("/api/local-ai/pull", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: m.name }),
+    });
+    if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.status === "error") { error = event.error; continue; }
+        const percent = event.total ? Math.round((event.completed / event.total) * 100) : 0;
+        const label = event.total ? `${percent}%  ${formatGb(event.completed / 1e9)} of ${formatGb(event.total / 1e9)}` : event.status;
+        localAI.downloading.set(m.name, { percent, label });
+        renderLocalAI();
+      }
+    }
+  } catch (err) {
+    error = err.message;
+  }
+  localAI.downloading.delete(m.name);
+  await loadLocalAI();
+  if (error) showLocalAIError(`Download failed: ${error}`);
+}
+
+async function selectModel(name) {
+  localAI.busy = name || localAI.status?.selected || "";
+  renderLocalAI();
+  let error = null;
+  try {
+    const res = await fetch("/api/local-ai/select", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: name }),
+    });
+    if (!res.ok) error = (await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`;
+  } catch (err) {
+    error = err.message;
+  }
+  localAI.busy = null;
+  await Promise.all([loadLocalAI(), loadHealth()]);
+  if (error) showLocalAIError(error);
+}
+
+function showLocalAIError(text) {
+  const msg = $("local-ai-message");
+  msg.hidden = false;
+  msg.textContent = text;
+  msg.classList.add("error");
+}
+
 // ---------- Collapsibles ----------
 function wireCollapsibles() {
   wireToggle("how-toggle", "how-body");
   wireToggle("tuning-toggle", "tuning-body");
+  wireToggle("local-ai-toggle", "local-ai-body");
+  $("local-ai-toggle").addEventListener("click", () => {
+    if (!$("local-ai-body").hidden) loadLocalAI();
+  });
   wireToggle("corpus-toggle", "corpus-body");
   // When the corpus panel opens, the canvas finally has a width, so size and
   // draw it then (it cannot size correctly while collapsed).

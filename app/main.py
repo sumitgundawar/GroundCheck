@@ -3,15 +3,18 @@ The embedding model and FAISS index are loaded once at startup."""
 
 from __future__ import annotations
 
+import ipaddress
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from . import audit, config, llm, pipeline, retrieval
+from . import audit, config, llm, local_ai, pipeline, retrieval
 from .schemas import AskRequest, AskResponse, Settings
 
 WEB_DIR = config.ROOT_DIR / "web"
@@ -49,7 +52,7 @@ def settings_defaults() -> JSONResponse:
     build the tuning panel and offer a one-click reset to defaults."""
     return JSONResponse({
         "defaults": Settings().model_dump(),
-        "llm_available": llm.LLM_AVAILABLE,
+        "llm_available": llm.llm_available(),
         "bounds": {
             "retrieval_min_score": {"min": 0.0, "max": 1.0, "step": 0.01},
             "grounding_min": {"min": 0.0, "max": 1.0, "step": 0.01},
@@ -110,11 +113,98 @@ def corpus_map() -> JSONResponse:
 @app.get("/api/health")
 def health() -> JSONResponse:
     corpus = retrieval.load_corpus()
+    provider = llm.active_provider()
     return JSONResponse({
         "status": "ok",
-        "llm": llm.LLM_AVAILABLE,
+        "llm": provider is not None,
+        "provider": provider,
         "corpus": len(corpus),
     })
+
+
+# --- Local AI ---------------------------------------------------------------
+
+class LocalModelRequest(BaseModel):
+    model: str | None = None
+
+
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "")
+
+
+def _require_local_ai_admin(request: Request) -> None:
+    """Downloading and switching models changes the server for everyone, so by
+    default only requests from this machine may do it."""
+    policy = config.LOCAL_AI_ADMIN
+    if policy == "all":
+        return
+    if policy == "local":
+        host = _client_ip(request)
+        try:
+            if host == "testclient" or ipaddress.ip_address(host).is_loopback:
+                return
+        except ValueError:
+            pass
+    raise HTTPException(status_code=403, detail="Managing local models is only allowed from this machine.")
+
+
+@app.get("/api/local-ai")
+def local_ai_status(request: Request) -> JSONResponse:
+    body = local_ai.status()
+    try:
+        _require_local_ai_admin(request)
+        body["can_manage"] = True
+    except HTTPException:
+        body["can_manage"] = False
+    return JSONResponse(body)
+
+
+@app.post("/api/local-ai/pull")
+def local_ai_pull(body: LocalModelRequest, request: Request) -> StreamingResponse:
+    """Download a catalogue model, streaming progress as newline-delimited JSON."""
+    _require_local_ai_admin(request)
+    if not body.model or body.model not in {m.name for m in local_ai.CATALOGUE}:
+        raise HTTPException(status_code=400, detail="Choose a model from the catalogue.")
+
+    def events():
+        try:
+            for event in local_ai.pull(body.model):
+                yield json.dumps(event) + "\n"
+        except local_ai.OllamaError as exc:
+            yield json.dumps({"status": "error", "error": str(exc)}) + "\n"
+        finally:
+            local_ai.forget_availability()
+
+    return StreamingResponse(events(), media_type="application/x-ndjson")
+
+
+@app.post("/api/local-ai/select")
+async def local_ai_select(body: LocalModelRequest, request: Request) -> JSONResponse:
+    """Make a downloaded model the one that drafts answers, and load it into
+    memory. A null model switches back to the cloud model or extractive mode."""
+    _require_local_ai_admin(request)
+    previous = local_ai.selected_model()
+    if body.model is None:
+        local_ai.select_model(None)
+        local_ai.forget_availability()
+        if previous:
+            await run_in_threadpool(local_ai.unload, previous)
+        return JSONResponse({"selected": None, "provider": llm.active_provider()})
+
+    if body.model not in {m.name for m in local_ai.CATALOGUE}:
+        raise HTTPException(status_code=400, detail="Choose a model from the catalogue.")
+    if not await run_in_threadpool(local_ai.is_installed, body.model):
+        raise HTTPException(status_code=409, detail=f"Download {body.model} before selecting it.")
+    try:
+        await run_in_threadpool(local_ai.load, body.model)
+    except local_ai.OllamaError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    local_ai.select_model(body.model)
+    local_ai.forget_availability()
+    if previous and previous != body.model:
+        await run_in_threadpool(local_ai.unload, previous)
+    return JSONResponse({"selected": body.model, "provider": llm.active_provider()})
 
 
 # Static assets (logo, fonts, css, js). Mounted last so API routes win.

@@ -7,3 +7,4 @@ __pycache__/
 index/
 eval/eval_summary.json
 audit/
+local_ai.json

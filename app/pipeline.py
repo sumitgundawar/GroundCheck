@@ -286,7 +286,8 @@ def run(raw_query: str, settings: "Settings | None" = None,
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
     # --- 5. Generate -------------------------------------------------------
-    llm_answer = None if cfg.force_extractive else llm.generate_llm(
+    provider = None if cfg.force_extractive else llm.active_provider()
+    llm_answer = None if provider is None else llm.generate_llm(
         query, source_records, cfg.temperature)
     llm_used = llm_answer is not None
     if not llm_used:
@@ -295,9 +296,11 @@ def run(raw_query: str, settings: "Settings | None" = None,
     trace.append(TraceStep(
         name="generate",
         status="pass" if llm_used else "info",
-        detail=("llm produced cited claims" if llm_used
+        detail=(f"{'local' if provider['kind'] == 'local' else 'cloud'} model "
+                f"{provider['model']} produced cited claims" if llm_used
                 else ("naive extractive, model bypassed" if cfg.force_extractive
-                      else "extractive fallback")),
+                      else ("extractive fallback: the model call failed" if provider
+                            else "extractive fallback"))),
         ms=timer.lap_ms(),
     ))
 

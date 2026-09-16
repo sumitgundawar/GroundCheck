@@ -7,3 +7,4 @@ __pycache__/
 eval/eval_summary.json
 audit/
 .DS_Store
+local_ai.json

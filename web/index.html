@@ -211,6 +211,25 @@
       </div>
     </section>
 
+    <!-- Local AI (collapsible) -->
+    <section class="panel collapsible local-ai-panel" id="local-ai-panel">
+      <button class="collapsible-toggle" id="local-ai-toggle" aria-expanded="false">
+        <span class="eyebrow">Local AI</span>
+        <span class="local-ai-summary" id="local-ai-summary">checking…</span>
+        <span class="chevron">▸</span>
+      </button>
+      <div class="local-ai-body" id="local-ai-body" hidden>
+        <p class="tuning-hint">
+          Run an open-source model on this machine. It drafts the answer; the same
+          checks still decide what is shown. If the model isn't available, answers
+          fall back to extractive mode.
+        </p>
+        <div class="local-ai-facts" id="local-ai-hw" aria-label="This machine"></div>
+        <p class="local-ai-message" id="local-ai-message" hidden></p>
+        <ul class="local-ai-models" id="local-ai-models" aria-label="Models"></ul>
+      </div>
+    </section>
+
     <!-- Decision -->
     <section class="panel decision-panel" id="decision-panel" hidden>
       <div class="decision-head">
