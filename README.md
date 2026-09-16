@@ -86,20 +86,21 @@ Full instructions, including configuration and Windows, are in
 7. [The evaluation](#the-evaluation)
 8. [The dashboard](#the-dashboard)
 9. [Live tuning](#live-tuning)
-10. [Using the API](#using-the-api)
-11. [Using your own documents](#using-your-own-documents)
-12. [Configuration](#configuration)
-13. [Local development](#local-development)
-14. [Running the checks](#running-the-checks)
-15. [Troubleshooting](#troubleshooting)
-16. [Deployment](#deployment)
-17. [Project layout](#project-layout)
-18. [Honest limitations](#honest-limitations)
-19. [Reporting issues](#reporting-issues)
-20. [Contributing](#contributing)
-21. [Security](#security)
-22. [License](#license)
-23. [Credits](#credits)
+10. [Local AI models](#local-ai-models)
+11. [Using the API](#using-the-api)
+12. [Using your own documents](#using-your-own-documents)
+13. [Configuration](#configuration)
+14. [Local development](#local-development)
+15. [Running the checks](#running-the-checks)
+16. [Troubleshooting](#troubleshooting)
+17. [Deployment](#deployment)
+18. [Project layout](#project-layout)
+19. [Honest limitations](#honest-limitations)
+20. [Reporting issues](#reporting-issues)
+21. [Contributing](#contributing)
+22. [Security](#security)
+23. [License](#license)
+24. [Credits](#credits)
 
 ---
 
@@ -321,6 +322,46 @@ are never changed.
 
 ---
 
+## Local AI models
+
+GroundCheck can draft answers with an open-source model running on your own
+machine through [Ollama](https://ollama.com). No API key is needed and nothing
+is sent to the cloud. The model only drafts: the same deterministic checks
+decide what is shown, and if the model is unavailable or fails, answers fall
+back to extractive mode.
+
+1. Install Ollama from [ollama.com/download](https://ollama.com/download) and
+   start it.
+2. Open the **Local AI** panel in the dashboard. It shows your hardware, how
+   much memory a model can use, and which models fit.
+3. Download a model, then choose **Use this model**. The header shows the
+   model in use.
+
+| Hardware | Memory a model can use |
+| --- | --- |
+| Apple silicon | About two thirds of system memory, shared with the GPU |
+| NVIDIA GPU | The largest GPU's memory |
+| No GPU | Half of system memory, running on the CPU |
+
+The catalogue lists ten models from 1B to 14B parameters, with download sizes
+from the Ollama registry and the licence each model ships with. Models with
+non-commercial licences are left out. The recommended model is the best one
+that fits your machine with headroom.
+
+A selected local model takes precedence over a cloud model. You can also set
+one without the dashboard: `ollama pull llama3.2:3b`, then
+`LOCAL_MODEL=llama3.2:3b`.
+
+Downloading and switching models changes the server for everyone, so by
+default it is allowed only from the machine running GroundCheck. Set
+`LOCAL_AI_ADMIN=all` to allow it from anywhere, or `none` to lock the choice.
+
+Small local models are slower and less capable than large cloud models. Expect
+several seconds to tens of seconds per answer on a laptop, and more refusals
+when a small model drafts claims the grounding check can't verify.
+
+---
+
 ## Using the API
 
 The dashboard is a client of a small JSON API. You can call it directly.
@@ -334,7 +375,10 @@ The dashboard is a client of a small JSON API. You can call it directly.
 | `GET /api/examples` | The example questions shown in the dashboard |
 | `GET /api/eval-summary` | The latest evaluation results |
 | `GET /api/corpus` | Corpus statistics and the 3D projection |
-| `GET /api/health` | Status, model mode, and corpus size |
+| `GET /api/health` | Status, the model drafting answers, and corpus size |
+| `GET /api/local-ai` | Hardware, Ollama status, and the model catalogue with fit |
+| `POST /api/local-ai/pull` | Download a catalogue model (streams progress as NDJSON) |
+| `POST /api/local-ai/select` | Use a downloaded model, or `null` to stop using one |
 
 ```bash
 curl -X POST http://localhost:8000/api/ask \
@@ -398,6 +442,10 @@ The only one you may want to set is `GROQ_API_KEY`.
 | --- | --- | --- |
 | `GROQ_API_KEY` | _empty_ | Enables the live LLM. Empty means extractive mode. |
 | `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Any OpenAI-compatible endpoint that supports JSON output mode. |
+| `OLLAMA_HOST` | `http://localhost:11434` | Where the Ollama server runs. |
+| `LOCAL_MODEL` | _empty_ | A local model to use at startup, if none was chosen in the dashboard. |
+| `LOCAL_AI_TIMEOUT_SECONDS` | `60` | Timeout for a local model call before falling back. |
+| `LOCAL_AI_ADMIN` | `local` | Who may download and switch local models: `local`, `all`, or `none`. |
 | `FORCE_EXTRACTIVE` | `false` | Force extractive mode even with a key set. Use to run a public demo without spending quota. |
 | `GEN_MODEL` | `llama-3.3-70b-versatile` | Generation model. |
 | `JUDGE_MODEL` | `llama-3.1-8b-instant` | Optional grounding-judge model. |
