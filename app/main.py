@@ -792,6 +792,23 @@ def governance_report(request: Request, days: int = 30) -> dict:
         raise _governance_error(exc) from exc
 
 
+@app.get("/api/usage")
+def usage_dashboard(request: Request, days: int = 30) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return governance.usage(days)
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.get("/api/embeddings")
+def embeddings_summary() -> dict:
+    from . import knowledge
+
+    return {**retrieval.embedding_summary(), "index": knowledge.index_status()}
+
+
 @app.get("/api/governance/safety-case")
 def governance_safety_case(request: Request, days: int = 30) -> Response:
     require_manager(request, "reviewer")
@@ -827,6 +844,17 @@ def retention_run(request: Request) -> dict:
     user = require_manager(request, "admin")
     _require_database()
     return {"run": retention.apply(user.id if user else None), "retention": retention.plan()}
+
+
+@app.middleware("http")
+async def revalidate_static_files(request: Request, call_next):
+    """Ask browsers to check the dashboard's files on every load. Unchanged
+    files still come back as a quick 304, and an update is never hidden
+    behind a stale cached copy."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
 
 
 # Static assets (logo, fonts, css, js). Mounted last so API routes win.

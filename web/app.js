@@ -65,6 +65,7 @@ function startDashboard() {
   renderHowStages();
   wireForm();
   wireCollapsibles();
+  wireNavigation();
 }
 
 // ---------- Accounts ----------
@@ -148,9 +149,29 @@ function renderAccountMenu() {
   $("account-label").textContent = user.name || user.email;
   $("account-email").textContent = user.email;
   $("account-role").textContent = user.role;
-  $("open-users").hidden = user.role !== "admin";
-  $("review-panel").hidden = user.role === "clinician";
-  $("hazard-add").hidden = user.role !== "admin";
+  const initials = (user.name || user.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+  $("account-avatar").textContent = initials;
+  applyRoleNavigation();
+}
+
+// Which pages a person sees depends on their role when sign-in is required.
+// Without sign-in (the local demo), every page is shown; the server still
+// decides what each request may do.
+function canSee(view) {
+  const role = account.user?.role;
+  if (!account.authRequired) return view !== "users";
+  const rank = { clinician: 0, reviewer: 1, admin: 2 }[role] ?? -1;
+  const needs = { usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0 }[view] ?? 0;
+  return rank >= needs;
+}
+
+function applyRoleNavigation() {
+  document.querySelectorAll(".nav-link").forEach((link) => { link.hidden = !canSee(link.dataset.view); });
+  document.querySelectorAll(".nav-group").forEach((group) => {
+    group.hidden = ![...group.querySelectorAll(".nav-link")].some((l) => !l.hidden);
+  });
+  $("hazard-add").hidden = account.authRequired && account.user?.role !== "admin";
+  if (dashboardStarted) route();
 }
 
 function canEditHazards() {
@@ -221,7 +242,6 @@ function wireAccounts() {
   });
 
   $("open-account").addEventListener("click", () => { setMenu(false); openAccountDialog(); });
-  $("open-users").addEventListener("click", () => { setMenu(false); openUsersDialog(); });
   document.querySelectorAll("dialog [data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
 
   $("password-form").addEventListener("submit", async (e) => {
@@ -307,12 +327,6 @@ function openAccountDialog() {
   $("account-message").hidden = true;
   renderTwoFactor();
   $("account-dialog").showModal();
-}
-
-async function openUsersDialog() {
-  $("users-message").hidden = true;
-  $("users-dialog").showModal();
-  await loadUsers();
 }
 
 async function loadUsers() {
@@ -558,6 +572,7 @@ async function submitQuery(query) {
       body: JSON.stringify({ query, settings: readSettings() }),
     });
     render(await res.json());
+    refreshReviewCount();
   } catch (_) {
     render({ decision: "refuse", answer_text: "The service is unreachable. Please try again.",
       refused_reason: "network error", claims: [], sources: [], trace: [], audit_id: "", total_ms: 0, llm_used: false });
@@ -1033,7 +1048,7 @@ async function loadCorpus() {
     renderCorpusLegend(data.stats);
     renderSectionBars(data.stats);
     $("corpus-summary").textContent =
-      `${data.stats.total.toLocaleString()} documents, ${data.stats.topics} topics, 3D`;
+      `${data.stats.total.toLocaleString()} passages, ${data.stats.topics} topics`;
   } catch (_) { $("corpus-summary").textContent = "unavailable"; }
 }
 
@@ -1770,9 +1785,6 @@ async function openDocument(id) {
 }
 
 function wireDocuments() {
-  $("documents-toggle").addEventListener("click", () => {
-    if (!$("documents-body").hidden) loadDocuments();
-  });
   $("index-rebuild").addEventListener("click", async () => {
     try {
       const data = await api("/api/index/rebuild", { method: "POST" });
@@ -1829,7 +1841,7 @@ const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`
 
 function selectTab(name) {
   review.tab = name;
-  for (const tab of ["queue", "hazards", "report", "protection"]) {
+  for (const tab of ["queue", "hazards", "report"]) {
     const on = tab === name;
     $(`tab-${tab}`).setAttribute("aria-selected", String(on));
     $(`tab-${tab}`).tabIndex = on ? 0 : -1;
@@ -1842,7 +1854,6 @@ function selectTab(name) {
 function loadReviewTab() {
   if (review.tab === "queue") return loadReviews();
   if (review.tab === "hazards") return loadHazards();
-  if (review.tab === "protection") return loadProtection();
   return loadReport();
 }
 
@@ -2009,6 +2020,7 @@ async function caseAction(path, body, form, done) {
     renderCase(data.case);
     showMessage("case-message", done);
     loadReviews();
+    refreshReviewCount();
   } catch (err) { showMessage("case-message", err.message, true); }
   if (form) formBusy(form, false);
 }
@@ -2212,7 +2224,7 @@ async function verifyAudit() {
       });
       out.appendChild(list);
     }
-  } catch (err) { showMessage("review-message", err.message, true); }
+  } catch (err) { showMessage("protection-message", err.message, true); }
   trigger.disabled = false;
   trigger.textContent = "Verify audit trail";
 }
@@ -2258,9 +2270,9 @@ async function runRetention() {
   if (!window.confirm("Permanently delete every record past its retention period? This can’t be undone.")) return;
   try {
     const data = await api("/api/retention/run", { method: "POST" });
-    showMessage("review-message", `Deleted ${plural(data.run.audit_deleted, "audit record")} and ${plural(data.run.reviews_deleted, "review case")}.`);
+    showMessage("protection-message", `Deleted ${plural(data.run.audit_deleted, "audit record")} and ${plural(data.run.reviews_deleted, "review case")}.`);
     renderRetention(data.retention);
-  } catch (err) { showMessage("review-message", err.message, true); }
+  } catch (err) { showMessage("protection-message", err.message, true); }
 }
 
 function resetFlag(auditId) {
@@ -2273,10 +2285,7 @@ function resetFlag(auditId) {
 }
 
 function wireReview() {
-  $("review-toggle").addEventListener("click", () => {
-    if (!$("review-body").hidden) loadReviewTab();
-  });
-  const tabs = ["queue", "hazards", "report", "protection"];
+  const tabs = ["queue", "hazards", "report"];
   tabs.forEach((name, i) => {
     const tab = $(`tab-${name}`);
     tab.addEventListener("click", () => selectTab(name));
@@ -2374,31 +2383,286 @@ function wireReview() {
       await api(`/api/audit/${$("flag-row").dataset.auditId}/flag`, { method: "POST", body: { note: $("flag-note").value } });
       form.hidden = true;
       showMessage("flag-message", "Sent for review. A reviewer will check this answer.");
+      refreshReviewCount();
     } catch (err) { showMessage("flag-message", err.message, true); }
     formBusy(form, false);
   });
 }
 
+// ---------- Usage ----------
+function statTile(label, value, note, { attention = false, small = false } = {}) {
+  const tile = document.createElement("div");
+  tile.className = `stat${attention ? " attention" : ""}`;
+  const l = document.createElement("span"); l.className = "stat-label"; l.textContent = label;
+  const v = document.createElement("strong"); v.className = `stat-value${small ? " small" : ""}`; v.textContent = value;
+  tile.append(l, v);
+  if (note) { const n = document.createElement("span"); n.className = "stat-note"; n.textContent = note; tile.appendChild(n); }
+  return tile;
+}
+
+function formatMs(ms) {
+  if (ms === null || ms === undefined) return "–";
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)} s`;
+}
+
+function renderBars(container, rows, emptyText) {
+  container.textContent = "";
+  if (!rows.length) {
+    const p = document.createElement("p"); p.className = "bars-empty"; p.textContent = emptyText;
+    container.appendChild(p);
+    return;
+  }
+  const max = Math.max(...rows.map((r) => r.value), 1);
+  rows.forEach((r) => {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    const label = document.createElement("span"); label.className = "bar-label"; label.textContent = r.label; label.title = r.label;
+    const value = document.createElement("span"); value.className = "bar-value"; value.textContent = r.value.toLocaleString();
+    const track = document.createElement("span"); track.className = "bar-track";
+    const fill = document.createElement("span"); fill.className = "bar-fill"; fill.style.width = `${(r.value / max) * 100}%`;
+    track.appendChild(fill);
+    row.append(label, value, track);
+    container.appendChild(row);
+  });
+}
+
+function niceMax(n) {
+  if (n <= 4) return 4;
+  const step = Math.pow(10, Math.floor(Math.log10(n)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * step >= n) return m * step;
+  return 10 * step;
+}
+
+// Stacked daily bars: answered below, refused above, with a hover tooltip.
+function renderDailyChart(container, daily) {
+  container.textContent = "";
+  const total = daily.reduce((a, d) => a + d.answered + d.refused, 0);
+  if (!total) {
+    const empty = document.createElement("div");
+    empty.className = "chart-empty";
+    empty.textContent = "No questions in this period yet. Ask one and it appears here.";
+    container.appendChild(empty);
+    return;
+  }
+  const width = Math.max(container.clientWidth, 280), height = container.clientHeight || 240;
+  const pad = { top: 8, right: 4, bottom: 22, left: 34 };
+  const innerW = width - pad.left - pad.right, innerH = height - pad.top - pad.bottom;
+  const top = niceMax(Math.max(...daily.map((d) => d.answered + d.refused)));
+  const y = (v) => pad.top + innerH - (v / top) * innerH;
+  const slot = innerW / daily.length;
+  const barW = Math.max(2, Math.min(28, slot * 0.7));
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `Questions per day: ${total} in ${daily.length} days`);
+  const el = (name, attrs) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+  for (let i = 0; i <= 4; i++) {
+    const v = (top / 4) * i;
+    svg.appendChild(el("line", { class: "grid-line", x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v) }));
+    const t = el("text", { class: "axis-label", x: pad.left - 6, y: y(v) + 4, "text-anchor": "end" });
+    t.textContent = Number.isInteger(v) ? v : v.toFixed(1);
+    svg.appendChild(t);
+  }
+  // Date labels at a regular interval, always including today. A regular
+  // label too close to today's is dropped so they never overlap.
+  const labelEvery = Math.ceil(daily.length / Math.max(2, Math.floor(innerW / 56)));
+  const last = daily.length - 1;
+  const labelled = new Set();
+  for (let i = 0; i <= last; i += labelEvery) if (last - i >= labelEvery || i === last) labelled.add(i);
+  labelled.add(last);
+  const tooltip = document.createElement("div");
+  tooltip.className = "chart-tooltip";
+  tooltip.hidden = true;
+
+  daily.forEach((d, i) => {
+    const cx = pad.left + slot * i + slot / 2, x = cx - barW / 2;
+    const g = el("g", {});
+    const answeredTop = y(d.answered);
+    if (d.answered) g.appendChild(el("rect", { class: "bar-answered", x, y: answeredTop, width: barW, height: pad.top + innerH - answeredTop, rx: Math.min(2, barW / 2) }));
+    if (d.refused) {
+      const refusedTop = y(d.answered + d.refused);
+      const gap = d.answered ? 2 : 0;
+      g.appendChild(el("rect", { class: "bar-refused", x, y: refusedTop, width: barW, height: Math.max(1, answeredTop - refusedTop - gap), rx: Math.min(2, barW / 2) }));
+    }
+    svg.appendChild(g);
+    const date = new Date(`${d.date}T00:00:00`);
+    if (labelled.has(i)) {
+      const t = el("text", { class: "axis-label", x: cx, y: height - 6, "text-anchor": "middle" });
+      t.textContent = date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+      svg.appendChild(t);
+    }
+    const hit = el("rect", { class: "bar-hit", x: pad.left + slot * i, y: pad.top, width: slot, height: innerH });
+    hit.addEventListener("mouseenter", () => {
+      g.classList.add("hover");
+      tooltip.hidden = false;
+      tooltip.innerHTML = "";
+      const strong = document.createElement("strong");
+      strong.textContent = date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+      tooltip.append(strong, `${d.answered} answered, ${d.refused} refused`);
+      tooltip.style.left = `${(cx / width) * 100}%`;
+      tooltip.style.top = `${(y(d.answered + d.refused) / height) * 100}%`;
+    });
+    hit.addEventListener("mouseleave", () => { g.classList.remove("hover"); tooltip.hidden = true; });
+    svg.appendChild(hit);
+  });
+  container.append(svg, tooltip);
+}
+
+async function loadUsage() {
+  let data;
+  try { data = await api(`/api/usage?days=${$("usage-days").value}`); }
+  catch (err) { showMessage("usage-message", err.message, true); return; }
+  $("usage-message").hidden = true;
+  const t = data.totals;
+  const stats = $("usage-stats");
+  stats.textContent = "";
+  const pct = t.refusal_rate === null ? "–" : `${Math.round(t.refusal_rate * 100)}%`;
+  stats.append(
+    statTile("Questions", t.questions.toLocaleString(), `${t.answered.toLocaleString()} answered`),
+    statTile("Refused", pct, `${plural(t.refused, "question")}`),
+    statTile("Median response", formatMs(t.median_ms), t.p95_ms === null ? "" : `95% within ${formatMs(t.p95_ms)}`),
+    draftedTile(data.drafted_by, t.questions),
+    statTile("Identifiers removed", t.deidentified.toLocaleString(), "questions with names, dates or numbers"),
+    statTile("Open reviews", t.open_reviews.toLocaleString(), t.overdue_reviews ? `${t.overdue_reviews} overdue` : "none overdue", { attention: t.overdue_reviews > 0 }),
+  );
+  usageState.daily = data.daily;
+  renderDailyChart($("usage-chart"), data.daily);
+  renderBars($("usage-reasons"), Object.entries(data.refusal_reasons).map(([k, v]) => ({ label: capitalize(k), value: v })), "No refusals in this period.");
+  renderBars($("usage-sources"), data.top_sources.map((x) => ({ label: `${x.title} (${x.id})`, value: x.citations })), "No answers cited a source in this period.");
+  $("usage-users-panel").hidden = !account.authRequired;
+  renderBars($("usage-users"), data.by_user.map((x) => ({ label: x.name, value: x.questions })), "No signed-in questions in this period.");
+}
+const usageState = { daily: null };
+
+function draftedTile(drafted, total) {
+  const models = drafted["Local model"] + drafted["Cloud model"];
+  const note = total ? [
+    drafted["Local model"] && `${drafted["Local model"]} local`,
+    drafted["Cloud model"] && `${drafted["Cloud model"]} cloud`,
+    `${drafted.Extractive} extractive`,
+  ].filter(Boolean).join(", ") : "";
+  return statTile("Drafted by a model", total ? `${Math.round((models / total) * 100)}%` : "–", note);
+}
+
+// ---------- Embeddings ----------
+async function loadEmbeddings() {
+  let data;
+  try { data = await api("/api/embeddings"); }
+  catch (_) { return; }
+  const stats = $("embed-stats");
+  stats.textContent = "";
+  const idx = data.index || {};
+  const rebuilt = idx.finished_at ? `rebuilt ${new Date(idx.finished_at).toLocaleString()}` : "built when the app started";
+  stats.append(
+    statTile("Passages indexed", data.passages.toLocaleString(), `${data.from_your_documents.toLocaleString()} from your documents`),
+    statTile("Embedding model", data.model.replace(/^sentence-transformers\//, ""), data.model.startsWith("sentence-transformers/") ? "sentence-transformers" : "", { small: true }),
+    statTile("Dimensions", data.dimensions.toLocaleString(), "per passage vector"),
+    statTile("Vector store", data.vector_store === "qdrant" ? "Qdrant" : "Local (NumPy)", data.vector_store === "qdrant" ? "server or embedded" : "exact cosine search", { small: true }),
+    statTile("Keyword vocabulary", data.vocabulary.toLocaleString(), "terms for keyword ranking"),
+    statTile("Index", idx.state === "running" ? "Rebuilding…" : idx.state === "failed" ? "Failed" : "Ready", idx.state === "failed" ? idx.error : rebuilt, { small: true, attention: idx.state === "failed" }),
+  );
+  const rows = [
+    ["Ranking", data.hybrid.enabled ? `Hybrid: ${Math.round(data.hybrid.embedding_weight * 100)}% embedding similarity, ${Math.round(data.hybrid.keyword_weight * 100)}% keyword (BM25)` : "Embedding similarity only"],
+    ["Similarity", "Cosine, on normalised vectors"],
+    ["Passages retrieved", `${data.top_k} per question`],
+    ["Relevance threshold", `${data.min_score} cosine. Below this, GroundCheck refuses before drafting anything.`],
+    ["Sources", data.include_demo_corpus ? `Your approved documents and the synthetic demo corpus (${data.from_demo_corpus.toLocaleString()} passages)` : "Your approved documents only"],
+  ];
+  const list = $("embed-settings");
+  list.textContent = "";
+  rows.forEach(([term, value]) => {
+    const dt = document.createElement("dt"); dt.textContent = term;
+    const dd = document.createElement("dd"); dd.textContent = value;
+    list.append(dt, dd);
+  });
+}
+
+// ---------- Navigation ----------
+// One page per area, addressed by the URL hash (#/review), so pages can be
+// bookmarked and the back button works.
+const VIEWS = {
+  ask: { load: () => {} },
+  usage: { load: () => loadUsage() },
+  review: { load: () => { loadReviewTab(); } },
+  documents: { load: () => loadDocuments() },
+  evaluation: { load: () => {} },
+  embeddings: { load: () => { loadEmbeddings(); requestAnimationFrame(() => map3d.resize && map3d.resize()); } },
+  "local-ai": { load: () => loadLocalAI() },
+  "data-protection": { load: () => loadProtection() },
+  users: { load: () => { $("users-message").hidden = true; loadUsers(); } },
+};
+
+function currentView() {
+  const name = (location.hash.match(/^#\/([\w-]+)/) || [])[1];
+  return VIEWS[name] && canSee(name) ? name : "ask";
+}
+
+function route() {
+  const name = currentView();
+  document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== `view-${name}`; });
+  document.querySelectorAll(".nav-link").forEach((l) => {
+    if (l.dataset.view === name) l.setAttribute("aria-current", "page");
+    else l.removeAttribute("aria-current");
+  });
+  const title = $(`view-${name}`).dataset.title;
+  $("topbar-title").textContent = title;
+  document.title = name === "ask" ? "GroundCheck" : `${title} · GroundCheck`;
+  setNavOpen(false);
+  VIEWS[name].load();
+}
+
+function setNavOpen(open) {
+  document.body.classList.toggle("nav-open", open);
+  $("nav-scrim").hidden = !open;
+  $("nav-open").setAttribute("aria-expanded", String(open));
+  if (open) $("nav-close").focus();
+}
+
+function wireNavigation() {
+  window.addEventListener("hashchange", () => {
+    route();
+    $("content").focus({ preventScroll: true });
+    window.scrollTo(0, 0);
+  });
+  $("nav-open").addEventListener("click", () => setNavOpen(true));
+  $("nav-close").addEventListener("click", () => { setNavOpen(false); $("nav-open").focus(); });
+  $("nav-scrim").addEventListener("click", () => setNavOpen(false));
+  $("usage-days").addEventListener("change", loadUsage);
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { if (usageState.daily && currentView() === "usage") renderDailyChart($("usage-chart"), usageState.daily); }, 150);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.body.classList.contains("nav-open")) { setNavOpen(false); $("nav-open").focus(); }
+  });
+  applyRoleNavigation();
+  route();
+  refreshReviewCount();
+}
+
+// The number of open review cases, shown beside Review in the navigation.
+async function refreshReviewCount() {
+  if (!canSee("review")) return;
+  try {
+    const data = await api("/api/reviews?status=open");
+    const n = data.counts.open;
+    const badge = $("nav-review-count");
+    badge.hidden = n === 0;
+    badge.textContent = n > 99 ? "99+" : String(n);
+    badge.classList.toggle("overdue", data.counts.overdue > 0);
+    badge.title = `${n} open${data.counts.overdue ? `, ${data.counts.overdue} overdue` : ""}`;
+  } catch (_) { /* no database or no access */ }
+}
+
 // ---------- Collapsibles ----------
 function wireCollapsibles() {
-  // The panel toggle must be wired first, so loaders below see it open.
-  wireToggle("documents-toggle", "documents-body");
   wireDocuments();
-  wireToggle("review-toggle", "review-body");
   wireReview();
   wireToggle("how-toggle", "how-body");
   wireToggle("tuning-toggle", "tuning-body");
-  wireToggle("local-ai-toggle", "local-ai-body");
-  $("local-ai-toggle").addEventListener("click", () => {
-    if (!$("local-ai-body").hidden) loadLocalAI();
-  });
-  wireToggle("corpus-toggle", "corpus-body");
-  // When the corpus panel opens, the canvas finally has a width, so size and
-  // draw it then (it cannot size correctly while collapsed).
-  $("corpus-toggle").addEventListener("click", () => {
-    if (!$("corpus-body").hidden && map3d.resize) requestAnimationFrame(map3d.resize);
-  });
-  wireToggle("eval-toggle", "eval-body");
   const auditToggle = $("audit-toggle");
   auditToggle.addEventListener("click", () => {
     const expanded = auditToggle.getAttribute("aria-expanded") === "true";

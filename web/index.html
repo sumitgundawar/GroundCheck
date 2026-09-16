@@ -12,45 +12,26 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <!-- Header -->
-  <header class="header">
-    <div class="header-inner">
-      <a class="brand" href="/" aria-label="GroundCheck home">
-        <span class="brand-mark" id="brand-mark"></span>
-        <span class="brand-word">groundcheck</span>
-      </a>
-      <div class="header-right">
-        <span class="pill provider" id="provider-pill" title="Live provider state">
-          <span class="dot" id="provider-dot"></span>
-          <span id="provider-label">llm: …</span>
-        </span>
-        <span class="pill corpus-pill" id="corpus-pill" title="Indexed source documents">
-          corpus: <span id="corpus-count">…</span>
-        </span>
-        <span class="tag-synthetic">synthetic demo</span>
-        <div class="account-menu" id="account-menu" hidden>
-          <button type="button" class="pill account-button" id="account-button" aria-expanded="false" aria-controls="account-dropdown">
-            <span id="account-label"></span>
-          </button>
-          <div class="account-dropdown" id="account-dropdown" hidden>
-            <p class="account-who"><span id="account-email"></span><span class="account-role" id="account-role"></span></p>
-            <button type="button" class="account-item" id="open-account">Account and security</button>
-            <button type="button" class="account-item" id="open-users" hidden>Users</button>
-            <button type="button" class="account-item" id="sign-out">Sign out</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- Disclaimer -->
-  <div class="disclaimer" role="note">
-    Synthetic demonstration data. All conditions, medications, and dosages are fictional. Not medical advice.
-  </div>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-message-square-quote" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14a2 2 0 0 0 2-2V8h-2" /> <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /> <path d="M8 14a2 2 0 0 0 2-2V8H8" /></symbol>
+    <symbol id="i-user-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m16 11 2 2 4-4" /> <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <circle cx="9" cy="7" r="4" /></symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></symbol>
+    <symbol id="i-list-checks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5h8" /> <path d="M13 12h8" /> <path d="M13 19h8" /> <path d="m3 17 2 2 4-4" /> <path d="m3 7 2 2 4-4" /></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /> <path d="M15 5.764v15" /> <path d="M9 3.236v15" /></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v2" /> <path d="M12 2v2" /> <path d="M17 20v2" /> <path d="M17 2v2" /> <path d="M2 12h2" /> <path d="M2 17h2" /> <path d="M2 7h2" /> <path d="M20 12h2" /> <path d="M20 17h2" /> <path d="M20 7h2" /> <path d="M7 20v2" /> <path d="M7 2v2" /> <rect x="4" y="4" width="16" height="16" rx="2" /> <rect x="8" y="8" width="8" height="8" rx="1" /></symbol>
+    <symbol id="i-lock-keyhole" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1" /> <rect x="3" y="10" width="18" height="12" rx="2" /> <path d="M7 10V7a5 5 0 0 1 10 0v3" /></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></symbol>
+    <symbol id="i-sliders-horizontal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" /></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></symbol>
+    <symbol id="i-network" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1" /> <rect x="2" y="16" width="6" height="6" rx="1" /> <rect x="9" y="2" width="6" height="6" rx="1" /> <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" /> <path d="M12 12V8" /></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  </svg>
 
   <!-- Sign-in: shown instead of the dashboard when accounts are required -->
   <section class="auth-screen" id="auth-screen" hidden aria-labelledby="auth-title">
     <div class="auth-card">
+      <p class="auth-brand">groundcheck</p>
       <h1 class="auth-title" id="auth-title">Sign in</h1>
       <p class="auth-lede" id="auth-lede">Sign in to ask questions and review answers.</p>
 
@@ -83,6 +64,7 @@
       <p class="auth-error" id="auth-error" role="alert" hidden></p>
     </div>
   </section>
+
 
   <!-- Account settings -->
   <dialog class="modal" id="account-dialog" aria-labelledby="account-dialog-title">
@@ -255,525 +237,670 @@
     <p class="modal-message" id="hazard-message" role="status" hidden></p>
   </dialog>
 
-  <!-- User management (admins) -->
-  <dialog class="modal modal-wide" id="users-dialog" aria-labelledby="users-dialog-title">
-    <div class="modal-head">
-      <h2 id="users-dialog-title">Users</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
-    </div>
-    <div class="users-table-wrap">
-      <table class="users-table">
-        <thead><tr><th scope="col">User</th><th scope="col">Role</th><th scope="col">2FA</th><th scope="col">Last sign-in</th><th scope="col">Status</th></tr></thead>
-        <tbody id="users-body"></tbody>
-      </table>
-    </div>
-    <section class="modal-section" aria-labelledby="add-user-title">
-      <h3 id="add-user-title">Add a user</h3>
-      <form class="auth-form add-user-form" id="add-user-form" novalidate>
-        <label for="new-user-name">Name</label>
-        <input id="new-user-name" autocomplete="off">
-        <label for="new-user-email">Email</label>
-        <input id="new-user-email" type="email" autocomplete="off" required>
-        <label for="new-user-password">Temporary password</label>
-        <input id="new-user-password" type="password" autocomplete="new-password" minlength="12" required>
-        <label for="new-user-role">Role</label>
-        <select id="new-user-role">
-          <option value="clinician">Clinician: asks questions</option>
-          <option value="reviewer">Reviewer: also reads the audit trail</option>
-          <option value="admin">Admin: also manages users and models</option>
-        </select>
-        <button type="submit" class="btn btn-primary">Add user</button>
-      </form>
-    </section>
-    <p class="modal-message" id="users-message" role="status" hidden></p>
-  </dialog>
-
-  <main class="container" id="dashboard">
-    <!-- Hero -->
-    <section class="hero">
-      <h1 class="hero-line">Grounded answers, or none at all.</h1>
-      <p class="hero-sub">
-        GroundCheck answers clinical-style questions only from its trusted sources,
-        and refuses when it cannot ground a response. Watch the pipeline decide,
-        then tune the thresholds and guards and watch the decision change.
-      </p>
-      <p class="hero-dataset">
-        Synthetic corpus. Document structure modelled on
-        <a href="https://github.com/abachaa/MedQuAD" target="_blank" rel="noopener">MedQuAD</a>
-        (NIH medical Q&amp;A) and the FDA
-        <a href="https://dailymed.nlm.nih.gov" target="_blank" rel="noopener">DailyMed</a>
-        drug-label format. Every condition, drug, and dose is invented.
-      </p>
-    </section>
-
-    <!-- How it works (collapsible) -->
-    <section class="panel collapsible howitworks-panel" id="how-panel">
-      <button class="collapsible-toggle" id="how-toggle" aria-expanded="false">
-        <span class="eyebrow">How it works</span>
-        <span class="how-summary">The pipeline, stage by stage</span>
-        <span class="chevron">▸</span>
-      </button>
-      <div class="how-body" id="how-body" hidden>
-        <p class="how-intro">
-          Every question runs through a fixed pipeline. The decision to answer or
-          refuse is deterministic and never depends on a live model call, so the
-          system behaves the same with or without an LLM. Each stage below records
-          a status and a timing. After you ask, the <strong>Pipeline trace</strong>
-          shows the real run, and every step there is clickable for the detail of
-          what happened, including the LLM judge's verdict on each claim.
-        </p>
-        <ol class="how-stages" id="how-stages"></ol>
-        <div class="how-judge">
-          <h3 class="how-judge-title">The LLM as a judge</h3>
-          <p>
-            Grounding is decided in two layers. First, a deterministic embedding
-            similarity between each claim and its cited source must clear a
-            threshold. This is authoritative and reproducible. Second, when a live
-            provider is configured, a separate, cheaper model is shown only the
-            claim and its cited source and asked, strictly, whether the source
-            supports the claim. It returns JSON: <code>{"supported": bool,
-            "reason": string}</code>. The judge is corroboration, recorded in the
-            trace, never the deciding vote. So a flaky model can never turn a
-            refusal into an answer. Open the grounding step in the trace to read
-            the judge's verdict and reasoning for each claim.
-          </p>
-        </div>
+  <div class="app" id="dashboard">
+    <!-- Navigation: a sidebar on wide screens, a drawer on narrow ones -->
+    <aside class="sidebar" id="sidebar" aria-label="GroundCheck">
+      <div class="sidebar-head">
+        <a class="brand" href="#/ask" aria-label="GroundCheck, ask a question">
+          <span class="brand-mark" id="brand-mark"></span>
+          <span class="brand-word">groundcheck</span>
+        </a>
+        <button type="button" class="icon-button nav-close" id="nav-close" aria-label="Close menu">
+          <svg aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
       </div>
-    </section>
-
-    <!-- Ask panel -->
-    <section class="panel ask-panel">
-      <form id="ask-form" class="ask-form" autocomplete="off">
-        <label for="query" class="eyebrow">Ask a question</label>
-        <div class="ask-row">
-          <input
-            type="text"
-            id="query"
-            name="query"
-            class="ask-input"
-            placeholder="How is Veltris syndrome treated?"
-            maxlength="400"
-            required
-          />
-          <button type="submit" class="btn btn-primary" id="ask-btn">
-            <span class="btn-label">Ask</span>
-            <span class="spinner" id="spinner" hidden></span>
-          </button>
+      <nav class="nav" aria-label="Main">
+        <div class="nav-group">
+          <a class="nav-link" href="#/ask" data-view="ask">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-message-square-quote"/></svg>
+            <span>Ask</span>
+          </a>
+          <a class="nav-link" href="#/usage" data-view="usage">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-activity"/></svg>
+            <span>Usage</span>
+          </a>
+          <a class="nav-link" href="#/review" data-view="review" data-nav="review">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-user-check"/></svg>
+            <span>Review</span>
+            <span class="nav-count" id="nav-review-count" hidden></span>
+          </a>
         </div>
-        <div class="chips" id="chips" aria-label="Example queries"></div>
-      </form>
-    </section>
-
-    <!-- Tuning panel (collapsible) -->
-    <section class="panel collapsible tuning-panel" id="tuning-panel">
-      <button class="collapsible-toggle" id="tuning-toggle" aria-expanded="false">
-        <span class="toggle-icon" id="tuning-icon"></span>
-        <span class="eyebrow">Tuning</span>
-        <span class="tuning-status" id="tuning-status">defaults</span>
-        <span class="chevron">▸</span>
-      </button>
-      <div class="tuning-body" id="tuning-body" hidden>
-        <p class="tuning-hint">
-          Adjust the pipeline, then ask again. Lower the gate to answer more often,
-          raise it to refuse more. Switch a guard off to see what an ungoverned
-          system would have returned.
-        </p>
-
-        <div class="tuning-grid">
-          <div class="control">
-            <div class="control-head">
-              <label for="set-retrieval">Retrieval gate</label>
-              <output id="set-retrieval-val" class="control-val">0.30</output>
-            </div>
-            <input type="range" id="set-retrieval" min="0" max="1" step="0.01" value="0.30" />
-            <p class="control-note">Minimum source similarity. Below this, refuse before generating.</p>
-          </div>
-
-          <div class="control">
-            <div class="control-head">
-              <label for="set-grounding">Grounding threshold</label>
-              <output id="set-grounding-val" class="control-val">0.45</output>
-            </div>
-            <input type="range" id="set-grounding" min="0" max="1" step="0.01" value="0.45" />
-            <p class="control-note">How strongly each claim must match its cited source.</p>
-          </div>
-
-          <div class="control">
-            <div class="control-head">
-              <label for="set-topk">Sources retrieved</label>
-              <output id="set-topk-val" class="control-val">4</output>
-            </div>
-            <input type="range" id="set-topk" min="1" max="12" step="1" value="4" />
-            <p class="control-note">How many passages the retriever returns (top-k).</p>
-          </div>
-
-          <div class="control">
-            <div class="control-head">
-              <label for="set-temperature">Model temperature</label>
-              <output id="set-temperature-val" class="control-val">0.0</output>
-            </div>
-            <input type="range" id="set-temperature" min="0" max="1.5" step="0.1" value="0.0" />
-            <p class="control-note">0 is deterministic. Higher makes the model's wording vary between runs.</p>
-          </div>
+        <div class="nav-group">
+          <p class="nav-label">Knowledge</p>
+          <a class="nav-link" href="#/documents" data-view="documents">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-file-text"/></svg>
+            <span>Documents</span>
+          </a>
+          <a class="nav-link" href="#/evaluation" data-view="evaluation">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-list-checks"/></svg>
+            <span>Evaluation</span>
+          </a>
+          <a class="nav-link" href="#/embeddings" data-view="embeddings">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-network"/></svg>
+            <span>Embeddings</span>
+          </a>
         </div>
-
-        <div class="toggles">
-          <label class="switch">
-            <input type="checkbox" id="set-extractive" />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">Bypass model (naive retrieval)</span>
-          </label>
-          <label class="switch">
-            <input type="checkbox" id="set-pii" checked />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">PII redaction (input)</span>
-          </label>
-          <label class="switch">
-            <input type="checkbox" id="set-injection" checked />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">Injection guard (input)</span>
-          </label>
-          <label class="switch">
-            <input type="checkbox" id="set-coverage" checked />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">Source coverage guard</span>
-          </label>
-          <label class="switch">
-            <input type="checkbox" id="set-grounding-guard" checked />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">Grounding guard</span>
-          </label>
-          <label class="switch">
-            <input type="checkbox" id="set-dosage" checked />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">Dosage guard</span>
-          </label>
-          <label class="switch" id="judge-switch">
-            <input type="checkbox" id="set-judge" checked />
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-            <span class="switch-label">LLM grounding judge</span>
-          </label>
+        <div class="nav-group" id="nav-admin">
+          <p class="nav-label">Administration</p>
+          <a class="nav-link" href="#/local-ai" data-view="local-ai">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-cpu"/></svg>
+            <span>Local AI</span>
+          </a>
+          <a class="nav-link" href="#/data-protection" data-view="data-protection" data-nav="data-protection">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-lock-keyhole"/></svg>
+            <span>Data protection</span>
+          </a>
+          <a class="nav-link" href="#/users" data-view="users" data-nav="users" hidden>
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-users"/></svg>
+            <span>Users</span>
+          </a>
         </div>
-
-        <div class="tuning-actions">
-          <button type="button" class="btn btn-ghost" id="tuning-reset">Reset to defaults</button>
-          <span class="tuning-applies">Changes apply to your next question.</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Documents (collapsible) -->
-    <section class="panel collapsible documents-panel" id="documents-panel">
-      <button class="collapsible-toggle" id="documents-toggle" aria-expanded="false">
-        <span class="eyebrow">Documents</span>
-        <span class="local-ai-summary" id="documents-summary">your organisation’s sources</span>
-        <span class="chevron">▸</span>
-      </button>
-      <div class="documents-body" id="documents-body" hidden>
-        <p class="tuning-hint">
-          Import your own guidelines, formularies and protocols. A document is cited only
-          after someone other than the uploader approves it, and only between its
-          effective and expiry dates.
-        </p>
-        <p class="modal-message" id="documents-message" role="status" hidden></p>
-
-        <form class="upload-form" id="upload-form" novalidate>
-          <div class="upload-field upload-file">
-            <label for="upload-file">File</label>
-            <input id="upload-file" type="file" accept=".pdf,.docx,.html,.htm,.md,.markdown,.txt" required>
-            <span class="auth-hint">PDF, Word (.docx), HTML, Markdown or text, up to 25 MB.</span>
-          </div>
-          <div class="upload-field">
-            <label for="upload-title">Title <span class="optional">optional</span></label>
-            <input id="upload-title" placeholder="Taken from the document">
-          </div>
-          <div class="upload-field">
-            <label for="upload-owner">Owner</label>
-            <input id="upload-owner" placeholder="e.g. Pharmacy">
-          </div>
-          <div class="upload-field">
-            <label for="upload-effective">Effective from <span class="optional">optional</span></label>
-            <input id="upload-effective" type="date">
-          </div>
-          <div class="upload-field">
-            <label for="upload-expires">Expires on <span class="optional">optional</span></label>
-            <input id="upload-expires" type="date">
-          </div>
-          <div class="upload-actions">
-            <button type="submit" class="btn btn-primary" id="upload-button">Upload for review</button>
-          </div>
-        </form>
-
-        <div class="index-status" id="index-status">
-          <span id="index-status-text">Index status unknown</span>
-          <button type="button" class="btn btn-sm btn-ghost" id="index-rebuild">Rebuild index</button>
-        </div>
-
-        <div class="users-table-wrap">
-          <table class="users-table documents-table">
-            <thead><tr><th scope="col">Document</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col">In force</th><th scope="col">Sections</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
-            <tbody id="documents-body-rows"></tbody>
-          </table>
-        </div>
-        <p class="auth-hint" id="documents-empty" hidden>No documents yet. Upload one to start.</p>
-      </div>
-    </section>
-
-    <!-- Review (collapsible) -->
-    <section class="panel collapsible review-panel" id="review-panel">
-      <button class="collapsible-toggle" id="review-toggle" aria-expanded="false">
-        <span class="eyebrow">Review</span>
-        <span class="local-ai-summary" id="review-summary">refusals, flagged answers and safety</span>
-        <span class="chevron">▸</span>
-      </button>
-      <div class="review-body" id="review-body" hidden>
-        <p class="tuning-hint">
-          Every refusal and every flagged answer waits here for a clinician to review.
-          Resolve a case as a test and the question is checked on every future run.
-        </p>
-        <div class="review-tabs" role="tablist" aria-label="Review">
-          <button type="button" role="tab" class="review-tab" id="tab-queue" aria-controls="review-queue" aria-selected="true">Queue</button>
-          <button type="button" role="tab" class="review-tab" id="tab-hazards" aria-controls="review-hazards" aria-selected="false" tabindex="-1">Hazard log</button>
-          <button type="button" role="tab" class="review-tab" id="tab-report" aria-controls="review-report" aria-selected="false" tabindex="-1">Report</button>
-          <button type="button" role="tab" class="review-tab" id="tab-protection" aria-controls="review-protection" aria-selected="false" tabindex="-1">Data protection</button>
-        </div>
-        <p class="modal-message" id="review-message" role="status" hidden></p>
-
-        <div role="tabpanel" id="review-queue" aria-labelledby="tab-queue">
-          <div class="review-filters">
-            <label for="review-status">Show</label>
-            <select id="review-status">
-              <option value="open">Open cases</option>
-              <option value="resolved">Resolved cases</option>
-              <option value="all">All cases</option>
-            </select>
-            <label class="check"><input type="checkbox" id="review-mine"> Assigned to me</label>
-            <label class="check"><input type="checkbox" id="review-overdue"> Overdue only</label>
-          </div>
-          <div class="review-counts" id="review-counts"></div>
-          <div class="users-table-wrap">
-            <table class="users-table review-table">
-              <thead><tr><th scope="col">Question</th><th scope="col">Type</th><th scope="col">Asked</th><th scope="col">Due</th><th scope="col">Assigned</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
-              <tbody id="review-rows"></tbody>
-            </table>
-          </div>
-          <p class="auth-hint" id="review-empty" hidden>Nothing to review.</p>
-        </div>
-
-        <div role="tabpanel" id="review-hazards" aria-labelledby="tab-hazards" hidden>
-          <div class="review-toolbar">
-            <p class="auth-hint">Risk is severity × likelihood, each scored 1 to 5. Highest remaining risk first.</p>
-            <button type="button" class="btn btn-sm btn-primary" id="hazard-add">Add hazard</button>
-          </div>
-          <div class="users-table-wrap">
-            <table class="users-table hazard-table">
-              <thead><tr><th scope="col">ID</th><th scope="col">Hazard</th><th scope="col">Before controls</th><th scope="col">After controls</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
-              <tbody id="hazard-rows"></tbody>
-            </table>
-          </div>
-          <p class="auth-hint" id="hazard-empty" hidden>No hazards recorded yet.</p>
-        </div>
-
-        <div role="tabpanel" id="review-report" aria-labelledby="tab-report" hidden>
-          <div class="review-toolbar">
-            <div class="review-filters">
-              <label for="report-days">Period</label>
-              <select id="report-days">
-                <option value="7">Last 7 days</option>
-                <option value="30" selected>Last 30 days</option>
-                <option value="90">Last 90 days</option>
-                <option value="365">Last 12 months</option>
-              </select>
-            </div>
-            <a class="btn btn-sm btn-ghost" id="safety-case-download" href="/api/governance/safety-case?days=30" download>Download safety case</a>
-          </div>
-          <div class="report-grid" id="report-grid"></div>
-          <div class="report-reasons" id="report-reasons"></div>
-          <div class="review-tests">
-            <div class="review-toolbar">
-              <h3>Tests added from reviews</h3>
-              <button type="button" class="btn btn-sm btn-ghost" id="review-tests-run">Run tests</button>
-            </div>
-            <p class="auth-hint" id="review-tests-summary"></p>
-            <ul class="eval-cases" id="review-tests-list"></ul>
-          </div>
-        </div>
-
-        <div role="tabpanel" id="review-protection" aria-labelledby="tab-protection" hidden>
-          <section class="protection-block" aria-labelledby="audit-integrity-title">
-            <div class="review-toolbar">
-              <h3 id="audit-integrity-title">Audit trail integrity</h3>
-              <button type="button" class="btn btn-sm btn-primary" id="audit-verify">Verify audit trail</button>
-            </div>
-            <p class="auth-hint">Every audit record is chained to the one before it. Verifying checks that none has been changed, removed or reordered.</p>
-            <div class="verify-result" id="verify-result" hidden></div>
-          </section>
-          <div id="protection-admin" hidden>
-            <section class="protection-block" aria-labelledby="protection-status-title">
-              <h3 id="protection-status-title">Stored data</h3>
-              <dl class="protection-list" id="protection-list"></dl>
-            </section>
-            <section class="protection-block" aria-labelledby="retention-title">
-              <div class="review-toolbar">
-                <h3 id="retention-title">Retention</h3>
-                <button type="button" class="btn btn-sm btn-ghost" id="retention-run">Delete expired records</button>
-              </div>
-              <p class="auth-hint" id="retention-summary"></p>
-            </section>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Local AI (collapsible) -->
-    <section class="panel collapsible local-ai-panel" id="local-ai-panel">
-      <button class="collapsible-toggle" id="local-ai-toggle" aria-expanded="false">
-        <span class="eyebrow">Local AI</span>
-        <span class="local-ai-summary" id="local-ai-summary">checking…</span>
-        <span class="chevron">▸</span>
-      </button>
-      <div class="local-ai-body" id="local-ai-body" hidden>
-        <p class="tuning-hint">
-          Run an open-source model on this machine. It drafts the answer; the same
-          checks still decide what is shown. If the model isn't available, answers
-          fall back to extractive mode.
-        </p>
-        <div class="local-ai-facts" id="local-ai-hw" aria-label="This machine"></div>
-        <p class="local-ai-message" id="local-ai-message" hidden></p>
-        <ul class="local-ai-models" id="local-ai-models" aria-label="Models"></ul>
-      </div>
-    </section>
-
-    <!-- Decision -->
-    <section class="panel decision-panel" id="decision-panel" hidden>
-      <div class="decision-head">
-        <span class="status-chip" id="decision-chip"></span>
-        <span class="decision-reason" id="decision-reason"></span>
-      </div>
-      <div class="answer-body" id="answer-body"></div>
-      <div class="flag-row" id="flag-row" hidden>
-        <button type="button" class="btn btn-sm btn-ghost" id="flag-open">Flag this answer for review</button>
-        <form class="case-form flag-form" id="flag-form" hidden novalidate>
-          <label for="flag-note">What looks wrong?</label>
-          <textarea id="flag-note" rows="2" placeholder="e.g. The dose doesn't match our renal guidance"></textarea>
-          <div class="flag-actions">
-            <button type="submit" class="btn btn-sm btn-primary">Send for review</button>
-            <button type="button" class="btn btn-sm btn-ghost" id="flag-cancel">Cancel</button>
-          </div>
-        </form>
-        <p class="modal-message" id="flag-message" role="status" hidden></p>
-      </div>
-      <div class="refuse-callout" id="refuse-callout" hidden>
-        <span class="eyebrow">Why it refused</span>
-        <p id="refuse-detail"></p>
-        <p class="refuse-explain" id="refuse-explain"></p>
-        <span class="routed" id="routed-line">
-          No answer is shown. The question has been routed for review.
+      </nav>
+      <div class="sidebar-foot">
+        <span class="pill provider" id="provider-pill" title="What drafts answers">
+          <span class="dot" id="provider-dot"></span>
+          <span id="provider-label">llm: …</span>
         </span>
-      </div>
-    </section>
-
-    <!-- Two column: sources + trace -->
-    <div class="grid-2" id="results-grid" hidden>
-      <section class="panel" id="sources-panel">
-        <h2 class="panel-title eyebrow">Retrieved sources</h2>
-        <div class="sources" id="sources"></div>
-      </section>
-
-      <section class="panel" id="trace-panel">
-        <h2 class="panel-title eyebrow">Pipeline trace</h2>
-        <ol class="trace" id="trace"></ol>
-      </section>
-    </div>
-
-    <!-- Audit (collapsible) -->
-    <section class="panel collapsible" id="audit-panel" hidden>
-      <button class="collapsible-toggle" id="audit-toggle" aria-expanded="false">
-        <span class="eyebrow">View audit record</span>
-        <span class="chevron">▸</span>
-      </button>
-      <div class="audit-controls" id="audit-controls" hidden>
-        <button type="button" class="btn btn-ghost btn-sm" id="audit-expand">Expand all</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="audit-collapse">Collapse all</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="audit-copy">Copy JSON</button>
-      </div>
-      <div class="audit-tree" id="audit-json" hidden></div>
-    </section>
-
-    <!-- Corpus map (collapsible) -->
-    <section class="panel collapsible" id="corpus-panel">
-      <button class="collapsible-toggle" id="corpus-toggle" aria-expanded="false">
-        <span class="eyebrow">Corpus map</span>
-        <span class="corpus-summary" id="corpus-summary">loading…</span>
-        <span class="chevron">▸</span>
-      </button>
-      <div class="corpus-body" id="corpus-body" hidden>
-        <p class="corpus-hint">
-          Every document, embedded and projected to three dimensions with PCA, so
-          similar documents sit near each other. This is the space the retriever
-          searches. Drag to rotate. Ask a question and the retrieved sources light
-          up in black, so you can see where in the corpus the answer came from.
-        </p>
-        <div class="corpus-tiles" id="corpus-tiles"></div>
-        <div class="corpus-map-wrap">
-          <div class="corpus-canvas-wrap" id="corpus-canvas-wrap">
-            <canvas id="corpus-canvas" class="corpus-canvas" aria-label="3D corpus embedding map"></canvas>
-            <span class="corpus-drag-hint" id="corpus-drag-hint">drag to rotate, hover a point</span>
-            <button type="button" class="corpus-fs-btn" id="corpus-fs-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">⤢</button>
-            <div class="corpus-tooltip" id="corpus-tooltip" hidden></div>
+        <span class="pill corpus-pill" id="corpus-pill" title="Indexed source passages">
+          corpus: <span id="corpus-count">…</span>
+        </span>
+        <div class="account-menu" id="account-menu" hidden>
+          <button type="button" class="account-button" id="account-button" aria-expanded="false" aria-controls="account-dropdown">
+            <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
+            <span class="account-text"><span id="account-label"></span><span class="account-role" id="account-role"></span></span>
+          </button>
+          <div class="account-dropdown" id="account-dropdown" hidden>
+            <p class="account-who"><span id="account-email"></span></p>
+            <button type="button" class="account-item" id="open-account">Account and security</button>
+            <button type="button" class="account-item" id="sign-out">Sign out</button>
           </div>
-          <div class="corpus-legend" id="corpus-legend"></div>
-        </div>
-        <div class="corpus-section-bars" id="corpus-section-bars"></div>
-        <div class="dataset-note" id="dataset-note">
-          <span class="eyebrow">Dataset provenance</span>
-          <p>
-            This corpus is <strong>fully synthetic</strong>. Every condition,
-            medication, lab marker, dosage, and procedure is invented for this
-            demonstration. Nothing here is real and nothing is medical advice.
-          </p>
-          <p>
-            The document <em>structure</em> mirrors two real, public reference
-            formats so that retrieval and grounding are exercised realistically:
-            disease entries follow the
-            <a href="https://github.com/abachaa/MedQuAD" target="_blank" rel="noopener">MedQuAD</a>
-            question-type taxonomy (information, causes, symptoms, treatment,
-            monitoring, prognosis), and drug entries follow the FDA Structured
-            Product Labeling sections used by
-            <a href="https://dailymed.nlm.nih.gov" target="_blank" rel="noopener">DailyMed</a>
-            (indications, dosage, contraindications, interactions, adverse
-            reactions). The records themselves are generated procedurally by
-            <code>scripts/generate_corpus.py</code>, seeded so the corpus is
-            reproducible.
-          </p>
         </div>
       </div>
-    </section>
+    </aside>
+    <div class="nav-scrim" id="nav-scrim" hidden></div>
 
-    <!-- Evaluation strip (collapsible) -->
-    <section class="panel collapsible" id="eval-panel">
-      <button class="collapsible-toggle" id="eval-toggle" aria-expanded="false">
-        <span class="eyebrow">Evaluation</span>
-        <span class="eval-summary" id="eval-summary-inline">loading…</span>
-        <span class="chevron">▸</span>
-      </button>
-      <div class="eval-body" id="eval-body" hidden>
-        <div class="eval-bar"><span class="eval-bar-fill" id="eval-bar-fill"></span></div>
-        <p class="eval-caption" id="eval-caption"></p>
-        <ul class="eval-cases" id="eval-cases"></ul>
-        <p class="eval-foot" id="eval-foot"></p>
-        <div class="adversarial-block" id="adversarial-block" hidden></div>
+    <div class="main">
+      <header class="topbar">
+        <button type="button" class="icon-button" id="nav-open" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+          <svg aria-hidden="true"><use href="#i-menu"/></svg>
+        </button>
+        <span class="topbar-title" id="topbar-title">Ask</span>
+      </header>
+      <div class="disclaimer" role="note">
+        Synthetic demonstration data. All conditions, medications and dosages are fictional. Not medical advice.
       </div>
-    </section>
 
-    <footer class="footer">
-      <div>GroundCheck. Synthetic demo. Built to refuse rather than guess.</div>
-      <div class="footer-note">
-        Synthetic corpus, structured after MedQuAD and FDA / DailyMed labelling.
-        Generation by Groq. Embeddings by sentence-transformers, hybrid keyword and embedding retrieval.
+      <main class="content" id="content" tabindex="-1">
+        <!-- Ask -->
+        <section class="view" id="view-ask" data-title="Ask" aria-labelledby="ask-title">
+        <header class="page-head">
+          <div>
+            <h1 class="page-title"><span id="ask-title">Grounded answers, or none at all</span></h1>
+            <p class="page-sub">Answers come only from approved sources, with a citation for every statement. When a question can’t be grounded, GroundCheck refuses and sends it for review.</p>
+          </div>
+        </header>
+      <section class="panel ask-panel">
+        <form id="ask-form" class="ask-form" autocomplete="off">
+          <label for="query" class="eyebrow">Ask a question</label>
+          <div class="ask-row">
+            <input
+              type="text"
+              id="query"
+              name="query"
+              class="ask-input"
+              placeholder="How is Veltris syndrome treated?"
+              maxlength="400"
+              required
+            />
+            <button type="submit" class="btn btn-primary" id="ask-btn">
+              <span class="btn-label">Ask</span>
+              <span class="spinner" id="spinner" hidden></span>
+            </button>
+          </div>
+          <div class="chips" id="chips" aria-label="Example queries"></div>
+        </form>
+      </section>
+
+      <section class="panel decision-panel" id="decision-panel" hidden>
+        <div class="decision-head">
+          <span class="status-chip" id="decision-chip"></span>
+          <span class="decision-reason" id="decision-reason"></span>
+        </div>
+        <div class="answer-body" id="answer-body"></div>
+        <div class="flag-row" id="flag-row" hidden>
+          <button type="button" class="btn btn-sm btn-ghost" id="flag-open">Flag this answer for review</button>
+          <form class="case-form flag-form" id="flag-form" hidden novalidate>
+            <label for="flag-note">What looks wrong?</label>
+            <textarea id="flag-note" rows="2" placeholder="e.g. The dose doesn't match our renal guidance"></textarea>
+            <div class="flag-actions">
+              <button type="submit" class="btn btn-sm btn-primary">Send for review</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="flag-cancel">Cancel</button>
+            </div>
+          </form>
+          <p class="modal-message" id="flag-message" role="status" hidden></p>
+        </div>
+        <div class="refuse-callout" id="refuse-callout" hidden>
+          <span class="eyebrow">Why it refused</span>
+          <p id="refuse-detail"></p>
+          <p class="refuse-explain" id="refuse-explain"></p>
+          <span class="routed" id="routed-line">
+            No answer is shown. The question has been routed for review.
+          </span>
+        </div>
+      </section>
+
+      <div class="grid-2" id="results-grid" hidden>
+        <section class="panel" id="sources-panel">
+          <h2 class="panel-title eyebrow">Retrieved sources</h2>
+          <div class="sources" id="sources"></div>
+        </section>
+
+        <section class="panel" id="trace-panel">
+          <h2 class="panel-title eyebrow">Pipeline trace</h2>
+          <ol class="trace" id="trace"></ol>
+        </section>
       </div>
-    </footer>
-  </main>
+
+      <section class="panel collapsible" id="audit-panel" hidden>
+        <button class="collapsible-toggle" id="audit-toggle" aria-expanded="false">
+          <span class="eyebrow">View audit record</span>
+          <span class="chevron">▸</span>
+        </button>
+        <div class="audit-controls" id="audit-controls" hidden>
+          <button type="button" class="btn btn-ghost btn-sm" id="audit-expand">Expand all</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="audit-collapse">Collapse all</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="audit-copy">Copy JSON</button>
+        </div>
+        <div class="audit-tree" id="audit-json" hidden></div>
+      </section>
+
+      <section class="panel collapsible tuning-panel" id="tuning-panel">
+        <button class="collapsible-toggle" id="tuning-toggle" aria-expanded="false">
+          <span class="toggle-icon" id="tuning-icon"></span>
+          <span class="eyebrow">Tuning</span>
+          <span class="tuning-status" id="tuning-status">defaults</span>
+          <span class="chevron">▸</span>
+        </button>
+        <div class="tuning-body" id="tuning-body" hidden>
+          <p class="tuning-hint">
+            Adjust the pipeline, then ask again. Lower the gate to answer more often,
+            raise it to refuse more. Switch a guard off to see what an ungoverned
+            system would have returned.
+          </p>
+
+          <div class="tuning-grid">
+            <div class="control">
+              <div class="control-head">
+                <label for="set-retrieval">Retrieval gate</label>
+                <output id="set-retrieval-val" class="control-val">0.30</output>
+              </div>
+              <input type="range" id="set-retrieval" min="0" max="1" step="0.01" value="0.30" />
+              <p class="control-note">Minimum source similarity. Below this, refuse before generating.</p>
+            </div>
+
+            <div class="control">
+              <div class="control-head">
+                <label for="set-grounding">Grounding threshold</label>
+                <output id="set-grounding-val" class="control-val">0.45</output>
+              </div>
+              <input type="range" id="set-grounding" min="0" max="1" step="0.01" value="0.45" />
+              <p class="control-note">How strongly each claim must match its cited source.</p>
+            </div>
+
+            <div class="control">
+              <div class="control-head">
+                <label for="set-topk">Sources retrieved</label>
+                <output id="set-topk-val" class="control-val">4</output>
+              </div>
+              <input type="range" id="set-topk" min="1" max="12" step="1" value="4" />
+              <p class="control-note">How many passages the retriever returns (top-k).</p>
+            </div>
+
+            <div class="control">
+              <div class="control-head">
+                <label for="set-temperature">Model temperature</label>
+                <output id="set-temperature-val" class="control-val">0.0</output>
+              </div>
+              <input type="range" id="set-temperature" min="0" max="1.5" step="0.1" value="0.0" />
+              <p class="control-note">0 is deterministic. Higher makes the model's wording vary between runs.</p>
+            </div>
+          </div>
+
+          <div class="toggles">
+            <label class="switch">
+              <input type="checkbox" id="set-extractive" />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">Bypass model (naive retrieval)</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="set-pii" checked />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">PII redaction (input)</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="set-injection" checked />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">Injection guard (input)</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="set-coverage" checked />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">Source coverage guard</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="set-grounding-guard" checked />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">Grounding guard</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="set-dosage" checked />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">Dosage guard</span>
+            </label>
+            <label class="switch" id="judge-switch">
+              <input type="checkbox" id="set-judge" checked />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">LLM grounding judge</span>
+            </label>
+          </div>
+
+          <div class="tuning-actions">
+            <button type="button" class="btn btn-ghost" id="tuning-reset">Reset to defaults</button>
+            <span class="tuning-applies">Changes apply to your next question.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel collapsible howitworks-panel" id="how-panel">
+        <button class="collapsible-toggle" id="how-toggle" aria-expanded="false">
+          <span class="eyebrow">How it works</span>
+          <span class="how-summary">The pipeline, stage by stage</span>
+          <span class="chevron">▸</span>
+        </button>
+        <div class="how-body" id="how-body" hidden>
+          <p class="how-intro">
+            Every question runs through a fixed pipeline. The decision to answer or
+            refuse is deterministic and never depends on a live model call, so the
+            system behaves the same with or without an LLM. Each stage below records
+            a status and a timing. After you ask, the <strong>Pipeline trace</strong>
+            shows the real run, and every step there is clickable for the detail of
+            what happened, including the LLM judge's verdict on each claim.
+          </p>
+          <ol class="how-stages" id="how-stages"></ol>
+          <div class="how-judge">
+            <h3 class="how-judge-title">The LLM as a judge</h3>
+            <p>
+              Grounding is decided in two layers. First, a deterministic embedding
+              similarity between each claim and its cited source must clear a
+              threshold. This is authoritative and reproducible. Second, when a live
+              provider is configured, a separate, cheaper model is shown only the
+              claim and its cited source and asked, strictly, whether the source
+              supports the claim. It returns JSON: <code>{"supported": bool,
+              "reason": string}</code>. The judge is corroboration, recorded in the
+              trace, never the deciding vote. So a flaky model can never turn a
+              refusal into an answer. Open the grounding step in the trace to read
+              the judge's verdict and reasoning for each claim.
+            </p>
+          </div>
+        </div>
+      </section>
+
+        </section>
+
+        <!-- Usage -->
+        <section class="view" id="view-usage" data-title="Usage" aria-labelledby="usage-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title" id="usage-title">Usage</h1>
+            <p class="page-sub">Questions asked, what was answered and refused, how fast, and what needs review.</p>
+          </div>
+          <div class="page-actions">
+            <label class="visually-hidden" for="usage-days">Period</label>
+            <select id="usage-days" class="select">
+              <option value="7">Last 7 days</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </div>
+        </header>
+          <p class="modal-message" id="usage-message" role="status" hidden></p>
+          <div class="stat-grid" id="usage-stats"></div>
+          <section class="panel chart-panel">
+            <div class="chart-head">
+              <h2 class="panel-heading">Questions per day</h2>
+              <div class="legend" id="usage-legend">
+                <span><i class="swatch swatch-answered"></i>Answered</span>
+                <span><i class="swatch swatch-refused"></i>Refused</span>
+              </div>
+            </div>
+            <div class="chart" id="usage-chart"></div>
+          </section>
+          <div class="usage-grid">
+            <section class="panel">
+              <h2 class="panel-heading">Why questions were refused</h2>
+              <div class="bars" id="usage-reasons"></div>
+            </section>
+            <section class="panel">
+              <h2 class="panel-heading">Most-cited sources</h2>
+              <div class="bars" id="usage-sources"></div>
+            </section>
+            <section class="panel usage-wide" id="usage-users-panel">
+              <h2 class="panel-heading">Questions by person</h2>
+              <div class="bars" id="usage-users"></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- Review -->
+        <section class="view" id="view-review" data-title="Review" aria-labelledby="review-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title"><span id="review-title">Review</span></h1>
+            <p class="page-sub">Every refusal and flagged answer waits here for a clinician. Resolve a case as a test and the question is checked from then on. <span class="page-stat" id="review-summary"></span></p>
+          </div>
+        </header>
+      <section class="panel review-panel" id="review-panel">
+        <div class="review-body" id="review-body">
+          <div class="review-tabs" role="tablist" aria-label="Review">
+            <button type="button" role="tab" class="review-tab" id="tab-queue" aria-controls="review-queue" aria-selected="true">Queue</button>
+            <button type="button" role="tab" class="review-tab" id="tab-hazards" aria-controls="review-hazards" aria-selected="false" tabindex="-1">Hazard log</button>
+            <button type="button" role="tab" class="review-tab" id="tab-report" aria-controls="review-report" aria-selected="false" tabindex="-1">Report</button>
+          </div>
+          <p class="modal-message" id="review-message" role="status" hidden></p>
+
+          <div role="tabpanel" id="review-queue" aria-labelledby="tab-queue">
+            <div class="review-filters">
+              <label for="review-status">Show</label>
+              <select id="review-status">
+                <option value="open">Open cases</option>
+                <option value="resolved">Resolved cases</option>
+                <option value="all">All cases</option>
+              </select>
+              <label class="check"><input type="checkbox" id="review-mine"> Assigned to me</label>
+              <label class="check"><input type="checkbox" id="review-overdue"> Overdue only</label>
+            </div>
+            <div class="review-counts" id="review-counts"></div>
+            <div class="users-table-wrap">
+              <table class="users-table review-table">
+                <thead><tr><th scope="col">Question</th><th scope="col">Type</th><th scope="col">Asked</th><th scope="col">Due</th><th scope="col">Assigned</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                <tbody id="review-rows"></tbody>
+              </table>
+            </div>
+            <p class="auth-hint" id="review-empty" hidden>Nothing to review.</p>
+          </div>
+
+          <div role="tabpanel" id="review-hazards" aria-labelledby="tab-hazards" hidden>
+            <div class="review-toolbar">
+              <p class="auth-hint">Risk is severity × likelihood, each scored 1 to 5. Highest remaining risk first.</p>
+              <button type="button" class="btn btn-sm btn-primary" id="hazard-add">Add hazard</button>
+            </div>
+            <div class="users-table-wrap">
+              <table class="users-table hazard-table">
+                <thead><tr><th scope="col">ID</th><th scope="col">Hazard</th><th scope="col">Before controls</th><th scope="col">After controls</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                <tbody id="hazard-rows"></tbody>
+              </table>
+            </div>
+            <p class="auth-hint" id="hazard-empty" hidden>No hazards recorded yet.</p>
+          </div>
+
+          <div role="tabpanel" id="review-report" aria-labelledby="tab-report" hidden>
+            <div class="review-toolbar">
+              <div class="review-filters">
+                <label for="report-days">Period</label>
+                <select id="report-days">
+                  <option value="7">Last 7 days</option>
+                  <option value="30" selected>Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="365">Last 12 months</option>
+                </select>
+              </div>
+              <a class="btn btn-sm btn-ghost" id="safety-case-download" href="/api/governance/safety-case?days=30" download>Download safety case</a>
+            </div>
+            <div class="report-grid" id="report-grid"></div>
+            <div class="report-reasons" id="report-reasons"></div>
+            <div class="review-tests">
+              <div class="review-toolbar">
+                <h3>Tests added from reviews</h3>
+                <button type="button" class="btn btn-sm btn-ghost" id="review-tests-run">Run tests</button>
+              </div>
+              <p class="auth-hint" id="review-tests-summary"></p>
+              <ul class="eval-cases" id="review-tests-list"></ul>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+        </section>
+
+        <!-- Documents -->
+        <section class="view" id="view-documents" data-title="Documents" aria-labelledby="documents-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title"><span id="documents-title">Documents</span></h1>
+            <p class="page-sub">Your guidelines, formularies and protocols. A document is cited only after someone other than the uploader approves it, and only between its effective and expiry dates. <span class="page-stat" id="documents-summary"></span></p>
+          </div>
+        </header>
+      <section class="panel documents-panel" id="documents-panel">
+        <div class="documents-body" id="documents-body">
+          <p class="modal-message" id="documents-message" role="status" hidden></p>
+
+          <form class="upload-form" id="upload-form" novalidate>
+            <div class="upload-field upload-file">
+              <label for="upload-file">File</label>
+              <input id="upload-file" type="file" accept=".pdf,.docx,.html,.htm,.md,.markdown,.txt" required>
+              <span class="auth-hint">PDF, Word (.docx), HTML, Markdown or text, up to 25 MB.</span>
+            </div>
+            <div class="upload-field">
+              <label for="upload-title">Title <span class="optional">optional</span></label>
+              <input id="upload-title" placeholder="Taken from the document">
+            </div>
+            <div class="upload-field">
+              <label for="upload-owner">Owner</label>
+              <input id="upload-owner" placeholder="e.g. Pharmacy">
+            </div>
+            <div class="upload-field">
+              <label for="upload-effective">Effective from <span class="optional">optional</span></label>
+              <input id="upload-effective" type="date">
+            </div>
+            <div class="upload-field">
+              <label for="upload-expires">Expires on <span class="optional">optional</span></label>
+              <input id="upload-expires" type="date">
+            </div>
+            <div class="upload-actions">
+              <button type="submit" class="btn btn-primary" id="upload-button">Upload for review</button>
+            </div>
+          </form>
+
+          <div class="index-status" id="index-status">
+            <span id="index-status-text">Index status unknown</span>
+            <button type="button" class="btn btn-sm btn-ghost" id="index-rebuild">Rebuild index</button>
+          </div>
+
+          <div class="users-table-wrap">
+            <table class="users-table documents-table">
+              <thead><tr><th scope="col">Document</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col">In force</th><th scope="col">Sections</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+              <tbody id="documents-body-rows"></tbody>
+            </table>
+          </div>
+          <p class="auth-hint" id="documents-empty" hidden>No documents yet. Upload one to start.</p>
+        </div>
+      </section>
+
+        </section>
+
+        <!-- Evaluation -->
+        <section class="view" id="view-evaluation" data-title="Evaluation" aria-labelledby="evaluation-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title"><span id="evaluation-title">Evaluation</span></h1>
+            <p class="page-sub">Every release runs a golden set of answerable and must-refuse questions, and adversarial probes. <span class="page-stat" id="eval-summary-inline"></span></p>
+          </div>
+        </header>
+      <section class="panel" id="eval-panel">
+        <div class="eval-body" id="eval-body">
+          <div class="eval-bar"><span class="eval-bar-fill" id="eval-bar-fill"></span></div>
+          <p class="eval-caption" id="eval-caption"></p>
+          <ul class="eval-cases" id="eval-cases"></ul>
+          <p class="eval-foot" id="eval-foot"></p>
+          <div class="adversarial-block" id="adversarial-block" hidden></div>
+        </div>
+      </section>
+
+        </section>
+
+        <!-- Embeddings -->
+        <section class="view" id="view-embeddings" data-title="Embeddings" aria-labelledby="corpus-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title"><span id="corpus-title">Embeddings</span></h1>
+            <p class="page-sub">How passages are turned into vectors and searched. <span class="page-stat" id="corpus-summary"></span></p>
+          </div>
+        </header>
+          <div class="stat-grid" id="embed-stats" aria-label="Embedding index"></div>
+          <section class="panel embed-settings">
+            <h2 class="panel-heading">Search settings</h2>
+            <dl class="protection-list" id="embed-settings"></dl>
+          </section>
+          <h2 class="section-heading">Map of every passage</h2>
+          <p class="section-sub">Each passage projected from its embedding to three dimensions with PCA, so similar passages sit together. Drag to rotate, hover a point. After you ask, the retrieved sources light up.</p>
+      <section class="panel" id="corpus-panel">
+        <div class="corpus-body" id="corpus-body">
+          <div class="corpus-tiles" id="corpus-tiles"></div>
+          <div class="corpus-map-wrap">
+            <div class="corpus-canvas-wrap" id="corpus-canvas-wrap">
+              <canvas id="corpus-canvas" class="corpus-canvas" aria-label="3D corpus embedding map"></canvas>
+              <span class="corpus-drag-hint" id="corpus-drag-hint">drag to rotate, hover a point</span>
+              <button type="button" class="corpus-fs-btn" id="corpus-fs-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">⤢</button>
+              <div class="corpus-tooltip" id="corpus-tooltip" hidden></div>
+            </div>
+            <div class="corpus-legend" id="corpus-legend"></div>
+          </div>
+          <div class="corpus-section-bars" id="corpus-section-bars"></div>
+          <div class="dataset-note" id="dataset-note">
+            <span class="eyebrow">Dataset provenance</span>
+            <p>
+              This corpus is <strong>fully synthetic</strong>. Every condition,
+              medication, lab marker, dosage, and procedure is invented for this
+              demonstration. Nothing here is real and nothing is medical advice.
+            </p>
+            <p>
+              The document <em>structure</em> mirrors two real, public reference
+              formats so that retrieval and grounding are exercised realistically:
+              disease entries follow the
+              <a href="https://github.com/abachaa/MedQuAD" target="_blank" rel="noopener">MedQuAD</a>
+              question-type taxonomy (information, causes, symptoms, treatment,
+              monitoring, prognosis), and drug entries follow the FDA Structured
+              Product Labeling sections used by
+              <a href="https://dailymed.nlm.nih.gov" target="_blank" rel="noopener">DailyMed</a>
+              (indications, dosage, contraindications, interactions, adverse
+              reactions). The records themselves are generated procedurally by
+              <code>scripts/generate_corpus.py</code>, seeded so the corpus is
+              reproducible.
+            </p>
+          </div>
+        </div>
+      </section>
+
+        </section>
+
+        <!-- Local AI -->
+        <section class="view" id="view-local-ai" data-title="Local AI" aria-labelledby="local-ai-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title"><span id="local-ai-title">Local AI</span></h1>
+            <p class="page-sub">Run an open-source model on this machine. It drafts answers; the same checks still decide what is shown, and answers fall back to extractive mode if it isn’t available. <span class="page-stat" id="local-ai-summary"></span></p>
+          </div>
+        </header>
+      <section class="panel local-ai-panel" id="local-ai-panel">
+        <div class="local-ai-body" id="local-ai-body">
+          <div class="local-ai-facts" id="local-ai-hw" aria-label="This machine"></div>
+          <p class="local-ai-message" id="local-ai-message" hidden></p>
+          <ul class="local-ai-models" id="local-ai-models" aria-label="Models"></ul>
+        </div>
+      </section>
+
+        </section>
+
+        <!-- Data protection -->
+        <section class="view" id="view-data-protection" data-title="Data protection" aria-labelledby="protection-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title"><span id="protection-title">Data protection</span></h1>
+            <p class="page-sub">Check the audit trail hasn’t been changed, and see how stored data is encrypted and how long it’s kept.</p>
+          </div>
+        </header>
+          <p class="modal-message" id="protection-message" role="status" hidden></p>
+          <section class="panel protection-panel">
+          <div id="review-protection">
+            <section class="protection-block" aria-labelledby="audit-integrity-title">
+              <div class="review-toolbar">
+                <h3 id="audit-integrity-title">Audit trail integrity</h3>
+                <button type="button" class="btn btn-sm btn-primary" id="audit-verify">Verify audit trail</button>
+              </div>
+              <p class="auth-hint">Every audit record is chained to the one before it. Verifying checks that none has been changed, removed or reordered.</p>
+              <div class="verify-result" id="verify-result" hidden></div>
+            </section>
+            <div id="protection-admin" hidden>
+              <section class="protection-block" aria-labelledby="protection-status-title">
+                <h3 id="protection-status-title">Stored data</h3>
+                <dl class="protection-list" id="protection-list"></dl>
+              </section>
+              <section class="protection-block" aria-labelledby="retention-title">
+                <div class="review-toolbar">
+                  <h3 id="retention-title">Retention</h3>
+                  <button type="button" class="btn btn-sm btn-ghost" id="retention-run">Delete expired records</button>
+                </div>
+                <p class="auth-hint" id="retention-summary"></p>
+              </section>
+            </div>
+          </div>
+          </section>
+        </section>
+
+        <!-- Users -->
+        <section class="view" id="view-users" data-title="Users" aria-labelledby="users-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title"><span id="users-title">Users</span></h1>
+            <p class="page-sub">Everyone who can sign in, their role and two-factor status.</p>
+          </div>
+        </header>
+          <p class="modal-message" id="users-message" role="status" hidden></p>
+          <section class="panel">
+      <div class="users-table-wrap">
+            <table class="users-table">
+              <thead><tr><th scope="col">User</th><th scope="col">Role</th><th scope="col">2FA</th><th scope="col">Last sign-in</th><th scope="col">Status</th></tr></thead>
+              <tbody id="users-body"></tbody>
+            </table>
+          </div>
+          <section class="panel add-user-panel" aria-labelledby="add-user-title">
+            <h3 id="add-user-title">Add a user</h3>
+            <form class="auth-form add-user-form" id="add-user-form" novalidate>
+              <label for="new-user-name">Name</label>
+              <input id="new-user-name" autocomplete="off">
+              <label for="new-user-email">Email</label>
+              <input id="new-user-email" type="email" autocomplete="off" required>
+              <label for="new-user-password">Temporary password</label>
+              <input id="new-user-password" type="password" autocomplete="new-password" minlength="12" required>
+              <label for="new-user-role">Role</label>
+              <select id="new-user-role">
+                <option value="clinician">Clinician: asks questions</option>
+                <option value="reviewer">Reviewer: also reads the audit trail</option>
+                <option value="admin">Admin: also manages users and models</option>
+              </select>
+              <button type="submit" class="btn btn-primary">Add user</button>
+            </form>
+          </section>
+          </section>
+        </section>
+
+        <footer class="footer">
+          GroundCheck. Built to refuse rather than guess. Synthetic corpus structured after MedQuAD and FDA DailyMed labelling.
+        </footer>
+      </main>
+    </div>
+  </div>
 
   <script src="/app.js"></script>
 </body>

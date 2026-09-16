@@ -468,6 +468,87 @@ def report(days: int = 30) -> dict:
         }
 
 
+def usage(days: int = 30) -> dict:
+    """Day-by-day use for the usage dashboard: questions answered and refused,
+    response times, what drafted answers, the most-cited sources, who asks, and
+    how often identifiers were removed. Test runs are left out."""
+    if not 1 <= days <= 366:
+        raise GovernanceError("Choose a period of 1 to 366 days.")
+    now = utcnow()
+    today = now.date()
+    start = today - timedelta(days=days - 1)
+    since = datetime(start.year, start.month, start.day, tzinfo=timezone.utc)
+    daily = {start + timedelta(days=i): {"answered": 0, "refused": 0} for i in range(days)}
+    latencies: list[int] = []
+    drafted = {"Extractive": 0, "Local model": 0, "Cloud model": 0}
+    cited: dict[str, dict] = {}
+    by_user: dict[int, int] = {}
+    deidentified = 0
+    reasons: dict[str, int] = {}
+    with db.session() as s:
+        records = [r for r in s.scalars(select(AuditRecord).where(AuditRecord.created_at >= since))
+                   if not r.record.get("test_run")]
+        for r in records:
+            day = daily.get(r.created_at.date())
+            if day is not None:
+                day["answered" if r.decision == "answer" else "refused"] += 1
+            latencies.append(r.total_ms)
+            provider = r.record.get("provider") or {}
+            kind = provider.get("kind") if r.llm_used else None
+            drafted["Local model" if kind == "local" else "Cloud model" if r.llm_used else "Extractive"] += 1
+            response = r.record.get("response", {})
+            if r.decision == "answer":
+                titles = {x.get("id"): x.get("title") for x in response.get("sources", [])}
+                for claim in response.get("claims", []):
+                    for sid in set(claim.get("source_ids", [])):
+                        entry = cited.setdefault(sid, {"id": sid, "title": titles.get(sid) or sid, "citations": 0})
+                        entry["citations"] += 1
+            else:
+                category = categorise(response.get("refused_reason") or "")
+                reasons[category] = reasons.get(category, 0) + 1
+            if r.user_id:
+                by_user[r.user_id] = by_user.get(r.user_id, 0) + 1
+            if any(step.get("name") == "pii redaction" and step.get("status") == "warn"
+                   for step in response.get("trace", [])):
+                deidentified += 1
+        names = _user_names(s, by_user.keys())
+        open_cases = s.scalar(select(func.count(ReviewCase.id)).where(ReviewCase.status == "open")) or 0
+        overdue = s.scalar(select(func.count(ReviewCase.id)).where(
+            ReviewCase.status == "open", ReviewCase.due_at <= now)) or 0
+
+    latencies.sort()
+
+    def percentile(p: float) -> int | None:
+        if not latencies:
+            return None
+        return latencies[min(len(latencies) - 1, int(round(p * (len(latencies) - 1))))]
+
+    total = len(records)
+    refused = sum(d["refused"] for d in daily.values())
+    return {
+        "period_days": days,
+        "from": start.isoformat(),
+        "to": today.isoformat(),
+        "totals": {
+            "questions": total,
+            "answered": total - refused,
+            "refused": refused,
+            "refusal_rate": round(refused / total, 3) if total else None,
+            "median_ms": percentile(0.5),
+            "p95_ms": percentile(0.95),
+            "deidentified": deidentified,
+            "open_reviews": open_cases,
+            "overdue_reviews": overdue,
+        },
+        "daily": [{"date": d.isoformat(), **v} for d, v in daily.items()],
+        "drafted_by": drafted,
+        "refusal_reasons": dict(sorted(reasons.items(), key=lambda kv: -kv[1])),
+        "top_sources": sorted(cited.values(), key=lambda e: -e["citations"])[:8],
+        "by_user": sorted(({"name": names.get(uid, f"Account {uid}"), "questions": n} for uid, n in by_user.items()),
+                          key=lambda e: -e["questions"])[:8],
+    }
+
+
 def safety_case_markdown(days: int = 30) -> str:
     """A clinical safety case summary for this release, as Markdown."""
     r = report(days)

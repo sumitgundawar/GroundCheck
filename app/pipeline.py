@@ -298,6 +298,7 @@ def run(raw_query: str, settings: "Settings | None" = None,
 
     # --- 5. Generate -------------------------------------------------------
     provider = None if cfg.force_extractive else llm.active_provider()
+    extras["provider"] = provider
     llm_answer = None if provider is None else llm.generate_llm(
         query, source_records, cfg.temperature)
     llm_used = llm_answer is not None

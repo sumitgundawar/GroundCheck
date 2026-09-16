@@ -294,3 +294,29 @@ def test_api_without_sign_in_is_local_only(queue, monkeypatch):
         remote = {"X-Forwarded-For": "203.0.113.9"}
         assert c.get("/api/reviews", headers=remote).status_code == 403
         assert c.post("/api/hazards", json=HAZARD, headers=remote).status_code == 403
+
+
+def test_usage_dashboard(queue):
+    pipeline.run(ANSWERED)
+    pipeline.run(REFUSED)
+    pipeline.run("Mr John Smith: " + REFUSED)
+    pipeline.run(REFUSED, review=False)  # a test run: not counted
+    u = governance.usage(7)
+    assert len(u["daily"]) == 7 and u["daily"][-1] == {"date": u["to"], "answered": 1, "refused": 2}
+    t = u["totals"]
+    assert (t["questions"], t["answered"], t["refused"], t["deidentified"]) == (3, 1, 2, 1)
+    assert t["median_ms"] is not None and t["open_reviews"] == 2
+    assert u["drafted_by"] == {"Extractive": 3, "Local model": 0, "Cloud model": 0}
+    assert u["refusal_reasons"] == {"term not in sources": 2}
+    assert u["top_sources"] and u["top_sources"][0]["citations"] >= 1
+    with pytest.raises(governance.GovernanceError):
+        governance.usage(0)
+
+
+def test_embeddings_summary_endpoint():
+    from app.main import app
+
+    with TestClient(app) as c:
+        body = c.get("/api/embeddings").json()
+    assert body["dimensions"] == 384 and body["passages"] == len(retrieval.all_metadata())
+    assert body["vector_store"] in ("local", "qdrant") and "state" in body["index"]

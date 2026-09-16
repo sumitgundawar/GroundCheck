@@ -384,6 +384,30 @@ def corpus_projection(dims: int = 3) -> list[dict]:
     return points
 
 
+def embedding_summary() -> dict:
+    """The embedding model, vector store and search settings, for the
+    Embeddings page."""
+    _ensure_loaded()
+    assert _store is not None
+    vectors = _store.vectors([0]) if _metadata else np.zeros((0, 0))
+    documents = sum(1 for r in _metadata if r.get("source_id"))
+    return {
+        "model": config.EMBED_MODEL,
+        "dimensions": int(vectors.shape[1]) if vectors.size else get_model().get_sentence_embedding_dimension(),
+        "passages": len(_metadata),
+        "from_your_documents": documents,
+        "from_demo_corpus": len(_metadata) - documents,
+        "include_demo_corpus": config.INCLUDE_DEMO_CORPUS,
+        "vector_store": getattr(_store, "name", config.VECTOR_STORE),
+        "similarity": "cosine",
+        "hybrid": {"enabled": config.HYBRID_RETRIEVAL, "embedding_weight": config.HYBRID_ALPHA,
+                   "keyword_weight": round(1 - config.HYBRID_ALPHA, 3) if config.HYBRID_RETRIEVAL else 0},
+        "top_k": config.TOP_K,
+        "min_score": config.RETRIEVAL_MIN_SCORE,
+        "vocabulary": len(_lexical.postings) if _lexical is not None else 0,
+    }
+
+
 def corpus_stats() -> dict:
     """Aggregate counts for the corpus map header tiles."""
     _ensure_loaded()
