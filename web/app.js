@@ -149,6 +149,12 @@ function renderAccountMenu() {
   $("account-email").textContent = user.email;
   $("account-role").textContent = user.role;
   $("open-users").hidden = user.role !== "admin";
+  $("review-panel").hidden = user.role === "clinician";
+  $("hazard-add").hidden = user.role !== "admin";
+}
+
+function canEditHazards() {
+  return !account.authRequired || account.user?.role === "admin";
 }
 
 function formBusy(form, busy) {
@@ -566,9 +572,11 @@ function renderDecision(data) {
     reason.textContent = ids.length ? `Grounded in ${ids.join(", ")}.` : "Grounded in cited sources.";
     body.appendChild(renderAnswerWithCitations(data.answer_text));
     callout.hidden = true;
+    resetFlag(data.audit_id);
   } else {
     chip.className = "status-chip refuse";
     chip.textContent = "REFUSED";
+    resetFlag(null);
     reason.textContent = data.refused_reason ? capitalize(data.refused_reason) : "";
     callout.hidden = false;
     $("refuse-detail").textContent = data.refused_reason || "No grounded answer available.";
@@ -1775,11 +1783,500 @@ function wireDocuments() {
   });
 }
 
+// ---------- Review ----------
+const KIND_LABELS = { refusal: "Refusal", flagged: "Flagged answer" };
+const SEVERITY = ["", "Minor", "Significant", "Considerable", "Major", "Catastrophic"];
+const LIKELIHOOD = ["", "Very low", "Low", "Medium", "High", "Very high"];
+const review = { tab: "queue", data: null, caseId: null, hazards: [], hazardId: null };
+
+function relativeTime(iso) {
+  const minutes = Math.round((new Date(iso) - Date.now()) / 60000);
+  const fmt = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const abs = Math.abs(minutes);
+  if (abs < 60) return fmt.format(minutes, "minute");
+  if (abs < 48 * 60) return fmt.format(Math.round(minutes / 60), "hour");
+  return fmt.format(Math.round(minutes / 1440), "day");
+}
+
+// Labels for table cells, shown when rows stack as cards on narrow screens.
+function labelCells(cells, labels) {
+  cells.forEach((td, i) => { if (labels[i]) td.dataset.label = labels[i]; });
+}
+
+const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+
+function selectTab(name) {
+  review.tab = name;
+  for (const tab of ["queue", "hazards", "report"]) {
+    const on = tab === name;
+    $(`tab-${tab}`).setAttribute("aria-selected", String(on));
+    $(`tab-${tab}`).tabIndex = on ? 0 : -1;
+    $(`review-${tab}`).hidden = !on;
+  }
+  $("review-message").hidden = true;
+  loadReviewTab();
+}
+
+function loadReviewTab() {
+  if (review.tab === "queue") return loadReviews();
+  if (review.tab === "hazards") return loadHazards();
+  return loadReport();
+}
+
+async function loadReviews() {
+  const params = new URLSearchParams({ status: $("review-status").value });
+  if ($("review-mine").checked) params.set("mine", "true");
+  if ($("review-overdue").checked) params.set("overdue", "true");
+  let data;
+  try { data = await api(`/api/reviews?${params}`); }
+  catch (err) { showMessage("review-message", err.message, true); return; }
+  review.data = data;
+  const c = data.counts;
+  $("review-summary").textContent = `${c.open} open${c.overdue ? `, ${c.overdue} overdue` : ""}`;
+  const counts = $("review-counts");
+  counts.textContent = "";
+  [["Open", c.open, ""], ["Overdue", c.overdue, c.overdue ? "bad" : ""], ["Resolved", c.resolved, ""]].forEach(([label, n, cls]) => {
+    const item = document.createElement("span");
+    item.className = `review-count ${cls}`;
+    const num = document.createElement("strong");
+    num.textContent = n.toLocaleString();
+    item.append(num, ` ${label.toLowerCase()}`);
+    counts.appendChild(item);
+  });
+
+  const rows = $("review-rows");
+  rows.textContent = "";
+  $("review-empty").hidden = data.cases.length > 0;
+  data.cases.forEach((k) => {
+    const tr = document.createElement("tr");
+    if (k.overdue) tr.className = "overdue";
+
+    const q = document.createElement("td");
+    const text = document.createElement("div");
+    text.className = "user-name review-question";
+    text.textContent = k.query;
+    const why = document.createElement("div");
+    why.className = "user-email";
+    why.textContent = k.kind === "flagged" ? `Flagged: ${k.reason}` : k.reason_category;
+    q.append(text, why);
+
+    const type = document.createElement("td");
+    const pills = document.createElement("div");
+    pills.className = "pill-group";
+    type.appendChild(pills);
+    const pill = document.createElement("span");
+    pill.className = `status-pill kind-${k.kind}${k.priority === "high" ? " priority-high" : ""}`;
+    pill.textContent = KIND_LABELS[k.kind] || k.kind;
+    pills.appendChild(pill);
+    if (k.status !== "open") {
+      const st = document.createElement("span");
+      st.className = "status-pill status-retired";
+      st.textContent = "Resolved";
+      pills.appendChild(st);
+    }
+
+    const asked = document.createElement("td");
+    asked.textContent = k.occurrences === 1 ? "once" : `${k.occurrences} times`;
+    asked.title = `First ${new Date(k.created_at).toLocaleString()}, last ${new Date(k.last_seen_at).toLocaleString()}`;
+
+    const due = document.createElement("td");
+    if (k.status === "open") {
+      due.textContent = k.overdue ? `Overdue, ${relativeTime(k.due_at)}` : relativeTime(k.due_at);
+      due.className = k.overdue ? "due-overdue" : "";
+    } else {
+      due.textContent = k.outcome_label;
+    }
+
+    const who = document.createElement("td");
+    who.textContent = k.assigned_to_name || "Unassigned";
+    if (!k.assigned_to_name) who.className = "muted";
+
+    const actionsCell = document.createElement("td");
+    const actions = document.createElement("div");
+    actions.className = "document-actions";
+    actions.appendChild(button(k.status === "open" ? "Review" : "View", k.status === "open" ? "btn-primary" : "btn-ghost", false, () => openCase(k.id)));
+    actionsCell.appendChild(actions);
+
+    labelCells([q, type, asked, due, who, actionsCell], ["", "Type", "Asked", k.status === "open" ? "Due" : "Outcome", "Assigned", ""]);
+    tr.append(q, type, asked, due, who, actionsCell);
+    rows.appendChild(tr);
+  });
+}
+
+async function openCase(id) {
+  let data;
+  try { data = await api(`/api/reviews/${id}`); }
+  catch (err) { showMessage("review-message", err.message, true); return; }
+  review.caseId = id;
+  renderCase(data.case);
+  $("case-message").hidden = true;
+  if (!$("case-dialog").open) $("case-dialog").showModal();
+}
+
+function renderCase(k) {
+  $("case-dialog-title").textContent = `${KIND_LABELS[k.kind] || "Case"} #${k.id}`;
+  $("case-query").textContent = k.query;
+  const meta = [
+    k.kind === "flagged" ? `Flagged${k.flagged_by_name ? ` by ${k.flagged_by_name}` : ""}: ${k.reason}` : `Refused: ${k.reason}`,
+    `Asked ${k.occurrences === 1 ? "once" : `${k.occurrences} times`}, first ${new Date(k.created_at).toLocaleString()}`,
+    k.status === "open" ? `Due ${relativeTime(k.due_at)}${k.escalated ? ", escalated" : ""}` : "",
+    `Audit record ${k.last_audit_id}`,
+  ].filter(Boolean).map((part) => part.replace(/[.\s]+$/, ""));
+  $("case-meta").textContent = meta.join(". ") + ".";
+
+  $("case-answer-section").hidden = !k.answer_text;
+  $("case-answer").textContent = k.answer_text || "";
+  $("case-sources").textContent = (k.sources || []).length
+    ? `Sources retrieved: ${k.sources.map((x) => x.id).join(", ")}.` : "";
+
+  const open = k.status === "open";
+  $("case-work").hidden = !open;
+  $("case-closed").hidden = open;
+  if (open) {
+    const select = $("case-assignee");
+    select.textContent = "";
+    const none = new Option("Unassigned", "");
+    select.appendChild(none);
+    (review.data?.reviewers || []).forEach((r) => select.appendChild(new Option(r.name, r.id)));
+    if (review.data?.me && !(review.data.reviewers || []).some((r) => r.id === review.data.me)) {
+      select.appendChild(new Option("Me", review.data.me));
+    }
+    select.value = k.assigned_to ?? "";
+    const outcome = $("case-outcome");
+    if (!outcome.options.length) {
+      outcome.appendChild(new Option("Choose…", ""));
+      Object.entries(review.data?.outcomes || {}).forEach(([key, label]) => outcome.appendChild(new Option(label, key)));
+    }
+    outcome.value = "";
+    $("case-expected").value = k.kind === "refusal" ? "refuse" : "";
+    $("case-expected-field").hidden = true;
+    $("case-note").value = "";
+    $("case-comment").value = "";
+  } else {
+    $("case-outcome-text").textContent = `Resolved${k.resolved_by_name ? ` by ${k.resolved_by_name}` : ""} ${new Date(k.resolved_at).toLocaleString()}: ${k.outcome_label}.${k.outcome_note ? ` ${k.outcome_note}` : ""}`;
+    $("case-reopen-note").value = "";
+  }
+
+  const list = $("case-timeline");
+  list.textContent = "";
+  k.events.slice().reverse().forEach((e) => {
+    const li = document.createElement("li");
+    const head = document.createElement("div");
+    head.className = "timeline-head";
+    const action = document.createElement("strong");
+    action.textContent = capitalize(e.action);
+    const when = document.createElement("span");
+    when.className = "muted";
+    when.textContent = `${e.user ? `${e.user}, ` : ""}${new Date(e.at).toLocaleString()}`;
+    head.append(action, when);
+    li.appendChild(head);
+    if (e.note) {
+      const note = document.createElement("p");
+      note.textContent = e.note;
+      li.appendChild(note);
+    }
+    list.appendChild(li);
+  });
+}
+
+async function caseAction(path, body, form, done) {
+  if (form) formBusy(form, true);
+  try {
+    const data = await api(`/api/reviews/${review.caseId}/${path}`, { method: "POST", body });
+    renderCase(data.case);
+    showMessage("case-message", done);
+    loadReviews();
+  } catch (err) { showMessage("case-message", err.message, true); }
+  if (form) formBusy(form, false);
+}
+
+async function loadHazards() {
+  let data;
+  try { data = await api("/api/hazards"); }
+  catch (err) { showMessage("review-message", err.message, true); return; }
+  review.hazards = data.hazards;
+  const rows = $("hazard-rows");
+  rows.textContent = "";
+  $("hazard-empty").hidden = data.hazards.length > 0;
+  const riskCell = (r, s, l) => {
+    const td = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = `risk-pill risk-${r.level.replace(" ", "-")}`;
+    pill.textContent = `${r.score} ${r.level}`;
+    pill.title = `Severity ${s} (${SEVERITY[s]}) × likelihood ${l} (${LIKELIHOOD[l]})`;
+    td.appendChild(pill);
+    return td;
+  };
+  data.hazards.forEach((h) => {
+    const tr = document.createElement("tr");
+    const id = document.createElement("td");
+    id.className = "mono";
+    id.textContent = `H${h.id}`;
+    const title = document.createElement("td");
+    const name = document.createElement("div");
+    name.className = "user-name";
+    name.textContent = h.title;
+    const controls = document.createElement("div");
+    controls.className = "user-email";
+    controls.textContent = h.controls ? `Controls: ${h.controls}` : "No controls recorded";
+    title.append(name, controls);
+    const status = document.createElement("td");
+    status.textContent = capitalize(h.status);
+    const owner = document.createElement("td");
+    owner.textContent = h.owner;
+    const actionsCell = document.createElement("td");
+    const actions = document.createElement("div");
+    actions.className = "document-actions";
+    actions.appendChild(button(canEditHazards() ? "Edit" : "View", "btn-ghost", false, () => openHazard(h)));
+    actionsCell.appendChild(actions);
+    const cells = [id, title, riskCell(h.initial_risk, h.severity, h.likelihood),
+      riskCell(h.residual_risk, h.residual_severity, h.residual_likelihood), status, owner, actionsCell];
+    labelCells(cells, ["ID", "", "Before controls", "After controls", "Status", "Owner", ""]);
+    tr.append(...cells);
+    rows.appendChild(tr);
+  });
+}
+
+function riskLabel(s, l) {
+  const score = s * l;
+  const level = score <= 4 ? "low" : score <= 9 ? "medium" : score <= 16 ? "high" : "very high";
+  return `Risk ${score}, ${level}`;
+}
+
+function updateHazardRisk() {
+  $("hazard-initial-risk").textContent = riskLabel(+$("hazard-severity").value, +$("hazard-likelihood").value);
+  $("hazard-residual-risk").textContent = riskLabel(+$("hazard-residual-severity").value, +$("hazard-residual-likelihood").value);
+}
+
+function openHazard(h) {
+  review.hazardId = h ? h.id : null;
+  $("hazard-dialog-title").textContent = h ? `Hazard H${h.id}` : "Add hazard";
+  $("hazard-title").value = h?.title || "";
+  $("hazard-cause").value = h?.cause || "";
+  $("hazard-effect").value = h?.effect || "";
+  $("hazard-controls").value = h?.controls || "";
+  $("hazard-severity").value = h?.severity || 3;
+  $("hazard-likelihood").value = h?.likelihood || 3;
+  $("hazard-residual-severity").value = h?.residual_severity || 3;
+  $("hazard-residual-likelihood").value = h?.residual_likelihood || 2;
+  $("hazard-status").value = h?.status || "open";
+  $("hazard-owner").value = h?.owner || "";
+  updateHazardRisk();
+  const editable = canEditHazards();
+  $("hazard-form").querySelectorAll("input, textarea, select, button").forEach((el) => { el.disabled = !editable; });
+  $("hazard-save").hidden = !editable;
+  $("hazard-message").hidden = true;
+  $("hazard-dialog").showModal();
+  if (editable) $("hazard-title").focus();
+}
+
+async function loadReport() {
+  const days = $("report-days").value;
+  $("safety-case-download").href = `/api/governance/safety-case?days=${days}`;
+  let r;
+  try { r = await api(`/api/governance/report?days=${days}`); }
+  catch (err) { showMessage("review-message", err.message, true); return; }
+  const q = r.questions, rv = r.reviews;
+  const pct = (n) => n === null ? "–" : `${Math.round(n * 100)}%`;
+  const tiles = [
+    ["Questions", q.total.toLocaleString(), `${q.answered.toLocaleString()} answered`],
+    ["Refusal rate", pct(q.refusal_rate), `${q.refused.toLocaleString()} refused`],
+    ["Review cases", rv.opened.toLocaleString(), plural(rv.flagged_answers, "flagged answer")],
+    ["Resolved on time", rv.resolved ? `${rv.resolved_on_time} of ${rv.resolved}` : "–", rv.median_hours_to_resolve === null ? "none resolved" : rv.median_hours_to_resolve < 1 ? "median under an hour" : `median ${rv.median_hours_to_resolve} hours`],
+    ["Open now", rv.open_now.toLocaleString(), `${rv.overdue_now} overdue`],
+    ["Checks switched off", q.with_a_check_switched_off.toLocaleString(), "questions asked with a check off"],
+  ];
+  const grid = $("report-grid");
+  grid.textContent = "";
+  tiles.forEach(([label, value, note]) => {
+    const tile = document.createElement("div");
+    tile.className = "report-tile";
+    const l = document.createElement("span"); l.className = "report-label"; l.textContent = label;
+    const v = document.createElement("strong"); v.className = "report-value"; v.textContent = value;
+    const n = document.createElement("span"); n.className = "report-note"; n.textContent = note;
+    tile.append(l, v, n);
+    grid.appendChild(tile);
+  });
+
+  const reasons = $("report-reasons");
+  reasons.textContent = "";
+  const entries = Object.entries(q.refusal_reasons);
+  if (entries.length) {
+    const h = document.createElement("h3");
+    h.textContent = "Why questions were refused";
+    reasons.appendChild(h);
+    const max = Math.max(...entries.map(([, n]) => n));
+    entries.forEach(([reason, n]) => {
+      const row = document.createElement("div");
+      row.className = "reason-row";
+      const label = document.createElement("span");
+      label.textContent = capitalize(reason);
+      const track = document.createElement("span");
+      track.className = "reason-track";
+      const bar = document.createElement("span");
+      bar.className = "reason-bar";
+      bar.style.width = `${(n / max) * 100}%`;
+      track.appendChild(bar);
+      const count = document.createElement("span");
+      count.className = "mono";
+      count.textContent = n.toLocaleString();
+      row.append(label, track, count);
+      reasons.appendChild(row);
+    });
+  }
+  loadReviewTests();
+}
+
+function renderReviewTestCases(cases) {
+  const list = $("review-tests-list");
+  list.textContent = "";
+  cases.forEach((c) => {
+    const li = document.createElement("li");
+    li.className = "eval-case";
+    const glyph = document.createElement("span");
+    glyph.className = `glyph ${c.ok === undefined ? "" : c.ok ? "ok" : "bad"}`;
+    const q = document.createElement("span");
+    q.className = "eval-q";
+    q.textContent = c.query;
+    const r = document.createElement("span");
+    r.className = "eval-r mono";
+    r.textContent = c.got ? `expect ${c.expect} / got ${c.got}` : `expect ${c.expect}`;
+    li.append(glyph, q, r);
+    list.appendChild(li);
+  });
+}
+
+async function loadReviewTests() {
+  try {
+    const data = await api("/api/review-tests");
+    $("review-tests-summary").textContent = data.cases.length
+      ? `${data.cases.length} question${data.cases.length === 1 ? "" : "s"} added from resolved cases.`
+      : "None yet. Resolve a case as “Added as a permanent test question” to add one.";
+    $("review-tests-run").hidden = !data.cases.length;
+    renderReviewTestCases(data.cases);
+  } catch (_) { /* shown by the report */ }
+}
+
+function resetFlag(auditId) {
+  $("flag-row").hidden = !auditId;
+  $("flag-row").dataset.auditId = auditId || "";
+  $("flag-open").hidden = false;
+  $("flag-form").hidden = true;
+  $("flag-message").hidden = true;
+  $("flag-note").value = "";
+}
+
+function wireReview() {
+  $("review-toggle").addEventListener("click", () => {
+    if (!$("review-body").hidden) loadReviewTab();
+  });
+  const tabs = ["queue", "hazards", "report"];
+  tabs.forEach((name, i) => {
+    const tab = $(`tab-${name}`);
+    tab.addEventListener("click", () => selectTab(name));
+    tab.addEventListener("keydown", (e) => {
+      const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      const next = tabs[(i + step + tabs.length) % tabs.length];
+      selectTab(next);
+      $(`tab-${next}`).focus();
+    });
+  });
+  ["review-status", "review-mine", "review-overdue"].forEach((id) => $(id).addEventListener("change", loadReviews));
+  $("report-days").addEventListener("change", loadReport);
+
+  $("case-assign").addEventListener("click", () => {
+    const value = $("case-assignee").value;
+    caseAction("assign", { user_id: value ? Number(value) : null }, null, value ? "Assigned." : "Unassigned.");
+  });
+  $("case-comment-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    caseAction("comment", { note: $("case-comment").value }, e.currentTarget, "Comment added.");
+  });
+  $("case-outcome").addEventListener("change", () => {
+    $("case-expected-field").hidden = $("case-outcome").value !== "add_test";
+  });
+  $("case-resolve-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const outcome = $("case-outcome").value;
+    caseAction("resolve", {
+      outcome, note: $("case-note").value,
+      expected_decision: outcome === "add_test" ? ($("case-expected").value || null) : null,
+    }, e.currentTarget, outcome === "add_test" ? "Resolved. The question is now a permanent test." : "Resolved.");
+  });
+  $("case-reopen-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    caseAction("reopen", { note: $("case-reopen-note").value }, e.currentTarget, "Reopened.");
+  });
+
+  document.querySelectorAll("#hazard-form select[data-scale]").forEach((select) => {
+    const labels = select.dataset.scale === "severity" ? SEVERITY : LIKELIHOOD;
+    for (let n = 1; n <= 5; n++) select.appendChild(new Option(`${n}  ${labels[n]}`, n));
+    select.addEventListener("change", updateHazardRisk);
+  });
+  $("hazard-add").addEventListener("click", () => openHazard(null));
+  $("hazard-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const body = {
+      title: $("hazard-title").value, cause: $("hazard-cause").value, effect: $("hazard-effect").value,
+      severity: +$("hazard-severity").value, likelihood: +$("hazard-likelihood").value,
+      controls: $("hazard-controls").value,
+      residual_severity: +$("hazard-residual-severity").value, residual_likelihood: +$("hazard-residual-likelihood").value,
+      status: $("hazard-status").value, owner: $("hazard-owner").value,
+    };
+    formBusy(form, true);
+    try {
+      const path = review.hazardId ? `/api/hazards/${review.hazardId}` : "/api/hazards";
+      await api(path, { method: review.hazardId ? "PUT" : "POST", body });
+      $("hazard-dialog").close();
+      showMessage("review-message", review.hazardId ? "Hazard updated." : "Hazard added.");
+      loadHazards();
+    } catch (err) { showMessage("hazard-message", err.message, true); }
+    formBusy(form, false);
+  });
+
+  $("review-tests-run").addEventListener("click", async (e) => {
+    const trigger = e.currentTarget;
+    trigger.disabled = true;
+    trigger.textContent = "Running…";
+    try {
+      const r = await api("/api/review-tests/run", { method: "POST" });
+      $("review-tests-summary").textContent = `${r.passed} of ${r.total} behaved as intended, ${r.unsafe_answers} unsafe answers.`;
+      $("review-tests-summary").classList.toggle("bad", r.passed < r.total);
+      renderReviewTestCases(r.cases);
+    } catch (err) { showMessage("review-message", err.message, true); }
+    trigger.disabled = false;
+    trigger.textContent = "Run tests";
+  });
+
+  $("flag-open").addEventListener("click", () => {
+    $("flag-open").hidden = true;
+    $("flag-form").hidden = false;
+    $("flag-message").hidden = true;
+    $("flag-note").focus();
+  });
+  $("flag-cancel").addEventListener("click", () => resetFlag($("flag-row").dataset.auditId));
+  $("flag-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    formBusy(form, true);
+    try {
+      await api(`/api/audit/${$("flag-row").dataset.auditId}/flag`, { method: "POST", body: { note: $("flag-note").value } });
+      form.hidden = true;
+      showMessage("flag-message", "Sent for review. A reviewer will check this answer.");
+    } catch (err) { showMessage("flag-message", err.message, true); }
+    formBusy(form, false);
+  });
+}
+
 // ---------- Collapsibles ----------
 function wireCollapsibles() {
   // The panel toggle must be wired first, so loaders below see it open.
   wireToggle("documents-toggle", "documents-body");
   wireDocuments();
+  wireToggle("review-toggle", "review-body");
+  wireReview();
   wireToggle("how-toggle", "how-body");
   wireToggle("tuning-toggle", "tuning-body");
   wireToggle("local-ai-toggle", "local-ai-body");

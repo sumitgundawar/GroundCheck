@@ -143,6 +143,118 @@
     </section>
   </dialog>
 
+  <!-- Review case -->
+  <dialog class="modal modal-wide" id="case-dialog" aria-labelledby="case-dialog-title">
+    <div class="modal-head">
+      <h2 id="case-dialog-title">Review case</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="case-query" id="case-query"></p>
+    <p class="modal-status" id="case-meta"></p>
+    <section class="modal-section" id="case-answer-section" hidden aria-labelledby="case-answer-title">
+      <h3 id="case-answer-title">What was shown</h3>
+      <p class="case-answer" id="case-answer"></p>
+      <p class="modal-status" id="case-sources"></p>
+    </section>
+    <section class="modal-section" id="case-work" aria-labelledby="case-work-title">
+      <h3 id="case-work-title">Work on this case</h3>
+      <div class="case-assign">
+        <label for="case-assignee">Assigned to</label>
+        <select id="case-assignee"></select>
+        <button type="button" class="btn btn-sm btn-ghost" id="case-assign">Assign</button>
+      </div>
+      <form class="case-form" id="case-comment-form" novalidate>
+        <label for="case-comment">Comment</label>
+        <textarea id="case-comment" rows="2" placeholder="What you checked, who you asked"></textarea>
+        <div><button type="submit" class="btn btn-sm btn-ghost">Add comment</button></div>
+      </form>
+      <form class="case-form" id="case-resolve-form" novalidate>
+        <label for="case-outcome">Outcome</label>
+        <select id="case-outcome" required></select>
+        <div class="case-expected" id="case-expected-field" hidden>
+          <label for="case-expected">The correct decision is to</label>
+          <select id="case-expected">
+            <option value="">Choose…</option>
+            <option value="refuse">Refuse</option>
+            <option value="answer">Answer</option>
+          </select>
+        </div>
+        <label for="case-note">Note <span class="optional">optional</span></label>
+        <textarea id="case-note" rows="2"></textarea>
+        <div><button type="submit" class="btn btn-sm btn-primary">Resolve case</button></div>
+      </form>
+    </section>
+    <section class="modal-section" id="case-closed" hidden>
+      <p class="modal-status" id="case-outcome-text"></p>
+      <form class="case-form" id="case-reopen-form" novalidate>
+        <label for="case-reopen-note">Reason for reopening</label>
+        <textarea id="case-reopen-note" rows="2"></textarea>
+        <div><button type="submit" class="btn btn-sm btn-ghost">Reopen case</button></div>
+      </form>
+    </section>
+    <section class="modal-section" aria-labelledby="case-timeline-title">
+      <h3 id="case-timeline-title">Timeline</h3>
+      <ol class="case-timeline" id="case-timeline"></ol>
+    </section>
+    <p class="modal-message" id="case-message" role="status" hidden></p>
+  </dialog>
+
+  <!-- Hazard -->
+  <dialog class="modal modal-wide" id="hazard-dialog" aria-labelledby="hazard-dialog-title">
+    <div class="modal-head">
+      <h2 id="hazard-dialog-title">Hazard</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <form class="hazard-form" id="hazard-form" novalidate>
+      <div class="upload-field hazard-wide">
+        <label for="hazard-title">Hazard</label>
+        <input id="hazard-title" required placeholder="e.g. An outdated protocol is cited">
+      </div>
+      <div class="upload-field">
+        <label for="hazard-cause">Cause</label>
+        <textarea id="hazard-cause" rows="2"></textarea>
+      </div>
+      <div class="upload-field">
+        <label for="hazard-effect">Effect on the patient</label>
+        <textarea id="hazard-effect" rows="2"></textarea>
+      </div>
+      <div class="upload-field hazard-wide">
+        <label for="hazard-controls">Controls</label>
+        <textarea id="hazard-controls" rows="3" placeholder="What prevents it or catches it"></textarea>
+      </div>
+      <fieldset class="risk-fieldset">
+        <legend>Before controls</legend>
+        <label for="hazard-severity">Severity</label>
+        <select id="hazard-severity" data-scale="severity"></select>
+        <label for="hazard-likelihood">Likelihood</label>
+        <select id="hazard-likelihood" data-scale="likelihood"></select>
+        <span class="risk-score" id="hazard-initial-risk"></span>
+      </fieldset>
+      <fieldset class="risk-fieldset">
+        <legend>After controls</legend>
+        <label for="hazard-residual-severity">Severity</label>
+        <select id="hazard-residual-severity" data-scale="severity"></select>
+        <label for="hazard-residual-likelihood">Likelihood</label>
+        <select id="hazard-residual-likelihood" data-scale="likelihood"></select>
+        <span class="risk-score" id="hazard-residual-risk"></span>
+      </fieldset>
+      <div class="upload-field">
+        <label for="hazard-status">Status</label>
+        <select id="hazard-status">
+          <option value="open">Open</option>
+          <option value="mitigated">Mitigated</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+      <div class="upload-field">
+        <label for="hazard-owner">Owner</label>
+        <input id="hazard-owner" placeholder="e.g. Clinical safety officer">
+      </div>
+      <div class="hazard-wide"><button type="submit" class="btn btn-primary" id="hazard-save">Save hazard</button></div>
+    </form>
+    <p class="modal-message" id="hazard-message" role="status" hidden></p>
+  </dialog>
+
   <!-- User management (admins) -->
   <dialog class="modal modal-wide" id="users-dialog" aria-labelledby="users-dialog-title">
     <div class="modal-head">
@@ -407,6 +519,87 @@
       </div>
     </section>
 
+    <!-- Review (collapsible) -->
+    <section class="panel collapsible review-panel" id="review-panel">
+      <button class="collapsible-toggle" id="review-toggle" aria-expanded="false">
+        <span class="eyebrow">Review</span>
+        <span class="local-ai-summary" id="review-summary">refusals, flagged answers and safety</span>
+        <span class="chevron">▸</span>
+      </button>
+      <div class="review-body" id="review-body" hidden>
+        <p class="tuning-hint">
+          Every refusal and every flagged answer waits here for a clinician to review.
+          Resolve a case as a test and the question is checked on every future run.
+        </p>
+        <div class="review-tabs" role="tablist" aria-label="Review">
+          <button type="button" role="tab" class="review-tab" id="tab-queue" aria-controls="review-queue" aria-selected="true">Queue</button>
+          <button type="button" role="tab" class="review-tab" id="tab-hazards" aria-controls="review-hazards" aria-selected="false" tabindex="-1">Hazard log</button>
+          <button type="button" role="tab" class="review-tab" id="tab-report" aria-controls="review-report" aria-selected="false" tabindex="-1">Report</button>
+        </div>
+        <p class="modal-message" id="review-message" role="status" hidden></p>
+
+        <div role="tabpanel" id="review-queue" aria-labelledby="tab-queue">
+          <div class="review-filters">
+            <label for="review-status">Show</label>
+            <select id="review-status">
+              <option value="open">Open cases</option>
+              <option value="resolved">Resolved cases</option>
+              <option value="all">All cases</option>
+            </select>
+            <label class="check"><input type="checkbox" id="review-mine"> Assigned to me</label>
+            <label class="check"><input type="checkbox" id="review-overdue"> Overdue only</label>
+          </div>
+          <div class="review-counts" id="review-counts"></div>
+          <div class="users-table-wrap">
+            <table class="users-table review-table">
+              <thead><tr><th scope="col">Question</th><th scope="col">Type</th><th scope="col">Asked</th><th scope="col">Due</th><th scope="col">Assigned</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+              <tbody id="review-rows"></tbody>
+            </table>
+          </div>
+          <p class="auth-hint" id="review-empty" hidden>Nothing to review.</p>
+        </div>
+
+        <div role="tabpanel" id="review-hazards" aria-labelledby="tab-hazards" hidden>
+          <div class="review-toolbar">
+            <p class="auth-hint">Risk is severity × likelihood, each scored 1 to 5. Highest remaining risk first.</p>
+            <button type="button" class="btn btn-sm btn-primary" id="hazard-add">Add hazard</button>
+          </div>
+          <div class="users-table-wrap">
+            <table class="users-table hazard-table">
+              <thead><tr><th scope="col">ID</th><th scope="col">Hazard</th><th scope="col">Before controls</th><th scope="col">After controls</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+              <tbody id="hazard-rows"></tbody>
+            </table>
+          </div>
+          <p class="auth-hint" id="hazard-empty" hidden>No hazards recorded yet.</p>
+        </div>
+
+        <div role="tabpanel" id="review-report" aria-labelledby="tab-report" hidden>
+          <div class="review-toolbar">
+            <div class="review-filters">
+              <label for="report-days">Period</label>
+              <select id="report-days">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="365">Last 12 months</option>
+              </select>
+            </div>
+            <a class="btn btn-sm btn-ghost" id="safety-case-download" href="/api/governance/safety-case?days=30" download>Download safety case</a>
+          </div>
+          <div class="report-grid" id="report-grid"></div>
+          <div class="report-reasons" id="report-reasons"></div>
+          <div class="review-tests">
+            <div class="review-toolbar">
+              <h3>Tests added from reviews</h3>
+              <button type="button" class="btn btn-sm btn-ghost" id="review-tests-run">Run tests</button>
+            </div>
+            <p class="auth-hint" id="review-tests-summary"></p>
+            <ul class="eval-cases" id="review-tests-list"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Local AI (collapsible) -->
     <section class="panel collapsible local-ai-panel" id="local-ai-panel">
       <button class="collapsible-toggle" id="local-ai-toggle" aria-expanded="false">
@@ -433,6 +626,18 @@
         <span class="decision-reason" id="decision-reason"></span>
       </div>
       <div class="answer-body" id="answer-body"></div>
+      <div class="flag-row" id="flag-row" hidden>
+        <button type="button" class="btn btn-sm btn-ghost" id="flag-open">Flag this answer for review</button>
+        <form class="case-form flag-form" id="flag-form" hidden novalidate>
+          <label for="flag-note">What looks wrong?</label>
+          <textarea id="flag-note" rows="2" placeholder="e.g. The dose doesn't match our renal guidance"></textarea>
+          <div class="flag-actions">
+            <button type="submit" class="btn btn-sm btn-primary">Send for review</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="flag-cancel">Cancel</button>
+          </div>
+        </form>
+        <p class="modal-message" id="flag-message" role="status" hidden></p>
+      </div>
       <div class="refuse-callout" id="refuse-callout" hidden>
         <span class="eyebrow">Why it refused</span>
         <p id="refuse-detail"></p>

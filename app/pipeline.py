@@ -91,8 +91,10 @@ def _finish(
         total_ms=timer.total_ms(),
         llm_used=llm_used,
     )
-    audit.store.save(audit_id, response, {k: v for k, v in extras.items() if k not in ("user_id", "review")},
-                     user_id=extras.get("user_id"))
+    saved = {k: v for k, v in extras.items() if k not in ("user_id", "review")}
+    if not extras.get("review", True):
+        saved["test_run"] = True  # kept in the audit trail, left out of usage reports
+    audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"))
     if decision == "refuse" and extras.get("review", True) and audit.store.backend() == "database":
         governance.record_refusal(audit_id, str(extras.get("redacted_query", "")), refused_reason or "")
     return response

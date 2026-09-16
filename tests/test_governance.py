@@ -166,6 +166,7 @@ def test_resolving_as_a_test_adds_a_permanent_evaluation_case(queue):
     result = governance.run_eval_cases()
     assert result == {**result, "total": 2, "passed": 2, "unsafe_answers": 0}
     assert _cases() == []  # running the tests opened no new cases
+    assert governance.report(1)["questions"]["total"] == 2  # and isn't counted as use
 
 
 # --- Hazard log --------------------------------------------------------------------

@@ -412,7 +412,8 @@ def report(days: int = 30) -> dict:
     now = utcnow()
     since = now - timedelta(days=days)
     with db.session() as s:
-        records = s.scalars(select(AuditRecord).where(AuditRecord.created_at >= since)).all()
+        records = [r for r in s.scalars(select(AuditRecord).where(AuditRecord.created_at >= since))
+                   if not r.record.get("test_run")]
         answered = sum(r.decision == "answer" for r in records)
         refused = len(records) - answered
         reasons: dict[str, int] = {}
