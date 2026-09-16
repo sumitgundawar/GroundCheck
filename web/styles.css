@@ -672,3 +672,64 @@ details[open] > .j-summary::before { content: "▾"; }
   .local-ai-model { grid-template-columns: minmax(0, 1fr); }
   .local-ai-model-actions { grid-column: 1; grid-row: auto; flex-wrap: wrap; }
 }
+
+/* ---------- Accounts ---------- */
+.account-menu { position: relative; }
+.account-button { cursor: pointer; font: inherit; font-size: 12px; background: var(--bg); }
+.account-button:hover { background: var(--bg-hover); }
+.account-dropdown {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 220px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: var(--space-2); display: grid;
+}
+.account-who { margin: 0; padding: var(--space-2) var(--space-3) var(--space-3); display: grid; gap: 2px;
+  border-bottom: 1px solid var(--border); margin-bottom: var(--space-2); font-size: 13px; }
+.account-role { color: var(--text-muted); font-size: 12px; text-transform: capitalize; }
+.account-item { text-align: left; font: inherit; font-size: 13.5px; background: none; border: 0; border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3); cursor: pointer; color: var(--text); }
+.account-item:hover, .account-item:focus-visible { background: var(--bg-hover); }
+
+.auth-screen { min-height: calc(100vh - 140px); display: grid; place-items: center; padding: var(--space-12) var(--space-6); }
+.auth-card { width: 100%; max-width: 400px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: var(--space-8); }
+.auth-title { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+.auth-lede { margin: var(--space-2) 0 var(--space-6); color: var(--text-secondary); font-size: 14px; }
+.auth-form { display: grid; gap: var(--space-2); }
+.auth-form label { font-size: 13px; font-weight: 500; margin-top: var(--space-2); }
+.auth-form input, .auth-form select, .users-table select {
+  font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); min-height: 38px;
+}
+.auth-form input:focus-visible, .auth-form select:focus-visible, .users-table select:focus-visible { outline: 2px solid var(--info); outline-offset: 1px; }
+.auth-form .btn { margin-top: var(--space-4); justify-content: center; }
+.auth-form .btn + .btn { margin-top: var(--space-2); }
+.auth-hint { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.auth-error { margin: var(--space-4) 0 0; padding: var(--space-3); border-radius: var(--radius-sm);
+  background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); font-size: 13.5px; }
+
+.modal { width: min(480px, calc(100vw - 32px)); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: var(--space-6); box-shadow: var(--shadow); color: var(--text); background: var(--bg); }
+.modal-wide { width: min(860px, calc(100vw - 32px)); }
+.modal::backdrop { background: rgba(0,0,0,0.35); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); }
+.modal-head h2 { margin: 0; font-size: 18px; }
+.modal-close { font: inherit; font-size: 22px; line-height: 1; background: none; border: 0; cursor: pointer; color: var(--text-muted);
+  width: 36px; height: 36px; border-radius: var(--radius-sm); }
+.modal-close:hover { background: var(--bg-hover); }
+.modal-section { padding: var(--space-4) 0; border-top: 1px solid var(--border); }
+.modal-section h3 { margin: 0 0 var(--space-2); font-size: 14px; }
+.modal-status { margin: 0 0 var(--space-3); color: var(--text-secondary); font-size: 13.5px; }
+.modal-message { margin: var(--space-3) 0 0; padding: var(--space-3); border-radius: var(--radius-sm); font-size: 13.5px;
+  background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok); }
+.modal-message.error { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.twofa-setup { display: grid; gap: var(--space-3); font-size: 13.5px; }
+.twofa-setup p { margin: 0; }
+.twofa-setup img { width: 200px; height: 200px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
+
+.users-table-wrap { overflow-x: auto; margin-bottom: var(--space-4); }
+.users-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.users-table th { text-align: left; font-weight: 500; color: var(--text-muted); font-size: 12px; padding: var(--space-2); border-bottom: 1px solid var(--border-strong); }
+.users-table td { padding: var(--space-2); border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+.users-table .user-name { font-weight: 500; }
+.users-table .user-email { font-size: 12px; color: var(--text-muted); }
+.add-user-form { max-width: 420px; }

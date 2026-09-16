@@ -28,6 +28,17 @@
           corpus: <span id="corpus-count">…</span>
         </span>
         <span class="tag-synthetic">synthetic demo</span>
+        <div class="account-menu" id="account-menu" hidden>
+          <button type="button" class="pill account-button" id="account-button" aria-expanded="false" aria-controls="account-dropdown">
+            <span id="account-label"></span>
+          </button>
+          <div class="account-dropdown" id="account-dropdown" hidden>
+            <p class="account-who"><span id="account-email"></span><span class="account-role" id="account-role"></span></p>
+            <button type="button" class="account-item" id="open-account">Account and security</button>
+            <button type="button" class="account-item" id="open-users" hidden>Users</button>
+            <button type="button" class="account-item" id="sign-out">Sign out</button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -37,7 +48,117 @@
     Synthetic demonstration data. All conditions, medications, and dosages are fictional. Not medical advice.
   </div>
 
-  <main class="container">
+  <!-- Sign-in: shown instead of the dashboard when accounts are required -->
+  <section class="auth-screen" id="auth-screen" hidden aria-labelledby="auth-title">
+    <div class="auth-card">
+      <h1 class="auth-title" id="auth-title">Sign in</h1>
+      <p class="auth-lede" id="auth-lede">Sign in to ask questions and review answers.</p>
+
+      <form class="auth-form" id="login-form" novalidate>
+        <label for="login-email">Email</label>
+        <input id="login-email" type="email" autocomplete="username" required>
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" autocomplete="current-password" required>
+        <button type="submit" class="btn btn-primary">Sign in</button>
+      </form>
+
+      <form class="auth-form" id="mfa-form" novalidate hidden>
+        <label for="mfa-code">6-digit code from your authenticator app</label>
+        <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="7" required>
+        <button type="submit" class="btn btn-primary">Verify</button>
+        <button type="button" class="btn btn-ghost" id="mfa-cancel">Use a different account</button>
+      </form>
+
+      <form class="auth-form" id="first-admin-form" novalidate hidden>
+        <label for="admin-name">Name</label>
+        <input id="admin-name" autocomplete="name">
+        <label for="admin-email">Email</label>
+        <input id="admin-email" type="email" autocomplete="username" required>
+        <label for="admin-password">Password</label>
+        <input id="admin-password" type="password" autocomplete="new-password" minlength="12" required>
+        <p class="auth-hint">At least 12 characters.</p>
+        <button type="submit" class="btn btn-primary">Create admin account</button>
+      </form>
+
+      <p class="auth-error" id="auth-error" role="alert" hidden></p>
+    </div>
+  </section>
+
+  <!-- Account settings -->
+  <dialog class="modal" id="account-dialog" aria-labelledby="account-dialog-title">
+    <div class="modal-head">
+      <h2 id="account-dialog-title">Account and security</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+
+    <section class="modal-section" aria-labelledby="password-title">
+      <h3 id="password-title">Change password</h3>
+      <form class="auth-form" id="password-form" novalidate>
+        <label for="current-password">Current password</label>
+        <input id="current-password" type="password" autocomplete="current-password" required>
+        <label for="new-password">New password</label>
+        <input id="new-password" type="password" autocomplete="new-password" minlength="12" required>
+        <button type="submit" class="btn btn-ghost">Change password</button>
+      </form>
+    </section>
+
+    <section class="modal-section" aria-labelledby="twofa-title">
+      <h3 id="twofa-title">Two-factor authentication</h3>
+      <p class="modal-status" id="twofa-status"></p>
+      <button type="button" class="btn btn-ghost" id="twofa-start" hidden>Turn on</button>
+      <div class="twofa-setup" id="twofa-setup" hidden>
+        <p>Scan this code with an authenticator app, then enter the 6-digit code it shows.</p>
+        <img id="twofa-qr" alt="QR code for your authenticator app" width="200" height="200">
+        <p class="auth-hint">Can’t scan? Enter this key: <code id="twofa-secret"></code></p>
+        <form class="auth-form" id="twofa-confirm-form" novalidate>
+          <label for="twofa-code">Code</label>
+          <input id="twofa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
+          <button type="submit" class="btn btn-primary">Confirm</button>
+        </form>
+      </div>
+      <form class="auth-form" id="twofa-disable-form" novalidate hidden>
+        <label for="twofa-disable-password">Password, to turn it off</label>
+        <input id="twofa-disable-password" type="password" autocomplete="current-password" required>
+        <button type="submit" class="btn btn-ghost">Turn off</button>
+      </form>
+    </section>
+    <p class="modal-message" id="account-message" role="status" hidden></p>
+  </dialog>
+
+  <!-- User management (admins) -->
+  <dialog class="modal modal-wide" id="users-dialog" aria-labelledby="users-dialog-title">
+    <div class="modal-head">
+      <h2 id="users-dialog-title">Users</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="users-table-wrap">
+      <table class="users-table">
+        <thead><tr><th scope="col">User</th><th scope="col">Role</th><th scope="col">2FA</th><th scope="col">Last sign-in</th><th scope="col">Status</th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
+    <section class="modal-section" aria-labelledby="add-user-title">
+      <h3 id="add-user-title">Add a user</h3>
+      <form class="auth-form add-user-form" id="add-user-form" novalidate>
+        <label for="new-user-name">Name</label>
+        <input id="new-user-name" autocomplete="off">
+        <label for="new-user-email">Email</label>
+        <input id="new-user-email" type="email" autocomplete="off" required>
+        <label for="new-user-password">Temporary password</label>
+        <input id="new-user-password" type="password" autocomplete="new-password" minlength="12" required>
+        <label for="new-user-role">Role</label>
+        <select id="new-user-role">
+          <option value="clinician">Clinician: asks questions</option>
+          <option value="reviewer">Reviewer: also reads the audit trail</option>
+          <option value="admin">Admin: also manages users and models</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Add user</button>
+      </form>
+    </section>
+    <p class="modal-message" id="users-message" role="status" hidden></p>
+  </dialog>
+
+  <main class="container" id="dashboard">
     <!-- Hero -->
     <section class="hero">
       <h1 class="hero-line">Grounded answers, or none at all.</h1>

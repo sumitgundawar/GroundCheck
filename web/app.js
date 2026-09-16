@@ -44,9 +44,19 @@ function refusalExplanation(reason) {
 }
 
 // ---------- Boot ----------
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   loadLogo();
-  loadHealth();
+  loadHealth(); // public, so the header is complete even on the sign-in screen
+  wireAccounts();
+  const ready = await checkSession();
+  if (ready) startDashboard();
+});
+
+let dashboardStarted = false;
+
+function startDashboard() {
+  if (dashboardStarted) return;
+  dashboardStarted = true;
   loadLocalAI();
   loadExamples();
   loadSettings();
@@ -55,7 +65,310 @@ document.addEventListener("DOMContentLoaded", () => {
   renderHowStages();
   wireForm();
   wireCollapsibles();
-});
+}
+
+// ---------- Accounts ----------
+const account = { user: null, authRequired: false };
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  let data = null;
+  try { data = await res.json(); } catch (_) { /* empty body */ }
+  if (res.status === 401 && account.authRequired && !path.startsWith("/api/auth/")) {
+    showAuthScreen("login", "Your session ended. Sign in again.");
+  }
+  if (!res.ok) {
+    const detail = data && typeof data.detail === "string" ? data.detail : `Request failed (${res.status}).`;
+    throw new Error(detail);
+  }
+  return data;
+}
+
+// Returns true when the dashboard can be shown.
+async function checkSession() {
+  let me;
+  try { me = await api("/api/auth/me"); }
+  catch (_) { return true; }
+  account.authRequired = me.auth_required;
+  account.user = me.user;
+  renderAccountMenu();
+  if (!me.auth_required || me.user) {
+    hideAuthScreen();
+    return true;
+  }
+  if (me.needs_first_admin) showAuthScreen("first-admin");
+  else if (me.mfa_pending) showAuthScreen("mfa");
+  else showAuthScreen("login");
+  return false;
+}
+
+function showAuthScreen(mode, message) {
+  const titles = {
+    login: ["Sign in", "Sign in to ask questions and review answers."],
+    mfa: ["Two-factor authentication", "Enter the code from your authenticator app to finish signing in."],
+    "first-admin": ["Create the first admin", "No accounts exist yet. The first account is an admin, who can add everyone else."],
+  };
+  $("dashboard").hidden = true;
+  $("auth-screen").hidden = false;
+  $("auth-title").textContent = titles[mode][0];
+  $("auth-lede").textContent = titles[mode][1];
+  $("login-form").hidden = mode !== "login";
+  $("mfa-form").hidden = mode !== "mfa";
+  $("first-admin-form").hidden = mode !== "first-admin";
+  setAuthError(message || "");
+  const first = { login: "login-email", mfa: "mfa-code", "first-admin": "admin-name" }[mode];
+  requestAnimationFrame(() => $(first).focus());
+}
+
+function hideAuthScreen() {
+  $("auth-screen").hidden = true;
+  $("dashboard").hidden = false;
+}
+
+function setAuthError(text) {
+  $("auth-error").textContent = text;
+  $("auth-error").hidden = !text;
+}
+
+async function signedIn(user) {
+  account.user = user;
+  renderAccountMenu();
+  hideAuthScreen();
+  startDashboard();
+}
+
+function renderAccountMenu() {
+  const user = account.user;
+  $("account-menu").hidden = !user;
+  if (!user) return;
+  $("account-label").textContent = user.name || user.email;
+  $("account-email").textContent = user.email;
+  $("account-role").textContent = user.role;
+  $("open-users").hidden = user.role !== "admin";
+}
+
+function formBusy(form, busy) {
+  form.querySelectorAll("button, input, select").forEach((el) => { el.disabled = busy; });
+}
+
+function wireAccounts() {
+  $("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    formBusy(form, true);
+    try {
+      const data = await api("/api/auth/login", { method: "POST", body: { email: $("login-email").value, password: $("login-password").value } });
+      $("login-password").value = "";
+      if (data.mfa_required) showAuthScreen("mfa");
+      else await signedIn(data.user);
+    } catch (err) { setAuthError(err.message); }
+    formBusy(form, false);
+  });
+
+  $("mfa-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    formBusy(form, true);
+    try {
+      const data = await api("/api/auth/mfa", { method: "POST", body: { code: $("mfa-code").value } });
+      $("mfa-code").value = "";
+      await signedIn(data.user);
+    } catch (err) { setAuthError(err.message); }
+    formBusy(form, false);
+  });
+
+  $("mfa-cancel").addEventListener("click", async () => {
+    await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+    showAuthScreen("login");
+  });
+
+  $("first-admin-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    formBusy(form, true);
+    try {
+      const data = await api("/api/auth/first-admin", { method: "POST", body: {
+        name: $("admin-name").value, email: $("admin-email").value, password: $("admin-password").value,
+      } });
+      $("admin-password").value = "";
+      await signedIn(data.user);
+    } catch (err) { setAuthError(err.message); }
+    formBusy(form, false);
+  });
+
+  // Account menu
+  const button = $("account-button"), dropdown = $("account-dropdown");
+  const setMenu = (open) => { dropdown.hidden = !open; button.setAttribute("aria-expanded", String(open)); };
+  button.addEventListener("click", () => setMenu(dropdown.hidden));
+  document.addEventListener("click", (e) => { if (!$("account-menu").contains(e.target)) setMenu(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setMenu(false); });
+
+  $("sign-out").addEventListener("click", async () => {
+    await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+    account.user = null;
+    if (account.authRequired) window.location.reload();
+    else { renderAccountMenu(); setMenu(false); }
+  });
+
+  $("open-account").addEventListener("click", () => { setMenu(false); openAccountDialog(); });
+  $("open-users").addEventListener("click", () => { setMenu(false); openUsersDialog(); });
+  document.querySelectorAll("dialog [data-close]").forEach((b) => b.addEventListener("click", () => b.closest("dialog").close()));
+
+  $("password-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    formBusy(form, true);
+    try {
+      await api("/api/auth/password", { method: "POST", body: { current_password: $("current-password").value, new_password: $("new-password").value } });
+      form.reset();
+      showMessage("account-message", "Password changed. Other sessions were signed out.");
+    } catch (err) { showMessage("account-message", err.message, true); }
+    formBusy(form, false);
+  });
+
+  $("twofa-start").addEventListener("click", async () => {
+    try {
+      const data = await api("/api/auth/mfa/setup", { method: "POST" });
+      $("twofa-qr").src = data.qr_svg_data_uri;
+      $("twofa-secret").textContent = data.secret;
+      $("twofa-setup").hidden = false;
+      $("twofa-start").hidden = true;
+      $("twofa-code").focus();
+    } catch (err) { showMessage("account-message", err.message, true); }
+  });
+
+  $("twofa-confirm-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget; // currentTarget is null once an await has run
+    try {
+      await api("/api/auth/mfa/confirm", { method: "POST", body: { code: $("twofa-code").value } });
+      account.user = { ...account.user, mfa_enabled: true };
+      form.reset();
+      renderTwoFactor();
+      showMessage("account-message", "Two-factor authentication is on.");
+    } catch (err) { showMessage("account-message", err.message, true); }
+  });
+
+  $("twofa-disable-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    try {
+      await api("/api/auth/mfa/disable", { method: "POST", body: { password: $("twofa-disable-password").value } });
+      account.user = { ...account.user, mfa_enabled: false };
+      form.reset();
+      renderTwoFactor();
+      showMessage("account-message", "Two-factor authentication is off.");
+    } catch (err) { showMessage("account-message", err.message, true); }
+  });
+
+  $("add-user-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    formBusy(form, true);
+    try {
+      await api("/api/users", { method: "POST", body: {
+        name: $("new-user-name").value, email: $("new-user-email").value,
+        password: $("new-user-password").value, role: $("new-user-role").value,
+      } });
+      form.reset();
+      await loadUsers();
+      showMessage("users-message", "User added. Share the temporary password with them securely.");
+    } catch (err) { showMessage("users-message", err.message, true); }
+    formBusy(form, false);
+  });
+}
+
+function showMessage(id, text, isError = false) {
+  const el = $(id);
+  el.textContent = text;
+  el.hidden = false;
+  el.classList.toggle("error", isError);
+}
+
+function renderTwoFactor() {
+  const on = !!account.user?.mfa_enabled;
+  $("twofa-status").textContent = on ? "On. You’ll be asked for a code when you sign in." : "Off.";
+  $("twofa-start").hidden = on;
+  $("twofa-setup").hidden = true;
+  $("twofa-disable-form").hidden = !on;
+}
+
+function openAccountDialog() {
+  $("account-message").hidden = true;
+  renderTwoFactor();
+  $("account-dialog").showModal();
+}
+
+async function openUsersDialog() {
+  $("users-message").hidden = true;
+  $("users-dialog").showModal();
+  await loadUsers();
+}
+
+async function loadUsers() {
+  const body = $("users-body");
+  let data;
+  try { data = await api("/api/users"); }
+  catch (err) { showMessage("users-message", err.message, true); return; }
+  body.textContent = "";
+  data.users.forEach((u) => {
+    const tr = document.createElement("tr");
+
+    const who = document.createElement("td");
+    const name = document.createElement("div");
+    name.className = "user-name";
+    name.textContent = u.name || u.email;
+    const email = document.createElement("div");
+    email.className = "user-email mono";
+    email.textContent = u.email;
+    who.append(name, email);
+
+    const roleCell = document.createElement("td");
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `Role for ${u.email}`);
+    ["clinician", "reviewer", "admin"].forEach((r) => {
+      const opt = document.createElement("option");
+      opt.value = r; opt.textContent = r; opt.selected = r === u.role;
+      select.appendChild(opt);
+    });
+    select.addEventListener("change", () => updateUser(u.id, { role: select.value }, () => { select.value = u.role; }));
+    roleCell.appendChild(select);
+
+    const mfa = document.createElement("td");
+    mfa.textContent = u.mfa_enabled ? "On" : "Off";
+
+    const last = document.createElement("td");
+    last.className = "mono";
+    last.textContent = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never";
+
+    const status = document.createElement("td");
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "btn btn-sm btn-ghost";
+    toggle.textContent = u.is_active ? "Deactivate" : "Reactivate";
+    toggle.disabled = account.user && u.id === account.user.id;
+    toggle.addEventListener("click", () => updateUser(u.id, { is_active: !u.is_active }));
+    status.append(document.createTextNode(u.is_active ? "Active " : "Inactive "), toggle);
+
+    tr.append(who, roleCell, mfa, last, status);
+    body.appendChild(tr);
+  });
+}
+
+async function updateUser(id, changes, revert) {
+  try {
+    await api(`/api/users/${id}`, { method: "PATCH", body: changes });
+    showMessage("users-message", "Saved.");
+  } catch (err) {
+    if (revert) revert();
+    showMessage("users-message", err.message, true);
+  }
+  await loadUsers();
+}
 
 async function loadLogo() {
   try { $("brand-mark").innerHTML = await (await fetch("/assets/logo.svg")).text(); }
