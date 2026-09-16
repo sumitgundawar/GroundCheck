@@ -1,4 +1,4 @@
-"""Embed the synthetic corpus and write the FAISS index + metadata.
+"""Embed the corpus into the configured vector store and write the metadata.
 
 Run from the repository root:
     python scripts/build_index.py

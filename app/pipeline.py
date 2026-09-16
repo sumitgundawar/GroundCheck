@@ -115,7 +115,7 @@ STAGE_EXPLAIN = {
         "burst of traffic cannot overwhelm the service.",
     "retrieve":
         "The query is embedded with a sentence-transformer and compared against "
-        "every document vector in the FAISS index. The top-k most similar "
+        "every document vector in the vector store, alongside a keyword search. The top-k "
         "passages are returned with cosine similarity scores.",
     "retrieval gate":
         "If even the best passage scores below the retrieval threshold, the "

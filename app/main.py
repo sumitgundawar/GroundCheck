@@ -1,5 +1,5 @@
 """FastAPI application: serves the static frontend and a small JSON API.
-The embedding model and FAISS index are loaded once at startup."""
+The embedding model and search index are loaded once at startup."""
 
 from __future__ import annotations
 

@@ -12,7 +12,7 @@ let lastRetrievedIds = [];
 // explainer shown before any question is asked.
 const PIPELINE_STAGES = [
   ["input guards", "Redact PII, reject injection and out-of-scope input, rate limit."],
-  ["embed + retrieve", "Embed the query and pull the top-k most similar passages from the FAISS index, with cosine scores."],
+  ["embed + retrieve", "Embed the query and rank passages by a blend of embedding similarity and keyword match, with cosine scores."],
   ["retrieval gate", "If the best passage is below threshold, refuse now, before any generation."],
   ["source coverage", "Check the question's entities actually appear in the retrieved sources."],
   ["generate", "LLM returns structured, cited claims. Extractive fallback if no LLM is available."],

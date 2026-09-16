@@ -21,7 +21,7 @@ RUN mkdir -p /home/user/.cache/huggingface /home/user/.cache/sentence-transforme
 
 USER user
 
-# Build the FAISS index at image build time so startup is instant and no runtime
+# Build the search index at image build time so startup is instant and no runtime
 # download is needed, then run the offline evaluation so the summary ships baked in.
 RUN python scripts/build_index.py && python scripts/run_eval.py
 

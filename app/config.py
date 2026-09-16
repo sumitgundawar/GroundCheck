@@ -60,6 +60,13 @@ LOCAL_AI_STATE_PATH = ROOT_DIR / _get("LOCAL_AI_STATE_PATH", "local_ai.json")
 # --- Embeddings + retrieval ------------------------------------------------
 EMBED_MODEL = _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 TOP_K = _get_int("TOP_K", 4)
+# Where embeddings are stored and searched: "local" (exact search in-process,
+# the default) or "qdrant" (a vector database; see app/vectorstore.py).
+VECTOR_STORE = _get("VECTOR_STORE", "local").lower()
+QDRANT_URL = _get("QDRANT_URL", "")            # server, e.g. http://localhost:6333
+QDRANT_PATH = _get("QDRANT_PATH", "")          # embedded on disk; default index/qdrant
+QDRANT_COLLECTION = _get("QDRANT_COLLECTION", "groundcheck")
+QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", "").strip()
 # Combine keyword (BM25) and embedding search. Keyword matching keeps rare,
 # look-alike names such as drug names from being confused with each other.
 HYBRID_RETRIEVAL = _get("HYBRID_RETRIEVAL", "true").lower() in ("1", "true", "yes")

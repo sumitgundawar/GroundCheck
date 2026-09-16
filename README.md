@@ -171,7 +171,7 @@ plain-English explanation, and stage-specific data). The whole pipeline is in
 question
   -> input guards     redact PII, check scope and injection, rate limit (per IP)
   -> embed query      sentence-transformers, all-MiniLM-L6-v2
-  -> retrieve         hybrid: FAISS embeddings + BM25 keywords, top-k passages
+  -> retrieve         hybrid: embedding search + BM25 keywords, top-k passages
                       ranked by a blend, reported with cosine scores
   -> retrieval gate   if top score < threshold: REFUSE now, before any generation
   -> source coverage  if a question term appears in no source: REFUSE
@@ -480,7 +480,7 @@ pip install -r requirements.txt
 python scripts/generate_corpus.py
 python scripts/generate_golden.py
 
-# build the FAISS index (downloads the embedding model once)
+# build the search index (downloads the embedding model once)
 python scripts/build_index.py
 
 # (optional) enable the live LLM; without this the app runs in extractive mode
@@ -527,7 +527,6 @@ test suite on every push and pull request.
 | --- | --- |
 | `FileNotFoundError` for the index on startup | Run `python scripts/build_index.py` first. The index is not committed. |
 | The first index build is slow or fails offline | It downloads `all-MiniLM-L6-v2` from Hugging Face once. Run it with network access, then it works offline. |
-| `faiss-cpu` fails to install | Use Python 3.11 or 3.12 with an up-to-date `pip`. On Windows, use Docker if the wheel is unavailable. |
 | The header shows `llm: extractive` although a key is set | Check that `FORCE_EXTRACTIVE` is not `true`, and that the key is exported in the same shell or set in `.env`. |
 | Every question is refused | Check you haven't raised `RETRIEVAL_MIN_SCORE` or `GROUNDING_MIN`, or switched the corpus without rebuilding the index. |
 | Refusals with a failed `rate limit` stage in the trace | You hit the per-IP rate limit. Raise `RATE_LIMIT_PER_MINUTE` for local testing or batch runs. |
@@ -537,7 +536,7 @@ test suite on every push and pull request.
 ## Deployment
 
 The app is one container that listens on the port given by `app_port` (7860 on
-Hugging Face Spaces). The FAISS index and evaluation are built inside the image,
+Hugging Face Spaces). The search index and evaluation are built inside the image,
 so startup is instant and no model download happens at runtime.
 
 It runs on Hugging Face Spaces (Docker SDK; the front matter at the top of this
@@ -566,7 +565,8 @@ groundcheck/
     config.py          settings and thresholds from the environment
     schemas.py         Pydantic request, response, settings, and LLM models
     pipeline.py        orchestration: retrieve -> guards -> decide -> audit
-    retrieval.py       embeddings, FAISS, corpus stats and 3D projection
+    retrieval.py       embeddings, hybrid search, corpus stats and 3D projection
+    vectorstore.py     vector stores: local (NumPy) and Qdrant
     guards_input.py    PII redaction, scope/injection, per-IP rate limit
     guards_output.py   coverage, grounding, dosage guards
     llm.py             Groq client, prompts, extractive fallback
@@ -575,7 +575,7 @@ groundcheck/
   scripts/
     generate_corpus.py  builds the synthetic corpus
     generate_golden.py  builds the golden evaluation set
-    build_index.py      embeds the corpus, writes the FAISS index
+    build_index.py      embeds the corpus into the configured vector store
     run_eval.py         runs the golden set and adversarial probes
   eval/
     golden.json         answerable and must-refuse cases
@@ -659,6 +659,6 @@ requires, is your responsibility.
 ## Credits
 
 Generation via Groq (Llama models). Embeddings via
-sentence-transformers (`all-MiniLM-L6-v2`). Vector search via FAISS. Corpus
+sentence-transformers (`all-MiniLM-L6-v2`). Vector search in NumPy or Qdrant. Corpus
 structured after MedQuAD and FDA / DailyMed labelling. Built to refuse rather
 than guess.

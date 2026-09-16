@@ -1,8 +1,9 @@
-"""Embeddings, FAISS and hybrid retrieval.
+"""Embeddings and hybrid retrieval.
 
-The embedding model is loaded once and reused. The FAISS index is built ahead of
-time by scripts/build_index.py and loaded at app startup. Vectors are
-L2-normalised, so the inner-product index returns cosine similarity directly.
+The embedding model is loaded once and reused. Document vectors are built ahead
+of time by scripts/build_index.py into the configured vector store (see
+app/vectorstore.py) and loaded at app startup. Vectors are L2-normalised, so an
+inner product is cosine similarity.
 
 Retrieval is hybrid by default. Embeddings capture meaning but blur rare,
 look-alike names (invented or real drug names), so a BM25 keyword index runs
@@ -19,17 +20,14 @@ from collections import Counter, defaultdict
 from functools import lru_cache
 from pathlib import Path
 
-import faiss
 import numpy as np
 
-from . import config
+from . import config, vectorstore
 
-# A parallel list of corpus records, populated when the index is loaded.
+# A parallel list of corpus records, populated when the index is loaded. Row i
+# of the vector store is _metadata[i].
 _metadata: list[dict] = []
-_index: faiss.Index | None = None
-# Document vectors (row i belongs to _metadata[i]), for cosine scores of
-# passages found by keyword search.
-_vectors: np.ndarray | None = None
+_store: "vectorstore.VectorStore | None" = None
 _lexical: "LexicalIndex | None" = None
 
 
@@ -61,18 +59,10 @@ def load_corpus() -> list[dict]:
 
 
 def build_index() -> None:
-    """Embed every corpus text and persist a FAISS index plus a metadata list."""
+    """Embed every corpus text into the configured vector store and write the
+    metadata that maps store rows to passages."""
     corpus = load_corpus()
-    texts = [record["text"] for record in corpus]
-    vectors = embed(texts)
-
-    dim = vectors.shape[1]
-    index = faiss.IndexFlatIP(dim)  # cosine on normalised vectors
-    index.add(vectors)
-
-    config.INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    faiss.write_index(index, str(config.INDEX_DIR / "corpus.faiss"))
-
+    vectors = embed([record["text"] for record in corpus])
     metadata = [
         {
             "id": r["id"],
@@ -84,6 +74,10 @@ def build_index() -> None:
         }
         for r in corpus
     ]
+    store = vectorstore.create()
+    store.build(vectors, [{"doc_id": m["id"], "title": m["title"]} for m in metadata])
+
+    config.INDEX_DIR.mkdir(parents=True, exist_ok=True)
     with open(config.INDEX_DIR / "metadata.json", "w", encoding="utf-8") as fh:
         json.dump(metadata, fh, indent=2)
 
@@ -109,24 +103,31 @@ def classify_kind(record: dict) -> str:
 
 
 def load_index() -> None:
-    """Load the prebuilt index and metadata into module state."""
-    global _index, _metadata
-    index_path = config.INDEX_DIR / "corpus.faiss"
+    """Open the vector store and load the metadata and keyword index."""
+    global _store, _metadata, _lexical
     meta_path = config.INDEX_DIR / "metadata.json"
-    if not index_path.exists() or not meta_path.exists():
+    store = vectorstore.create()
+    try:
+        store.load()
+    except FileNotFoundError as exc:
         raise FileNotFoundError(
-            "Index not found. Run scripts/build_index.py before starting the app."
-        )
-    global _vectors, _lexical
-    _index = faiss.read_index(str(index_path))
+            f"Index not found ({exc}). Run scripts/build_index.py before starting the app."
+        ) from exc
+    if not meta_path.exists():
+        raise FileNotFoundError("Index metadata not found. Run scripts/build_index.py before starting the app.")
     with open(meta_path, "r", encoding="utf-8") as fh:
-        _metadata = json.load(fh)
-    _vectors = _index.reconstruct_n(0, _index.ntotal)
+        metadata = json.load(fh)
+    if store.count() != len(metadata):
+        raise FileNotFoundError(
+            f"The {store.name} store has {store.count()} vectors but the metadata lists "
+            f"{len(metadata)} passages. Run scripts/build_index.py again."
+        )
+    _store, _metadata = store, metadata
     _lexical = LexicalIndex([f"{r['title']} {r['text']}" for r in _metadata])
 
 
 def _ensure_loaded() -> None:
-    if _index is None or not _metadata:
+    if _store is None or not _metadata:
         load_index()
 
 
@@ -193,26 +194,40 @@ def search(query: str, k: int | None = None,
     the highest-scoring one; callers that need the best score should take the
     maximum."""
     _ensure_loaded()
-    assert _index is not None and _vectors is not None and _lexical is not None
+    assert _store is not None and _lexical is not None
     k = k or config.TOP_K
     hybrid = config.HYBRID_RETRIEVAL if hybrid is None else hybrid
-    query_vec = embed([query])
+    query_vec = embed([query])[0]
 
     if not hybrid:
-        scores, idxs = _index.search(query_vec, min(k, len(_metadata)))
-        return [(_metadata[i], _cosine(s)) for s, i in zip(scores[0], idxs[0]) if i >= 0]
+        return [(_metadata[row], _cosine(score)) for row, score in _store.search(query_vec, k)]
 
-    # Score every passage: exact for a flat index, and cheap at corpus scale.
-    cosines = _vectors @ query_vec[0]
+    # Candidates: the nearest passages by meaning and the best by keywords.
+    # Every store can answer this, and at corpus scale it matches a full scan.
+    depth = max(_HYBRID_DEPTH, k * 25)
+    nearest = dict(_store.search(query_vec, depth))
     keyword = _lexical.scores(query)
+    by_keyword = [int(i) for i in np.argsort(-keyword)[:depth] if keyword[i] > 0]
+    missing = [row for row in by_keyword if row not in nearest]
+    if missing:
+        for row, vec in zip(missing, _store.vectors(missing)):
+            nearest[row] = float(np.dot(vec, query_vec))
+
+    rows = np.fromiter(nearest.keys(), dtype=int)
+    cosines = np.fromiter(nearest.values(), dtype="float32")
     peak = float(keyword.max())
-    keyword_norm = keyword / peak if peak > 0 else keyword
+    keyword_norm = keyword[rows] / peak if peak > 0 else keyword[rows]
     alpha = config.HYBRID_ALPHA
     blended = alpha * np.clip(cosines, 0.0, 1.0) + (1.0 - alpha) * keyword_norm
 
     # Ties break on cosine score, then corpus order, so results are stable.
-    order = np.lexsort((np.arange(len(blended)), -cosines, -blended))[:k]
-    return [(_metadata[int(i)], _cosine(cosines[i])) for i in order]
+    order = np.lexsort((rows, -cosines, -blended))[:k]
+    return [(_metadata[int(rows[i])], _cosine(cosines[i])) for i in order]
+
+
+# How many candidates hybrid search takes from each of embedding and keyword
+# search before blending.
+_HYBRID_DEPTH = 100
 
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
@@ -282,9 +297,8 @@ def corpus_projection(dims: int = 3) -> list[dict]:
     rather than re-embedding. Each axis is scaled independently into [-1, 1].
     Returns x, y, and (for 3D) z, so the frontend can render either."""
     _ensure_loaded()
-    assert _index is not None
-    n = _index.ntotal
-    vectors = _index.reconstruct_n(0, n)  # (n, dim), already L2-normalised
+    assert _store is not None
+    vectors = _store.vectors()  # (n, dim), already L2-normalised
 
     centred = vectors - vectors.mean(axis=0, keepdims=True)
     # Top principal directions via SVD on the centred matrix.
