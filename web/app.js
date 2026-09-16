@@ -168,8 +168,13 @@ function readSettings() {
 function isDefault() {
   if (!DEFAULTS) return true;
   const s = readSettings();
-  return Object.keys(s).every((k) => typeof s[k] === "number"
-    ? Math.abs(s[k] - DEFAULTS[k]) < 1e-9 : s[k] === DEFAULTS[k]);
+  return Object.keys(s).every((k) => {
+    // Without a live model the judge toggle is forced off and can't be changed,
+    // so it is not a user modification.
+    if (k === "use_llm_judge" && !llmAvailable) return true;
+    return typeof s[k] === "number"
+      ? Math.abs(s[k] - DEFAULTS[k]) < 1e-9 : s[k] === DEFAULTS[k];
+  });
 }
 
 function updateTuningStatus() {
