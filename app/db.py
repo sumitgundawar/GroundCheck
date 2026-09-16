@@ -1,0 +1,228 @@
+"""Database: engine, sessions, schema and migrations.
+
+GroundCheck stores users, sign-in sessions and audit records in a relational
+database through SQLAlchemy, so the same code runs on:
+
+- SQLite, the default: a single file, nothing to install
+- PostgreSQL: DATABASE_URL=postgresql+psycopg://user:pass@host/db
+- MySQL or MariaDB: DATABASE_URL=mysql+pymysql://user:pass@host/db
+
+The schema is managed with Alembic migrations in migrations/. On startup the
+app upgrades the database to the latest migration (DB_AUTO_MIGRATE=true), so a
+new install and an upgrade both need no manual step."""
+
+from __future__ import annotations
+
+import logging
+import threading
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Iterator
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    TypeDecorator,
+    create_engine,
+    event,
+)
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
+
+from . import config
+
+log = logging.getLogger("groundcheck.db")
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class UTCDateTime(TypeDecorator):
+    """Timezone-aware UTC timestamps on every backend. Values are converted to
+    UTC when written, and SQLite and MySQL, which drop timezone information,
+    get it back as UTC when read."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if isinstance(value, datetime):
+            value = value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            if dialect.name in ("sqlite", "mysql"):
+                value = value.replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if isinstance(value, datetime) and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="clinician")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    failed_logins: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+    sessions: Mapped[list["AuthSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class AuthSession(Base):
+    """A signed-in browser. Only a SHA-256 hash of the token is stored, so a
+    database leak doesn't hand out working sessions."""
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    # True until the second factor is verified, for users with MFA enabled.
+    mfa_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    ip_address: Mapped[str] = mapped_column(String(45), nullable=False, default="")
+    user_agent: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+
+    user: Mapped[User] = relationship(back_populates="sessions")
+
+    __table_args__ = (Index("ix_auth_sessions_user_id", "user_id"),)
+
+
+class AuditRecord(Base):
+    """One question and everything the pipeline did with it."""
+
+    __tablename__ = "audit_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    audit_id: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decision: Mapped[str] = mapped_column(String(10), nullable=False)
+    query: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    total_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    llm_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    record: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    __table_args__ = (
+        Index("ix_audit_records_created_at", "created_at"),
+        Index("ix_audit_records_user_id", "user_id"),
+    )
+
+
+# --------------------------------------------------------------------------
+# Engine and sessions
+# --------------------------------------------------------------------------
+
+_engine: Engine | None = None
+_sessionmaker: sessionmaker[Session] | None = None
+_lock = threading.Lock()
+
+
+def _make_engine(url: str) -> Engine:
+    kwargs: dict = {"future": True, "pool_pre_ping": True}
+    if url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+    engine = create_engine(url, **kwargs)
+    if url.startswith("sqlite"):
+        @event.listens_for(engine, "connect")
+        def _sqlite_pragmas(dbapi_connection, _record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.close()
+    return engine
+
+
+def engine() -> Engine:
+    global _engine, _sessionmaker
+    with _lock:
+        if _engine is None:
+            url = config.DATABASE_URL
+            if url.startswith("sqlite:///") and ":memory:" not in url:
+                # A relative SQLite path is relative to the repository root, and
+                # its folder is created if needed.
+                raw = url.removeprefix("sqlite:///")
+                path = Path(raw) if raw.startswith("/") else config.ROOT_DIR / raw
+                path.parent.mkdir(parents=True, exist_ok=True)
+                url = f"sqlite:///{path}"
+            _engine = _make_engine(url)
+            _sessionmaker = sessionmaker(bind=_engine, expire_on_commit=False, future=True)
+        return _engine
+
+
+def reset_engine() -> None:
+    """Forget the engine, so the next use reads DATABASE_URL again (tests)."""
+    global _engine, _sessionmaker
+    with _lock:
+        if _engine is not None:
+            _engine.dispose()
+        _engine, _sessionmaker = None, None
+
+
+@contextmanager
+def session() -> Iterator[Session]:
+    engine()
+    assert _sessionmaker is not None
+    s = _sessionmaker()
+    try:
+        yield s
+        s.commit()
+    except Exception:
+        s.rollback()
+        raise
+    finally:
+        s.close()
+
+
+def migrate() -> None:
+    """Upgrade the database to the latest migration."""
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(config.ROOT_DIR / "alembic.ini"))
+    cfg.set_main_option("script_location", str(config.ROOT_DIR / "migrations"))
+    with engine().begin() as connection:
+        cfg.attributes["connection"] = connection
+        command.upgrade(cfg, "head")
+
+
+_ready = False
+
+
+def ready() -> bool:
+    """Migrate once, on first use. Returns False (and the app runs without
+    persistence) if the database can't be reached or written."""
+    global _ready
+    if _ready:
+        return True
+    try:
+        if config.DB_AUTO_MIGRATE:
+            migrate()
+        _ready = True
+    except Exception as exc:  # noqa: BLE001 - any failure means no database
+        log.warning("Database unavailable, continuing without persistence: %s", exc)
+        _ready = False
+    return _ready

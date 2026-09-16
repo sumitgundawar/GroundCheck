@@ -8,3 +8,11 @@ openai==1.*
 httpx==0.27.*
 python-dotenv==1.*
 pytest==8.*
+sqlalchemy==2.0.*
+alembic==1.*
+argon2-cffi==25.*
+pyotp==2.*
+segno==1.*
+# Optional database drivers: install the one for your DATABASE_URL.
+#   PostgreSQL: psycopg[binary]==3.*
+#   MySQL/MariaDB: pymysql==1.*

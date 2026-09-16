@@ -91,7 +91,8 @@ def _finish(
         total_ms=timer.total_ms(),
         llm_used=llm_used,
     )
-    audit.store.save(audit_id, response, extras)
+    audit.store.save(audit_id, response, {k: v for k, v in extras.items() if k != "user_id"},
+                     user_id=extras.get("user_id"))
     return response
 
 
@@ -157,12 +158,12 @@ STAGE_EXPLAIN = {
 
 
 def run(raw_query: str, settings: "Settings | None" = None,
-        client_id: str = "global") -> AskResponse:
+        client_id: str = "global", user_id: int | None = None) -> AskResponse:
     # Effective settings: an explicit object, or the configured defaults.
     cfg = settings or Settings()
     timer = _Timer()
     trace: list[TraceStep] = []
-    extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump()}
+    extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump(), "user_id": user_id}
 
     # --- 1. Input guards ---------------------------------------------------
     if cfg.enable_pii_redaction:

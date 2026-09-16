@@ -8,13 +8,13 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audit, config, llm, local_ai, pipeline, retrieval
+from . import audit, auth, config, db, llm, local_ai, pipeline, retrieval
 from .schemas import AskRequest, AskResponse, Settings
 
 WEB_DIR = config.ROOT_DIR / "web"
@@ -31,19 +31,281 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="GroundCheck", version="1.0.0", lifespan=lifespan)
 
 
+# --- Accounts ---------------------------------------------------------------
+#
+# With AUTH_REQUIRED=false (the default, for the demo) every endpoint is open,
+# as before. With AUTH_REQUIRED=true, requests need a signed-in session and a
+# role: clinicians ask questions, reviewers also read the audit trail, and
+# admins also manage users and local AI models.
+
+SESSION_COOKIE = "gc_session"
+STATE_CHANGING = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _session_token(request: Request) -> str | None:
+    return request.cookies.get(SESSION_COOKIE)
+
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        SESSION_COOKIE, token, httponly=True, samesite="strict", path="/",
+        secure=config.SESSION_COOKIE_SECURE, max_age=int(config.SESSION_HOURS * 3600),
+    )
+
+
+@app.middleware("http")
+async def reject_cross_site_writes(request: Request, call_next):
+    """Refuse state-changing API requests sent from another site. The session
+    cookie is SameSite=Strict as well; this also covers older browsers."""
+    if request.method in STATE_CHANGING and request.url.path.startswith("/api/"):
+        origin = request.headers.get("origin")
+        if origin and origin.rstrip("/") != f"{request.url.scheme}://{request.url.netloc}":
+            forwarded_host = request.headers.get("x-forwarded-host")
+            if not (forwarded_host and origin.split("://", 1)[-1].rstrip("/") == forwarded_host):
+                return JSONResponse({"detail": "Cross-site request refused."}, status_code=403)
+    return await call_next(request)
+
+
+# Reachable without signing in, even when accounts are required.
+PUBLIC_API = {"/api/health", "/api/auth/me", "/api/auth/login", "/api/auth/mfa",
+              "/api/auth/logout", "/api/auth/first-admin"}
+
+
+@app.middleware("http")
+async def require_sign_in(request: Request, call_next):
+    """With accounts required, every API endpoint needs a signed-in session
+    unless it is listed as public. New endpoints are protected by default."""
+    path = request.url.path
+    if config.AUTH_REQUIRED and path.startswith("/api/") and path not in PUBLIC_API:
+        token = _session_token(request)
+        principal = await run_in_threadpool(auth.session_principal, token) if token and db.ready() else None
+        if principal is None:
+            return JSONResponse({"detail": "Sign in to continue."}, status_code=401)
+    return await call_next(request)
+
+
+def current_user(request: Request) -> auth.Principal | None:
+    """The signed-in user, or None. Raises 401 when accounts are required and
+    nobody is signed in."""
+    principal = auth.session_principal(_session_token(request)) if db.ready() else None
+    if principal is None and config.AUTH_REQUIRED:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    return principal
+
+
+def require_role(role: str):
+    def dependency(user: auth.Principal | None = Depends(current_user)) -> auth.Principal | None:
+        if config.AUTH_REQUIRED and (user is None or not user.can(role)):
+            raise HTTPException(status_code=403, detail="Your role doesn't allow this.")
+        return user
+    return dependency
+
+
+class SignInRequest(BaseModel):
+    email: str
+    password: str
+
+
+class CodeRequest(BaseModel):
+    code: str
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class PasswordRequest(BaseModel):
+    password: str
+
+
+class NewUserRequest(BaseModel):
+    email: str
+    password: str
+    role: str = "clinician"
+    name: str = ""
+
+
+class UserUpdateRequest(BaseModel):
+    role: str | None = None
+    is_active: bool | None = None
+    name: str | None = None
+    password: str | None = None
+
+
+def _auth_error(exc: auth.AuthError, status: int = 400) -> HTTPException:
+    return HTTPException(status_code=status, detail=str(exc))
+
+
+def _require_database() -> None:
+    if not db.ready():
+        raise HTTPException(status_code=503, detail="Accounts need a database, and it isn't available.")
+
+
+@app.get("/api/auth/me")
+def auth_me(request: Request) -> JSONResponse:
+    token = _session_token(request)
+    pending = None
+    principal = None
+    if db.ready() and token:
+        principal = auth.session_principal(token)
+        if principal is None:
+            pending = auth.session_principal(token, allow_mfa_pending=True)
+    return JSONResponse({
+        "auth_required": config.AUTH_REQUIRED,
+        "user": principal.__dict__ if principal else None,
+        "mfa_pending": pending is not None,
+        "needs_first_admin": db.ready() and auth.count_users() == 0,
+    })
+
+
+@app.post("/api/auth/login")
+def auth_login(body: SignInRequest, request: Request, response: Response) -> dict:
+    _require_database()
+    try:
+        result = auth.sign_in(body.email, body.password, ip=_client_ip(request),
+                              user_agent=request.headers.get("user-agent", ""))
+    except auth.AuthError as exc:
+        raise _auth_error(exc, 401) from exc
+    _set_session_cookie(response, result.token)
+    return {"mfa_required": result.mfa_required,
+            "user": None if result.mfa_required else result.principal.__dict__}
+
+
+@app.post("/api/auth/mfa")
+def auth_mfa(body: CodeRequest, request: Request) -> dict:
+    _require_database()
+    token = _session_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in again.")
+    try:
+        principal = auth.verify_mfa(token, body.code)
+    except auth.AuthError as exc:
+        raise _auth_error(exc, 401) from exc
+    return {"user": principal.__dict__}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(request: Request, response: Response) -> dict:
+    if db.ready():
+        auth.sign_out(_session_token(request))
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"signed_out": True}
+
+
+@app.post("/api/auth/first-admin")
+def auth_first_admin(body: NewUserRequest, request: Request, response: Response) -> dict:
+    """Create the first admin account. Only works while there are no users, and
+    only from this machine, so a new install can't be claimed remotely."""
+    _require_database()
+    if not _is_local_request(request):
+        raise HTTPException(status_code=403, detail="Create the first admin from the machine running GroundCheck.")
+    if auth.count_users() > 0:
+        raise HTTPException(status_code=409, detail="An admin already exists. Sign in instead.")
+    try:
+        auth.create_user(body.email, body.password, role="admin", name=body.name)
+        result = auth.sign_in(body.email, body.password, ip=_client_ip(request),
+                              user_agent=request.headers.get("user-agent", ""))
+    except auth.AuthError as exc:
+        raise _auth_error(exc) from exc
+    _set_session_cookie(response, result.token)
+    return {"user": result.principal.__dict__}
+
+
+def _signed_in(user: auth.Principal | None = Depends(current_user)) -> auth.Principal:
+    if user is None:
+        raise HTTPException(status_code=401, detail="Sign in to continue.")
+    return user
+
+
+@app.post("/api/auth/password")
+def auth_change_password(body: PasswordChangeRequest, request: Request, response: Response,
+                         user: auth.Principal = Depends(_signed_in)) -> dict:
+    try:
+        auth.set_password(user.id, body.new_password, current_password=body.current_password)
+        result = auth.sign_in(user.email, body.new_password, ip=_client_ip(request),
+                              user_agent=request.headers.get("user-agent", ""))
+    except auth.AuthError as exc:
+        raise _auth_error(exc) from exc
+    _set_session_cookie(response, result.token)
+    return {"changed": True, "mfa_required": result.mfa_required}
+
+
+@app.post("/api/auth/mfa/setup")
+def auth_mfa_setup(user: auth.Principal = Depends(_signed_in)) -> dict:
+    import segno
+
+    try:
+        setup = auth.begin_mfa_setup(user.id)
+    except auth.AuthError as exc:
+        raise _auth_error(exc) from exc
+    qr = segno.make(setup["otpauth_uri"], error="m").svg_data_uri(scale=5, border=2)
+    return {**setup, "qr_svg_data_uri": qr}
+
+
+@app.post("/api/auth/mfa/confirm")
+def auth_mfa_confirm(body: CodeRequest, user: auth.Principal = Depends(_signed_in)) -> dict:
+    try:
+        auth.confirm_mfa_setup(user.id, body.code)
+    except auth.AuthError as exc:
+        raise _auth_error(exc) from exc
+    return {"mfa_enabled": True}
+
+
+@app.post("/api/auth/mfa/disable")
+def auth_mfa_disable(body: PasswordRequest, user: auth.Principal = Depends(_signed_in)) -> dict:
+    try:
+        auth.disable_mfa(user.id, body.password)
+    except auth.AuthError as exc:
+        raise _auth_error(exc) from exc
+    return {"mfa_enabled": False}
+
+
+def _admin(user: auth.Principal | None = Depends(current_user)) -> auth.Principal:
+    if user is None or not user.can("admin"):
+        raise HTTPException(status_code=403, detail="Only admins can manage users.")
+    return user
+
+
+@app.get("/api/users")
+def users_list(_: auth.Principal = Depends(_admin)) -> dict:
+    return {"users": auth.list_users()}
+
+
+@app.post("/api/users")
+def users_create(body: NewUserRequest, _: auth.Principal = Depends(_admin)) -> dict:
+    try:
+        return {"user": auth.create_user(body.email, body.password, role=body.role, name=body.name).__dict__}
+    except auth.AuthError as exc:
+        raise _auth_error(exc) from exc
+
+
+@app.patch("/api/users/{user_id}")
+def users_update(user_id: int, body: UserUpdateRequest, admin: auth.Principal = Depends(_admin)) -> dict:
+    try:
+        if body.password is not None:
+            auth.set_password(user_id, body.password)
+        return {"user": auth.update_user(user_id, role=body.role, is_active=body.is_active,
+                                         name=body.name, acting_user_id=admin.id)}
+    except auth.AuthError as exc:
+        raise _auth_error(exc) from exc
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
 
 
 @app.post("/api/ask", response_model=AskResponse)
-def ask(body: AskRequest, request: Request) -> AskResponse:
+def ask(body: AskRequest, request: Request,
+        user: auth.Principal | None = Depends(require_role("clinician"))) -> AskResponse:
     # Rate limiting is keyed by client IP. Behind a proxy (Hugging Face, Render),
     # the real client is in X-Forwarded-For; fall back to the socket address.
     fwd = request.headers.get("x-forwarded-for", "")
     client_id = fwd.split(",")[0].strip() if fwd else (
         request.client.host if request.client else "global")
-    return pipeline.run(body.query, body.settings, client_id=client_id)
+    return pipeline.run(body.query, body.settings, client_id=client_id,
+                        user_id=user.id if user else None)
 
 
 @app.get("/api/settings")
@@ -82,20 +344,29 @@ def eval_summary() -> JSONResponse:
 
 
 @app.get("/api/audit")
-def list_audit() -> JSONResponse:
+def list_audit(user: auth.Principal | None = Depends(current_user)) -> JSONResponse:
     """Recent audit records (lightweight), most recent first. Persisted to disk,
     so this survives a restart."""
     return JSONResponse({
         "count": audit.store.count(),
-        "persisted": audit.store.persist,
-        "recent": audit.store.recent(20),
+        "persisted": audit.store.backend() is not None,
+        "backend": audit.store.backend(),
+        # Clinicians see their own questions; reviewers and admins see all.
+        "recent": audit.store.recent(20, user_id=_audit_scope(user)),
     })
 
 
+def _audit_scope(user: auth.Principal | None) -> int | None:
+    if config.AUTH_REQUIRED and user is not None and not user.can("reviewer"):
+        return user.id
+    return None
+
+
 @app.get("/api/audit/{audit_id}")
-def get_audit(audit_id: str) -> JSONResponse:
+def get_audit(audit_id: str, user: auth.Principal | None = Depends(current_user)) -> JSONResponse:
     record = audit.store.get(audit_id)
-    if record is None:
+    scope = _audit_scope(user)
+    if record is None or (scope is not None and record.get("user_id") != scope):
         raise HTTPException(status_code=404, detail="Audit record not found")
     return JSONResponse(record)
 
@@ -133,19 +404,27 @@ def _client_ip(request: Request) -> str:
     return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "")
 
 
+def _is_local_request(request: Request) -> bool:
+    host = _client_ip(request)
+    try:
+        return host == "testclient" or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def _require_local_ai_admin(request: Request) -> None:
     """Downloading and switching models changes the server for everyone, so by
-    default only requests from this machine may do it."""
+    default only requests from this machine may do it. With accounts required,
+    only admins may, from anywhere the policy allows."""
+    if config.AUTH_REQUIRED:
+        principal = auth.session_principal(_session_token(request)) if db.ready() else None
+        if principal is None or not principal.can("admin"):
+            raise HTTPException(status_code=403, detail="Only admins can manage local models.")
     policy = config.LOCAL_AI_ADMIN
     if policy == "all":
         return
-    if policy == "local":
-        host = _client_ip(request)
-        try:
-            if host == "testclient" or ipaddress.ip_address(host).is_loopback:
-                return
-        except ValueError:
-            pass
+    if policy == "local" and _is_local_request(request):
+        return
     raise HTTPException(status_code=403, detail="Managing local models is only allowed from this machine.")
 
 

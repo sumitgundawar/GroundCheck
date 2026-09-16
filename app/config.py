@@ -85,6 +85,24 @@ RATE_LIMIT_PER_MINUTE = _get_int("RATE_LIMIT_PER_MINUTE", 30)
 # public demo without spending the LLM quota; run the live model from localhost.
 FORCE_EXTRACTIVE = _get("FORCE_EXTRACTIVE", "false").lower() in ("1", "true", "yes")
 
+# --- Database ----------------------------------------------------------------
+# Users, sign-in sessions and audit records. SQLite by default; PostgreSQL and
+# MySQL are supported through their SQLAlchemy URLs (see app/db.py).
+DATABASE_URL = _get("DATABASE_URL", "sqlite:///data/groundcheck.db")
+DB_AUTO_MIGRATE = _get("DB_AUTO_MIGRATE", "true").lower() in ("1", "true", "yes")
+
+# --- Accounts ----------------------------------------------------------------
+# Off by default, so the demo works without an account. Set AUTH_REQUIRED=true
+# for any deployment with real users: every API call except health and sign-in
+# then needs a signed-in session, and actions are limited by role.
+AUTH_REQUIRED = _get("AUTH_REQUIRED", "false").lower() in ("1", "true", "yes")
+SESSION_HOURS = _get_float("SESSION_HOURS", 12.0)
+# Mark the session cookie Secure (HTTPS only). Leave on in production.
+SESSION_COOKIE_SECURE = _get("SESSION_COOKIE_SECURE", "true").lower() in ("1", "true", "yes")
+LOGIN_MAX_FAILURES = _get_int("LOGIN_MAX_FAILURES", 5)
+LOGIN_LOCKOUT_MINUTES = _get_float("LOGIN_LOCKOUT_MINUTES", 15.0)
+PASSWORD_MIN_LENGTH = _get_int("PASSWORD_MIN_LENGTH", 12)
+
 # --- Audit -----------------------------------------------------------------
 AUDIT_RING_SIZE = 50
 # Append-only audit log. Defaults to a writable path under the repo; override

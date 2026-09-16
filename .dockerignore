@@ -8,3 +8,4 @@ index/
 eval/eval_summary.json
 audit/
 local_ai.json
+data/groundcheck.db*
