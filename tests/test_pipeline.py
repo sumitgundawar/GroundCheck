@@ -183,3 +183,16 @@ def test_other_species_are_refused():
 ])
 def test_true_statements_and_word_endings_still_answer(query):
     assert pipeline.run(query, check_only=True).decision == "answer"
+
+
+@pytest.mark.parametrize("query, expect", [
+    # Doubled letters are a different word, not an English ending.
+    ("How is Sulsanaas Dysregulation treated?", "refuse"),
+    ("Tell me about Gedbasunnd Disorder.", "refuse"),
+    ("How is Sulsanas Dysregulation treated?", "answer"),
+    # Clinically equivalent question words still find their section.
+    ("How is Mendel Solution dosed?", "answer"),
+    ("When is Rispumirin prescribed?", "answer"),
+])
+def test_word_forms_are_matched_carefully(query, expect):
+    assert pipeline.run(query, check_only=True).decision == expect

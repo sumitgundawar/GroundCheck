@@ -158,17 +158,42 @@ def _stems(word: str) -> set[str]:
             out.add(stem)
             if stem.endswith("i"):          # therapies -> therapy
                 out.add(stem[:-1] + "y")
-            if len(stem) > 3 and stem[-1] == stem[-2]:   # stopped -> stop
+            # English doubles a final consonant before -ed and -ing (stop ->
+            # stopped). Anywhere else, a doubled letter is a different word,
+            # or a misspelling: "Sulsanaas" is not "Sulsanas".
+            if ending in ("ed", "ing") and len(stem) > 3 and stem[-1] == stem[-2] and stem[-1] not in "aeiou":
                 out.add(stem[:-1])
             out.add(stem + "e")             # dosed -> dose, managing -> manage
     return out
+
+
+# Words that ask for the same thing. A source that says "is given as 5 mL"
+# answers "how is it dosed?", and one headed "Indications" answers "when is it
+# prescribed?". Only ordinary clinical vocabulary is listed: never a name, so
+# a misspelled medicine can't be covered by a synonym.
+_SYNONYM_GROUPS = [
+    {"dose", "dosed", "dosing", "dosage", "doses", "administer", "administered", "administration", "given", "give",
+     "taken", "take"},
+    {"prescribe", "prescribed", "prescription", "indication", "indications", "indicated", "used", "use", "uses",
+     "usage", "treats", "treat"},
+    {"monitor", "monitored", "monitoring", "review", "reviewed", "check", "checked", "follow-up", "followup"},
+    {"side", "effects", "adverse", "reactions", "harms", "unwanted"},
+    {"interaction", "interactions", "interacts", "combined", "combination", "together", "with"},
+    {"contraindication", "contraindications", "contraindicated", "avoid", "avoided", "must", "not"},
+    {"symptom", "symptoms", "signs", "presentation", "presents", "features"},
+    {"cause", "causes", "caused", "aetiology", "etiology", "why"},
+    {"manage", "managed", "management", "treatment", "treated", "therapy", "care"},
+]
+_SYNONYMS = {word: group for group in _SYNONYM_GROUPS for word in group}
 
 
 def _covered(term: str, vocab: set[str]) -> bool:
     if term in vocab:
         return True
     term_stems = _stems(term)
-    return any(term_stems & _stems(word) for word in vocab if abs(len(word) - len(term)) <= 6 and word[:3] == term[:3])
+    if any(term_stems & _stems(word) for word in vocab if abs(len(word) - len(term)) <= 6 and word[:3] == term[:3]):
+        return True
+    return bool(_SYNONYMS.get(term, frozenset()) & vocab)
 
 
 # Qualifiers that change what a correct answer is. When one of these is
