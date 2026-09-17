@@ -3558,7 +3558,11 @@ function renderCdsCards(cards) {
     const tag = document.createElement("span"); tag.className = "finding-tag"; tag.textContent = { critical: "Critical", warning: "Warning", info: "Info" }[card.indicator];
     const summary = document.createElement("strong"); summary.textContent = card.summary;
     head.append(tag, summary);
-    const detail = document.createElement("p"); detail.textContent = card.detail.replace(/\*\*/g, "");
+    // The detail repeats the summary after naming the order, for EHRs that
+    // show only one of them. Here both are shown, so name the order once.
+    const plain = card.detail.replace(/\*\*/g, "");
+    const detail = document.createElement("p");
+    detail.textContent = plain.endsWith(card.summary) ? `Order: ${plain.slice(0, -card.summary.length).replace(/[:\s]+$/, "")}` : plain;
     const source = document.createElement("p"); source.className = "finding-meta mono"; source.textContent = card.source.label;
     el.append(head, detail, source);
     if (card.overrideReasons && card.overrideReasons.length) {

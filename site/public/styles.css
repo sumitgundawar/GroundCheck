@@ -574,6 +574,8 @@ code, .mono{ font-family: var(--font-mono); font-size: 0.9em; }
 }
 /* Keep the view list in reach while a tall screenshot scrolls past. */
 .tour.is-tabbed .tour-tabs{ position: sticky; top: calc(4.5rem + env(safe-area-inset-top, 0px)); }
+/* Thirteen views: only the chosen one shows its description, so the list fits beside the screenshot. */
+.tour.is-tabbed .tour-tab:not([aria-selected="true"]) .tour-tab-desc{ display: none; }
 
 .lightbox img{
   display: block;

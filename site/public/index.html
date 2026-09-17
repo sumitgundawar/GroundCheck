@@ -243,6 +243,10 @@
               <span class="tour-tab-title">See why it refused</span>
               <span class="tour-tab-desc">A plain-language reason, and the exact check that stopped it.</span>
             </button>
+            <button class="tour-tab" type="button" role="tab" id="tour-tab-patient" aria-controls="tour-panel-patient" aria-selected="false" tabindex="-1">
+              <span class="tour-tab-title">Check it against the patient</span>
+              <span class="tour-tab-desc">Allergies, interactions and kidney function can stop an answer.</span>
+            </button>
             <button class="tour-tab" type="button" role="tab" id="tour-tab-evidence" aria-controls="tour-panel-evidence" aria-selected="false" tabindex="-1">
               <span class="tour-tab-title">Inspect the evidence</span>
               <span class="tour-tab-desc">Retrieved passages with scores, next to every stage of the run.</span>
@@ -262,6 +266,14 @@
             <button class="tour-tab" type="button" role="tab" id="tour-tab-model" aria-controls="tour-panel-model" aria-selected="false" tabindex="-1">
               <span class="tour-tab-title">Use a trained model</span>
               <span class="tour-tab-desc">Accuracy per class, and it abstains when unsure.</span>
+            </button>
+            <button class="tour-tab" type="button" role="tab" id="tour-tab-imaging" aria-controls="tour-panel-imaging" aria-selected="false" tabindex="-1">
+              <span class="tour-tab-title">Read CT and MRI</span>
+              <span class="tour-tab-desc">De-identified series, a model that abstains, and a signed report.</span>
+            </button>
+            <button class="tour-tab" type="button" role="tab" id="tour-tab-ehr" aria-controls="tour-panel-ehr" aria-selected="false" tabindex="-1">
+              <span class="tour-tab-title">Check orders in the EHR</span>
+              <span class="tour-tab-desc">CDS Hooks cards with the rule behind them, when a medicine is ordered.</span>
             </button>
             <button class="tour-tab" type="button" role="tab" id="tour-tab-protection" aria-controls="tour-panel-protection" aria-selected="false" tabindex="-1">
               <span class="tour-tab-title">Protect the data</span>
@@ -295,6 +307,14 @@
                 <a class="lightbox-link" href="/screenshots/refusal.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/refusal-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/refusal.webp" width="1056" height="677" loading="lazy" decoding="async" alt="A refused question about a 5-year-old. The reason says no trusted source covers children, and the pipeline trace shows the source coverage check failing."></picture></a>
               </div>
               <figcaption><strong>See why it refused.</strong> A plain-language reason, and the exact check that stopped it.</figcaption>
+            </figure>
+            </div>
+            <div class="tour-panel" role="tabpanel" id="tour-panel-patient" aria-labelledby="tour-tab-patient">
+              <figure class="tour-figure">
+              <div class="lightbox">
+                <a class="lightbox-link" href="/screenshots/patient.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/patient-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/patient.webp" width="1040" height="422" loading="lazy" decoding="async" alt="A refused question about Caloradine for an 87-year-old taking Tessorin. Two checks are unsafe: the combination is contraindicated, and the creatinine clearance of 21.4 is below the limit."></picture></a>
+              </div>
+              <figcaption><strong>Check it against the patient.</strong> Allergies, interactions and kidney function can stop an answer.</figcaption>
             </figure>
             </div>
             <div class="tour-panel" role="tabpanel" id="tour-panel-evidence" aria-labelledby="tour-tab-evidence">
@@ -335,6 +355,22 @@
                 <a class="lightbox-link" href="/screenshots/model.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/model-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/model.webp" width="860" height="864" loading="lazy" decoding="async" alt="A model card for the abdominal CT organ classifier: a CT slice classified as liver, with 96.3% accuracy on 17,778 test images and per-class figures."></picture></a>
               </div>
               <figcaption><strong>Use a trained model.</strong> Accuracy per class, and it abstains when unsure.</figcaption>
+            </figure>
+            </div>
+            <div class="tour-panel" role="tabpanel" id="tour-panel-imaging" aria-labelledby="tour-tab-imaging">
+              <figure class="tour-figure">
+              <div class="lightbox">
+                <a class="lightbox-link" href="/screenshots/imaging.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/imaging-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/imaging.webp" width="1440" height="900" loading="lazy" decoding="async" alt="The CT and MRI page: an axial slice of a public abdominal CT in a dark viewer with orientation letters, the model abstaining because 78% of image regions were unlike its training images, and a signed report."></picture></a>
+              </div>
+              <figcaption><strong>Read CT and MRI.</strong> De-identified series, a model that abstains, and a signed report.</figcaption>
+            </figure>
+            </div>
+            <div class="tour-panel" role="tabpanel" id="tour-panel-ehr" aria-labelledby="tour-tab-ehr">
+              <figure class="tour-figure">
+              <div class="lightbox">
+                <a class="lightbox-link" href="/screenshots/ehr.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/ehr-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/ehr.webp" width="1040" height="740" loading="lazy" decoding="async" alt="A CDS Hooks request for Caloradine 15 mg and the cards returned: a critical card saying the dose is too high for an eGFR of 41, with the formulary rule and override reasons, and a warning about an interaction."></picture></a>
+              </div>
+              <figcaption><strong>Check orders in the EHR.</strong> CDS Hooks cards with the rule behind them, when a medicine is ordered.</figcaption>
             </figure>
             </div>
             <div class="tour-panel" role="tabpanel" id="tour-panel-protection" aria-labelledby="tour-tab-protection">
@@ -748,6 +784,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
           <li><strong>Synthetic tuning</strong>Thresholds need re-tuning for real documents.</li>
           <li><strong>Self-referential tests</strong>Answerable cases come from the corpus itself.</li>
           <li><strong>Text-layer documents only</strong>Scanned PDFs need OCR before import.</li>
+          <li><strong>Demonstration imaging models</strong>Trained on small public datasets, they abstain on most real scans.</li>
           <li><strong>Not a certified device</strong>Safety reports support your own clinical safety sign-off.</li>
         </ul>
       </div>
@@ -906,21 +943,21 @@ docker run -p 7860:7860 groundcheck</code></pre>
             </details>
           </li>
 
-          <li class="phase-card spotlight" data-state="planned">
+          <li class="phase-card spotlight" data-state="available">
             <div class="phase-head">
               <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#scan-line"/></svg></span>
-              <span class="state">Planned</span>
+              <span class="state">Available now</span>
             </div>
             <h3>CT and MRI imaging</h3>
             <p class="phase-goal">Apply the same principle to scans: show the evidence, or abstain.</p>
             <details class="phase-details">
               <summary>What’s included</summary>
               <ul>
-                <li>DICOM and DICOMweb intake from PACS, with de-identification</li>
-                <li>Pluggable models for CT and MRI tasks, such as segmentation and triage</li>
-                <li>Abstention on unfamiliar scanners, protocols or low-confidence results</li>
-                <li>Findings tied to image regions, a radiologist sign-off step, and DICOM Structured Reports</li>
-                </ul>
+                <li>DICOM upload, and PACS search and retrieval over DICOMweb, de-identified on import to the DICOM PS3.15 profile</li>
+                <li>A viewer with CT windows, standard orientation, and model regions slice by slice</li>
+                <li>Models that refuse the wrong modality and abstain on series unlike their training images</li>
+                <li>Clinician sign-off with amendments, exported as DICOM Structured Reports and sent back to the PACS</li>
+              </ul>
             </details>
           </li>
 
@@ -994,7 +1031,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
             <li><svg class="i" aria-hidden="true"><use href="/icons.svg#ban"/></svg>Abstain below a confidence threshold, and on unfamiliar images</li>
             <li><svg class="i" aria-hidden="true"><use href="/icons.svg#database"/></svg>Save to a model library you can copy to another machine</li>
           </ol>
-          <p class="fineprint">DICOM and NIfTI input, 3D volumes and using models in the answer pipeline are planned.</p>
+          <p class="fineprint">Run a trained model over whole CT and MRI series on the CT and MRI page. NIfTI input and 3D models are planned.</p>
         </div>
 
         <figure class="device-picker" aria-labelledby="device-picker-caption">
@@ -1110,7 +1147,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
           </details>
           <details>
             <summary>Does it analyse CT or MRI scans yet?</summary>
-            <p>You can train classifiers on CT and MRI slices exported as images. Reading DICOM and NIfTI directly, 3D volumes, and findings tied to image regions are planned.</p>
+            <p>Yes, as a research and evaluation workflow. Import DICOM series by upload or from a PACS, run a model trained in the studio over them, and sign a report that exports as a DICOM Structured Report. Models abstain on series unlike their training images: the demonstration CT model, trained on small public organ crops, abstains on real abdominal CT. No model here is validated for diagnosis. NIfTI input and 3D models are planned.</p>
           </details>
         </div>
       </div>
