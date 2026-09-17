@@ -24,6 +24,9 @@
     <symbol id="i-sliders-horizontal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" /></symbol>
     <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></symbol>
     <symbol id="i-network" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1" /> <rect x="2" y="16" width="6" height="6" rx="1" /> <rect x="9" y="2" width="6" height="6" rx="1" /> <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" /> <path d="M12 12V8" /></symbol>
+    <symbol id="i-brain-circuit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M9 13a4.5 4.5 0 0 0 3-4" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M12 13h4" /> <path d="M12 18h6a2 2 0 0 1 2 2v1" /> <path d="M12 8h8" /> <path d="M16 8V5a2 2 0 0 1 2-2" /> <circle cx="16" cy="13" r=".5" /> <circle cx="18" cy="3" r=".5" /> <circle cx="20" cy="21" r=".5" /> <circle cx="20" cy="8" r=".5" /></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
+    <symbol id="i-folder-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   </svg>
@@ -237,6 +240,57 @@
     <p class="modal-message" id="hazard-message" role="status" hidden></p>
   </dialog>
 
+  <!-- Folder browser -->
+  <dialog class="modal modal-wide" id="browse-dialog" aria-labelledby="browse-title">
+    <div class="modal-head">
+      <h2 id="browse-title">Choose a folder</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="browse-path mono" id="browse-path"></p>
+    <ul class="browse-list" id="browse-list"></ul>
+    <p class="modal-message" id="browse-message" role="status" hidden></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="browse-use">Use this folder</button>
+    </div>
+  </dialog>
+
+  <!-- Model details and trying a model -->
+  <dialog class="modal modal-wide" id="model-dialog" aria-labelledby="model-dialog-title">
+    <div class="modal-head">
+      <h2 id="model-dialog-title">Model</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="modal-status" id="model-meta"></p>
+    <section class="modal-section" aria-labelledby="try-title">
+      <h3 id="try-title">Try it on an image</h3>
+      <div class="try-row">
+        <label class="drop-zone" id="try-drop" for="try-file">
+          <input type="file" id="try-file" accept="image/png,image/jpeg,image/bmp,image/tiff,image/webp">
+          <img id="try-preview" alt="" hidden>
+          <span id="try-hint">Choose or drop an image</span>
+        </label>
+        <div class="try-result" id="try-result" aria-live="polite"></div>
+      </div>
+    </section>
+    <section class="modal-section" aria-labelledby="model-perf-title">
+      <h3 id="model-perf-title">How it performed</h3>
+      <div class="stat-grid" id="model-stats"></div>
+      <div class="users-table-wrap">
+        <table class="users-table class-table">
+          <thead><tr><th scope="col">Class</th><th scope="col">Images</th><th scope="col">Sensitivity</th><th scope="col">Specificity</th><th scope="col">Precision</th><th scope="col">AUC</th></tr></thead>
+          <tbody id="model-classes"></tbody>
+        </table>
+      </div>
+      <h3 class="subhead">Confusion matrix <span class="chart-note">rows are the true class, columns the prediction</span></h3>
+      <div class="confusion-wrap" id="model-confusion"></div>
+    </section>
+    <section class="modal-section" aria-labelledby="model-train-title">
+      <h3 id="model-train-title">Training</h3>
+      <dl class="protection-list" id="model-training"></dl>
+    </section>
+  </dialog>
+
   <div class="app" id="dashboard">
     <!-- Navigation: a sidebar on wide screens, a drawer on narrow ones -->
     <aside class="sidebar" id="sidebar" aria-label="GroundCheck">
@@ -278,6 +332,18 @@
           <a class="nav-link" href="#/embeddings" data-view="embeddings">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-network"/></svg>
             <span>Embeddings</span>
+          </a>
+        </div>
+        <div class="nav-group">
+          <p class="nav-label">Imaging</p>
+          <a class="nav-link" href="#/training" data-view="training">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-brain-circuit"/></svg>
+            <span>Training</span>
+            <span class="nav-count nav-live" id="nav-training-live" hidden>live</span>
+          </a>
+          <a class="nav-link" href="#/models" data-view="models">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-layers"/></svg>
+            <span>Model library</span>
           </a>
         </div>
         <div class="nav-group" id="nav-admin">
@@ -820,6 +886,153 @@
         </div>
       </section>
 
+        </section>
+
+        <!-- Training -->
+        <section class="view" id="view-training" data-title="Training" aria-labelledby="training-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title" id="training-title">Training</h1>
+            <p class="page-sub">Train an image classifier on a folder of your own images, on this machine’s GPU. The model is saved to the library, with its accuracy and the confidence below which it refuses to answer.</p>
+          </div>
+        </header>
+          <p class="modal-message" id="training-message" role="status" hidden></p>
+
+          <section class="panel run-live" id="run-live" hidden aria-live="polite">
+            <div class="run-live-head">
+              <div>
+                <h2 class="panel-heading" id="run-live-name">Training</h2>
+                <p class="run-live-status" id="run-live-status"></p>
+              </div>
+              <div class="document-actions">
+                <button type="button" class="btn btn-sm btn-primary" id="run-resume" hidden>Resume training</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="run-cancel">Cancel training</button>
+              </div>
+            </div>
+            <div class="run-progress" role="progressbar" aria-labelledby="run-live-name" aria-valuemin="0" aria-valuemax="100" id="run-progressbar">
+              <span id="run-progress-fill"></span>
+            </div>
+            <div class="stat-grid run-stats" id="run-stats"></div>
+            <div class="run-charts">
+              <div>
+                <h3 class="chart-title">Loss <span class="chart-note">lower is better</span></h3>
+                <div class="chart line-chart" id="chart-loss"></div>
+              </div>
+              <div>
+                <h3 class="chart-title">Accuracy</h3>
+                <div class="chart line-chart" id="chart-accuracy"></div>
+              </div>
+            </div>
+            <div class="legend">
+              <span><i class="swatch swatch-answered"></i>Training images</span>
+              <span><i class="swatch swatch-val"></i>Validation images</span>
+            </div>
+            <p class="run-result" id="run-result" hidden></p>
+          </section>
+
+          <form class="train-form" id="train-form" novalidate>
+            <section class="panel train-step" aria-labelledby="step-data-title">
+              <h2 class="step-title" id="step-data-title"><span class="step-num">1</span>Choose a folder of images</h2>
+              <p class="step-sub">One subfolder per class, such as <code>normal/</code> and <code>abnormal/</code>, or <code>train/</code>, <code>val/</code> and <code>test/</code> folders each holding class subfolders.</p>
+              <div class="folder-row">
+                <label class="visually-hidden" for="train-dataset">Folder</label>
+                <input id="train-dataset" class="text-input mono" placeholder="data/datasets/organamnist-64" autocomplete="off" spellcheck="false">
+                <button type="button" class="btn btn-ghost" id="train-browse">
+                  <svg class="btn-icon" aria-hidden="true"><use href="#i-folder-open"/></svg>Browse
+                </button>
+                <button type="button" class="btn btn-ghost" id="train-scan">Check folder</button>
+              </div>
+              <div class="dataset-summary" id="dataset-summary" hidden></div>
+            </section>
+
+            <section class="panel train-step" aria-labelledby="step-hw-title">
+              <h2 class="step-title" id="step-hw-title"><span class="step-num">2</span>Choose where to train</h2>
+              <p class="step-sub" id="hw-sub">Checking this machine’s hardware…</p>
+              <div class="device-list" id="device-list" role="radiogroup" aria-labelledby="step-hw-title"></div>
+            </section>
+
+            <section class="panel train-step" aria-labelledby="step-settings-title">
+              <h2 class="step-title" id="step-settings-title"><span class="step-num">3</span>Name the model and set how it trains</h2>
+              <div class="settings-grid">
+                <div class="field field-wide">
+                  <label for="train-name">Model name</label>
+                  <input id="train-name" class="text-input" placeholder="e.g. Abdominal CT organ classifier" maxlength="80">
+                </div>
+                <div class="field field-wide">
+                  <span class="field-label" id="arch-label">Architecture</span>
+                  <div class="arch-list" id="arch-list" role="radiogroup" aria-labelledby="arch-label"></div>
+                  <label class="check" id="pretrained-row" hidden><input type="checkbox" id="train-pretrained"> Start from ImageNet weights (downloads 45 MB once; check their terms for commercial use)</label>
+                </div>
+                <div class="field">
+                  <label for="train-epochs">Epochs</label>
+                  <input id="train-epochs" class="text-input" type="number" min="1" max="300" value="15">
+                  <span class="field-hint">Passes over the training images. Stops early when validation stops improving.</span>
+                </div>
+                <div class="field">
+                  <label for="train-size">Image size</label>
+                  <select id="train-size" class="select"></select>
+                  <span class="field-hint">Images are resized to this square. Larger is slower.</span>
+                </div>
+                <details class="field field-wide advanced">
+                  <summary>Advanced settings</summary>
+                  <div class="settings-grid">
+                    <div class="field">
+                      <label for="train-batch">Batch size</label>
+                      <input id="train-batch" class="text-input" type="number" min="1" max="1024">
+                    </div>
+                    <div class="field">
+                      <label for="train-lr">Learning rate</label>
+                      <input id="train-lr" class="text-input" type="number" min="0.000001" max="1" step="any">
+                    </div>
+                    <div class="field">
+                      <label for="train-val">Validation share</label>
+                      <input id="train-val" class="text-input" type="number" min="0.05" max="0.4" step="0.01" value="0.15">
+                      <span class="field-hint">Used when the folder has no val folder.</span>
+                    </div>
+                    <div class="field">
+                      <label for="train-test">Test share</label>
+                      <input id="train-test" class="text-input" type="number" min="0" max="0.4" step="0.01" value="0.15">
+                      <span class="field-hint">Used when the folder has no test folder.</span>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </section>
+
+            <div class="train-submit">
+              <button type="submit" class="btn btn-primary btn-lg" id="train-start">Start training</button>
+              <span class="field-hint" id="train-submit-hint"></span>
+            </div>
+          </form>
+
+          <section class="panel" aria-labelledby="runs-title">
+            <h2 class="panel-heading" id="runs-title">Training runs</h2>
+            <div class="users-table-wrap">
+              <table class="users-table runs-table">
+                <thead><tr><th scope="col">Model</th><th scope="col">Status</th><th scope="col">Hardware</th><th scope="col">Started</th><th scope="col">Result</th></tr></thead>
+                <tbody id="runs-rows"></tbody>
+              </table>
+            </div>
+            <p class="auth-hint" id="runs-empty" hidden>No training runs yet.</p>
+          </section>
+        </section>
+
+        <!-- Model library -->
+        <section class="view" id="view-models" data-title="Model library" aria-labelledby="models-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title" id="models-title">Model library</h1>
+            <p class="page-sub">Trained models, ready to use. Each abstains when it isn’t confident enough, or when an image doesn’t look like what it was trained on. <span class="page-stat" id="models-summary"></span></p>
+          </div>
+          <div class="page-actions"><a class="btn btn-ghost" href="#/training" id="models-train-link">Train a model</a></div>
+        </header>
+          <p class="modal-message" id="models-message" role="status" hidden></p>
+          <div class="model-grid" id="model-grid"></div>
+          <div class="empty-state" id="models-empty" hidden>
+            <h2>No models yet</h2>
+            <p>Train one on a folder of images. To try it first, download a public CT dataset:</p>
+            <pre><code>python scripts/fetch_scan_dataset.py organamnist</code></pre>
+          </div>
         </section>
 
         <!-- Data protection -->

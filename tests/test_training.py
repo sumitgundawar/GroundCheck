@@ -150,6 +150,9 @@ def test_threshold_needs_the_lower_bound_to_meet_the_target():
     assert metrics.wilson_lower(correct[answered].sum(), answered.sum()) >= 0.95
     assert chosen["accuracy"] > chosen["accuracy_lower_bound"] >= 0.95
 
+    floored = metrics.choose_threshold(probs, labels, 0.5, floor=0.8)
+    assert floored["threshold"] >= 0.8 and floored["coverage"] <= (confidence >= 0.8).mean()
+
     hopeless = metrics.choose_threshold(np.full((50, 2), 0.5), np.zeros(50, dtype=int), 0.95)
     assert hopeless == {**hopeless, "met": False, "threshold": 1.0, "coverage": 0.0}
 
@@ -220,6 +223,48 @@ def test_a_real_training_run_saves_a_usable_model(studio, monkeypatch):
     assert library.list_models() == []
     with pytest.raises(library.LibraryError):
         library.get_model(model["id"])
+
+
+def test_duplicates_and_identifiers_are_found(studio):
+    folder = _make_dataset(studio, per_class=20, split_folders=True)
+    # A training image copied into test, and a file name with a patient's details.
+    copy = folder / "test" / "dark" / "copy-of-train.png"
+    copy.write_bytes((folder / "train" / "dark" / "dark-0.png").read_bytes())
+    named = folder / "train" / "bright" / "Mr John Smith 12-03-1948.png"
+    named.write_bytes(_png(210, seed=500))
+    _, _, items, _ = datasets.read(str(folder))
+    checks = datasets.inspect(folder, items)
+    assert checks["duplicates"]["leaked"] == 1 and checks.pop("_leaked_paths") == ["test/dark/copy-of-train.png"]
+    assert checks["identifiers"]["file_names"] == 1
+    assert set(checks["identifiers"]["file_name_kinds"]) == {"name", "date"}
+    assert len(checks["warnings"]) == 2
+
+
+def test_a_stopped_run_resumes_where_it_left_off(studio, monkeypatch):
+    monkeypatch.setenv("MODEL_TARGET_ACCURACY", "0.7")
+    folder = _make_dataset(studio, per_class=60)
+    run = runs.start({"name": "Resumable", "dataset": str(folder), "device": "cpu", "epochs": 40,
+                      "image_size": 64, "batch_size": 4, "learning_rate": 0.0005})
+    deadline = time.time() + 240
+    while not runs.get(run["id"])["progress"].get("history") and time.time() < deadline:
+        time.sleep(0.1)
+    runs.cancel(run["id"])
+    while runs.get(run["id"])["progress"].get("state") in runs.ACTIVE and time.time() < deadline:
+        time.sleep(0.2)
+    stopped = runs.get(run["id"])
+    assert stopped["progress"]["state"] == "cancelled" and stopped["can_resume"]
+    done_before = len(stopped["progress"]["history"])
+
+    runs.resume(run["id"])
+    while runs.get(run["id"])["progress"].get("state") in runs.ACTIVE and time.time() < deadline:
+        time.sleep(0.5)
+    finished = runs.get(run["id"])
+    assert finished["progress"]["state"] == "completed", (config.TRAINING_RUNS_DIR / run["id"] / "worker.log").read_text()
+    epochs = [h["epoch"] for h in finished["progress"]["history"]]
+    assert epochs == list(range(1, len(epochs) + 1)) and len(epochs) > done_before
+    assert not (config.TRAINING_RUNS_DIR / run["id"] / "checkpoint.pt").exists()
+    with pytest.raises(runs.TrainingError, match="stopped run"):
+        runs.resume(run["id"])
 
 
 def test_cancelling_a_finished_run_is_refused(studio):

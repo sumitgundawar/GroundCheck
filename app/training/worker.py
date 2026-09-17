@@ -1,9 +1,10 @@
 """The training process. Started by runs.py as its own Python process, so
 training never slows the app and can be stopped cleanly:
 
-    python -m app.training.worker models/runs/<run id>
+    python -m app.training.worker models/runs/<run id> [--resume]
 
-It reads run.json, trains, and writes progress.json as it goes. The best
+It reads run.json, trains, and writes progress.json as it goes. After every
+epoch it saves a checkpoint, so a stopped run can resume where it left off. The best
 model (lowest validation loss) is evaluated, given its confidence threshold,
 and saved to the model library. A file named `cancel` in the run folder
 stops it at the next batch."""
@@ -140,12 +141,15 @@ def _predict(model, images, labels, device, batch_size, mean, std, in_channels, 
     return probs, sum(losses) / max(1, len(images))
 
 
-def train(run_dir: Path) -> None:
+def train(run_dir: Path, resume: bool = False) -> None:
     import torch
     from safetensors.torch import save_file
 
     run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
     progress = Progress(run_dir)
+    checkpoint_path = run_dir / "checkpoint.pt"
+    if resume:
+        (run_dir / "cancel").unlink(missing_ok=True)
     progress.update(force=True, message="Reading the dataset")
     seed = int(run.get("seed", 7))
     random.seed(seed)
@@ -153,6 +157,13 @@ def train(run_dir: Path) -> None:
     torch.manual_seed(seed)
 
     folder, classes, items, summary = datasets.read(run["dataset"], run["val_fraction"], run["test_fraction"], seed)
+    if resume and summary["fingerprint"] != run["dataset_summary"]["fingerprint"]:
+        raise RuntimeError("The images in the folder have changed since this run started, so it can't resume. "
+                           "Start a new run.")
+    progress.update(force=True, message="Checking for duplicate images")
+    checks = datasets.inspect(folder, items)
+    leaked = set(checks.pop("_leaked_paths"))
+    items = [i for i in items if i.path not in leaked]
     by_split = {s: [i for i in items if i.split == s] for s in ("train", "val", "test")}
     size, arch = int(run["image_size"]), run["architecture"]
     sample = random.Random(seed).sample(by_split["train"], min(200, len(by_split["train"])))
@@ -192,8 +203,21 @@ def train(run_dir: Path) -> None:
     best = {"loss": float("inf"), "epoch": 0, "state": None}
     history: list[dict] = []
     started = time.monotonic()
+    first_epoch = 1
+    earlier_seconds = 0.0
+    if resume and checkpoint_path.is_file():
+        saved = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        model.load_state_dict(saved["model"])
+        optimizer.load_state_dict(saved["optimizer"])
+        scheduler.load_state_dict(saved["scheduler"])
+        best, history = saved["best"], saved["history"]
+        first_epoch = saved["epoch"] + 1
+        earlier_seconds = saved.get("seconds", 0.0)
+        torch.set_rng_state(saved["rng"])
+        progress.update(force=True, history=history, best_epoch=best["epoch"],
+                        message=f"Resuming after epoch {saved['epoch']}")
 
-    for epoch in range(1, epochs + 1):
+    for epoch in range(first_epoch, epochs + 1):
         model.train()
         epoch_start = time.monotonic()
         order = torch.randperm(len(tensors["train"]))
@@ -214,10 +238,11 @@ def train(run_dir: Path) -> None:
             running_correct += (logits.argmax(1) == yb).sum().item()
             seen += len(idx)
             done = (epoch - 1) * steps_per_epoch + step + 1
+            done_here = done - (first_epoch - 1) * steps_per_epoch
             elapsed = time.monotonic() - started
             progress.update(phase="training", epoch=epoch, epochs=epochs, step=step + 1, steps=steps_per_epoch,
                             percent=round(100 * done / (epochs * steps_per_epoch), 1),
-                            eta_seconds=round(elapsed / done * (epochs * steps_per_epoch - done)),
+                            eta_seconds=round(elapsed / done_here * (epochs * steps_per_epoch - done)),
                             train_loss=running_loss / seen, message=f"Epoch {epoch} of {epochs}")
         _recalibrate_batch_norm(model, tensors["train"], device, batch_size, mean, std, in_channels)
         val_probs, val_loss = _predict(model, tensors["val"], labels["val"], device, batch_size * 2,
@@ -232,6 +257,11 @@ def train(run_dir: Path) -> None:
             best = {"loss": val_loss, "epoch": epoch,
                     "state": {k: v.detach().to("cpu").clone() for k, v in model.state_dict().items()}}
         progress.update(force=True, history=history, best_epoch=best["epoch"])
+        tmp = run_dir / "checkpoint.pt.tmp"
+        torch.save({"epoch": epoch, "model": model.state_dict(), "optimizer": optimizer.state_dict(),
+                    "scheduler": scheduler.state_dict(), "best": best, "history": history,
+                    "rng": torch.get_rng_state(), "seconds": earlier_seconds + time.monotonic() - started}, tmp)
+        os.replace(tmp, checkpoint_path)
         if epoch - best["epoch"] >= patience:
             progress.update(force=True, message=f"Stopped early: no improvement for {patience} epochs")
             break
@@ -240,7 +270,8 @@ def train(run_dir: Path) -> None:
     model.load_state_dict(best["state"])
     val_probs, _ = _predict(model, tensors["val"], labels["val"], device, batch_size * 2, mean, std, in_channels,
                             progress, "validation")
-    threshold = metrics.choose_threshold(val_probs, labels["val"].numpy(), config.MODEL_TARGET_ACCURACY)
+    threshold = metrics.choose_threshold(val_probs, labels["val"].numpy(), config.MODEL_TARGET_ACCURACY,
+                                         config.MODEL_MIN_CONFIDENCE)
     validation = metrics.evaluate(val_probs, labels["val"].numpy(), classes, threshold["threshold"])
 
     progress.update(force=True, message="Learning what the training images look like")
@@ -284,17 +315,19 @@ def train(run_dir: Path) -> None:
         "test": test,
         "history": history,
         "best_epoch": best["epoch"],
-        "dataset": {k: summary[k] for k in ("name", "path", "layout", "classes", "total", "splits", "fingerprint")},
+        "dataset": {**{k: summary[k] for k in ("name", "path", "layout", "classes", "total", "splits", "fingerprint")},
+                    "checks": checks},
         "training": {k: run[k] for k in ("epochs", "batch_size", "learning_rate", "image_size", "device", "seed")},
         "hardware": {"device": run["device"], "device_name": run.get("device_name"), "platform": platform.platform(),
                      "torch": torch.__version__},
         "created_at": _now(),
         "created_by": run.get("created_by"),
-        "training_seconds": round(time.monotonic() - started, 1),
+        "training_seconds": round(earlier_seconds + time.monotonic() - started, 1),
         "notes": run.get("notes", ""),
         "intended_use": "Research and evaluation only. Not validated for clinical use.",
     }
     (target / "model.json").write_text(json.dumps(card, indent=2), encoding="utf-8")
+    checkpoint_path.unlink(missing_ok=True)
     progress.update(force=True, state="completed", phase="done", message="Saved to the model library",
                     model_id=model_id, finished_at=_now(),
                     summary={"target_met": (test or {}).get("target_met"),
@@ -308,7 +341,7 @@ def main(argv: list[str]) -> int:
     run_dir = Path(argv[0]).resolve()
     progress = Progress(run_dir)
     try:
-        train(run_dir)
+        train(run_dir, resume="--resume" in argv[1:])
         return 0
     except Cancelled:
         progress.state.update(json.loads((run_dir / "progress.json").read_text()) if (run_dir / "progress.json").exists() else {})

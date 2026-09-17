@@ -68,10 +68,12 @@ def get(run_id: str) -> dict:
     progress = _read_json(folder / "progress.json") or {"state": "queued", "message": "Waiting to start"}
     if progress.get("state") in ACTIVE and not _alive(run_id, progress.get("pid") or run.get("pid")):
         # Give a just-started worker a moment to write its first progress.
-        started = datetime.fromisoformat(run["created_at"])
+        started = datetime.fromisoformat(run.get("resumed_at") or run["created_at"])
         if (datetime.now(timezone.utc) - started).total_seconds() > 20 or progress.get("pid"):
             progress.update(state="failed", message="Training stopped unexpectedly. See worker.log in the run folder.")
-    return {**run, "progress": progress}
+    result = {**run, "progress": progress}
+    result["can_resume"] = can_resume(result)
+    return result
 
 
 def list_runs(limit: int = 50) -> list[dict]:
@@ -149,15 +151,45 @@ def start(settings: dict, user_name: str | None = None) -> dict:
             "created_at": datetime.now(timezone.utc).isoformat(), "created_by": user_name,
         }
         (folder / "run.json").write_text(json.dumps(run, indent=2), encoding="utf-8")
-        env = {**os.environ, "PYTORCH_ENABLE_MPS_FALLBACK": "1", "TOKENIZERS_PARALLELISM": "false"}
-        log = open(folder / "worker.log", "ab")  # noqa: SIM115 - handed to the child process
-        proc = subprocess.Popen([sys.executable, "-m", "app.training.worker", str(folder)],
-                                cwd=str(config.ROOT_DIR), stdout=log, stderr=subprocess.STDOUT, env=env,
-                                start_new_session=True)
-        log.close()
-        _processes[run_id] = proc
-        run["pid"] = proc.pid
+        run["pid"] = _spawn(run_id, folder)
         (folder / "run.json").write_text(json.dumps(run, indent=2), encoding="utf-8")
+    return get(run_id)
+
+
+def _spawn(run_id: str, folder: Path, resume: bool = False) -> int:
+    env = {**os.environ, "PYTORCH_ENABLE_MPS_FALLBACK": "1", "TOKENIZERS_PARALLELISM": "false"}
+    log = open(folder / "worker.log", "ab")  # noqa: SIM115 - handed to the child process
+    args = [sys.executable, "-m", "app.training.worker", str(folder)] + (["--resume"] if resume else [])
+    proc = subprocess.Popen(args, cwd=str(config.ROOT_DIR), stdout=log, stderr=subprocess.STDOUT, env=env,
+                            start_new_session=True)
+    log.close()
+    _processes[run_id] = proc
+    return proc.pid
+
+
+def can_resume(run: dict) -> bool:
+    return (run["progress"].get("state") in ("cancelled", "failed")
+            and (config.TRAINING_RUNS_DIR / run["id"] / "checkpoint.pt").is_file())
+
+
+def resume(run_id: str) -> dict:
+    folder = _run_dir(run_id)
+    with _lock:
+        run = get(run_id)
+        if not can_resume(run):
+            raise TrainingError("Only a stopped run with at least one finished epoch can resume.")
+        if active() is not None:
+            raise TrainingError("A model is already training. Wait for it to finish, or cancel it.")
+        (folder / "cancel").unlink(missing_ok=True)
+        previous = run["progress"]
+        (folder / "progress.json").write_text(json.dumps({
+            "state": "queued", "message": "Resuming", "history": previous.get("history", []),
+            "best_epoch": previous.get("best_epoch"), "epoch": previous.get("epoch"), "epochs": run["epochs"],
+            "percent": previous.get("percent")}), encoding="utf-8")
+        stored = {k: v for k, v in run.items() if k not in ("progress", "can_resume")}
+        stored["resumed_at"] = datetime.now(timezone.utc).isoformat()
+        stored["pid"] = _spawn(run_id, folder, resume=True)
+        (folder / "run.json").write_text(json.dumps(stored, indent=2), encoding="utf-8")
     return get(run_id)
 
 

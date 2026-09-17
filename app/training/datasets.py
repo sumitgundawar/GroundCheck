@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import os
 import random
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -208,6 +209,123 @@ def read(path: str, val_fraction: float = 0.15, test_fraction: float = 0.15, see
         "warnings": warnings,
     }
     return folder, classes, items, summary
+
+
+IDENTIFIER_SAMPLE = 2000
+_METADATA_KEYS = ("patient", "name", "birth", "dob", "mrn", "nhs", "accession", "institution", "physician",
+                  "author", "artist", "comment", "description", "usercomment")
+
+
+def _content_key(path: Path) -> bytes:
+    """A fast fingerprint: size plus a hash of the first 64 KB."""
+    size = path.stat().st_size
+    with open(path, "rb") as fh:
+        return size.to_bytes(8, "little") + hashlib.blake2b(fh.read(65536), digest_size=16).digest()
+
+
+def _full_hash(path: Path) -> bytes:
+    digest = hashlib.blake2b(digest_size=20)
+    with open(path, "rb") as fh:
+        while chunk := fh.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.digest()
+
+
+def find_duplicates(folder: Path, items: list[ImageItem]) -> dict:
+    """Identical image files. A copy in both the training set and the
+    validation or test set makes the model look better than it is, so those
+    copies are left out of validation and test when training."""
+    by_key: dict[bytes, list[ImageItem]] = defaultdict(list)
+    for item in items:
+        try:
+            by_key[_content_key(folder / item.path)].append(item)
+        except OSError:
+            continue
+    groups: list[list[ImageItem]] = []
+    for candidates in by_key.values():
+        if len(candidates) < 2:
+            continue
+        exact: dict[bytes, list[ImageItem]] = defaultdict(list)
+        for item in candidates:
+            exact[_full_hash(folder / item.path)].append(item)
+        groups.extend(g for g in exact.values() if len(g) > 1)
+    leaked = sorted({i.path for g in groups if any(x.split == "train" for x in g)
+                     for i in g if i.split != "train"})
+    conflicting = [g for g in groups if len({i.label for i in g}) > 1]
+    return {
+        "groups": len(groups),
+        "extra_copies": sum(len(g) - 1 for g in groups),
+        "leaked": leaked,
+        "conflicting_labels": len(conflicting),
+        "examples": [[i.path for i in g][:3] for g in (conflicting or groups)[:5]],
+    }
+
+
+def find_identifiers(folder: Path, items: list[ImageItem], seed: int = 7) -> dict:
+    """Possible patient identifiers in file names (every file) and in image
+    metadata (a sample). Text burned into the pixels isn't detected."""
+    from .. import deid
+
+    in_names: dict[str, int] = defaultdict(int)
+    name_examples: list[str] = []
+    files_with_names = 0
+    for item in items:
+        stem = Path(item.path).stem.replace("_", " ")
+        result = deid.deidentify(stem)
+        kinds = {k for k in result.found if k not in ("long number",)}
+        for kind in kinds:
+            in_names[kind] += 1
+        if kinds:
+            files_with_names += 1
+            if len(name_examples) < 3:
+                name_examples.append(item.path)
+
+    from PIL import Image
+
+    sample = random.Random(seed).sample(items, min(IDENTIFIER_SAMPLE, len(items)))
+    metadata_files, metadata_examples = 0, []
+    for item in sample:
+        try:
+            with Image.open(folder / item.path) as image:
+                fields = {str(k).lower(): v for k, v in image.info.items() if isinstance(v, (str, bytes))}
+                exif = image.getexif()
+                fields.update({str(k): v for k, v in exif.items() if isinstance(v, (str, bytes))})
+        except Exception:  # noqa: BLE001 - unreadable files are reported when training
+            continue
+        if any(any(word in key for word in _METADATA_KEYS) or (isinstance(v, str) and deid.deidentify(v).changed)
+               for key, v in fields.items() if key not in ("icc_profile", "exif", "dpi", "gamma", "transparency")):
+            metadata_files += 1
+            if len(metadata_examples) < 3:
+                metadata_examples.append(item.path)
+    return {
+        "file_names": files_with_names,
+        "file_name_kinds": dict(in_names),
+        "file_name_examples": name_examples,
+        "metadata_sampled": len(sample),
+        "metadata_files": metadata_files,
+        "metadata_examples": metadata_examples,
+    }
+
+
+def inspect(folder: Path, items: list[ImageItem]) -> dict:
+    duplicates = find_duplicates(folder, items)
+    identifiers = find_identifiers(folder, items)
+    warnings = []
+    if duplicates["leaked"]:
+        warnings.append(f"{len(duplicates['leaked']):,} validation or test images are exact copies of training "
+                        "images. They'll be left out of validation and test, so results aren't flattered.")
+    if duplicates["conflicting_labels"]:
+        warnings.append(f"{duplicates['conflicting_labels']:,} identical images are filed under different "
+                        "classes. Check their labels.")
+    if identifiers["file_names"]:
+        warnings.append(f"Some file names look like they contain patient details "
+                        f"({', '.join(sorted(identifiers['file_name_kinds']))}). Rename files before sharing a model "
+                        "or dataset.")
+    if identifiers["metadata_files"]:
+        warnings.append(f"{identifiers['metadata_files']:,} of {identifiers['metadata_sampled']:,} images checked "
+                        "carry metadata that may identify a patient. Strip metadata before training on shared data.")
+    return {"duplicates": {k: v for k, v in duplicates.items() if k != "leaked"} | {"leaked": len(duplicates["leaked"])},
+            "identifiers": identifiers, "warnings": warnings, "_leaked_paths": duplicates["leaked"]}
 
 
 def _carve(items: list[ImageItem], split: str, fraction: float, seed: int) -> list[ImageItem]:

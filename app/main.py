@@ -906,8 +906,10 @@ async def training_dataset(request: Request, path: str) -> dict:
 
     require_manager(request, "admin")
     try:
-        _, _, _, summary = await run_in_threadpool(datasets.read, path)
-        return summary
+        folder, _, items, summary = await run_in_threadpool(datasets.read, path)
+        checks = await run_in_threadpool(datasets.inspect, folder, items)
+        checks.pop("_leaked_paths", None)
+        return {**summary, "checks": checks, "warnings": summary["warnings"] + checks["warnings"]}
     except Exception as exc:  # noqa: BLE001
         raise _training_error(exc) from exc
 
@@ -969,6 +971,17 @@ def training_cancel(run_id: str, request: Request) -> dict:
     require_manager(request, "admin")
     try:
         return {"run": runs.cancel(run_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.post("/api/training/runs/{run_id}/resume")
+def training_resume(run_id: str, request: Request) -> dict:
+    from .training import runs
+
+    require_manager(request, "admin")
+    try:
+        return {"run": runs.resume(run_id)}
     except Exception as exc:  # noqa: BLE001
         raise _training_error(exc) from exc
 

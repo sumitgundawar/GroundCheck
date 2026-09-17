@@ -902,21 +902,21 @@ docker run -p 7860:7860 groundcheck</code></pre>
             </details>
           </li>
 
-          <li class="phase-card spotlight" data-state="planned">
+          <li class="phase-card spotlight" data-state="available">
             <div class="phase-head">
               <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#brain-circuit"/></svg></span>
-              <span class="state">Planned</span>
+              <span class="state">Available now</span>
             </div>
             <h3>Model training studio</h3>
-            <p class="phase-goal">Train imaging models on your own data and hardware, then reuse them anywhere in the platform.</p>
+            <p class="phase-goal">Train imaging models on your own images and hardware, and keep them in a library.</p>
             <details class="phase-details">
               <summary>What’s included</summary>
               <ul>
-                <li>Pick a folder of images or a registered dataset, with format and label checks</li>
-                <li>Detects NVIDIA and Apple silicon GPUs and lets you choose one, falling back to the CPU</li>
-                <li>Live progress, validation metrics and the option to stop and resume</li>
-                <li>A versioned model library, ready to use in the imaging pipeline</li>
-                </ul>
+                <li>Choose a folder of PNG, JPEG or TIFF images arranged by class, with checks before training</li>
+                <li>Detects NVIDIA, AMD and Apple GPUs and lets you choose one, or the CPU</li>
+                <li>Live loss and accuracy, early stopping, and cancel at any time</li>
+                <li>A model library where every model abstains when unsure or shown an unfamiliar image</li>
+              </ul>
             </details>
           </li>
 
@@ -956,22 +956,23 @@ docker run -p 7860:7860 groundcheck</code></pre>
       </div>
     </section>
 
-    <!-- Training studio (planned) -->
+    <!-- Training studio -->
     <section class="section section-rule" id="training" aria-labelledby="training-title">
       <div class="wrap local-ai-grid">
         <div>
           <div class="section-intro">
-            <h2 id="training-title">Planned: train models on your own scans</h2>
-            <p>For teams without a machine learning platform. None of this is built yet.</p>
+            <h2 id="training-title">Train models on your own scans</h2>
+            <p>For teams without a machine learning platform. Try it on public CT scans with one command.</p>
           </div>
           <ol class="checklist checklist-numbered">
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#folder-open"/></svg>Choose a folder of DICOM, NIfTI or PNG images</li>
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#list-checks"/></svg>Check labels, duplicates and leftover identifiers</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#folder-open"/></svg>Choose a folder of PNG, JPEG or TIFF images, one subfolder per class</li>
             <li><svg class="i" aria-hidden="true"><use href="/icons.svg#cpu"/></svg>Pick a detected GPU, or train on the CPU</li>
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#activity"/></svg>Watch loss and validation metrics live, and stop or resume</li>
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#database"/></svg>Save to a versioned model library</li>
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#scan-eye"/></svg>Use it in the imaging pipeline, with the same rules</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#activity"/></svg>Watch loss and accuracy live, and cancel at any time</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#badge-check"/></svg>Get sensitivity, specificity, AUC and a confusion matrix for every class</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#ban"/></svg>Abstain below a confidence threshold, and on unfamiliar images</li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#database"/></svg>Save to a model library you can copy to another machine</li>
           </ol>
+          <p class="fineprint">DICOM and NIfTI input, 3D volumes and using models in the answer pipeline are planned.</p>
         </div>
 
         <figure class="device-picker" aria-labelledby="device-picker-caption">
@@ -1083,11 +1084,11 @@ docker run -p 7860:7860 groundcheck</code></pre>
           </details>
           <details>
             <summary>Can I train models on my own images?</summary>
-            <p>Not yet. A training studio is planned. It’s designed to train on a folder you choose, using a GPU when one is available, and to save each model to a library for reuse.</p>
+            <p>Yes. Choose a folder of images arranged by class, pick a GPU or the CPU, and watch it train. Each model is saved to a library with its accuracy per class, and it abstains when it isn’t confident or an image looks unfamiliar. To try it, <code>python scripts/fetch_scan_dataset.py organamnist</code> downloads public abdominal CT slices.</p>
           </details>
           <details>
             <summary>Does it analyse CT or MRI scans yet?</summary>
-            <p>Not yet. CT and MRI support is planned. Today GroundCheck works with text documents only.</p>
+            <p>You can train classifiers on CT and MRI slices exported as images. Reading DICOM and NIfTI directly, 3D volumes, and findings tied to image regions are planned.</p>
           </details>
         </div>
       </div>

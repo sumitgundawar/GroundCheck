@@ -91,18 +91,19 @@ Full instructions, including configuration and Windows, are in
 12. [Using the API](#using-the-api)
 13. [Using your own documents](#using-your-own-documents)
 14. [Clinical review and governance](#clinical-review-and-governance)
-15. [Configuration](#configuration)
-16. [Local development](#local-development)
-17. [Running the checks](#running-the-checks)
-18. [Troubleshooting](#troubleshooting)
-19. [Deployment](#deployment)
-20. [Project layout](#project-layout)
-21. [Honest limitations](#honest-limitations)
-22. [Reporting issues](#reporting-issues)
-23. [Contributing](#contributing)
-24. [Security](#security)
-25. [License](#license)
-26. [Credits](#credits)
+15. [Training imaging models](#training-imaging-models)
+16. [Configuration](#configuration)
+17. [Local development](#local-development)
+18. [Running the checks](#running-the-checks)
+19. [Troubleshooting](#troubleshooting)
+20. [Deployment](#deployment)
+21. [Project layout](#project-layout)
+22. [Honest limitations](#honest-limitations)
+23. [Reporting issues](#reporting-issues)
+24. [Contributing](#contributing)
+25. [Security](#security)
+26. [License](#license)
+27. [Credits](#credits)
 
 ---
 
@@ -546,6 +547,63 @@ sign-off by your clinical safety officer.
 
 ---
 
+## Training imaging models
+
+The **Training** page trains an image classifier on a folder of your own
+images, on this machine's hardware, and saves it to the **Model library**.
+
+1. **Choose a folder.** One subfolder per class (`normal/`, `abnormal/`), or
+   `train/`, `val/` and `test/` folders each holding class subfolders. PNG,
+   JPEG, BMP, TIFF and WebP are read; 16-bit images are windowed to 8 bits.
+   Without split folders, images are split 70/15/15 by class. Folders are only
+   read from `TRAINING_DATA_DIRS`.
+2. **Choose where to train.** NVIDIA and AMD GPUs, the Apple GPU and the CPU
+   are detected. With several GPUs you pick one; the recommended one is
+   selected.
+3. **Name the model and start.** Choose a small CNN (fast, from scratch) or
+   ResNet-18 (optionally from ImageNet weights; check their terms for
+   commercial use). Loss and accuracy update live, training stops early when
+   validation stops improving, and it can be cancelled. Training runs in its
+   own process, so the app stays responsive.
+
+Every saved model refuses to guess, like the rest of GroundCheck:
+
+- **Confidence threshold.** Chosen on validation images as the lowest
+  confidence at which answered images are at least `MODEL_TARGET_ACCURACY`
+  (95%) correct, by the lower end of a 95% confidence interval. Below it, the
+  model abstains, and it never answers below `MODEL_MIN_CONFIDENCE` (50%). The
+  library shows whether the target also held on the test
+  images, and marks a model experimental if not.
+- **Unfamiliar images.** An image whose features are far from every class the
+  model learned (Mahalanobis distance, calibrated to flag 1% of validation
+  images) is refused rather than forced into a class. This catches noise,
+  blank images and very different images; it can miss images that are only
+  slightly different, such as another scanner's settings.
+- **Model card.** Accuracy, balanced accuracy, AUC, calibration error,
+  sensitivity, specificity and precision for every class, a confusion matrix,
+  training history, the dataset's fingerprint and the hardware used.
+
+A model is a self-contained folder (`models/library/<id>/`: weights in
+safetensors format and `model.json`). Download it as a zip from the library
+and copy it into another installation's library to use it there.
+
+### Try it on public CT scans
+
+```bash
+python scripts/fetch_scan_dataset.py organamnist        # abdominal CT slices, 11 organs, 200 MB
+python scripts/fetch_scan_dataset.py pneumoniamnist     # paediatric chest X-rays, 2 classes, 20 MB
+```
+
+Both come from [MedMNIST v2](https://medmnist.com) under CC BY 4.0 and are
+written to `data/datasets/`, with a `DATASET.md` giving the source and
+citations. Then choose the folder on the Training page.
+
+Models trained here are for research and evaluation. They are not medical
+devices and haven't been validated for clinical use. DICOM and NIfTI input,
+3D volumes and using models inside the answer pipeline are planned.
+
+---
+
 ## Configuration
 
 All settings are read from the environment with safe defaults (`app/config.py`).
@@ -578,6 +636,16 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `LLM_TIMEOUT_SECONDS` | `8` | Outbound call timeout. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests per minute, per client IP. |
 | `AUDIT_PERSIST` | `true` | Persist the audit trail to disk. |
+| `TRAINING_DATA_DIRS` | `data/datasets` and your home folder | Folders the training studio may read images from, comma-separated. On a shared server, list only dataset folders. |
+| `MODEL_LIBRARY_DIR` | `models/library` | Where trained models are saved. |
+| `TRAINING_RUNS_DIR` | `models/runs` | Training run settings, progress and logs. |
+| `MODEL_TARGET_ACCURACY` | `0.95` | Accuracy a model must show on answered validation images when setting its confidence threshold. |
+| `MODEL_MIN_CONFIDENCE` | `0.5` | A trained model never answers below this confidence. |
+| `DATA_ENCRYPTION_KEYS` | _empty_ | Base64 keys, comma-separated, to encrypt stored questions, answers and review notes. The first encrypts. |
+| `DATA_ENCRYPTION_RETIRED_KEYS` | _empty_ | Keys that only decrypt, for rotation. |
+| `AUDIT_SIGNING_KEYS` | _empty_ | Base64 keys to sign the audit chain. The first signs. |
+| `AUDIT_RETENTION_DAYS` | `0` | Delete audit records older than this when retention runs. 0 keeps them. |
+| `REVIEW_RETENTION_DAYS` | `0` | Delete resolved review cases older than this when retention runs. 0 keeps them. |
 | `REVIEW_QUEUE` | `true` | Open a review case for every refusal. |
 | `REVIEW_SLA_HOURS` | `72` | When a refusal case is due. |
 | `FLAGGED_SLA_HOURS` | `24` | When a flagged answer case is due. |

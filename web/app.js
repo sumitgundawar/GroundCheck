@@ -161,7 +161,7 @@ function canSee(view) {
   const role = account.user?.role;
   if (!account.authRequired) return view !== "users";
   const rank = { clinician: 0, reviewer: 1, admin: 2 }[role] ?? -1;
-  const needs = { usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0 }[view] ?? 0;
+  const needs = { usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0, training: 2, models: 1 }[view] ?? 0;
   return rank >= needs;
 }
 
@@ -2579,6 +2579,563 @@ async function loadEmbeddings() {
   });
 }
 
+// ---------- Training ----------
+const training = { setup: null, dataset: null, device: null, architecture: "small-cnn", poll: null, runId: null, browsePath: null };
+const pct = (v, digits = 0) => (v === null || v === undefined ? "–" : `${(v * 100).toFixed(digits)}%`);
+
+function formatDuration(seconds) {
+  if (seconds === null || seconds === undefined) return "–";
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ${Math.round(seconds % 60)} s`;
+  return `${Math.floor(seconds / 3600)} h ${Math.round((seconds % 3600) / 60)} min`;
+}
+
+async function loadTraining() {
+  try { training.setup = await api("/api/training/setup"); }
+  catch (err) { showMessage("training-message", err.message, true); return; }
+  renderDevices(training.setup.hardware);
+  renderArchitectures(training.setup.architectures, training.setup.image_sizes);
+  loadRuns();
+  const active = training.setup.active_run;
+  if (active) followRun(active.id);
+}
+
+function renderDevices(hw) {
+  const list = $("device-list");
+  list.textContent = "";
+  const gpus = hw.devices.filter((d) => d.kind === "gpu");
+  if (!training.device || !hw.devices.some((d) => d.id === training.device)) training.device = hw.recommended;
+  $("hw-sub").textContent = gpus.length === 0
+    ? "No GPU found, so training will use the CPU. It works, but more slowly."
+    : gpus.length === 1
+      ? `Training will use ${gpus[0].name}. You can choose the CPU instead, which is slower.`
+      : `This machine has ${gpus.length} GPUs. Choose one to train on.`;
+  hw.devices.forEach((d) => {
+    const label = document.createElement("label");
+    label.className = "device-card";
+    const input = document.createElement("input");
+    input.type = "radio"; input.name = "train-device"; input.value = d.id; input.checked = d.id === training.device;
+    input.addEventListener("change", () => { training.device = d.id; });
+    const body = document.createElement("span");
+    body.className = "device-body";
+    const name = document.createElement("strong");
+    name.textContent = d.name;
+    const meta = document.createElement("span");
+    meta.className = "device-meta";
+    meta.textContent = d.kind === "gpu"
+      ? `${d.vendor} GPU, ${d.memory_gb} GB${d.shared_memory ? " shared memory" : ""}`
+      : `CPU, ${d.cores} cores, ${d.memory_gb} GB memory`;
+    body.append(name, meta);
+    if (d.id === hw.recommended) {
+      const badge = document.createElement("span");
+      badge.className = "local-ai-badge recommended";
+      badge.textContent = "Recommended";
+      body.appendChild(badge);
+    }
+    label.append(input, body);
+    list.appendChild(label);
+  });
+}
+
+function renderArchitectures(archs, sizes) {
+  const list = $("arch-list");
+  list.textContent = "";
+  archs.forEach((a) => {
+    const label = document.createElement("label");
+    label.className = `device-card${a.available ? "" : " disabled"}`;
+    const input = document.createElement("input");
+    input.type = "radio"; input.name = "train-arch"; input.value = a.id;
+    input.checked = a.id === training.architecture; input.disabled = !a.available;
+    input.addEventListener("change", () => applyArchitecture(a));
+    const body = document.createElement("span");
+    body.className = "device-body";
+    const name = document.createElement("strong"); name.textContent = a.label;
+    const meta = document.createElement("span"); meta.className = "device-meta"; meta.textContent = a.available ? a.description : a.unavailable_reason;
+    body.append(name, meta);
+    label.append(input, body);
+    list.appendChild(label);
+  });
+  const select = $("train-size");
+  if (!select.options.length) sizes.forEach((n) => select.appendChild(new Option(`${n} × ${n} px`, n)));
+  applyArchitecture(archs.find((a) => a.id === training.architecture) || archs[0]);
+}
+
+function applyArchitecture(a) {
+  training.architecture = a.id;
+  $("train-size").value = a.image_size;
+  $("train-batch").value = a.batch_size;
+  $("train-lr").value = a.learning_rate;
+  $("pretrained-row").hidden = !a.pretrained_option;
+  if (!a.pretrained_option) $("train-pretrained").checked = false;
+}
+
+async function scanDataset() {
+  const path = $("train-dataset").value.trim();
+  const box = $("dataset-summary");
+  if (!path) { showMessage("training-message", "Choose a folder of images first.", true); return; }
+  box.hidden = false;
+  box.textContent = "Reading the folder…";
+  box.classList.remove("invalid");
+  try {
+    const summary = await api(`/api/training/dataset?path=${encodeURIComponent(path)}`);
+    training.dataset = summary;
+    $("train-dataset").value = summary.path;
+    renderDatasetSummary(summary);
+    if (!$("train-name").value.trim()) $("train-name").value = `${summary.name} classifier`;
+  } catch (err) {
+    training.dataset = null;
+    box.textContent = err.message;
+    box.classList.add("invalid");
+  }
+}
+
+function renderDatasetSummary(d) {
+  const box = $("dataset-summary");
+  box.textContent = "";
+  const head = document.createElement("p");
+  head.className = "dataset-head";
+  const splits = d.layout === "split-folders" ? "using the folder’s own train, validation and test split" : "split into training, validation and test sets for you";
+  head.innerHTML = "";
+  const strong = document.createElement("strong");
+  strong.textContent = `${d.total.toLocaleString()} images in ${d.classes.length} classes`;
+  head.append(strong, `, ${splits}: ${d.splits.train.toLocaleString()} training, ${d.splits.val.toLocaleString()} validation, ${d.splits.test.toLocaleString()} test.`);
+  box.appendChild(head);
+
+  const grid = document.createElement("div");
+  grid.className = "class-grid";
+  const max = Math.max(...d.classes.map((c) => c.total));
+  d.classes.forEach((c) => {
+    const sample = d.samples.find((x) => x.class === c.name);
+    const card = document.createElement("div");
+    card.className = "class-card";
+    if (sample) {
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.alt = `Example image of ${c.name}`;
+      img.src = `/api/training/image?dataset=${encodeURIComponent(d.path)}&file=${encodeURIComponent(sample.file)}`;
+      card.appendChild(img);
+    }
+    const name = document.createElement("span"); name.className = "class-name"; name.textContent = c.name; name.title = c.name;
+    const count = document.createElement("span"); count.className = "class-count"; count.textContent = c.total.toLocaleString();
+    const track = document.createElement("span"); track.className = "bar-track";
+    const fill = document.createElement("span"); fill.className = "bar-fill"; fill.style.width = `${(c.total / max) * 100}%`;
+    track.appendChild(fill);
+    card.append(name, count, track);
+    grid.appendChild(card);
+  });
+  box.appendChild(grid);
+  d.warnings.forEach((w) => {
+    const p = document.createElement("p"); p.className = "dataset-warning"; p.textContent = w; box.appendChild(p);
+  });
+}
+
+async function openBrowser(path) {
+  const dialog = $("browse-dialog");
+  $("browse-message").hidden = true;
+  let data;
+  try { data = await api(`/api/training/browse?path=${encodeURIComponent(path || "")}`); }
+  catch (err) { showMessage("browse-message", err.message, true); if (!dialog.open) dialog.showModal(); return; }
+  training.browsePath = data.path;
+  $("browse-path").textContent = data.path || "Folders you can train from";
+  $("browse-use").disabled = !data.path;
+  const list = $("browse-list");
+  list.textContent = "";
+  const addRow = (label, target, hint, cls = "") => {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `browse-item ${cls}`;
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("class", "btn-icon"); icon.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use"); use.setAttribute("href", "#i-folder-open");
+    icon.appendChild(use);
+    const name = document.createElement("span"); name.textContent = label;
+    btn.append(icon, name);
+    if (hint) { const h = document.createElement("span"); h.className = "local-ai-badge recommended"; h.textContent = hint; btn.appendChild(h); }
+    btn.addEventListener("click", () => openBrowser(target));
+    li.appendChild(btn);
+    list.appendChild(li);
+  };
+  if (data.path) addRow(data.parent ? "Up one folder" : "All folders", data.parent || "", null, "browse-up");
+  data.folders.forEach((f) => addRow(f.name, f.path, f.looks_like_dataset ? "Looks like a dataset" : null));
+  if (!data.folders.length) {
+    const li = document.createElement("li"); li.className = "auth-hint"; li.textContent = "No subfolders here."; list.appendChild(li);
+  }
+  if (!dialog.open) dialog.showModal();
+}
+
+async function startTraining(e) {
+  e.preventDefault();
+  if (!training.dataset || training.dataset.path !== $("train-dataset").value.trim()) await scanDataset();
+  if (!training.dataset) { $("train-dataset").focus(); return; }
+  const body = {
+    name: $("train-name").value.trim(), dataset: training.dataset.path, architecture: training.architecture,
+    pretrained: $("train-pretrained").checked, device: training.device,
+    epochs: Number($("train-epochs").value), image_size: Number($("train-size").value),
+    batch_size: Number($("train-batch").value), learning_rate: Number($("train-lr").value),
+    val_fraction: Number($("train-val").value), test_fraction: Number($("train-test").value),
+  };
+  const button = $("train-start");
+  button.disabled = true;
+  button.textContent = "Starting…";
+  try {
+    const data = await api("/api/training/runs", { method: "POST", body });
+    $("training-message").hidden = true;
+    followRun(data.run.id);
+    loadRuns();
+    $("run-live").scrollIntoView({ behavior: REDUCED_MOTION ? "auto" : "smooth", block: "start" });
+  } catch (err) { showMessage("training-message", err.message, true); }
+  button.disabled = false;
+  button.textContent = "Start training";
+}
+
+function followRun(runId) {
+  training.runId = runId;
+  clearInterval(training.poll);
+  const tick = async () => {
+    let data;
+    try { data = await api(`/api/training/runs/${runId}`); } catch (_) { return; }
+    renderLiveRun(data.run);
+    const state = data.run.progress.state;
+    const live = state === "running" || state === "queued";
+    $("nav-training-live").hidden = !live;
+    if (!live) { clearInterval(training.poll); training.poll = null; loadRuns(); }
+  };
+  tick();
+  training.poll = setInterval(tick, 1500);
+}
+
+function renderLiveRun(run) {
+  const p = run.progress;
+  const box = $("run-live");
+  box.hidden = false;
+  $("run-live-name").textContent = run.name;
+  const live = p.state === "running" || p.state === "queued";
+  $("run-cancel").hidden = !live;
+  $("run-resume").hidden = !run.can_resume;
+  $("run-live-status").textContent = `${p.message || ""}${live && p.eta_seconds ? `, about ${formatDuration(p.eta_seconds)} left` : ""}`;
+  const percent = p.state === "completed" ? 100 : (p.percent || 0);
+  $("run-progress-fill").style.width = `${percent}%`;
+  $("run-progressbar").setAttribute("aria-valuenow", String(Math.round(percent)));
+  box.dataset.state = p.state;
+
+  const history = p.history || [];
+  const last = history[history.length - 1];
+  const bestVal = history.length ? Math.max(...history.map((h) => h.val_accuracy ?? 0)) : null;
+  const stats = $("run-stats");
+  stats.textContent = "";
+  stats.append(
+    statTile("Epoch", p.epoch ? `${p.epoch} of ${p.epochs}` : "–", p.best_epoch ? `best so far: ${p.best_epoch}` : ""),
+    statTile("Validation accuracy", last ? pct(last.val_accuracy, 1) : "–", bestVal !== null ? `best ${pct(bestVal, 1)}` : ""),
+    statTile("Hardware", run.device_name, `${run.architecture === "resnet18" ? "ResNet-18" : "Small CNN"}, ${run.image_size} px`, { small: true }),
+  );
+  renderLineChart($("chart-loss"), history, [["train_loss", "line-train"], ["val_loss", "line-val"]], (v) => v.toFixed(2));
+  renderLineChart($("chart-accuracy"), history, [["train_accuracy", "line-train"], ["val_accuracy", "line-val"]], (v) => `${Math.round(v * 100)}%`, [0, 1]);
+
+  const result = $("run-result");
+  result.hidden = p.state === "running" || p.state === "queued";
+  result.className = `run-result ${p.state}`;
+  result.textContent = "";
+  if (p.state === "completed") {
+    const sm = p.summary || {};
+    result.append(`Saved to the model library. On held-out test images: ${pct(sm.test_accuracy, 1)} accurate; it answers ${pct(sm.coverage)} of images and is ${pct(sm.answered_accuracy, 1)} correct when it does. `);
+    const link = document.createElement("a");
+    link.href = "#/models";
+    link.textContent = "Open the model library";
+    link.addEventListener("click", () => { models.openAfterLoad = p.model_id; });
+    result.appendChild(link);
+  } else if (p.state === "failed" || p.state === "cancelled") {
+    result.textContent = run.can_resume
+      ? `${p.message}. It stopped after epoch ${(p.history || []).length} and can resume from there.`
+      : p.message;
+  }
+}
+
+// A line per series across epochs, with a dot on each value.
+function renderLineChart(container, history, series, format, fixedRange) {
+  container.textContent = "";
+  if (history.length === 0) {
+    const empty = document.createElement("div"); empty.className = "chart-empty"; empty.textContent = "Appears after the first epoch";
+    container.appendChild(empty);
+    return;
+  }
+  const width = Math.max(container.clientWidth, 240), height = container.clientHeight || 180;
+  const pad = { top: 8, right: 10, bottom: 22, left: 40 };
+  const values = series.flatMap(([key]) => history.map((h) => h[key]).filter((v) => v !== null && v !== undefined));
+  let [lo, hi] = fixedRange || [Math.min(0, ...values), Math.max(...values)];
+  if (fixedRange) lo = Math.max(0, Math.floor(Math.min(...values) * 10) / 10);
+  if (hi === lo) hi = lo + 1;
+  const n = Math.max(history.length, 2);
+  const x = (i) => pad.left + (i / (n - 1)) * (width - pad.left - pad.right);
+  const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * (height - pad.top - pad.bottom);
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (name, attrs) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": `${series.map(([k]) => k).join(" and ")} by epoch` });
+  for (let i = 0; i <= 3; i++) {
+    const v = lo + ((hi - lo) / 3) * i;
+    svg.appendChild(el("line", { class: "grid-line", x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v) }));
+    const t = el("text", { class: "axis-label", x: pad.left - 6, y: y(v) + 4, "text-anchor": "end" });
+    t.textContent = format(v);
+    svg.appendChild(t);
+  }
+  const every = Math.ceil(history.length / 8);
+  history.forEach((h, i) => {
+    if (i % every === 0 || i === history.length - 1) {
+      const t = el("text", { class: "axis-label", x: x(i), y: height - 6, "text-anchor": "middle" });
+      t.textContent = h.epoch;
+      svg.appendChild(t);
+    }
+  });
+  series.forEach(([key, cls]) => {
+    const points = history.map((h, i) => [x(i), h[key]]).filter(([, v]) => v !== null && v !== undefined);
+    if (points.length > 1) svg.appendChild(el("polyline", { class: cls, points: points.map(([px, v]) => `${px},${y(v)}`).join(" ") }));
+    points.forEach(([px, v]) => {
+      const dot = el("circle", { class: `${cls} dot`, cx: px, cy: y(v), r: 3.5 });
+      const title = el("title", {}); title.textContent = `${format(v)}`;
+      dot.appendChild(title);
+      svg.appendChild(dot);
+    });
+  });
+  container.appendChild(svg);
+}
+
+async function loadRuns() {
+  let data;
+  try { data = await api("/api/training/runs"); } catch (_) { return; }
+  const rows = $("runs-rows");
+  rows.textContent = "";
+  $("runs-empty").hidden = data.runs.length > 0;
+  rows.closest(".users-table-wrap").hidden = data.runs.length === 0;
+  const labels = { queued: "Starting", running: "Training", completed: "Saved", failed: "Failed", cancelled: "Cancelled" };
+  const pills = { queued: "status-pending", running: "status-pending", completed: "status-approved", failed: "status-rejected", cancelled: "status-retired" };
+  data.runs.forEach((run) => {
+    const p = run.progress;
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    const n = document.createElement("div"); n.className = "user-name"; n.textContent = run.name;
+    const dsn = document.createElement("div"); dsn.className = "user-email"; dsn.textContent = `${run.dataset_summary.name}, ${run.dataset_summary.total.toLocaleString()} images`;
+    name.append(n, dsn);
+    const status = document.createElement("td");
+    const pill = document.createElement("span"); pill.className = `status-pill ${pills[p.state] || ""}`; pill.textContent = labels[p.state] || p.state;
+    status.appendChild(pill);
+    if (p.state === "running") status.append(` ${Math.round(p.percent || 0)}%`);
+    const hwCell = document.createElement("td"); hwCell.textContent = run.device_name;
+    const started = document.createElement("td"); started.textContent = new Date(run.created_at).toLocaleString();
+    const result = document.createElement("td");
+    if (p.state === "completed" && p.summary) result.textContent = `${pct(p.summary.test_accuracy, 1)} accurate`;
+    else if (p.state === "failed") result.textContent = p.message;
+    const actions = document.createElement("div"); actions.className = "document-actions";
+    if (p.state === "running" || p.state === "queued" || run.id !== training.runId) {
+      actions.appendChild(button("View", "btn-ghost", false, () => { followRun(run.id); $("run-live").scrollIntoView({ block: "start" }); }));
+    }
+    if (run.can_resume) actions.appendChild(button("Resume", "btn-primary", false, () => resumeRun(run.id)));
+    result.appendChild(actions);
+    labelCells([name, status, hwCell, started, result], ["", "Status", "Hardware", "Started", "Result"]);
+    tr.append(name, status, hwCell, started, result);
+    rows.appendChild(tr);
+  });
+}
+
+async function resumeRun(runId) {
+  try {
+    await api(`/api/training/runs/${runId}/resume`, { method: "POST" });
+    $("training-message").hidden = true;
+    followRun(runId);
+    loadRuns();
+    $("run-live").scrollIntoView({ behavior: REDUCED_MOTION ? "auto" : "smooth", block: "start" });
+  } catch (err) { showMessage("training-message", err.message, true); }
+}
+
+function wireTraining() {
+  $("run-resume").addEventListener("click", () => training.runId && resumeRun(training.runId));
+  $("train-form").addEventListener("submit", startTraining);
+  $("train-scan").addEventListener("click", scanDataset);
+  $("train-dataset").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); scanDataset(); } });
+  $("train-browse").addEventListener("click", () => openBrowser($("train-dataset").value.trim() || training.browsePath || ""));
+  $("browse-use").addEventListener("click", () => {
+    $("train-dataset").value = training.browsePath;
+    $("browse-dialog").close();
+    scanDataset();
+  });
+  $("run-cancel").addEventListener("click", async () => {
+    if (!training.runId || !window.confirm("Stop training? Nothing is saved to the library.")) return;
+    try { await api(`/api/training/runs/${training.runId}/cancel`, { method: "POST" }); }
+    catch (err) { showMessage("training-message", err.message, true); }
+  });
+}
+
+// ---------- Model library ----------
+const models = { list: [], current: null, openAfterLoad: null, target: 0.95 };
+
+async function loadModels() {
+  let data;
+  try { data = await api("/api/models"); }
+  catch (err) { showMessage("models-message", err.message, true); return; }
+  models.list = data.models;
+  models.target = data.target_accuracy;
+  $("models-summary").textContent = data.models.length ? plural(data.models.length, "model") : "";
+  $("models-empty").hidden = data.models.length > 0;
+  $("models-train-link").hidden = !canSee("training");
+  const grid = $("model-grid");
+  grid.textContent = "";
+  data.models.forEach((m) => {
+    const card = document.createElement("article");
+    card.className = "model-card";
+    const head = document.createElement("div"); head.className = "model-card-head";
+    const title = document.createElement("h2"); title.textContent = m.name;
+    const meta = document.createElement("p"); meta.className = "model-meta";
+    meta.textContent = `${m.architecture_label}, ${m.image_size} px. ${m.classes.length} classes from ${m.dataset}.`;
+    head.append(title, meta);
+    const classes = document.createElement("p"); classes.className = "model-classes";
+    classes.textContent = m.classes.slice(0, 8).join(", ") + (m.classes.length > 8 ? ` and ${m.classes.length - 8} more` : "");
+    const figures = document.createElement("dl"); figures.className = "model-figures";
+    [["Accuracy", pct(m.accuracy, 1)], ["Balanced accuracy", pct(m.balanced_accuracy, 1)], ["Answers", pct(m.coverage)], ["Correct when it answers", pct(m.answered_accuracy, 1)]]
+      .forEach(([k, v]) => { const d = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; d.append(dt, dd); figures.appendChild(d); });
+    const verdict = document.createElement("p");
+    verdict.className = `model-verdict ${m.target_met === false ? "warn" : "ok"}`;
+    verdict.textContent = m.target_met === false
+      ? `Below the ${pct(m.target_accuracy)} target on its ${m.evaluated_on} images when it answers. Treat as experimental.`
+      : `Met the ${pct(m.target_accuracy)} target on its ${m.evaluated_on} images when it answers.`;
+    const foot = document.createElement("p"); foot.className = "model-meta";
+    foot.textContent = `Trained ${new Date(m.created_at).toLocaleDateString()} on ${m.device_name} in ${formatDuration(m.training_seconds)}${m.created_by ? ` by ${m.created_by}` : ""}. ${m.size_mb} MB.`;
+    const actions = document.createElement("div"); actions.className = "model-actions";
+    actions.appendChild(button("Try it", "btn-primary", false, () => openModel(m.id)));
+    if (canSee("training")) {
+      const dl = document.createElement("a");
+      dl.className = "btn btn-sm btn-ghost"; dl.href = `/api/models/${encodeURIComponent(m.id)}/download`; dl.textContent = "Download";
+      actions.appendChild(dl);
+      actions.appendChild(button("Delete", "btn-ghost", false, async () => {
+        if (!window.confirm(`Delete “${m.name}” from the library? This can’t be undone.`)) return;
+        try { await api(`/api/models/${encodeURIComponent(m.id)}`, { method: "DELETE" }); showMessage("models-message", "Deleted."); }
+        catch (err) { showMessage("models-message", err.message, true); }
+        loadModels();
+      }));
+    }
+    card.append(head, classes, figures, verdict, foot, actions);
+    grid.appendChild(card);
+  });
+  if (models.openAfterLoad) { const id = models.openAfterLoad; models.openAfterLoad = null; if (data.models.some((m) => m.id === id)) openModel(id); }
+}
+
+async function openModel(id) {
+  let data;
+  try { data = await api(`/api/models/${encodeURIComponent(id)}`); }
+  catch (err) { showMessage("models-message", err.message, true); return; }
+  const m = data.model;
+  models.current = m;
+  $("model-dialog-title").textContent = m.name;
+  $("model-meta").textContent = `${m.intended_use} ${m.classes.length} classes: ${m.classes.join(", ")}.`;
+  $("try-result").textContent = "";
+  $("try-preview").hidden = true;
+  $("try-hint").hidden = false;
+  $("try-file").value = "";
+  const r = m.test || m.validation;
+  const where = m.test ? "test" : "validation";
+  const stats = $("model-stats");
+  stats.textContent = "";
+  stats.append(
+    statTile("Accuracy", pct(r.accuracy, 1), `${r.images.toLocaleString()} ${where} images`),
+    statTile("Balanced accuracy", pct(r.balanced_accuracy, 1), "average sensitivity across classes"),
+    statTile("AUC", r.auc === null ? "–" : r.auc.toFixed(3), m.classes.length > 2 ? "average, one class against the rest" : ""),
+    statTile("Confidence threshold", pct(m.threshold.threshold), m.threshold.met ? `chosen for ${pct(m.threshold.target)} accuracy on validation images` : "no share of images met the target: it abstains on all", { attention: !m.threshold.met }),
+    statTile("Answers", pct(r.abstention.coverage), `${pct(r.abstention.answered_accuracy, 1)} correct when it does`, { attention: r.target_met === false }),
+    statTile("Calibration error", r.calibration_error === null ? "–" : pct(r.calibration_error, 1), "gap between confidence and accuracy"),
+  );
+  const rows = $("model-classes");
+  rows.textContent = "";
+  r.per_class.forEach((c) => {
+    const tr = document.createElement("tr");
+    [c.name, c.support.toLocaleString(), pct(c.sensitivity, 1), pct(c.specificity, 1), pct(c.precision, 1), c.auc === null ? "–" : c.auc.toFixed(3)]
+      .forEach((v, i) => { const td = document.createElement("td"); td.textContent = v; if (i) td.className = "mono"; tr.appendChild(td); });
+    rows.appendChild(tr);
+  });
+  renderConfusion($("model-confusion"), m.classes, r.confusion);
+  const tr = m.training;
+  const items = [
+    ["Dataset", `${m.dataset.name}: ${m.dataset.total.toLocaleString()} images (${m.dataset.splits.train.toLocaleString()} training, ${m.dataset.splits.val.toLocaleString()} validation, ${m.dataset.splits.test.toLocaleString()} test). Fingerprint ${m.dataset.fingerprint}.`],
+    ["Data checks", m.dataset.checks ? [
+      m.dataset.checks.duplicates.leaked ? `${m.dataset.checks.duplicates.leaked.toLocaleString()} ${m.dataset.checks.duplicates.leaked === 1 ? "copy" : "copies"} of training images left out of validation and test.` : "No training images copied into validation or test.",
+      m.dataset.checks.duplicates.conflicting_labels ? `${plural(m.dataset.checks.duplicates.conflicting_labels, "identical image")} filed under different classes.` : "",
+      m.dataset.checks.identifiers.file_names || m.dataset.checks.identifiers.metadata_files ? "Possible patient details found in file names or metadata." : "No patient details found in file names or sampled metadata.",
+    ].filter(Boolean).join(" ") : "Not recorded for this model."],
+    ["Architecture", `${m.architecture === "resnet18" ? "ResNet-18" : "Small CNN"}${m.pretrained ? ", from ImageNet weights" : ", trained from scratch"}. Input ${m.input.image_size} × ${m.input.image_size} px, ${m.input.channels === 1 ? "grayscale" : "colour"}.`],
+    ["Training", `${m.history.length} of ${tr.epochs} epochs (best: ${m.best_epoch}), batch ${tr.batch_size}, learning rate ${tr.learning_rate}, on ${m.hardware.device_name} in ${formatDuration(m.training_seconds)}.`],
+    ["Unfamiliar images", m.novelty ? `Abstains on images far from anything it was trained on (1% of validation images would be flagged${m.test && m.test.novelty_flagged !== undefined ? `; ${pct(m.test.novelty_flagged, 1)} of test images were` : ""}).` : "No check recorded for this model."],
+    ["Created", `${new Date(m.created_at).toLocaleString()}${m.created_by ? ` by ${m.created_by}` : ""}. ID ${m.id}.`],
+  ];
+  const dl = $("model-training");
+  dl.textContent = "";
+  items.forEach(([k, v]) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); });
+  if (!$("model-dialog").open) $("model-dialog").showModal();
+}
+
+function renderConfusion(container, classes, matrix) {
+  container.textContent = "";
+  const table = document.createElement("table");
+  table.className = "confusion";
+  const max = Math.max(1, ...matrix.flat());
+  const head = document.createElement("tr");
+  head.appendChild(document.createElement("th"));
+  classes.forEach((c) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = c; th.title = `Predicted ${c}`; head.appendChild(th); });
+  table.appendChild(head);
+  matrix.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th"); th.scope = "row"; th.textContent = classes[i]; tr.appendChild(th);
+    const total = row.reduce((a, b) => a + b, 0) || 1;
+    row.forEach((v, j) => {
+      const td = document.createElement("td");
+      td.textContent = v.toLocaleString();
+      const share = v / total;
+      td.style.setProperty("--share", Math.sqrt(v / max).toFixed(3));
+      td.className = i === j ? "diag" : v ? "off" : "zero";
+      td.title = `${classes[i]} predicted as ${classes[j]}: ${v} (${Math.round(share * 100)}% of ${classes[i]})`;
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  container.appendChild(table);
+}
+
+async function tryModel(file) {
+  if (!file || !models.current) return;
+  const preview = $("try-preview");
+  preview.src = URL.createObjectURL(file);
+  preview.hidden = false;
+  $("try-hint").hidden = true;
+  const out = $("try-result");
+  out.textContent = "Checking…";
+  const body = new FormData();
+  body.append("file", file);
+  try {
+    const res = await fetch(`/api/models/${encodeURIComponent(models.current.id)}/predict`, { method: "POST", body });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `Request failed (${res.status}).`);
+    out.textContent = "";
+    const verdict = document.createElement("div");
+    verdict.className = `try-verdict ${data.abstained ? "abstained" : "answered"}`;
+    const chip = document.createElement("span");
+    chip.className = `status-chip ${data.abstained ? "refuse" : "answer"}`;
+    chip.textContent = data.abstained ? (data.abstain_reason === "unfamiliar" ? "UNFAMILIAR IMAGE" : "NOT CONFIDENT") : data.prediction.toUpperCase();
+    const msg = document.createElement("p"); msg.textContent = data.message;
+    verdict.append(chip, msg);
+    out.appendChild(verdict);
+    const bars = document.createElement("div"); bars.className = "bars";
+    renderBars(bars, data.probabilities.slice(0, 6).map((p) => ({ label: p.class, value: Math.round(p.probability * 100) })), "");
+    bars.querySelectorAll(".bar-value").forEach((v) => { v.textContent += "%"; });
+    out.appendChild(bars);
+  } catch (err) {
+    out.textContent = err.message;
+  }
+}
+
+function wireModels() {
+  $("try-file").addEventListener("change", (e) => tryModel(e.target.files[0]));
+  const drop = $("try-drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("dragging"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("dragging"); }));
+  drop.addEventListener("drop", (e) => tryModel(e.dataTransfer.files[0]));
+}
+
 // ---------- Navigation ----------
 // One page per area, addressed by the URL hash (#/review), so pages can be
 // bookmarked and the back button works.
@@ -2592,6 +3149,8 @@ const VIEWS = {
   "local-ai": { load: () => loadLocalAI() },
   "data-protection": { load: () => loadProtection() },
   users: { load: () => { $("users-message").hidden = true; loadUsers(); } },
+  training: { load: () => loadTraining() },
+  models: { load: () => loadModels() },
 };
 
 function currentView() {
@@ -2638,6 +3197,8 @@ function wireNavigation() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && document.body.classList.contains("nav-open")) { setNavOpen(false); $("nav-open").focus(); }
   });
+  wireTraining();
+  wireModels();
   applyRoleNavigation();
   route();
   refreshReviewCount();

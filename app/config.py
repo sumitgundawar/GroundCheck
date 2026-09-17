@@ -153,6 +153,9 @@ TRAINING_RUNS_DIR = Path(_get("TRAINING_RUNS_DIR", str(ROOT_DIR / "models" / "ru
 # Accuracy a trained model must reach on the images it answers, on held-out
 # validation images. Below its confidence threshold it abstains instead.
 MODEL_TARGET_ACCURACY = _get_float("MODEL_TARGET_ACCURACY", 0.95)
+# A model never answers below this confidence, however well it validated:
+# with many classes, a top class at 30% means the model is torn.
+MODEL_MIN_CONFIDENCE = _get_float("MODEL_MIN_CONFIDENCE", 0.5)
 
 # --- Retention (see app/retention.py). 0 keeps records for ever. ---
 AUDIT_RETENTION_DAYS = _get_int("AUDIT_RETENTION_DAYS", 0)

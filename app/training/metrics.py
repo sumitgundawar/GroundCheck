@@ -59,10 +59,10 @@ def wilson_lower(correct: np.ndarray | float, total: np.ndarray | float, z: floa
     return (centre - margin) / (1 + z * z / total)
 
 
-def choose_threshold(probs: np.ndarray, labels: np.ndarray, target: float) -> dict:
-    """The lowest confidence threshold at which answered images meet the
-    target accuracy, by the Wilson lower bound. If none does, the model
-    abstains on everything."""
+def choose_threshold(probs: np.ndarray, labels: np.ndarray, target: float, floor: float = 0.0) -> dict:
+    """The lowest confidence threshold, not below floor, at which answered
+    images meet the target accuracy by the Wilson lower bound. If none does,
+    the model abstains on everything."""
     confidence = probs.max(axis=1)
     correct = probs.argmax(axis=1) == labels
     order = np.argsort(-confidence, kind="mergesort")
@@ -72,13 +72,14 @@ def choose_threshold(probs: np.ndarray, labels: np.ndarray, target: float) -> di
     # Only thresholds at the end of a run of equal confidences are valid:
     # a threshold includes every image with that confidence.
     last_of_value = np.r_[conf_sorted[1:] != conf_sorted[:-1], True]
-    ok = (wilson_lower(cumulative, counts) >= target) & last_of_value
+    ok = (wilson_lower(cumulative, counts) >= target) & last_of_value & (conf_sorted >= floor)
     if not ok.any():
-        return {"threshold": 1.0, "coverage": 0.0, "accuracy": None, "met": False, "target": target}
+        return {"threshold": 1.0, "coverage": 0.0, "accuracy": None, "met": False, "target": target, "floor": floor}
     k = int(np.nonzero(ok)[0].max())
     return {"threshold": float(conf_sorted[k]), "coverage": float((k + 1) / len(order)),
             "accuracy": float(cumulative[k] / (k + 1)),
-            "accuracy_lower_bound": float(wilson_lower(cumulative[k], k + 1)), "met": True, "target": target}
+            "accuracy_lower_bound": float(wilson_lower(cumulative[k], k + 1)), "met": True, "target": target,
+            "floor": floor}
 
 
 def evaluate(probs: np.ndarray, labels: np.ndarray, classes: list[str], threshold: float) -> dict:
