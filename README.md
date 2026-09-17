@@ -1236,6 +1236,13 @@ In the spirit of the demo, these are real and worth knowing:
 
 ---
 
+## Changes
+
+[CHANGELOG.md](CHANGELOG.md) lists what each release changed, and which
+problems it fixed.
+
+---
+
 ## Reporting issues
 
 Use the issue forms at
