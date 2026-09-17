@@ -31,6 +31,7 @@ from sqlalchemy import (
     String,
     Text,
     TypeDecorator,
+    UniqueConstraint,
     create_engine,
     event,
 )
@@ -131,6 +132,11 @@ class User(Base):
     locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    # Set for people who sign in through single sign-on (app/sso.py).
+    sso_issuer: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sso_subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    __table_args__ = (UniqueConstraint("sso_issuer", "sso_subject", name="uq_users_sso"),)
 
     sessions: Mapped[list["AuthSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -182,6 +188,22 @@ class AuditRecord(Base):
         Index("ix_audit_records_created_at", "created_at"),
         Index("ix_audit_records_user_id", "user_id"),
     )
+
+
+class SsoLogin(Base):
+    """A single sign-on attempt between sending someone to the identity
+    provider and their return. Kept in the database so any app instance can
+    finish it. The state is stored only as a hash."""
+
+    __tablename__ = "sso_logins"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    nonce: Mapped[str] = mapped_column(String(64), nullable=False)
+    code_verifier: Mapped[str] = mapped_column(EncryptedText("sso_logins.code_verifier"), nullable=False)
+    next_path: Mapped[str] = mapped_column(String(300), nullable=False, default="/")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
 class RetentionRun(Base):

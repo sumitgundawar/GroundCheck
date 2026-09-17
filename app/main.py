@@ -3,18 +3,22 @@ The embedding model and search index are loaded once at startup."""
 
 from __future__ import annotations
 
+import html
 import ipaddress
 import json
+from urllib.parse import quote
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audit, auth, config, db, encryption, governance, integrity, llm, local_ai, pipeline, retrieval, retention
+from . import (
+    audit, auth, config, db, encryption, governance, integrity, llm, local_ai, pipeline, retention, retrieval, sso,
+)
 from .schemas import AskRequest, AskResponse, Settings
 
 WEB_DIR = config.ROOT_DIR / "web"
@@ -72,7 +76,7 @@ async def reject_cross_site_writes(request: Request, call_next):
 
 # Reachable without signing in, even when accounts are required.
 PUBLIC_API = {"/api/health", "/api/auth/me", "/api/auth/login", "/api/auth/mfa",
-              "/api/auth/logout", "/api/auth/first-admin"}
+              "/api/auth/logout", "/api/auth/first-admin", "/api/auth/sso/start", "/api/auth/sso/callback"}
 
 
 @app.middleware("http")
@@ -160,12 +164,69 @@ def auth_me(request: Request) -> JSONResponse:
         "user": principal.__dict__ if principal else None,
         "mfa_pending": pending is not None,
         "needs_first_admin": db.ready() and auth.count_users() == 0,
+        "sso": {"enabled": sso.enabled(), "provider": config.OIDC_PROVIDER_NAME},
+        "password_sign_in": config.PASSWORD_SIGN_IN or not sso.enabled(),
     })
+
+
+SSO_STATE_COOKIE = "gc_sso_state"
+
+
+def _base_url(request: Request) -> str:
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.url.netloc)
+    return f"{proto}://{host}"
+
+
+def _continue_page(path: str, message: str = "Signing you in") -> HTMLResponse:
+    """A page that moves on to a path on this site. A page, not a redirect: a
+    redirect chain that began at the identity provider counts as cross-site,
+    and the browser wouldn't send the new SameSite=Strict session cookie."""
+    target = html.escape(path, quote=True)
+    return HTMLResponse(
+        f'<!doctype html><html lang="en"><meta charset="utf-8"><meta http-equiv="refresh" content="0;url={target}">'
+        f"<title>{html.escape(message)}</title><p>{html.escape(message)}… <a href=\"{target}\">Continue</a></p></html>",
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@app.get("/api/auth/sso/start")
+def auth_sso_start(request: Request, next: str = "/") -> Response:  # noqa: A002 - query parameter name
+    _require_database()
+    try:
+        url, state = sso.start(_base_url(request), next)
+    except sso.SsoError as exc:
+        return _continue_page(f"/?sso_error={quote(str(exc))}", "Sign-in failed")
+    response = RedirectResponse(url, status_code=302)
+    response.set_cookie(SSO_STATE_COOKIE, state, httponly=True, samesite="lax", secure=config.SESSION_COOKIE_SECURE,
+                        max_age=sso.LOGIN_MINUTES * 60, path="/api/auth/sso")
+    return response
+
+
+@app.get("/api/auth/sso/callback")
+def auth_sso_callback(request: Request, code: str = "", state: str = "", error: str = "",
+                      error_description: str = "") -> Response:
+    _require_database()
+    if error:
+        message = f"{config.OIDC_PROVIDER_NAME} didn't sign you in: {error_description or error}"[:300]
+        response = _continue_page(f"/?sso_error={quote(message)}", "Sign-in failed")
+    else:
+        try:
+            done = sso.finish(code, state, request.cookies.get(SSO_STATE_COOKIE), _base_url(request),
+                              ip=_client_ip(request), user_agent=request.headers.get("user-agent", ""))
+        except sso.SsoError as exc:
+            response = _continue_page(f"/?sso_error={quote(str(exc))}", "Sign-in failed")
+        else:
+            response = _continue_page(done.next_path)
+            _set_session_cookie(response, done.token)
+    response.delete_cookie(SSO_STATE_COOKIE, path="/api/auth/sso")
+    return response
 
 
 @app.post("/api/auth/login")
 def auth_login(body: SignInRequest, request: Request, response: Response) -> dict:
     _require_database()
+    if not config.PASSWORD_SIGN_IN and sso.enabled():
+        raise HTTPException(status_code=403, detail=f"Sign in with {config.OIDC_PROVIDER_NAME} instead.")
     try:
         result = auth.sign_in(body.email, body.password, ip=_client_ip(request),
                               user_agent=request.headers.get("user-agent", ""))

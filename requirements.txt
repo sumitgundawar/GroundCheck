@@ -12,6 +12,7 @@ sqlalchemy==2.0.*
 alembic==1.*
 argon2-cffi==25.*
 cryptography==46.*
+PyJWT[crypto]==2.*
 pyotp==2.*
 segno==1.*
 # Optional database drivers: install the one for your DATABASE_URL.

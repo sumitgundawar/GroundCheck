@@ -38,6 +38,10 @@
       <h1 class="auth-title" id="auth-title">Sign in</h1>
       <p class="auth-lede" id="auth-lede">Sign in to ask questions and review answers.</p>
 
+      <div class="sso-block" id="sso-block" hidden>
+        <a class="btn btn-primary sso-button" id="sso-button" href="/api/auth/sso/start">Sign in with your organisation</a>
+        <p class="sso-divider" id="sso-divider"><span>or use a password</span></p>
+      </div>
       <form class="auth-form" id="login-form" novalidate>
         <label for="login-email">Email</label>
         <input id="login-email" type="email" autocomplete="username" required>

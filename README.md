@@ -402,6 +402,41 @@ Other commands: `python -m app.cli set-password`, `list-users`,
 `purge-sessions`, `escalate-reviews` and `migrate`. Passwords are always prompted for, never
 passed as arguments.
 
+### Single sign-on
+
+GroundCheck signs people in through your identity provider with OpenID
+Connect: Microsoft Entra ID, Okta, Google Workspace, Auth0, Keycloak, Ping or
+ADFS. Register GroundCheck as a web application with the redirect address
+`https://<your GroundCheck>/api/auth/sso/callback`, then set:
+
+```bash
+AUTH_REQUIRED=true
+OIDC_ISSUER=https://login.microsoftonline.com/<tenant id>/v2.0
+OIDC_CLIENT_ID=<application id>
+OIDC_CLIENT_SECRET=<client secret>
+OIDC_PROVIDER_NAME="NHS Trust account"
+OIDC_ROLES_CLAIM=roles            # or groups
+OIDC_ADMIN_VALUES=GroundCheck.Admin
+OIDC_REVIEWER_VALUES=GroundCheck.Reviewer
+OIDC_DEFAULT_ROLE=clinician       # or none, to refuse people without a mapped role
+OIDC_ALLOWED_DOMAINS=nhs.net      # optional
+OIDC_REQUIRE_MFA=true             # optional: refuse sign-ins without MFA
+PASSWORD_SIGN_IN=false            # optional: single sign-on only
+```
+
+The sign-in page then offers "Sign in with NHS Trust account". Sign-in uses
+the authorisation code flow with PKCE. The ID token's signature is checked
+against the provider's published keys (RSA or EC only), with its issuer,
+audience, expiry and nonce, and the sign-in must return to the browser that
+started it. Roles follow the provider's claims at every sign-in, so removing
+someone from a group removes their access. An existing account is linked by
+email only if the provider confirms the email. Providers that only support
+SAML can connect through one that bridges to OpenID Connect, such as Keycloak.
+
+Keep one local admin account for emergencies. With `PASSWORD_SIGN_IN=false`
+it can't sign in on the web, but `python -m app.cli set-password` still works
+on the server.
+
 ### Using PostgreSQL or MySQL
 
 Set `DATABASE_URL` and install the driver:

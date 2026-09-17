@@ -1139,3 +1139,9 @@ body { background: var(--canvas); }
   .drop-zone { max-width: 240px; }
   .model-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Single sign-on */
+.sso-block { display: grid; gap: var(--space-4); margin-bottom: var(--space-4); }
+.sso-button { justify-content: center; text-decoration: none; min-height: 42px; }
+.sso-divider { display: flex; align-items: center; gap: var(--space-3); margin: 0; color: var(--text-quiet); font-size: 12.5px; }
+.sso-divider::before, .sso-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }

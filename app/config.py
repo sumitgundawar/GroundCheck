@@ -140,6 +140,23 @@ DATA_ENCRYPTION_RETIRED_KEYS = os.environ.get("DATA_ENCRYPTION_RETIRED_KEYS", ""
 # Comma-separated base64 keys; the first signs the audit chain, all verify.
 AUDIT_SIGNING_KEYS = os.environ.get("AUDIT_SIGNING_KEYS", "").strip()
 
+# --- Single sign-on with OpenID Connect (see app/sso.py) ---
+OIDC_ISSUER = _get("OIDC_ISSUER", "").rstrip("/")
+OIDC_CLIENT_ID = _get("OIDC_CLIENT_ID", "")
+OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "").strip()
+OIDC_PROVIDER_NAME = _get("OIDC_PROVIDER_NAME", "your organisation")
+OIDC_REDIRECT_URL = _get("OIDC_REDIRECT_URL", "")   # default: <this site>/api/auth/sso/callback
+OIDC_SCOPES = _get("OIDC_SCOPES", "openid email profile")
+OIDC_ROLES_CLAIM = _get("OIDC_ROLES_CLAIM", "roles")  # "groups" for many providers
+OIDC_ADMIN_VALUES = {v.strip() for v in _get("OIDC_ADMIN_VALUES", "").split(",") if v.strip()}
+OIDC_REVIEWER_VALUES = {v.strip() for v in _get("OIDC_REVIEWER_VALUES", "").split(",") if v.strip()}
+OIDC_CLINICIAN_VALUES = {v.strip() for v in _get("OIDC_CLINICIAN_VALUES", "").split(",") if v.strip()}
+OIDC_DEFAULT_ROLE = _get("OIDC_DEFAULT_ROLE", "clinician")  # or "none" to refuse people without a mapped role
+OIDC_ALLOWED_DOMAINS = {v.strip().lower() for v in _get("OIDC_ALLOWED_DOMAINS", "").split(",") if v.strip()}
+OIDC_AUTO_CREATE = _get("OIDC_AUTO_CREATE", "true").lower() in ("1", "true", "yes")
+OIDC_REQUIRE_MFA = _get("OIDC_REQUIRE_MFA", "false").lower() in ("1", "true", "yes")
+PASSWORD_SIGN_IN = _get("PASSWORD_SIGN_IN", "true").lower() in ("1", "true", "yes")
+
 # --- Imaging model training (see app/training/) ---
 # Folders the training studio may read images from, comma-separated. The
 # default is the repository's data/datasets folder and your home folder, for

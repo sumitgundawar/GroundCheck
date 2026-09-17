@@ -96,6 +96,8 @@ async function checkSession() {
   catch (_) { return true; }
   account.authRequired = me.auth_required;
   account.user = me.user;
+  account.sso = me.sso || { enabled: false };
+  account.passwordSignIn = me.password_sign_in !== false;
   renderAccountMenu();
   if (!me.auth_required || me.user) {
     hideAuthScreen();
@@ -117,12 +119,28 @@ function showAuthScreen(mode, message) {
   $("auth-screen").hidden = false;
   $("auth-title").textContent = titles[mode][0];
   $("auth-lede").textContent = titles[mode][1];
-  $("login-form").hidden = mode !== "login";
+  const ssoOn = mode === "login" && account.sso && account.sso.enabled;
+  $("sso-block").hidden = !ssoOn;
+  if (ssoOn) {
+    $("sso-button").textContent = `Sign in with ${account.sso.provider}`;
+    $("sso-button").href = `/api/auth/sso/start?next=${encodeURIComponent("/" + location.hash)}`;
+  }
+  $("sso-divider").hidden = !account.passwordSignIn;
+  const passwordButton = $("login-form").querySelector("button[type=submit]");
+  passwordButton.classList.toggle("btn-primary", !ssoOn);
+  passwordButton.classList.toggle("btn-ghost", ssoOn);
+  $("login-form").hidden = mode !== "login" || (ssoOn && !account.passwordSignIn);
   $("mfa-form").hidden = mode !== "mfa";
   $("first-admin-form").hidden = mode !== "first-admin";
   setAuthError(message || "");
-  const first = { login: "login-email", mfa: "mfa-code", "first-admin": "admin-name" }[mode];
+  const first = ssoOn ? "sso-button" : { login: "login-email", mfa: "mfa-code", "first-admin": "admin-name" }[mode];
   requestAnimationFrame(() => $(first).focus());
+  // A sign-in the identity provider sent back with an error.
+  const ssoError = new URLSearchParams(location.search).get("sso_error");
+  if (ssoError) {
+    setAuthError(ssoError);
+    history.replaceState(null, "", location.pathname + location.hash);
+  }
 }
 
 function hideAuthScreen() {
