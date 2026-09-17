@@ -140,6 +140,20 @@ DATA_ENCRYPTION_RETIRED_KEYS = os.environ.get("DATA_ENCRYPTION_RETIRED_KEYS", ""
 # Comma-separated base64 keys; the first signs the audit chain, all verify.
 AUDIT_SIGNING_KEYS = os.environ.get("AUDIT_SIGNING_KEYS", "").strip()
 
+# --- Imaging model training (see app/training/) ---
+# Folders the training studio may read images from, comma-separated. The
+# default is the repository's data/datasets folder and your home folder, for
+# use on your own machine. On a shared server, list only the dataset folders.
+TRAINING_DATA_DIRS = [
+    Path(os.path.expanduser(p.strip())).resolve()
+    for p in _get("TRAINING_DATA_DIRS", f"{ROOT_DIR / 'data' / 'datasets'},~").split(",") if p.strip()
+]
+MODEL_LIBRARY_DIR = Path(_get("MODEL_LIBRARY_DIR", str(ROOT_DIR / "models" / "library"))).resolve()
+TRAINING_RUNS_DIR = Path(_get("TRAINING_RUNS_DIR", str(ROOT_DIR / "models" / "runs"))).resolve()
+# Accuracy a trained model must reach on the images it answers, on held-out
+# validation images. Below its confidence threshold it abstains instead.
+MODEL_TARGET_ACCURACY = _get_float("MODEL_TARGET_ACCURACY", 0.95)
+
 # --- Retention (see app/retention.py). 0 keeps records for ever. ---
 AUDIT_RETENTION_DAYS = _get_int("AUDIT_RETENTION_DAYS", 0)
 REVIEW_RETENTION_DAYS = _get_int("REVIEW_RETENTION_DAYS", 0)

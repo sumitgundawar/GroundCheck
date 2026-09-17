@@ -9,3 +9,5 @@ audit/
 .DS_Store
 local_ai.json
 data/groundcheck.db*
+models/
+data/datasets/

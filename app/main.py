@@ -846,6 +846,197 @@ def retention_run(request: Request) -> dict:
     return {"run": retention.apply(user.id if user else None), "retention": retention.plan()}
 
 
+# --- Training studio and model library --------------------------------------
+#
+# Training reads folders on this machine and uses its GPUs, so it's for
+# admins. Reviewers can see the library, and anyone signed in can use a model
+# on an image.
+
+class TrainingRequest(BaseModel):
+    name: str
+    dataset: str
+    architecture: str = "small-cnn"
+    pretrained: bool = False
+    device: str
+    epochs: int = 20
+    image_size: int | None = None
+    batch_size: int | None = None
+    learning_rate: float | None = None
+    val_fraction: float = 0.15
+    test_fraction: float = 0.15
+    notes: str = ""
+
+
+def _training_error(exc: Exception) -> HTTPException:
+    from .training import datasets, library, runs
+
+    if isinstance(exc, (datasets.DatasetError, runs.TrainingError, library.LibraryError)):
+        return HTTPException(status_code=400, detail=str(exc))
+    raise exc
+
+
+@app.get("/api/training/setup")
+async def training_setup(request: Request) -> dict:
+    from .training import architectures, datasets, hardware, runs
+
+    require_manager(request, "admin")
+    return {
+        "hardware": await run_in_threadpool(hardware.detect),
+        **architectures.options(),
+        "roots": [str(r) for r in datasets.roots()],
+        "target_accuracy": config.MODEL_TARGET_ACCURACY,
+        "active_run": runs.active(),
+    }
+
+
+@app.get("/api/training/browse")
+def training_browse(request: Request, path: str = "") -> dict:
+    from .training import datasets
+
+    require_manager(request, "admin")
+    try:
+        return datasets.browse(path or None)
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.get("/api/training/dataset")
+async def training_dataset(request: Request, path: str) -> dict:
+    from .training import datasets
+
+    require_manager(request, "admin")
+    try:
+        _, _, _, summary = await run_in_threadpool(datasets.read, path)
+        return summary
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.get("/api/training/image")
+def training_image(request: Request, dataset: str, file: str) -> Response:
+    """A small preview of one image in a dataset."""
+    import io
+
+    from .training import datasets, preprocess
+
+    require_manager(request, "admin")
+    try:
+        path = datasets.resolve_file(datasets.resolve(dataset), file)
+        image = preprocess.open_image(path).convert("RGB")
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+    image.thumbnail((160, 160))
+    buffer = io.BytesIO()
+    image.save(buffer, "PNG")
+    return Response(buffer.getvalue(), media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
+
+
+@app.post("/api/training/runs")
+async def training_start(body: TrainingRequest, request: Request) -> dict:
+    from .training import runs
+
+    user = require_manager(request, "admin")
+    try:
+        return {"run": await run_in_threadpool(runs.start, body.model_dump(exclude_none=True),
+                                               (user.name or user.email) if user else None)}
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.get("/api/training/runs")
+def training_runs(request: Request) -> dict:
+    from .training import runs
+
+    require_manager(request, "admin")
+    return {"runs": runs.list_runs()}
+
+
+@app.get("/api/training/runs/{run_id}")
+def training_run(run_id: str, request: Request) -> dict:
+    from .training import runs
+
+    require_manager(request, "admin")
+    try:
+        return {"run": runs.get(run_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.post("/api/training/runs/{run_id}/cancel")
+def training_cancel(run_id: str, request: Request) -> dict:
+    from .training import runs
+
+    require_manager(request, "admin")
+    try:
+        return {"run": runs.cancel(run_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.get("/api/models")
+def models_list(request: Request) -> dict:
+    from .training import library
+
+    require_manager(request, "reviewer")
+    return {"models": library.list_models(), "target_accuracy": config.MODEL_TARGET_ACCURACY}
+
+
+@app.get("/api/models/{model_id}")
+def models_get(model_id: str, request: Request) -> dict:
+    from .training import library
+
+    require_manager(request, "reviewer")
+    try:
+        return {"model": library.get_model(model_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.delete("/api/models/{model_id}")
+def models_delete(model_id: str, request: Request) -> dict:
+    from .training import library
+
+    require_manager(request, "admin")
+    try:
+        library.delete_model(model_id)
+        return {"deleted": model_id}
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.get("/api/models/{model_id}/download")
+def models_download(model_id: str, request: Request) -> Response:
+    from .training import library
+
+    require_manager(request, "admin")
+    try:
+        data = library.export_zip(model_id)
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+    return Response(data, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{model_id}.zip"'})
+
+
+@app.post("/api/models/{model_id}/predict")
+async def models_predict(model_id: str, request: Request,
+                         user: auth.Principal | None = Depends(require_role("clinician"))) -> dict:
+    from .training import library
+
+    if not config.AUTH_REQUIRED:
+        require_manager(request, "clinician")
+    form = await request.form()
+    upload = form.get("file")
+    if upload is None or not hasattr(upload, "read"):
+        raise HTTPException(status_code=400, detail="Choose an image.")
+    data = await upload.read(20 * 1024 * 1024 + 1)
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Images can be up to 20 MB.")
+    try:
+        return await run_in_threadpool(library.predict, model_id, data)
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
 @app.middleware("http")
 async def revalidate_static_files(request: Request, call_next):
     """Ask browsers to check the dashboard's files on every load. Unchanged
