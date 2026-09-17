@@ -28,17 +28,34 @@ def redact_pii(text: str) -> tuple[str, bool]:
 
 
 # --- Injection / scope -----------------------------------------------------
+_OVERRIDE_VERB = r"(?:ignore|disregard|forget|override|skip|drop|abandon|stop following|don't follow|do not follow)"
+_OVERRIDE_TARGET = (r"(?:(?:all|any|the|your|my|these|those|previous|prior|earlier|above|preceding|original|system|safety)\s+){0,4}"
+                    r"(?:instructions?|rules?|sources?|guidelines?|guardrails?|restrictions?|constraints?|prompts?|"
+                    r"context|policies|policy|checks?|guards?|above|everything)")
 _INJECTION_PATTERNS = [
-    r"ignore (all |the )?previous instructions",
-    r"ignore (all |the )?above",
-    r"disregard (all |the )?(previous|above)",
-    r"system prompt",
-    r"you are now",
-    r"developer mode",
-    r"jailbreak",
-    r"reveal your (instructions|prompt|rules)",
+    rf"\b{_OVERRIDE_VERB}\s+{_OVERRIDE_TARGET}\b",
+    r"\bsystem\s*prompt\b",
+    r"^\s*(?:system|assistant|developer)\s*:",
+    r"\byou\s+are\s+now\b",
+    r"\byou\s+are\s+no\s+longer\s+(?:bound|restricted|limited|required)",
+    r"\bpretend\s+(?:you|to\s+be|that\s+you)\b",
+    r"\broleplay\s+as\b",
+    r"\bdeveloper\s+mode\b",
+    r"\bjailbreak",
+    r"\bdo\s+anything\s+now\b",
+    r"\breveal\s+(?:your|the)\s+(?:instructions|prompt|rules|system)",
+    r"\bwithout\s+(?:any\s+)?(?:restrictions|guardrails|safety\s+checks)\b",
 ]
-_INJECTION = re.compile("|".join(_INJECTION_PATTERNS), re.IGNORECASE)
+_INJECTION = re.compile("|".join(_INJECTION_PATTERNS), re.IGNORECASE | re.MULTILINE)
+# Characters that hide words from the patterns: zero-width spaces and joiners.
+_INVISIBLE = re.compile("[\u200b-\u200f\u2060\ufeff\u00ad]")
+
+
+def _normalise_for_injection(text: str) -> str:
+    import unicodedata
+
+    text = unicodedata.normalize("NFKC", _INVISIBLE.sub("", text))
+    return re.sub(r"\s+", " ", text)
 
 
 @dataclass
@@ -56,7 +73,7 @@ def check_scope_and_injection(text: str, check_injection: bool = True) -> GuardR
     if len(stripped) > config.MAX_QUERY_CHARS:
         return GuardResult(False, "This request was blocked by an input guard.",
                            "query exceeds maximum length")
-    if check_injection and _INJECTION.search(stripped):
+    if check_injection and (_INJECTION.search(stripped) or _INJECTION.search(_normalise_for_injection(stripped))):
         return GuardResult(False, "This request was blocked by an input guard.",
                            "instruction-override pattern detected")
     detail = "no scope or injection issues" if check_injection else "injection guard disabled"
