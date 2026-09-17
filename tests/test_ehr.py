@@ -148,6 +148,7 @@ class FakeEhr:
         self.codes: dict[str, dict] = {}
         self.tokens: set[str] = set()
         self.patient_in_token = True
+        self.notes: list[dict] = []
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -168,6 +169,11 @@ class FakeEhr:
             if self.patient_in_token:
                 body["patient"] = "p1"
             return httpx.Response(200, json=body)
+        if path == "/fhir/DocumentReference" and request.method == "POST":
+            if request.headers.get("authorization", "").removeprefix("Bearer ") not in self.tokens:
+                return httpx.Response(401)
+            self.notes.append(json.loads(request.content))
+            return httpx.Response(201, headers={"Location": f"{EHR}/DocumentReference/note-{len(self.notes)}/_history/1"})
         if path.startswith("/fhir/"):
             if request.headers.get("authorization", "").removeprefix("Bearer ") not in self.tokens and "open" not in url:
                 return httpx.Response(401)
@@ -247,6 +253,38 @@ def test_open_servers_load_directly_and_others_are_refused(ehr, monkeypatch):
     refused = client.post("/api/ehr/load", json={"server": open_base, "patient_id": "p1"})
     assert refused.status_code == 400 and "allowed list" in refused.json()["detail"]
     assert client.post("/api/ehr/load", json={"server": EHR, "patient_id": "../Patient/p1"}).status_code == 400
+
+
+def test_a_reviewed_answer_is_saved_to_the_record(ehr, monkeypatch):
+    fake, client = ehr
+    monkeypatch.setattr(config, "SMART_WRITE_NOTES", True)
+    early = client.post("/api/ask", json={"query": "What is the standard dose of Caloradine?",
+                                          "patient": {"age_years": 60, "weight_kg": 70, "egfr": 90}}).json()
+    start = client.get(f"/api/ehr/launch?iss={EHR}&launch=l1", follow_redirects=False)
+    assert "DocumentReference.write" in parse_qs(urlparse(start.headers["location"]).query)["scope"][0]
+    code, state = fake.authorize(start.headers["location"])
+    client.get(f"/api/ehr/callback?code={code}&state={state}", follow_redirects=False)
+    context = client.get("/api/ehr/context").json()["context"]
+    assert context["can_write_notes"] is True and "access" not in context and "token" not in json.dumps(context)
+
+    too_early = client.post("/api/ehr/notes", json={"audit_id": early["audit_id"]})
+    assert too_early.status_code == 400 and "before this patient" in too_early.json()["detail"]
+    no_patient = client.post("/api/ask", json={"query": "How is Veltris syndrome treated?"}).json()
+    assert "asked for this patient" in client.post("/api/ehr/notes", json={"audit_id": no_patient["audit_id"]}).json()["detail"]
+
+    asked = client.post("/api/ask", json={"query": "What is the standard dose of Caloradine?",
+                                          "patient": context["patient"]}).json()
+    saved = client.post("/api/ehr/notes", json={"audit_id": asked["audit_id"], "comment": "Agree, check eGFR weekly."})
+    assert saved.status_code == 200 and saved.json()["reference"] == "DocumentReference/note-1"
+    [note] = fake.notes
+    assert note["docStatus"] == "preliminary" and note["subject"] == {"reference": "Patient/p1"}
+    text = base64.b64decode(note["content"][0]["attachment"]["data"]).decode()
+    assert "Question: What is the standard dose of Caloradine?" in text and "Agree, check eGFR weekly." in text
+    assert f"Audit record {asked['audit_id']}" in text and "reviewed by a clinician" in text
+    assert client.post("/api/ehr/notes", json={"audit_id": "missing"}).status_code == 404
+
+    client.delete("/api/ehr/context")
+    assert "SMART launch" in client.post("/api/ehr/notes", json={"audit_id": asked["audit_id"]}).json()["detail"]
 
 
 # --- CDS Hooks ---------------------------------------------------------------------------------
@@ -382,6 +420,7 @@ def test_live_smart_launch_against_the_smart_health_it_sandbox(database, monkeyp
     issuer = f"{LAUNCHER}/sim/{encoded}/fhir"
     monkeypatch.setattr(config, "SMART_CLIENT_ID", "groundcheck-test")
     monkeypatch.setattr(config, "SMART_ALLOWED_ISSUERS", [f"{LAUNCHER}/sim"])
+    monkeypatch.setattr(config, "SMART_WRITE_NOTES", True)
     monkeypatch.setattr(smart, "transport", None)
     from app.main import app
     with TestClient(app) as client:
@@ -399,5 +438,10 @@ def test_live_smart_launch_against_the_smart_health_it_sandbox(database, monkeyp
         done = client.get(f"/api/ehr/callback?code={q['code']}&state={q['state']}", follow_redirects=False)
         assert "ehr_error" not in done.text, unquote(done.text)
         context = client.get("/api/ehr/context").json()["context"]
-    assert context["source"]["patient"] == f"Patient/{patient}"
-    assert context["patient"].get("age_years") is not None
+        assert context["source"]["patient"] == f"Patient/{patient}"
+        assert context["patient"].get("age_years") is not None and context["can_write_notes"]
+        asked = client.post("/api/ask", json={"query": "How is Veltris syndrome treated?",
+                                              "patient": context["patient"]}).json()
+        saved = client.post("/api/ehr/notes", json={"audit_id": asked["audit_id"], "comment": "Automated sandbox test."})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["reference"].startswith("DocumentReference/")

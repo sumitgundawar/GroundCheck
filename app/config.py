@@ -181,6 +181,10 @@ SMART_SCOPES = _get("SMART_SCOPES", "launch launch/patient openid fhirUser patie
                     "patient/AllergyIntolerance.read patient/MedicationRequest.read patient/MedicationStatement.read "
                     "patient/Condition.read")
 SMART_REDIRECT_URL = _get("SMART_REDIRECT_URL", "")   # default: <this site>/api/ehr/callback
+# Let clinicians save a reviewed answer to the patient's record as a
+# preliminary DocumentReference. Adds the write scope and keeps the EHR's
+# access token, encrypted, for as long as the patient is kept.
+SMART_WRITE_NOTES = _get("SMART_WRITE_NOTES", "false").lower() in ("1", "true", "yes")
 # Lab results older than this are flagged as possibly out of date.
 FHIR_LAB_MAX_AGE_DAYS = _get_int("FHIR_LAB_MAX_AGE_DAYS", 90)
 EHR_CONTEXT_MINUTES = _get_int("EHR_CONTEXT_MINUTES", 60)

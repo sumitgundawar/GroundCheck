@@ -536,6 +536,16 @@
           </form>
           <p class="modal-message" id="flag-message" role="status" hidden></p>
         </div>
+        <div class="flag-row ehr-save" id="ehr-save" hidden>
+          <form class="case-form flag-form" id="ehr-save-form" novalidate>
+            <label for="ehr-save-comment">Save this to the patient’s record <span class="optional">as a preliminary note, with your comment</span></label>
+            <textarea id="ehr-save-comment" rows="2" placeholder="e.g. Reviewed; dose confirmed against local guidance"></textarea>
+            <div class="flag-actions">
+              <button type="submit" class="btn btn-sm btn-primary" id="ehr-save-button">Save to patient record</button>
+            </div>
+          </form>
+          <p class="modal-message" id="ehr-save-message" role="status" hidden></p>
+        </div>
         <div class="patient-findings" id="patient-findings" hidden>
           <h3 class="patient-findings-title">Checked for this patient</h3>
           <ul id="patient-findings-list"></ul>

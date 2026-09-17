@@ -629,6 +629,12 @@ function setLoading(on) {
 function render(data) {
   renderDecision(data);
   renderPatientFindings(data.patient_findings || [], data.patient_given);
+  const canSave = Boolean(ehr.context && ehr.context.can_write_notes && data.patient_given && data.audit_id);
+  $("ehr-save").hidden = !canSave;
+  $("ehr-save-form").hidden = false;
+  $("ehr-save-message").hidden = true;
+  $("ehr-save-comment").value = "";
+  $("ehr-save").dataset.auditId = data.audit_id || "";
   const block = (data.patient_findings || []).find((f) => f.severity === "block");
   if (data.decision === "refuse" && block && data.refused_reason && data.refused_reason.startsWith(block.message.charAt(0).toLowerCase() + block.message.slice(1, 20))) {
     $("decision-reason").textContent = `Not safe for this patient: ${block.medicine}`;
@@ -3429,6 +3435,7 @@ function fillPatient(p) {
 
 function applyEhrContext(context) {
   const strip = $("ehr-strip");
+  ehr.context = context;
   if (!context) { strip.hidden = true; return; }
   fillPatient(context.patient);
   const source = context.source || {};
@@ -3529,8 +3536,22 @@ function wireEhr() {
     } catch (err) { $("pt-error").textContent = err.message; }
     trigger.disabled = false; trigger.textContent = "Load from EHR";
   });
+  $("ehr-save-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    if (!window.confirm("Save this answer and the patient checks to the patient's record as a preliminary note?")) return;
+    formBusy(form, true);
+    try {
+      const data = await api("/api/ehr/notes", { method: "POST", body: { audit_id: $("ehr-save").dataset.auditId, comment: $("ehr-save-comment").value } });
+      form.hidden = true;
+      showMessage("ehr-save-message", `Saved to the record as a preliminary note${data.reference ? ` (${data.reference})` : ""}.`);
+    } catch (err) { showMessage("ehr-save-message", err.message, true); }
+    formBusy(form, false);
+  });
   $("ehr-forget").addEventListener("click", async () => {
     await api("/api/ehr/context", { method: "DELETE" }).catch(() => {});
+    ehr.context = null;
+    $("ehr-save").hidden = true;
     $("ehr-strip").hidden = true;
     $("pt-clear").click();
   });

@@ -18,7 +18,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 import httpx
@@ -87,8 +87,9 @@ def start(issuer: str, launch: str | None, base_url: str) -> tuple[str, str]:
         s.add(EhrLaunch(state_hash=_hash(state), issuer=issuer, code_verifier=verifier,
                         token_endpoint=document["token_endpoint"], created_at=now,
                         expires_at=now + timedelta(minutes=LAUNCH_MINUTES)))
+    scopes = config.SMART_SCOPES + (" patient/DocumentReference.write" if config.SMART_WRITE_NOTES else "")
     params = {"response_type": "code", "client_id": config.SMART_CLIENT_ID, "redirect_uri": redirect_url(base_url),
-              "scope": config.SMART_SCOPES if launch else config.SMART_SCOPES.replace("launch ", "", 1),
+              "scope": scopes if launch else scopes.replace("launch ", "", 1),
               "state": state, "aud": issuer, "code_challenge": challenge, "code_challenge_method": "S256"}
     if launch:
         params["launch"] = launch
@@ -125,7 +126,14 @@ def finish(code: str, state: str, cookie_state: str | None, base_url: str) -> st
             loaded = fhir.load_patient(client, patient_id, {"system": "SMART on FHIR", "server": issuer})
     except fhir.FhirError as exc:
         raise SmartError(str(exc)) from exc
-    return save(loaded)
+    granted = str(tokens.get("scope", ""))
+    can_write = config.SMART_WRITE_NOTES and any(s in granted for s in (
+        "DocumentReference.write", "DocumentReference.c", "DocumentReference.*", "patient/*.write", "patient/*.*"))
+    access = None
+    if can_write:
+        expires_in = tokens.get("expires_in") if isinstance(tokens.get("expires_in"), int) else 3600
+        access = {"token": tokens["access_token"], "expires_at": (utcnow() + timedelta(seconds=expires_in)).isoformat()}
+    return save(loaded, access)
 
 
 def load_open(server: str, patient_id: str) -> tuple[str, dict]:
@@ -139,16 +147,28 @@ def load_open(server: str, patient_id: str) -> tuple[str, dict]:
     return token, get(token)
 
 
-def save(loaded: fhir.EhrPatient) -> str:
+def save(loaded: fhir.EhrPatient, access: dict | None = None) -> str:
     token = secrets.token_urlsafe(32)
     now = utcnow()
+    data = {"patient": loaded.context.model_dump(exclude_defaults=True), "source": loaded.source,
+            "warnings": loaded.warnings, "loaded_at": now.isoformat()}
+    if access:
+        data["access"] = access  # encrypted at rest with the rest of the context
     with db.session() as s:
         s.execute(delete(EhrContext).where(EhrContext.expires_at < now))
         s.add(EhrContext(token_hash=_hash(token), created_at=now,
-                         expires_at=now + timedelta(minutes=config.EHR_CONTEXT_MINUTES),
-                         data={"patient": loaded.context.model_dump(exclude_defaults=True), "source": loaded.source,
-                               "warnings": loaded.warnings, "loaded_at": now.isoformat()}))
+                         expires_at=now + timedelta(minutes=config.EHR_CONTEXT_MINUTES), data=data))
     return token
+
+
+def _row(token: str | None):
+    if not token:
+        return None
+    with db.session() as s:
+        row = s.scalar(select(EhrContext).where(EhrContext.token_hash == _hash(token)))
+        if row is None or row.expires_at < utcnow():
+            return None
+        return dict(row.data)
 
 
 def get(token: str | None) -> dict | None:
@@ -161,10 +181,92 @@ def get(token: str | None) -> dict | None:
         if row.expires_at < utcnow():
             s.delete(row)
             return None
-        return {**row.data, "expires_at": row.expires_at.isoformat()}
+        data = {k: v for k, v in row.data.items() if k != "access"}
+        access = row.data.get("access")
+        data["can_write_notes"] = bool(access and datetime.fromisoformat(access["expires_at"]) > utcnow())
+        return {**data, "expires_at": row.expires_at.isoformat()}
 
 
 def clear(token: str | None) -> None:
     if token:
         with db.session() as s:
             s.execute(delete(EhrContext).where(EhrContext.token_hash == _hash(token)))
+
+
+NOTE_TYPE = {"system": "http://loinc.org", "code": "11506-3", "display": "Progress note"}
+
+
+def note_text(record: dict, reviewer: str, comment: str) -> str:
+    response = record.get("response", {})
+    answered = response.get("decision") == "answer"
+    lines = [f"Question: {record.get('redacted_query', '')}", f"Decision: {'Answered' if answered else 'Refused'}", ""]
+    if answered:
+        lines += ["Answer:", response.get("answer_text", ""), ""]
+        cited = {sid for c in response.get("claims", []) for sid in c.get("source_ids", [])}
+        sources = [f"- {s['id']}: {s.get('title', '')}" for s in response.get("sources", []) if s.get("id") in cited]
+        if sources:
+            lines += ["Sources:", *sources, ""]
+    else:
+        lines += [f"Reason: {response.get('refused_reason', '')}", ""]
+    findings = response.get("patient_findings", [])
+    if findings:
+        lines += ["Checked for this patient:",
+                  *[f"- [{f['severity']}] {f['medicine']}: {f['message']}" for f in findings], ""]
+    if comment.strip():
+        lines += [f"Clinician comment: {comment.strip()}", ""]
+    lines += [f"Drafted by GroundCheck from approved sources and reviewed by {reviewer} before saving. "
+              f"GroundCheck is not a medical device. Audit record {record.get('audit_id', '')}."]
+    return "\n".join(lines)
+
+
+def write_note(context_token: str | None, record: dict, reviewer: str, comment: str = "") -> dict:
+    """Save a reviewed answer to the patient's record as a preliminary note."""
+    data = _row(context_token)
+    if not data or data.get("source", {}).get("system") != "SMART on FHIR" or not data.get("access"):
+        raise SmartError("Saving to the record needs a SMART launch from the EHR with permission to write notes.")
+    access = data["access"]
+    if datetime.fromisoformat(access["expires_at"]) <= utcnow():
+        raise SmartError("The EHR's permission has expired. Launch GroundCheck from the record again.")
+    if not record.get("patient"):
+        raise SmartError("Only an answer asked for this patient can be saved to their record.")
+    loaded_at = datetime.fromisoformat(data["loaded_at"])
+    created = record.get("created_at")
+    if created and datetime.fromisoformat(created) < loaded_at:
+        raise SmartError("That answer was asked before this patient was opened.")
+    now = utcnow()
+    text = note_text(record, reviewer, comment)
+    document = {
+        "resourceType": "DocumentReference", "status": "current", "docStatus": "preliminary",
+        "type": {"coding": [NOTE_TYPE], "text": "GroundCheck answer"},
+        "category": [{"coding": [{"system": "http://hl7.org/fhir/us/core/CodeSystem/us-core-documentreference-category",
+                                  "code": "clinical-note", "display": "Clinical Note"}]}],
+        "subject": {"reference": data["source"]["patient"]},
+        "date": now.isoformat(),
+        "author": [{"display": reviewer}],
+        "description": f"GroundCheck: {str(record.get('redacted_query', ''))[:120]}",
+        "content": [{"attachment": {"contentType": "text/plain; charset=utf-8", "title": "GroundCheck answer",
+                                    "creation": now.isoformat(),
+                                    "data": base64.b64encode(text.encode("utf-8")).decode("ascii")}}],
+        "context": {"related": [{"identifier": {"system": "https://groundcheckhealth.com/audit",
+                                                "value": record.get("audit_id", "")}}]},
+    }
+    server = data["source"]["server"]
+    try:
+        with httpx.Client(timeout=15.0, transport=transport, follow_redirects=False) as client:
+            response = client.post(f"{server}/DocumentReference", json=document,
+                                   headers={"Authorization": f"Bearer {access['token']}",
+                                            "Content-Type": "application/fhir+json", "Accept": "application/fhir+json"})
+    except httpx.HTTPError as exc:
+        raise SmartError("Couldn't reach the EHR to save the note.") from exc
+    if response.status_code in (401, 403):
+        raise SmartError("The EHR refused to save the note. Check GroundCheck's write permission with the EHR team.")
+    if response.status_code not in (200, 201):
+        raise SmartError(f"The EHR couldn't save the note ({response.status_code}).")
+    location = response.headers.get("location", "")
+    try:
+        created_id = response.json().get("id") if response.content else None
+    except ValueError:
+        created_id = None
+    if not created_id and "/DocumentReference/" in location:
+        created_id = location.split("/DocumentReference/", 1)[1].split("/")[0]
+    return {"id": created_id, "reference": f"DocumentReference/{created_id}" if created_id else None, "text": text}

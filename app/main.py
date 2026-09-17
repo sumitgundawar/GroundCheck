@@ -16,6 +16,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from . import (
     audit, auth, config, db, encryption, governance, integrity, llm, local_ai, pipeline, retention, retrieval, sso,
@@ -1027,6 +1028,35 @@ async def ehr_load(body: EhrLoadRequest, request: Request, response: Response,
     response.set_cookie(EHR_COOKIE, token, httponly=True, samesite="strict", path="/",
                         secure=config.SESSION_COOKIE_SECURE, max_age=config.EHR_CONTEXT_MINUTES * 60)
     return {"context": context}
+
+
+class EhrNoteRequest(BaseModel):
+    audit_id: str
+    comment: str = ""
+
+
+@app.post("/api/ehr/notes")
+async def ehr_note(body: EhrNoteRequest, request: Request,
+                   user: auth.Principal | None = Depends(require_role("clinician"))) -> dict:
+    from . import smart
+
+    _require_database()
+    record = audit.store.get(body.audit_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="That answer isn't in the audit trail.")
+    if user is not None and record.get("user_id") not in (None, user.id):
+        raise HTTPException(status_code=403, detail="You can only save answers you asked.")
+    with db.session() as s:
+        row = s.scalar(select(db.AuditRecord).where(db.AuditRecord.audit_id == body.audit_id))
+        created = row.created_at.isoformat() if row else None
+    reviewer = (user.name or user.email) if user else "a clinician"
+    try:
+        result = await run_in_threadpool(smart.write_note, request.cookies.get(EHR_COOKIE),
+                                         {**record, "created_at": created}, reviewer, body.comment[:1000])
+    except smart.SmartError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    logging.getLogger("groundcheck.ehr").info("Saved audit record %s to the EHR as %s", body.audit_id, result["reference"])
+    return {"reference": result["reference"]}
 
 
 CDS_CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
