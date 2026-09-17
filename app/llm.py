@@ -224,10 +224,8 @@ def generate_extractive(query: str, scored_sources: list[tuple[dict, float]],
         ]
         scored_sources = on_topic or scored_sources
 
-    claims: list[LLMClaim] = []
-    for record, score in scored_sources:
-        if score < threshold:
-            continue
-        sentence = retrieval.best_sentence(query, record["text"])
-        claims.append(LLMClaim(text=sentence, source_ids=[record["id"]]))
+    kept = [record for record, score in scored_sources if score >= threshold]
+    sentences = retrieval.best_sentences(query, [record["text"] for record in kept])
+    claims = [LLMClaim(text=sentence, source_ids=[record["id"]])
+              for record, sentence in zip(kept, sentences)]
     return LLMAnswer(insufficient_context=not claims, claims=claims)

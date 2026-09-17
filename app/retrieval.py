@@ -357,6 +357,26 @@ def split_sentences(text: str) -> list[str]:
     return parts or [text.strip()]
 
 
+def best_sentences(query: str, passages: list[str]) -> list[str]:
+    """The sentence of each passage most similar to the query. Every sentence
+    across every passage is embedded in one call, with the query, because a
+    sentence-transformer batches far better than it repeats: answering a
+    question took two thirds of a second when each passage was embedded on
+    its own."""
+    if not passages:
+        return []
+    split = [split_sentences(text) for text in passages]
+    flat = [s for sentences in split for s in sentences]
+    vectors = embed([query] + flat)
+    query_vec, sentence_vecs = vectors[0], vectors[1:]
+    out, start = [], 0
+    for sentences in split:
+        sims = sentence_vecs[start:start + len(sentences)] @ query_vec
+        out.append(sentences[int(np.argmax(sims))])
+        start += len(sentences)
+    return out
+
+
 def best_sentence(query: str, passage_text: str) -> str:
     """Pick the sentence of a passage most similar to the query. Used by the
     extractive fallback so claims stay short and on-topic."""
