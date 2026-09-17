@@ -66,6 +66,16 @@ def _model_lines(analysis) -> str:
     return "; ".join(parts)
 
 
+def _person_name(name: str) -> str:
+    """A DICOM person name (family^given) from a display name."""
+    parts = (name or "").replace("^", " ").split()
+    if not parts:
+        return "Unknown^"
+    if len(parts) == 1:
+        return f"{parts[0]}^"
+    return f"{parts[-1]}^{' '.join(parts[:-1])}"
+
+
 def build(*, series, report, analysis, previous, identified: bool) -> Dataset:
     items = [
         _text("121071", "DCM", "Finding", report.findings),
@@ -92,7 +102,7 @@ def build(*, series, report, analysis, previous, identified: bool) -> Dataset:
         series_instance_uid=generate_uid(entropy_srcs=[series.uid, "groundcheck report series"]),
         series_number=990, sop_instance_uid=report.sr_uid, instance_number=report.id,
         manufacturer="GroundCheck", is_complete=True, is_final=True, is_verified=True,
-        verifying_observer_name=report.author_name or "Unknown",
+        verifying_observer_name=_person_name(report.author_name),
         verifying_organization=config.ORGANISATION_NAME or "GroundCheck",
     )
     ds.SeriesDescription = "GroundCheck report"

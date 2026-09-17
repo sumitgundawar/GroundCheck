@@ -208,7 +208,7 @@ def train(run_dir: Path, resume: bool = False) -> None:
     first_epoch = 1
     earlier_seconds = 0.0
     if resume and checkpoint_path.is_file():
-        saved = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        saved = torch.load(checkpoint_path, map_location="cpu", weights_only=True)  # tensors and plain data only; never code
         model.load_state_dict(saved["model"])
         optimizer.load_state_dict(saved["optimizer"])
         scheduler.load_state_dict(saved["scheduler"])

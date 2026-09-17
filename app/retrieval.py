@@ -61,6 +61,12 @@ def get_model():
     return SentenceTransformer(config.EMBED_MODEL)
 
 
+def embedding_dimension() -> int:
+    model = get_model()
+    method = getattr(model, "get_embedding_dimension", None) or model.get_sentence_embedding_dimension
+    return int(method())
+
+
 def embed(texts: list[str]) -> np.ndarray:
     """Embed and L2-normalise a list of texts. Returns a float32 matrix."""
     model = get_model()
@@ -446,7 +452,7 @@ def embedding_summary() -> dict:
     documents = sum(1 for r in state.metadata if r.get("source_id"))
     return {
         "model": config.EMBED_MODEL,
-        "dimensions": int(vectors.shape[1]) if vectors.size else get_model().get_sentence_embedding_dimension(),
+        "dimensions": int(vectors.shape[1]) if vectors.size else embedding_dimension(),
         "passages": len(state.metadata),
         "from_your_documents": documents,
         "from_demo_corpus": len(state.metadata) - documents,

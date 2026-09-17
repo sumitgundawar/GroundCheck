@@ -286,7 +286,7 @@ def rebuild_index(reason: str = "Index rebuilt", user_id: int | None = None, use
             vectors = np.stack([cache[k] for k in keys]).astype("float32")
         else:
             # Nothing to search yet: every question will be refused.
-            dim = retrieval.get_model().get_sentence_embedding_dimension()
+            dim = retrieval.embedding_dimension()
             vectors = np.zeros((0, dim), dtype="float32")
         _status.release = None
         if db.ready():
