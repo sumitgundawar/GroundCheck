@@ -1954,6 +1954,11 @@ async def security_headers(request: Request, call_next):
     headers.setdefault("Referrer-Policy", "same-origin")
     headers.setdefault("X-Frame-Options", "DENY")
     headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    # Other sites can't embed or read the dashboard's resources. EHRs call the
+    # CDS services with CORS, which these don't restrict.
+    headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    if path not in ("/docs", "/redoc", "/docs/oauth2-redirect"):   # the docs load scripts from a CDN
+        headers.setdefault("Cross-Origin-Embedder-Policy", "require-corp")
     headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
     headers.setdefault("Content-Security-Policy",
                        DOCS_POLICY if path in ("/docs", "/redoc", "/docs/oauth2-redirect") else CONTENT_SECURITY_POLICY)

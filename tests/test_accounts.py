@@ -334,6 +334,9 @@ def test_security_headers_and_no_third_party_resources():
         csp = page.headers["content-security-policy"]
         assert "default-src 'self'" in csp and "frame-ancestors 'none'" in csp and "unsafe-inline" not in csp
         assert page.headers["x-frame-options"] == "DENY" and page.headers["x-content-type-options"] == "nosniff"
+        assert page.headers["cross-origin-resource-policy"] == "same-origin"
+        assert page.headers["cross-origin-embedder-policy"] == "require-corp"
+        assert "cross-origin-embedder-policy" not in c.get("/docs").headers
         assert "googleapis" not in page.text and "gstatic" not in page.text
         assert "strict-transport-security" not in page.headers
         assert c.get("/", headers={"X-Forwarded-Proto": "https"}).headers["strict-transport-security"].startswith("max-age=")
