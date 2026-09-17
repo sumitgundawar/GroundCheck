@@ -1119,7 +1119,9 @@ family at a time.
 | Static analysis | `bandit -r app` | no medium or high findings |
 | Web vulnerabilities | OWASP ZAP baseline and active API scan | 0 failures over 305 endpoint variants |
 
-Re-run them before a release, and after upgrading dependencies.
+Re-run them before a release, and after upgrading dependencies. CI also
+produces a CycloneDX bill of materials and a licence list for every build; see
+[docs/third-party.md](docs/third-party.md).
 
 ---
 

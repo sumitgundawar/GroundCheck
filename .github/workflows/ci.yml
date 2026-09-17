@@ -70,6 +70,21 @@ jobs:
       - name: Static analysis
         run: bandit -r app -q -ll
 
+      - name: Bill of materials and licences
+        run: |
+          pip install cyclonedx-bom pip-licenses
+          pip install -r requirements.txt
+          cyclonedx-py environment -o sbom.json --output-format json
+          pip-licenses --format=csv --with-urls > third-party-licences.csv
+
+      - name: Upload the bill of materials
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            third-party-licences.csv
+
   site:
     name: Website checks
     runs-on: ubuntu-latest
