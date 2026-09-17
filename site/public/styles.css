@@ -1054,12 +1054,13 @@ code, .mono{ font-family: var(--font-mono); font-size: 0.9em; }
 
 .demo-chapters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.75rem;
   margin-top: 1rem;
 }
-@media (max-width: 40rem) {
-  .demo-chapters { grid-template-columns: minmax(0, 1fr); }
+/* Five chapters: one row where they fit, otherwise one per line. */
+@media (max-width: 72rem) {
+  .demo-chapters { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
 }
 
 .chapter {

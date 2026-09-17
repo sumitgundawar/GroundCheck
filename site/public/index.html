@@ -154,8 +154,8 @@
     <section class="section demo" id="demo" aria-labelledby="demo-title">
       <div class="wrap">
         <div class="section-intro section-intro-center">
-          <h2 id="demo-title">See it in 35 seconds</h2>
-          <p>A real screen recording of the dashboard on a laptop, with no API key.</p>
+          <h2 id="demo-title">See it in 50 seconds</h2>
+          <p>A real screen recording of the app on a laptop, with synthetic data and no API key.</p>
         </div>
 
         <figure class="demo-figure" data-demo>
@@ -176,15 +176,19 @@
           </div>
           <div class="demo-chapters" role="group" aria-label="Jump to a moment">
             <button type="button" class="chapter" data-chapter="0"><span class="chapter-num">1</span><span class="chapter-text">A cited answer</span><span class="chapter-time">0:00</span></button>
-            <button type="button" class="chapter" data-chapter="13"><span class="chapter-num">2</span><span class="chapter-text">A refusal, with its reason</span><span class="chapter-time">0:13</span></button>
-            <button type="button" class="chapter" data-chapter="22.4"><span class="chapter-num">3</span><span class="chapter-text">A guard switched off</span><span class="chapter-time">0:22</span></button>
+            <button type="button" class="chapter" data-chapter="11.6"><span class="chapter-num">2</span><span class="chapter-text">A refusal, sent for review</span><span class="chapter-time">0:11</span></button>
+            <button type="button" class="chapter" data-chapter="24.5"><span class="chapter-num">3</span><span class="chapter-text">The usage dashboard</span><span class="chapter-time">0:24</span></button>
+            <button type="button" class="chapter" data-chapter="29.1"><span class="chapter-num">4</span><span class="chapter-text">Train and try a CT model</span><span class="chapter-time">0:29</span></button>
+            <button type="button" class="chapter" data-chapter="42.9"><span class="chapter-num">5</span><span class="chapter-text">Dark mode and the audit trail</span><span class="chapter-time">0:42</span></button>
           </div>
           <details class="transcript" id="demo-transcript">
             <summary>What happens in the video</summary>
             <ol>
-              <li>A question about Caloradine’s dose and interactions gets an answer in which every claim cites its source, with the retrieved passages and a trace of every check.</li>
-              <li>A question about Zalortin, which no source mentions, is refused with the reason: the term does not appear in any trusted source.</li>
-              <li>With the source coverage guard switched off, the same question gets a confident answer about Caloradine, a different drug. This is what an unguarded system does.</li>
+              <li>A question about Caloradine’s standard dose gets an answer in which every statement cites its source, shown with the retrieved passages and a trace of every check.</li>
+              <li>A question about a 5-year-old is refused, because no trusted source covers children. The refusal appears in the Review queue for a clinician.</li>
+              <li>The Usage page shows questions, refusal rates and response times.</li>
+              <li>A classifier trained on public abdominal CT scans on the laptop’s GPU shows its training curves, then names the organ in a CT slice as liver.</li>
+              <li>The app switches to dark mode, and the Data protection page verifies that the audit trail is intact and signed.</li>
             </ol>
           </details>
         </figure>
