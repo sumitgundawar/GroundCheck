@@ -560,6 +560,122 @@ def usage(days: int = 30, site_id: int | None = None) -> dict:
     }
 
 
+def surveillance_markdown(days: int = 90, site_id: int | None = None) -> str:
+    """A post-market surveillance report for the period: what people asked, what
+    was refused and why, what reviewers found, incidents and their harm,
+    operational alerts, and which knowledge releases went live. Regulators and
+    quality systems expect this kind of summary at regular intervals; it
+    gathers the evidence, and a qualified person signs it off."""
+    from . import incidents as incidents_module
+    from .db import Alert, Incident, Release
+
+    r = report(days, site_id)
+    use = usage(min(days, 366), site_id)
+    now = utcnow()
+    since = now - timedelta(days=days)
+    with db.session() as s:
+        incident_rows = s.scalars(select(Incident).where(Incident.reported_at >= since, *(
+            [Incident.site_id == site_id] if site_id is not None else []))).all()
+        by_harm = {k: sum(i.harm == k for i in incident_rows) for k in incidents_module.HARM}
+        by_category = {}
+        for i in incident_rows:
+            by_category[i.category] = by_category.get(i.category, 0) + 1
+        open_incidents = [i for i in incident_rows if i.status != "closed"]
+        reportable = [i for i in incident_rows if i.category == "data_protection" or i.harm in ("severe", "death")]
+        alerts = s.scalars(select(Alert).where(Alert.first_seen >= since).order_by(Alert.first_seen)).all()
+        releases = s.scalars(select(Release).where(Release.created_at >= since).order_by(Release.number)).all()
+        alert_counts: dict[str, int] = {}
+        for a in alerts:
+            alert_counts[a.rule] = alert_counts.get(a.rule, 0) + 1
+    q, rv = r["questions"], r["reviews"]
+    lines = [
+        "# GroundCheck post-market surveillance report",
+        "",
+        f"Version {__version__}. Generated {now:%Y-%m-%d %H:%M} UTC. Period: {since:%Y-%m-%d} to {now:%Y-%m-%d} "
+        f"({days} days).",
+        "",
+        "This report gathers what the software did in use. It supports, and does not replace, the surveillance",
+        "your quality system requires. GroundCheck is not a certified medical device.",
+        "",
+        "## Use",
+        "",
+        f"- Questions: {q['total']} ({q['answered']} answered, {q['refused']} refused"
+        + (f", {q['refusal_rate']:.0%} refused" if q["refusal_rate"] is not None else "") + ")",
+        f"- Drafted by a model: {q['drafted_by_a_model']}; asked with a check switched off: {q['with_a_check_switched_off']}",
+        f"- Median response time: {use['totals'].get('median_ms', '–')} ms; 95th percentile: {use['totals'].get('p95_ms', '–')} ms",
+        f"- Questions with identifiers removed before storage: {use['totals'].get('deidentified', 0)}",
+        "",
+        "## Why answers were refused",
+        "",
+    ]
+    if q["refusal_reasons"]:
+        lines += ["| Reason | Refusals |", "| --- | --- |"]
+        lines += [f"| {reason} | {count} |" for reason, count in q["refusal_reasons"].items()]
+    else:
+        lines.append("No refusals in this period.")
+    lines += [
+        "",
+        "## Clinical review",
+        "",
+        f"- Cases opened: {rv['opened']} ({rv['flagged_answers']} flagged answers); resolved: {rv['resolved']}, "
+        f"on time: {rv['resolved_on_time']}",
+        f"- Escalated: {rv['escalated']}; open now: {rv['open_now']}; overdue now: {rv['overdue_now']}",
+        f"- Median time to resolve: {rv['median_hours_to_resolve'] if rv['median_hours_to_resolve'] is not None else '–'} hours",
+        "- Outcomes: " + (", ".join(f"{OUTCOMES.get(k, k)}: {v}" for k, v in rv["outcomes"].items()) or "none"),
+        "",
+        "## Incidents",
+        "",
+        f"- Reported: {len(incident_rows)}; still open: {len(open_incidents)}",
+        "- Harm: " + (", ".join(f"{incidents_module.HARM[k]}: {v}" for k, v in by_harm.items() if v) or "none reported"),
+        "- Concerning: " + (", ".join(f"{incidents_module.CATEGORIES[k]}: {v}" for k, v in by_category.items()) or "none"),
+        f"- Needing a decision on reporting to a regulator: {len(reportable)}",
+        "",
+    ]
+    if incident_rows:
+        lines += ["| Reference | Concerns | Harm | Status | External report |", "| --- | --- | --- | --- | --- |"]
+        for i in incident_rows:
+            lines.append("| " + " | ".join([
+                incidents_module.reference(i.id, i.reported_at), incidents_module.CATEGORIES[i.category],
+                incidents_module.HARM[i.harm], i.status,
+                (i.external_reference or "none recorded").replace("|", "/")[:80],
+            ]) + " |")
+        lines.append("")
+    lines += [
+        "## Operational alerts",
+        "",
+        ("- " + "\n- ".join(f"{rule}: {count}" for rule, count in sorted(alert_counts.items()))) if alert_counts
+        else "No alerts fired in this period.",
+        "",
+        "## Knowledge releases",
+        "",
+    ]
+    if releases:
+        lines += ["| Release | Reason | Passages | Check | Status |", "| --- | --- | --- | --- | --- |"]
+        for rel in releases:
+            check = rel.check or {}
+            verdict = "not checked" if check.get("skipped") else ("passed" if check.get("passed") else
+                                                                 f"blocked, {check.get('unsafe', 0)} unsafe")
+            lines.append(f"| R{rel.number} | {rel.reason.replace('|', '/')} | {rel.passages} | {verdict} | {rel.status} |")
+    else:
+        lines.append("No releases in this period.")
+    lines += [
+        "",
+        "## Actions for this period",
+        "",
+        "- [ ] Every incident reviewed, and reportable ones decided on",
+        "- [ ] Refusal reasons reviewed for documents that need writing or updating",
+        "- [ ] Overdue review cases cleared",
+        "- [ ] Hazard log reviewed against what happened",
+        "- [ ] Thresholds and the evaluation re-checked if use has changed",
+        "",
+        "## Sign-off",
+        "",
+        "Quality or clinical safety lead: ____________________  Date: __________",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def safety_case_markdown(days: int = 30, site_id: int | None = None) -> str:
     """A clinical safety case summary for this release, as Markdown."""
     r = report(days, site_id)

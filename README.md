@@ -934,6 +934,17 @@ Titles, descriptions, root causes, actions and comments are encrypted with
 `DATA_ENCRYPTION_KEYS`. **Download CSV** exports the log for your safety
 committee or quality system.
 
+### Surveillance reports
+
+The Review page's report tab also downloads a **post-market surveillance
+report** for a period (90 days by default): what people asked, why answers
+were refused, what reviewers found and how quickly, every incident with its
+harm and whether a regulator decision is needed, the operational alerts that
+fired, and which knowledge releases went live. It ends with the actions to
+work through and a line for a quality or clinical safety lead to sign.
+Regulated use expects this at regular intervals; GroundCheck gathers the
+evidence, and a qualified person reviews and signs it.
+
 ---
 
 ## Configuration

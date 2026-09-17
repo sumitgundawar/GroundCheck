@@ -2243,6 +2243,7 @@ function openHazard(h) {
 async function loadReport() {
   const days = $("report-days").value;
   $("safety-case-download").href = `/api/governance/safety-case?days=${days}`;
+  $("surveillance-download").href = `/api/governance/surveillance?days=${Math.max(days, 90)}`;
   let r;
   try { r = await api(`/api/governance/report?days=${days}`); }
   catch (err) { showMessage("review-message", err.message, true); return; }

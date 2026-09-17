@@ -320,3 +320,34 @@ def test_embeddings_summary_endpoint():
         body = c.get("/api/embeddings").json()
     assert body["dimensions"] == 384 and body["passages"] == len(retrieval.all_metadata())
     assert body["vector_store"] in ("local", "qdrant") and "state" in body["index"]
+
+
+def test_surveillance_report_gathers_the_period(queue, monkeypatch):
+    from app import incidents, monitoring
+
+    monkeypatch.setattr(config, "ALERT_DISABLED_RULES", {"audit_chain"})
+    pipeline.run(REFUSED)
+    pipeline.run(ANSWERED)
+    incidents.report({"title": "Wrong formulation quoted", "category": "answer", "harm": "moderate",
+                      "description": "Seen on the ward."}, None, "Dr Rev")
+    incidents.report({"title": "Export sent to the wrong address", "category": "data_protection",
+                      "description": "Recalled."}, None, "Dr Rev")
+    monitoring.evaluate()
+    text = governance.surveillance_markdown(90)
+    assert "# GroundCheck post-market surveillance report" in text
+    assert "Questions: 2 (1 answered, 1 refused" in text
+    assert "Moderate harm: 1" in text and "Data protection or security: 1" in text
+    assert "Needing a decision on reporting to a regulator: 1" in text   # the data breach, not moderate harm
+    assert "INC-" in text and "Quality or clinical safety lead:" in text
+    assert "term not in sources" in text          # why the refusal happened
+
+
+def test_surveillance_report_needs_a_reviewer(client):
+    auth.create_user("clin@example.org", PASSWORD, role="clinician")
+    auth.create_user("rev@example.org", PASSWORD, role="reviewer")
+    _login(client, "clin@example.org")
+    assert client.get("/api/governance/surveillance").status_code == 403
+    _login(client, "rev@example.org")
+    r = client.get("/api/governance/surveillance?days=30")
+    assert r.status_code == 200 and r.text.startswith("# GroundCheck post-market surveillance report")
+    assert r.headers["content-disposition"].endswith('filename="groundcheck-surveillance.md"')

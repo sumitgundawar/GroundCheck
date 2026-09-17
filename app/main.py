@@ -1034,6 +1034,18 @@ def governance_safety_case(request: Request, days: int = 30) -> Response:
         "Content-Disposition": 'attachment; filename="groundcheck-safety-case.md"'})
 
 
+@app.get("/api/governance/surveillance")
+def governance_surveillance(request: Request, days: int = 90) -> Response:
+    user = require_manager(request, "reviewer")
+    _require_database()
+    try:
+        text = governance.surveillance_markdown(days, _site(user))
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+    return Response(text, media_type="text/markdown; charset=utf-8", headers={
+        "Content-Disposition": 'attachment; filename="groundcheck-surveillance.md"'})
+
+
 # --- EHR integration --------------------------------------------------------------
 #
 # SMART on FHIR launch and patient loading (/api/ehr/...), and a CDS Hooks
