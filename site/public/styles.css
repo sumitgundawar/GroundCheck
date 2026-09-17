@@ -1398,6 +1398,19 @@ code, .mono{ font-family: var(--font-mono); font-size: 0.9em; }
 .limits { gap: 0 clamp(2rem, 5vw, 4rem); grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
 .limits li { color: var(--muted); }
 
+
+/* Scale note under the evaluation meters */
+.eval-scale{
+  margin-top: 1.75rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.eval-scale h3{ margin: 0 0 0.35rem; font-size: 1.05rem; }
+.eval-scale p{ margin: 0; color: var(--muted); max-width: 70ch; }
+
 /* ---------- Roadmap cards ---------- */
 
 .phase-card {
