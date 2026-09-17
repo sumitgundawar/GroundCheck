@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import time
 
-from . import audit, config, governance, guards_input, guards_output, llm, retrieval
-from .schemas import AskResponse, Claim, Settings, Source, TraceStep
+from . import audit, config, governance, guards_input, guards_output, llm, patient_checks, retrieval
+from .schemas import AskResponse, Claim, PatientContext, PatientFinding, Settings, Source, TraceStep
 
 # The full ordered set of stage names, used to render skipped stages after an
 # early refusal so the trace always shows the complete instrument.
@@ -64,6 +64,7 @@ def _finish(
     llm_used: bool,
     timer: _Timer,
     extras: dict,
+    patient_findings: list[PatientFinding] | None = None,
 ) -> AskResponse:
     audit_id = audit.store.new_id()
     # Final decision step.
@@ -90,6 +91,7 @@ def _finish(
         audit_id=audit_id,
         total_ms=timer.total_ms(),
         llm_used=llm_used,
+        patient_findings=patient_findings or [],
     )
     saved = {k: v for k, v in extras.items() if k not in ("user_id", "review")}
     if not extras.get("review", True):
@@ -118,6 +120,12 @@ STAGE_EXPLAIN = {
     "rate limit":
         "A simple in-memory limiter caps requests per minute per process, so a "
         "burst of traffic cannot overwhelm the service.",
+    "patient checks":
+        "When the question is about a specific patient, the formulary's rules "
+        "for every medicine named are applied to that patient: allergies, "
+        "conditions, interactions with current medicines, age, weight, kidney and "
+        "liver function, pregnancy, lab results and high-alert status. A problem "
+        "that makes the answer unsafe refuses it; others are shown as warnings.",
     "retrieve":
         "The query is embedded with a sentence-transformer and compared against "
         "every document vector in the vector store, alongside a keyword search. The top-k "
@@ -164,7 +172,7 @@ STAGE_EXPLAIN = {
 
 def run(raw_query: str, settings: "Settings | None" = None,
         client_id: str = "global", user_id: int | None = None,
-        review: bool = True) -> AskResponse:
+        review: bool = True, patient: PatientContext | None = None) -> AskResponse:
     """Run a question through the pipeline. review=False keeps a refusal out of
     the review queue, for generated test questions."""
     # Effective settings: an explicit object, or the configured defaults.
@@ -173,6 +181,8 @@ def run(raw_query: str, settings: "Settings | None" = None,
     trace: list[TraceStep] = []
     extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump(), "user_id": user_id,
                     "review": review}
+    if patient is not None and not patient.is_empty():
+        extras["patient"] = patient.model_dump(exclude_defaults=True)
 
     # --- 1. Input guards ---------------------------------------------------
     if cfg.enable_pii_redaction:
@@ -428,7 +438,36 @@ def run(raw_query: str, settings: "Settings | None" = None,
                                              "verbatim in a retrieved source",
                                      "ok": dose_ok}))
 
-    # --- 9. Decision gate --------------------------------------------------
+    # --- 9. Patient checks -------------------------------------------------
+    findings: list[PatientFinding] = []
+    if patient is None or patient.is_empty():
+        trace.append(TraceStep(name="patient checks", status="skip",
+                               detail="no patient details given", ms=timer.lap_ms()))
+    else:
+        checked = patient_checks.review(query, claims, patient)
+        findings = checked.findings
+        blocking = checked.blocking
+        warnings = [f for f in findings if f.severity == "warn"]
+        trace.append(TraceStep(
+            name="patient checks",
+            status="fail" if blocking else "warn" if warnings else "pass" if checked.medicines else "info",
+            detail=(blocking.message if blocking
+                    else f"{len(warnings)} warning(s) for {', '.join(checked.medicines)}" if warnings
+                    else f"no problems for this patient with {', '.join(checked.medicines)}" if checked.medicines
+                    else "no formulary medicines in the question or answer"),
+            ms=timer.lap_ms(),
+            data={"medicines": checked.medicines, "findings": [f.model_dump() for f in findings],
+                  "derived": checked.derived},
+        ))
+        if blocking and not ungrounded and dose_ok:
+            reason = blocking.message.rstrip(".")
+            return _finish(decision="refuse",
+                           answer_text=REFUSAL_PREFIX + blocking.message + " " + ROUTED,
+                           refused_reason=reason[0].lower() + reason[1:], claims=claims, sources=sources,
+                           trace=trace, llm_used=llm_used, timer=timer, extras=extras,
+                           patient_findings=findings)
+
+    # --- 10. Decision gate -------------------------------------------------
     if ungrounded:
         reason = f"a claim could not be grounded: \"{ungrounded[0]}\""
         return _finish(decision="refuse",
@@ -448,7 +487,8 @@ def run(raw_query: str, settings: "Settings | None" = None,
     answer_text = _assemble_answer(claims)
     return _finish(decision="answer", answer_text=answer_text,
                    refused_reason=None, claims=claims, sources=sources,
-                   trace=trace, llm_used=llm_used, timer=timer, extras=extras)
+                   trace=trace, llm_used=llm_used, timer=timer, extras=extras,
+                   patient_findings=findings)
 
 
 def _assemble_answer(claims: list[Claim]) -> str:

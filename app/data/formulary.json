@@ -1,0 +1,4107 @@
+{
+ "name": "GroundCheck demo formulary",
+ "version": "2026.09",
+ "synthetic": true,
+ "medicines": [
+  {
+   "name": "Caloradine",
+   "classes": [
+    "quorl modulators"
+   ],
+   "source_ids": [
+    "CALO-001",
+    "VELT-002",
+    "INTR-001"
+   ],
+   "allergy_groups": [
+    "quorl"
+   ],
+   "contraindicated_conditions": [
+    "quorl sensitivity"
+   ],
+   "interactions": [
+    {
+     "id": "CALO-INT-1",
+     "with_class": "Orrin-blockers",
+     "severity": "contraindicated",
+     "source": "INTR-001",
+     "note": "Orrin-blockers must not be combined with Caloradine."
+    },
+    {
+     "id": "CALO-INT-2",
+     "with_medicine": "Mendel solution",
+     "severity": "major",
+     "source": "Demo formulary (synthetic)",
+     "note": "Use together only with specialist advice, and review for dizziness."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 15
+   },
+   "renal": [
+    {
+     "id": "CALO-RENAL-1",
+     "egfr_below": 30,
+     "action": "avoid",
+     "source": "Demo formulary (synthetic)",
+     "note": "Avoid when eGFR is below 30."
+    },
+    {
+     "id": "CALO-RENAL-2",
+     "egfr_below": 60,
+     "action": "reduce",
+     "source": "Demo formulary (synthetic)",
+     "dose": {
+      "amount": 7.5,
+      "unit": "mg",
+      "frequency": "once daily",
+      "max_daily": 7.5
+     },
+     "note": "Halve the dose when eGFR is 30 to 59."
+    }
+   ],
+   "hepatic": [
+    {
+     "id": "CALO-HEP-1",
+     "child_pugh": "C",
+     "action": "avoid",
+     "source": "Demo formulary (synthetic)",
+     "note": "Avoid in severe liver disease."
+    },
+    {
+     "id": "CALO-HEP-2",
+     "child_pugh": "B",
+     "action": "caution",
+     "source": "Demo formulary (synthetic)",
+     "note": "Monitor closely in moderate liver disease."
+    }
+   ],
+   "pregnancy": "avoid",
+   "breastfeeding": "no_data",
+   "requires": [
+    "egfr"
+   ]
+  },
+  {
+   "name": "Mendel solution",
+   "aliases": [
+    "Mendel"
+   ],
+   "classes": [
+    "orrin supplements"
+   ],
+   "source_ids": [
+    "MEND-001",
+    "INTR-001"
+   ],
+   "interactions": [
+    {
+     "id": "MEND-INT-1",
+     "with_class": "Orrin-blockers",
+     "severity": "contraindicated",
+     "source": "INTR-001",
+     "note": "Orrin-blockers must not be combined with Mendel solution."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 5
+   },
+   "paediatric_dose": {
+    "per_kg": 0.1,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_single": 5
+   },
+   "paediatric_min_age": 6,
+   "pregnancy": "compatible",
+   "breastfeeding": "compatible"
+  },
+  {
+   "name": "Tessorin",
+   "classes": [
+    "Orrin-blockers"
+   ],
+   "source_ids": [
+    "INTR-001"
+   ],
+   "adult_dose": {
+    "amount": 10,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 20
+   },
+   "labs": [
+    {
+     "id": "TESS-LAB-1",
+     "lab": "potassium",
+     "above": 5.5,
+     "action": "avoid",
+     "source": "Demo formulary (synthetic)",
+     "note": "Avoid when potassium is above 5.5 mmol/L."
+    }
+   ],
+   "pregnancy": "no_data"
+  },
+  {
+   "name": "Vorantil",
+   "classes": [
+    "anticoagulants"
+   ],
+   "high_alert": true,
+   "source_ids": [],
+   "weight_dose": {
+    "per_kg": 1,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_single": 100
+   },
+   "renal": [
+    {
+     "id": "VORA-RENAL-1",
+     "egfr_below": 30,
+     "action": "avoid",
+     "source": "Demo formulary (synthetic)",
+     "note": "Avoid when eGFR is below 30."
+    }
+   ],
+   "labs": [
+    {
+     "id": "VORA-LAB-1",
+     "lab": "platelets",
+     "below": 100,
+     "action": "avoid",
+     "source": "Demo formulary (synthetic)",
+     "note": "Avoid when platelets are below 100 x10^9/L."
+    },
+    {
+     "id": "VORA-LAB-2",
+     "lab": "inr",
+     "above": 1.5,
+     "action": "caution",
+     "source": "Demo formulary (synthetic)",
+     "note": "Check with a haematologist when INR is above 1.5."
+    }
+   ],
+   "interactions": [
+    {
+     "id": "VORA-INT-1",
+     "with_class": "anticoagulants",
+     "severity": "contraindicated",
+     "source": "Demo formulary (synthetic)",
+     "note": "Don't combine two anticoagulants."
+    }
+   ],
+   "pregnancy": "avoid",
+   "requires": [
+    "weight_kg",
+    "egfr"
+   ]
+  },
+  {
+   "name": "Barkoririn complex",
+   "source_ids": [
+    "BARK-D1472",
+    "BARK-D1473",
+    "BARK-D1474"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "BARK-D1472-INT",
+     "with_class": "Get-blockers",
+     "severity": "contraindicated",
+     "source": "BARK-D1474",
+     "note": "Barkoririn complex should not be combined with Get-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Belbotirin complex",
+   "source_ids": [
+    "BELB-D0462",
+    "BELB-D0463",
+    "BELB-D0464"
+   ],
+   "allergy_groups": [
+    "tovrin"
+   ],
+   "interactions": [
+    {
+     "id": "BELB-D0462-INT",
+     "with_class": "Mur-blockers",
+     "severity": "contraindicated",
+     "source": "BELB-D0464",
+     "note": "Belbotirin complex should not be combined with Mur-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Bemmisumide",
+   "source_ids": [
+    "BEMM-D0912",
+    "BEMM-D0913",
+    "BEMM-D0914"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "BEMM-D0912-INT",
+     "with_class": "Tol-blockers",
+     "severity": "contraindicated",
+     "source": "BEMM-D0914",
+     "note": "Bemmisumide should not be combined with Tol-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Betbarondel",
+   "source_ids": [
+    "BETB-D1402",
+    "BETB-D1403",
+    "BETB-D1404"
+   ],
+   "allergy_groups": [
+    "glenor"
+   ],
+   "interactions": [
+    {
+     "id": "BETB-D1402-INT",
+     "with_class": "Sit-blockers",
+     "severity": "contraindicated",
+     "source": "BETB-D1404",
+     "note": "Betbarondel should not be combined with Sit-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 15.0
+   }
+  },
+  {
+   "name": "Bimgimaprex",
+   "source_ids": [
+    "BIMG-D0362",
+    "BIMG-D0363",
+    "BIMG-D0364"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "BIMG-D0362-INT",
+     "with_class": "Fam-blockers",
+     "severity": "contraindicated",
+     "source": "BIMG-D0364",
+     "note": "Bimgimaprex should not be combined with Fam-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mL",
+    "frequency": "once every morning",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Bolmuririn",
+   "source_ids": [
+    "BOLM-D1032",
+    "BOLM-D1033",
+    "BOLM-D1034"
+   ],
+   "allergy_groups": [
+    "yarnic"
+   ],
+   "interactions": [
+    {
+     "id": "BOLM-D1032-INT",
+     "with_class": "Rum-blockers",
+     "severity": "contraindicated",
+     "source": "BOLM-D1034",
+     "note": "Bolmuririn should not be combined with Rum-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mL",
+    "frequency": "twice daily",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Borsudavine",
+   "source_ids": [
+    "BORS-D1282",
+    "BORS-D1283",
+    "BORS-D1284"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "BORS-D1282-INT",
+     "with_class": "Sim-blockers",
+     "severity": "contraindicated",
+     "source": "BORS-D1284",
+     "note": "Borsudavine should not be combined with Sim-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Bossodavine complex",
+   "source_ids": [
+    "BOSS-D0172",
+    "BOSS-D0173",
+    "BOSS-D0174"
+   ],
+   "allergy_groups": [
+    "jadrin"
+   ],
+   "interactions": [
+    {
+     "id": "BOSS-D0172-INT",
+     "with_class": "Ton-blockers",
+     "severity": "contraindicated",
+     "source": "BOSS-D0174",
+     "note": "Bossodavine complex should not be combined with Ton-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mcg",
+    "frequency": "once every morning",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Dedsotestal",
+   "source_ids": [
+    "DEDS-D0032",
+    "DEDS-D0033",
+    "DEDS-D0034"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "DEDS-D0032-INT",
+     "with_class": "Lat-blockers",
+     "severity": "contraindicated",
+     "source": "DEDS-D0034",
+     "note": "Dedsotestal should not be combined with Lat-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Delrolavine complex",
+   "source_ids": [
+    "DELR-D0302",
+    "DELR-D0303",
+    "DELR-D0304"
+   ],
+   "allergy_groups": [
+    "wendal"
+   ],
+   "interactions": [
+    {
+     "id": "DELR-D0302-INT",
+     "with_class": "Tid-blockers",
+     "severity": "contraindicated",
+     "source": "DELR-D0304",
+     "note": "Delrolavine complex should not be combined with Tid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mL",
+    "frequency": "twice daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Demtetaprex solution",
+   "source_ids": [
+    "DEMT-D0502",
+    "DEMT-D0503",
+    "DEMT-D0504"
+   ],
+   "allergy_groups": [
+    "glenor"
+   ],
+   "interactions": [
+    {
+     "id": "DEMT-D0502-INT",
+     "with_class": "Som-blockers",
+     "severity": "contraindicated",
+     "source": "DEMT-D0504",
+     "note": "Demtetaprex solution should not be combined with Som-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Derselaprex solution",
+   "source_ids": [
+    "DERS-D1022",
+    "DERS-D1023",
+    "DERS-D1024"
+   ],
+   "allergy_groups": [
+    "wendal"
+   ],
+   "interactions": [
+    {
+     "id": "DERS-D1022-INT",
+     "with_class": "Von-blockers",
+     "severity": "contraindicated",
+     "source": "DERS-D1024",
+     "note": "Derselaprex solution should not be combined with Von-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Dorbilufen",
+   "source_ids": [
+    "DORB-D1412",
+    "DORB-D1413",
+    "DORB-D1414"
+   ],
+   "allergy_groups": [
+    "hossel"
+   ],
+   "interactions": [
+    {
+     "id": "DORB-D1412-INT",
+     "with_class": "Tud-blockers",
+     "severity": "contraindicated",
+     "source": "DORB-D1414",
+     "note": "Dorbilufen should not be combined with Tud-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Dorpenostan complex",
+   "source_ids": [
+    "DORP-D1182",
+    "DORP-D1183",
+    "DORP-D1184"
+   ],
+   "allergy_groups": [
+    "tovrin"
+   ],
+   "interactions": [
+    {
+     "id": "DORP-D1182-INT",
+     "with_class": "Vat-blockers",
+     "severity": "contraindicated",
+     "source": "DORP-D1184",
+     "note": "Dorpenostan complex should not be combined with Vat-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Dostinendal suspension",
+   "source_ids": [
+    "DOST-D0142",
+    "DOST-D0143",
+    "DOST-D0144"
+   ],
+   "allergy_groups": [
+    "glenor"
+   ],
+   "interactions": [
+    {
+     "id": "DOST-D0142-INT",
+     "with_class": "Dom-blockers",
+     "severity": "contraindicated",
+     "source": "DOST-D0144",
+     "note": "Dostinendal suspension should not be combined with Dom-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Dumkesadine complex",
+   "source_ids": [
+    "DUMK-D0932",
+    "DUMK-D0933",
+    "DUMK-D0934"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "DUMK-D0932-INT",
+     "with_class": "Lin-blockers",
+     "severity": "contraindicated",
+     "source": "DUMK-D0934",
+     "note": "Dumkesadine complex should not be combined with Lin-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Dusradavine",
+   "source_ids": [
+    "DUSR-D0292",
+    "DUSR-D0293",
+    "DUSR-D0294"
+   ],
+   "allergy_groups": [
+    "ulmate"
+   ],
+   "interactions": [
+    {
+     "id": "DUSR-D0292-INT",
+     "with_class": "Vis-blockers",
+     "severity": "contraindicated",
+     "source": "DUSR-D0294",
+     "note": "Dusradavine should not be combined with Vis-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Famtedestal complex",
+   "source_ids": [
+    "FAMT-D1092",
+    "FAMT-D1093",
+    "FAMT-D1094"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "FAMT-D1092-INT",
+     "with_class": "Lus-blockers",
+     "severity": "contraindicated",
+     "source": "FAMT-D1094",
+     "note": "Famtedestal complex should not be combined with Lus-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Fasmamavine complex",
+   "source_ids": [
+    "FASM-D0712",
+    "FASM-D0713",
+    "FASM-D0714"
+   ],
+   "allergy_groups": [
+    "jadrin"
+   ],
+   "interactions": [
+    {
+     "id": "FASM-D0712-INT",
+     "with_class": "Vis-blockers",
+     "severity": "contraindicated",
+     "source": "FASM-D0714",
+     "note": "Fasmamavine complex should not be combined with Vis-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 200.0
+   }
+  },
+  {
+   "name": "Fasrelirin suspension",
+   "source_ids": [
+    "FASR-D0852",
+    "FASR-D0853",
+    "FASR-D0854"
+   ],
+   "allergy_groups": [
+    "yarnic"
+   ],
+   "interactions": [
+    {
+     "id": "FASR-D0852-INT",
+     "with_class": "Nil-blockers",
+     "severity": "contraindicated",
+     "source": "FASR-D0854",
+     "note": "Fasrelirin suspension should not be combined with Nil-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Ferrumizane",
+   "source_ids": [
+    "FERR-D0422",
+    "FERR-D0423",
+    "FERR-D0424"
+   ],
+   "allergy_groups": [
+    "brindyl"
+   ],
+   "interactions": [
+    {
+     "id": "FERR-D0422-INT",
+     "with_class": "Fam-blockers",
+     "severity": "contraindicated",
+     "source": "FERR-D0424",
+     "note": "Ferrumizane should not be combined with Fam-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Filpomirin complex",
+   "source_ids": [
+    "FILP-D0002",
+    "FILP-D0003",
+    "FILP-D0004"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "FILP-D0002-INT",
+     "with_class": "Dad-blockers",
+     "severity": "contraindicated",
+     "source": "FILP-D0004",
+     "note": "Filpomirin complex should not be combined with Dad-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Folgurendal",
+   "source_ids": [
+    "FOLG-D1202",
+    "FOLG-D1203",
+    "FOLG-D1204"
+   ],
+   "allergy_groups": [
+    "wendal"
+   ],
+   "interactions": [
+    {
+     "id": "FOLG-D1202-INT",
+     "with_class": "Var-blockers",
+     "severity": "contraindicated",
+     "source": "FOLG-D1204",
+     "note": "Folgurendal should not be combined with Var-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Gadvudaprex",
+   "source_ids": [
+    "GADV-D0792",
+    "GADV-D0793",
+    "GADV-D0794"
+   ],
+   "allergy_groups": [
+    "morvex"
+   ],
+   "interactions": [
+    {
+     "id": "GADV-D0792-INT",
+     "with_class": "Get-blockers",
+     "severity": "contraindicated",
+     "source": "GADV-D0794",
+     "note": "Gadvudaprex should not be combined with Get-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 2.5
+   }
+  },
+  {
+   "name": "Gankululex complex",
+   "source_ids": [
+    "GANK-D0492",
+    "GANK-D0493",
+    "GANK-D0494"
+   ],
+   "allergy_groups": [
+    "yarnic"
+   ],
+   "interactions": [
+    {
+     "id": "GANK-D0492-INT",
+     "with_class": "Dim-blockers",
+     "severity": "contraindicated",
+     "source": "GANK-D0494",
+     "note": "Gankululex complex should not be combined with Dim-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Gemfuladine complex",
+   "source_ids": [
+    "GEMF-D0702",
+    "GEMF-D0703",
+    "GEMF-D0704"
+   ],
+   "allergy_groups": [
+    "irenic"
+   ],
+   "interactions": [
+    {
+     "id": "GEMF-D0702-INT",
+     "with_class": "Pem-blockers",
+     "severity": "contraindicated",
+     "source": "GEMF-D0704",
+     "note": "Gemfuladine complex should not be combined with Pem-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Gengosoxine complex",
+   "source_ids": [
+    "GENG-D1102",
+    "GENG-D1103",
+    "GENG-D1104"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "GENG-D1102-INT",
+     "with_class": "Nut-blockers",
+     "severity": "contraindicated",
+     "source": "GENG-D1104",
+     "note": "Gengosoxine complex should not be combined with Nut-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Gidlirorphil",
+   "source_ids": [
+    "GIDL-D0892",
+    "GIDL-D0893",
+    "GIDL-D0894"
+   ],
+   "allergy_groups": [
+    "jadrin"
+   ],
+   "interactions": [
+    {
+     "id": "GIDL-D0892-INT",
+     "with_class": "Kor-blockers",
+     "severity": "contraindicated",
+     "source": "GIDL-D0894",
+     "note": "Gidlirorphil should not be combined with Kor-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Gidpinirin",
+   "source_ids": [
+    "GIDP-D0552",
+    "GIDP-D0553",
+    "GIDP-D0554"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "GIDP-D0552-INT",
+     "with_class": "Pir-blockers",
+     "severity": "contraindicated",
+     "source": "GIDP-D0554",
+     "note": "Gidpinirin should not be combined with Pir-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Girlotaleen solution",
+   "source_ids": [
+    "GIRL-D0692",
+    "GIRL-D0693",
+    "GIRL-D0694"
+   ],
+   "allergy_groups": [
+    "hossel"
+   ],
+   "interactions": [
+    {
+     "id": "GIRL-D0692-INT",
+     "with_class": "Nen-blockers",
+     "severity": "contraindicated",
+     "source": "GIRL-D0694",
+     "note": "Girlotaleen solution should not be combined with Nen-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mcg",
+    "frequency": "once every morning",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Godfesoltin",
+   "source_ids": [
+    "GODF-D1362",
+    "GODF-D1363",
+    "GODF-D1364"
+   ],
+   "allergy_groups": [
+    "tovrin"
+   ],
+   "interactions": [
+    {
+     "id": "GODF-D1362-INT",
+     "with_class": "Kur-blockers",
+     "severity": "contraindicated",
+     "source": "GODF-D1364",
+     "note": "Godfesoltin should not be combined with Kur-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mcg",
+    "frequency": "twice daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Golbilendal solution",
+   "source_ids": [
+    "GOLB-D1462",
+    "GOLB-D1463",
+    "GOLB-D1464"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "GOLB-D1462-INT",
+     "with_class": "Vod-blockers",
+     "severity": "contraindicated",
+     "source": "GOLB-D1464",
+     "note": "Golbilendal solution should not be combined with Vod-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Gonlitestal",
+   "source_ids": [
+    "GONL-D0052",
+    "GONL-D0053",
+    "GONL-D0054"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "GONL-D0052-INT",
+     "with_class": "Mod-blockers",
+     "severity": "contraindicated",
+     "source": "GONL-D0054",
+     "note": "Gonlitestal should not be combined with Mod-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 80.0
+   }
+  },
+  {
+   "name": "Gorfutizane",
+   "source_ids": [
+    "GORF-D0822",
+    "GORF-D0823",
+    "GORF-D0824"
+   ],
+   "allergy_groups": [
+    "tovrin"
+   ],
+   "interactions": [
+    {
+     "id": "GORF-D0822-INT",
+     "with_class": "Fen-blockers",
+     "severity": "contraindicated",
+     "source": "GORF-D0824",
+     "note": "Gorfutizane should not be combined with Fen-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Gossataprex complex",
+   "source_ids": [
+    "GOSS-D1432",
+    "GOSS-D1433",
+    "GOSS-D1434"
+   ],
+   "allergy_groups": [
+    "jadrin"
+   ],
+   "interactions": [
+    {
+     "id": "GOSS-D1432-INT",
+     "with_class": "Det-blockers",
+     "severity": "contraindicated",
+     "source": "GOSS-D1434",
+     "note": "Gossataprex complex should not be combined with Det-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Kadterumide",
+   "source_ids": [
+    "KADT-D0222",
+    "KADT-D0223",
+    "KADT-D0224"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "KADT-D0222-INT",
+     "with_class": "Van-blockers",
+     "severity": "contraindicated",
+     "source": "KADT-D0224",
+     "note": "Kadterumide should not be combined with Van-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Kamnetravil",
+   "source_ids": [
+    "KAMN-D0382",
+    "KAMN-D0383",
+    "KAMN-D0384"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "KAMN-D0382-INT",
+     "with_class": "Tom-blockers",
+     "severity": "contraindicated",
+     "source": "KAMN-D0384",
+     "note": "Kamnetravil should not be combined with Tom-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Komgemaprex solution",
+   "source_ids": [
+    "KOMG-D0752",
+    "KOMG-D0753",
+    "KOMG-D0754"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "KOMG-D0752-INT",
+     "with_class": "Fel-blockers",
+     "severity": "contraindicated",
+     "source": "KOMG-D0754",
+     "note": "Komgemaprex solution should not be combined with Fel-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 200.0
+   }
+  },
+  {
+   "name": "Konkimostan",
+   "source_ids": [
+    "KONK-D0162",
+    "KONK-D0163",
+    "KONK-D0164"
+   ],
+   "allergy_groups": [
+    "irenic"
+   ],
+   "interactions": [
+    {
+     "id": "KONK-D0162-INT",
+     "with_class": "Fes-blockers",
+     "severity": "contraindicated",
+     "source": "KONK-D0164",
+     "note": "Konkimostan should not be combined with Fes-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 30.0
+   }
+  },
+  {
+   "name": "Kormalizane suspension",
+   "source_ids": [
+    "KORM-D1012",
+    "KORM-D1013",
+    "KORM-D1014"
+   ],
+   "allergy_groups": [
+    "ulmate"
+   ],
+   "interactions": [
+    {
+     "id": "KORM-D1012-INT",
+     "with_class": "Vid-blockers",
+     "severity": "contraindicated",
+     "source": "KORM-D1014",
+     "note": "Kormalizane suspension should not be combined with Vid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Kudromulex complex",
+   "source_ids": [
+    "KUDR-D0072",
+    "KUDR-D0073",
+    "KUDR-D0074"
+   ],
+   "allergy_groups": [
+    "morvex"
+   ],
+   "interactions": [
+    {
+     "id": "KUDR-D0072-INT",
+     "with_class": "Pot-blockers",
+     "severity": "contraindicated",
+     "source": "KUDR-D0074",
+     "note": "Kudromulex complex should not be combined with Pot-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Kulferondel",
+   "source_ids": [
+    "KULF-D1342",
+    "KULF-D1343",
+    "KULF-D1344"
+   ],
+   "allergy_groups": [
+    "lunate"
+   ],
+   "interactions": [
+    {
+     "id": "KULF-D1342-INT",
+     "with_class": "Don-blockers",
+     "severity": "contraindicated",
+     "source": "KULF-D1344",
+     "note": "Kulferondel should not be combined with Don-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mL",
+    "frequency": "twice daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Kunpenravil",
+   "source_ids": [
+    "KUNP-D0312",
+    "KUNP-D0313",
+    "KUNP-D0314"
+   ],
+   "allergy_groups": [
+    "yarnic"
+   ],
+   "interactions": [
+    {
+     "id": "KUNP-D0312-INT",
+     "with_class": "Mus-blockers",
+     "severity": "contraindicated",
+     "source": "KUNP-D0314",
+     "note": "Kunpenravil should not be combined with Mus-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Kunrinizane complex",
+   "source_ids": [
+    "KUNR-D0952",
+    "KUNR-D0953",
+    "KUNR-D0954"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "KUNR-D0952-INT",
+     "with_class": "Ril-blockers",
+     "severity": "contraindicated",
+     "source": "KUNR-D0954",
+     "note": "Kunrinizane complex should not be combined with Ril-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Lamfasoxine",
+   "source_ids": [
+    "LAMF-D0062",
+    "LAMF-D0063",
+    "LAMF-D0064"
+   ],
+   "allergy_groups": [
+    "brindyl"
+   ],
+   "interactions": [
+    {
+     "id": "LAMF-D0062-INT",
+     "with_class": "Mur-blockers",
+     "severity": "contraindicated",
+     "source": "LAMF-D0064",
+     "note": "Lamfasoxine should not be combined with Mur-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 30.0
+   }
+  },
+  {
+   "name": "Laslunostan solution",
+   "source_ids": [
+    "LASL-D1172",
+    "LASL-D1173",
+    "LASL-D1174"
+   ],
+   "allergy_groups": [
+    "praxel"
+   ],
+   "interactions": [
+    {
+     "id": "LASL-D1172-INT",
+     "with_class": "Fal-blockers",
+     "severity": "contraindicated",
+     "source": "LASL-D1174",
+     "note": "Laslunostan solution should not be combined with Fal-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mL",
+    "frequency": "every 12 hours",
+    "max_daily": 200.0
+   }
+  },
+  {
+   "name": "Lembitulex complex",
+   "source_ids": [
+    "LEMB-D0102",
+    "LEMB-D0103",
+    "LEMB-D0104"
+   ],
+   "allergy_groups": [
+    "tovrin"
+   ],
+   "interactions": [
+    {
+     "id": "LEMB-D0102-INT",
+     "with_class": "Fon-blockers",
+     "severity": "contraindicated",
+     "source": "LEMB-D0104",
+     "note": "Lembitulex complex should not be combined with Fon-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Lengerravil",
+   "source_ids": [
+    "LENG-D1162",
+    "LENG-D1163",
+    "LENG-D1164"
+   ],
+   "allergy_groups": [
+    "lunate"
+   ],
+   "interactions": [
+    {
+     "id": "LENG-D1162-INT",
+     "with_class": "Ros-blockers",
+     "severity": "contraindicated",
+     "source": "LENG-D1164",
+     "note": "Lengerravil should not be combined with Ros-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Lennedizane",
+   "source_ids": [
+    "LENN-D0432",
+    "LENN-D0433",
+    "LENN-D0434"
+   ],
+   "allergy_groups": [
+    "morvex"
+   ],
+   "interactions": [
+    {
+     "id": "LENN-D0432-INT",
+     "with_class": "Ton-blockers",
+     "severity": "contraindicated",
+     "source": "LENN-D0434",
+     "note": "Lennedizane should not be combined with Ton-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mcg",
+    "frequency": "once every morning",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Lerburaprex",
+   "source_ids": [
+    "LERB-D0622",
+    "LERB-D0623",
+    "LERB-D0624"
+   ],
+   "allergy_groups": [
+    "lunate"
+   ],
+   "interactions": [
+    {
+     "id": "LERB-D0622-INT",
+     "with_class": "Nir-blockers",
+     "severity": "contraindicated",
+     "source": "LERB-D0624",
+     "note": "Lerburaprex should not be combined with Nir-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Letfalethol",
+   "source_ids": [
+    "LETF-D0262",
+    "LETF-D0263",
+    "LETF-D0264"
+   ],
+   "allergy_groups": [
+    "lunate"
+   ],
+   "interactions": [
+    {
+     "id": "LETF-D0262-INT",
+     "with_class": "Fol-blockers",
+     "severity": "contraindicated",
+     "source": "LETF-D0264",
+     "note": "Letfalethol should not be combined with Fol-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Letkodirin",
+   "source_ids": [
+    "LETK-D0722",
+    "LETK-D0723",
+    "LETK-D0724"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "LETK-D0722-INT",
+     "with_class": "Bas-blockers",
+     "severity": "contraindicated",
+     "source": "LETK-D0724",
+     "note": "Letkodirin should not be combined with Bas-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 2.5
+   }
+  },
+  {
+   "name": "Lirkumondel",
+   "source_ids": [
+    "LIRK-D0682",
+    "LIRK-D0683",
+    "LIRK-D0684"
+   ],
+   "allergy_groups": [
+    "glenor"
+   ],
+   "interactions": [
+    {
+     "id": "LIRK-D0682-INT",
+     "with_class": "Pir-blockers",
+     "severity": "contraindicated",
+     "source": "LIRK-D0684",
+     "note": "Lirkumondel should not be combined with Pir-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Lomsunorphil",
+   "source_ids": [
+    "LOMS-D0372",
+    "LOMS-D0373",
+    "LOMS-D0374"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "LOMS-D0372-INT",
+     "with_class": "Sud-blockers",
+     "severity": "contraindicated",
+     "source": "LOMS-D0374",
+     "note": "Lomsunorphil should not be combined with Sud-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Losnelethol solution",
+   "source_ids": [
+    "LOSN-D1002",
+    "LOSN-D1003",
+    "LOSN-D1004"
+   ],
+   "allergy_groups": [
+    "tovrin"
+   ],
+   "interactions": [
+    {
+     "id": "LOSN-D1002-INT",
+     "with_class": "Nid-blockers",
+     "severity": "contraindicated",
+     "source": "LOSN-D1004",
+     "note": "Losnelethol solution should not be combined with Nid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mL",
+    "frequency": "once every morning",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Losrimorphil",
+   "source_ids": [
+    "LOSR-D0632",
+    "LOSR-D0633",
+    "LOSR-D0634"
+   ],
+   "allergy_groups": [
+    "praxel"
+   ],
+   "interactions": [
+    {
+     "id": "LOSR-D0632-INT",
+     "with_class": "Lit-blockers",
+     "severity": "contraindicated",
+     "source": "LOSR-D0634",
+     "note": "Losrimorphil should not be combined with Lit-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Lotfamondel",
+   "source_ids": [
+    "LOTF-D1052",
+    "LOTF-D1053",
+    "LOTF-D1054"
+   ],
+   "allergy_groups": [
+    "hossel"
+   ],
+   "interactions": [
+    {
+     "id": "LOTF-D1052-INT",
+     "with_class": "Mer-blockers",
+     "severity": "contraindicated",
+     "source": "LOTF-D1054",
+     "note": "Lotfamondel should not be combined with Mer-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mL",
+    "frequency": "once every morning",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Ludresirin suspension",
+   "source_ids": [
+    "LUDR-D1122",
+    "LUDR-D1123",
+    "LUDR-D1124"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "LUDR-D1122-INT",
+     "with_class": "Som-blockers",
+     "severity": "contraindicated",
+     "source": "LUDR-D1124",
+     "note": "Ludresirin suspension should not be combined with Som-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Lunlidaleen",
+   "source_ids": [
+    "LUNL-D0212",
+    "LUNL-D0213",
+    "LUNL-D0214"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "LUNL-D0212-INT",
+     "with_class": "Kid-blockers",
+     "severity": "contraindicated",
+     "source": "LUNL-D0214",
+     "note": "Lunlidaleen should not be combined with Kid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Lurridestal solution",
+   "source_ids": [
+    "LURR-D0992",
+    "LURR-D0993",
+    "LURR-D0994"
+   ],
+   "allergy_groups": [
+    "praxel"
+   ],
+   "interactions": [
+    {
+     "id": "LURR-D0992-INT",
+     "with_class": "Lem-blockers",
+     "severity": "contraindicated",
+     "source": "LURR-D0994",
+     "note": "Lurridestal solution should not be combined with Lem-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Lurvelufen solution",
+   "source_ids": [
+    "LURV-D0732",
+    "LURV-D0733",
+    "LURV-D0734"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "LURV-D0732-INT",
+     "with_class": "Fan-blockers",
+     "severity": "contraindicated",
+     "source": "LURV-D0734",
+     "note": "Lurvelufen solution should not be combined with Fan-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Lustelondel",
+   "source_ids": [
+    "LUST-D1142",
+    "LUST-D1143",
+    "LUST-D1144"
+   ],
+   "allergy_groups": [
+    "brindyl"
+   ],
+   "interactions": [
+    {
+     "id": "LUST-D1142-INT",
+     "with_class": "God-blockers",
+     "severity": "contraindicated",
+     "source": "LUST-D1144",
+     "note": "Lustelondel should not be combined with God-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mL",
+    "frequency": "twice daily",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Manpolondel",
+   "source_ids": [
+    "MANP-D1132",
+    "MANP-D1133",
+    "MANP-D1134"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "MANP-D1132-INT",
+     "with_class": "Bes-blockers",
+     "severity": "contraindicated",
+     "source": "MANP-D1134",
+     "note": "Manpolondel should not be combined with Bes-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15.0,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 15.0
+   }
+  },
+  {
+   "name": "Massadufen",
+   "source_ids": [
+    "MASS-D0802",
+    "MASS-D0803",
+    "MASS-D0804"
+   ],
+   "allergy_groups": [
+    "lunate"
+   ],
+   "interactions": [
+    {
+     "id": "MASS-D0802-INT",
+     "with_class": "Mam-blockers",
+     "severity": "contraindicated",
+     "source": "MASS-D0804",
+     "note": "Massadufen should not be combined with Mam-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15.0,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 15.0
+   }
+  },
+  {
+   "name": "Memgosoxine",
+   "source_ids": [
+    "MEMG-D0392",
+    "MEMG-D0393",
+    "MEMG-D0394"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "MEMG-D0392-INT",
+     "with_class": "Ban-blockers",
+     "severity": "contraindicated",
+     "source": "MEMG-D0394",
+     "note": "Memgosoxine should not be combined with Ban-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Messenestal solution",
+   "source_ids": [
+    "MESS-D1072",
+    "MESS-D1073",
+    "MESS-D1074"
+   ],
+   "allergy_groups": [
+    "jadrin"
+   ],
+   "interactions": [
+    {
+     "id": "MESS-D1072-INT",
+     "with_class": "Mer-blockers",
+     "severity": "contraindicated",
+     "source": "MESS-D1074",
+     "note": "Messenestal solution should not be combined with Mer-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Milrusestal",
+   "source_ids": [
+    "MILR-D0182",
+    "MILR-D0183",
+    "MILR-D0184"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "MILR-D0182-INT",
+     "with_class": "Rel-blockers",
+     "severity": "contraindicated",
+     "source": "MILR-D0184",
+     "note": "Milrusestal should not be combined with Rel-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mL",
+    "frequency": "every 12 hours",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Molpunendal",
+   "source_ids": [
+    "MOLP-D1112",
+    "MOLP-D1113",
+    "MOLP-D1114"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "MOLP-D1112-INT",
+     "with_class": "Nes-blockers",
+     "severity": "contraindicated",
+     "source": "MOLP-D1114",
+     "note": "Molpunendal should not be combined with Nes-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Monfatirin complex",
+   "source_ids": [
+    "MONF-D0332",
+    "MONF-D0333",
+    "MONF-D0334"
+   ],
+   "allergy_groups": [
+    "hossel"
+   ],
+   "interactions": [
+    {
+     "id": "MONF-D0332-INT",
+     "with_class": "Ten-blockers",
+     "severity": "contraindicated",
+     "source": "MONF-D0334",
+     "note": "Monfatirin complex should not be combined with Ten-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Mumsunorphil complex",
+   "source_ids": [
+    "MUMS-D1372",
+    "MUMS-D1373",
+    "MUMS-D1374"
+   ],
+   "allergy_groups": [
+    "ulmate"
+   ],
+   "interactions": [
+    {
+     "id": "MUMS-D1372-INT",
+     "with_class": "Mus-blockers",
+     "severity": "contraindicated",
+     "source": "MUMS-D1374",
+     "note": "Mumsunorphil complex should not be combined with Mus-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 80.0
+   }
+  },
+  {
+   "name": "Nadpasaprex",
+   "source_ids": [
+    "NADP-D1222",
+    "NADP-D1223",
+    "NADP-D1224"
+   ],
+   "allergy_groups": [
+    "glenor"
+   ],
+   "interactions": [
+    {
+     "id": "NADP-D1222-INT",
+     "with_class": "Bin-blockers",
+     "severity": "contraindicated",
+     "source": "NADP-D1224",
+     "note": "Nadpasaprex should not be combined with Bin-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mL",
+    "frequency": "once every morning",
+    "max_daily": 75.0
+   }
+  },
+  {
+   "name": "Nalsulizane",
+   "source_ids": [
+    "NALS-D0642",
+    "NALS-D0643",
+    "NALS-D0644"
+   ],
+   "allergy_groups": [
+    "tovrin"
+   ],
+   "interactions": [
+    {
+     "id": "NALS-D0642-INT",
+     "with_class": "Dun-blockers",
+     "severity": "contraindicated",
+     "source": "NALS-D0644",
+     "note": "Nalsulizane should not be combined with Dun-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mcg",
+    "frequency": "twice daily",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Namtanufen",
+   "source_ids": [
+    "NAMT-D0772",
+    "NAMT-D0773",
+    "NAMT-D0774"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "NAMT-D0772-INT",
+     "with_class": "Mun-blockers",
+     "severity": "contraindicated",
+     "source": "NAMT-D0774",
+     "note": "Namtanufen should not be combined with Mun-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 80.0
+   }
+  },
+  {
+   "name": "Nedmusestal",
+   "source_ids": [
+    "NEDM-D0192",
+    "NEDM-D0193",
+    "NEDM-D0194"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "NEDM-D0192-INT",
+     "with_class": "Rir-blockers",
+     "severity": "contraindicated",
+     "source": "NEDM-D0194",
+     "note": "Nedmusestal should not be combined with Rir-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Nerduradine",
+   "source_ids": [
+    "NERD-D0762",
+    "NERD-D0763",
+    "NERD-D0764"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "NERD-D0762-INT",
+     "with_class": "Per-blockers",
+     "severity": "contraindicated",
+     "source": "NERD-D0764",
+     "note": "Nerduradine should not be combined with Per-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Nirpedorphil complex",
+   "source_ids": [
+    "NIRP-D0812",
+    "NIRP-D0813",
+    "NIRP-D0814"
+   ],
+   "allergy_groups": [
+    "praxel"
+   ],
+   "interactions": [
+    {
+     "id": "NIRP-D0812-INT",
+     "with_class": "Pil-blockers",
+     "severity": "contraindicated",
+     "source": "NIRP-D0814",
+     "note": "Nirpedorphil complex should not be combined with Pil-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Nirvusizane complex",
+   "source_ids": [
+    "NIRV-D0962",
+    "NIRV-D0963",
+    "NIRV-D0964"
+   ],
+   "allergy_groups": [
+    "brindyl"
+   ],
+   "interactions": [
+    {
+     "id": "NIRV-D0962-INT",
+     "with_class": "Pid-blockers",
+     "severity": "contraindicated",
+     "source": "NIRV-D0964",
+     "note": "Nirvusizane complex should not be combined with Pid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mL",
+    "frequency": "every 12 hours",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Nonkumadine",
+   "source_ids": [
+    "NONK-D1062",
+    "NONK-D1063",
+    "NONK-D1064"
+   ],
+   "allergy_groups": [
+    "irenic"
+   ],
+   "interactions": [
+    {
+     "id": "NONK-D1062-INT",
+     "with_class": "Pet-blockers",
+     "severity": "contraindicated",
+     "source": "NONK-D1064",
+     "note": "Nonkumadine should not be combined with Pet-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Nonraraprex solution",
+   "source_ids": [
+    "NONR-D0132",
+    "NONR-D0133",
+    "NONR-D0134"
+   ],
+   "allergy_groups": [
+    "yarnic"
+   ],
+   "interactions": [
+    {
+     "id": "NONR-D0132-INT",
+     "with_class": "Ket-blockers",
+     "severity": "contraindicated",
+     "source": "NONR-D0134",
+     "note": "Nonraraprex solution should not be combined with Ket-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Nospulondel",
+   "source_ids": [
+    "NOSP-D0112",
+    "NOSP-D0113",
+    "NOSP-D0114"
+   ],
+   "allergy_groups": [
+    "ulmate"
+   ],
+   "interactions": [
+    {
+     "id": "NOSP-D0112-INT",
+     "with_class": "Rum-blockers",
+     "severity": "contraindicated",
+     "source": "NOSP-D0114",
+     "note": "Nospulondel should not be combined with Rum-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Nunminavine",
+   "source_ids": [
+    "NUNM-D0282",
+    "NUNM-D0283",
+    "NUNM-D0284"
+   ],
+   "allergy_groups": [
+    "tovrin"
+   ],
+   "interactions": [
+    {
+     "id": "NUNM-D0282-INT",
+     "with_class": "Lus-blockers",
+     "severity": "contraindicated",
+     "source": "NUNM-D0284",
+     "note": "Nunminavine should not be combined with Lus-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mcg",
+    "frequency": "once every morning",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Pemkorostan suspension",
+   "source_ids": [
+    "PEMK-D1442",
+    "PEMK-D1443",
+    "PEMK-D1444"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "PEMK-D1442-INT",
+     "with_class": "Nom-blockers",
+     "severity": "contraindicated",
+     "source": "PEMK-D1444",
+     "note": "Pemkorostan suspension should not be combined with Nom-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Permanendal",
+   "source_ids": [
+    "PERM-D0922",
+    "PERM-D0923",
+    "PERM-D0924"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "PERM-D0922-INT",
+     "with_class": "Ton-blockers",
+     "severity": "contraindicated",
+     "source": "PERM-D0924",
+     "note": "Permanendal should not be combined with Ton-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 200.0
+   }
+  },
+  {
+   "name": "Petmunorphil solution",
+   "source_ids": [
+    "PETM-D1272",
+    "PETM-D1273",
+    "PETM-D1274"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "PETM-D1272-INT",
+     "with_class": "Gat-blockers",
+     "severity": "contraindicated",
+     "source": "PETM-D1274",
+     "note": "Petmunorphil solution should not be combined with Gat-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Pidvirorphil complex",
+   "source_ids": [
+    "PIDV-D1322",
+    "PIDV-D1323",
+    "PIDV-D1324"
+   ],
+   "allergy_groups": [
+    "brindyl"
+   ],
+   "interactions": [
+    {
+     "id": "PIDV-D1322-INT",
+     "with_class": "Vir-blockers",
+     "severity": "contraindicated",
+     "source": "PIDV-D1324",
+     "note": "Pidvirorphil complex should not be combined with Vir-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Pirfanravil complex",
+   "source_ids": [
+    "PIRF-D0512",
+    "PIRF-D0513",
+    "PIRF-D0514"
+   ],
+   "allergy_groups": [
+    "hossel"
+   ],
+   "interactions": [
+    {
+     "id": "PIRF-D0512-INT",
+     "with_class": "Sot-blockers",
+     "severity": "contraindicated",
+     "source": "PIRF-D0514",
+     "note": "Pirfanravil complex should not be combined with Sot-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mL",
+    "frequency": "twice daily",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Pistadulex solution",
+   "source_ids": [
+    "PIST-D0662",
+    "PIST-D0663",
+    "PIST-D0664"
+   ],
+   "allergy_groups": [
+    "wendal"
+   ],
+   "interactions": [
+    {
+     "id": "PIST-D0662-INT",
+     "with_class": "Dam-blockers",
+     "severity": "contraindicated",
+     "source": "PIST-D0664",
+     "note": "Pistadulex solution should not be combined with Dam-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 80.0
+   }
+  },
+  {
+   "name": "Pitdomendal suspension",
+   "source_ids": [
+    "PITD-D0482",
+    "PITD-D0483",
+    "PITD-D0484"
+   ],
+   "allergy_groups": [
+    "wendal"
+   ],
+   "interactions": [
+    {
+     "id": "PITD-D0482-INT",
+     "with_class": "Vod-blockers",
+     "severity": "contraindicated",
+     "source": "PITD-D0484",
+     "note": "Pitdomendal suspension should not be combined with Vod-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 15.0
+   }
+  },
+  {
+   "name": "Pitgaraprex complex",
+   "source_ids": [
+    "PITG-D1492",
+    "PITG-D1493",
+    "PITG-D1494"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "PITG-D1492-INT",
+     "with_class": "Sen-blockers",
+     "severity": "contraindicated",
+     "source": "PITG-D1494",
+     "note": "Pitgaraprex complex should not be combined with Sen-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Potkemestal suspension",
+   "source_ids": [
+    "POTK-D0672",
+    "POTK-D0673",
+    "POTK-D0674"
+   ],
+   "allergy_groups": [
+    "yarnic"
+   ],
+   "interactions": [
+    {
+     "id": "POTK-D0672-INT",
+     "with_class": "Nir-blockers",
+     "severity": "contraindicated",
+     "source": "POTK-D0674",
+     "note": "Potkemestal suspension should not be combined with Nir-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Potvulostan suspension",
+   "source_ids": [
+    "POTV-D0582",
+    "POTV-D0583",
+    "POTV-D0584"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "POTV-D0582-INT",
+     "with_class": "Fit-blockers",
+     "severity": "contraindicated",
+     "source": "POTV-D0584",
+     "note": "Potvulostan suspension should not be combined with Fit-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Pullosestal",
+   "source_ids": [
+    "PULL-D0972",
+    "PULL-D0973",
+    "PULL-D0974"
+   ],
+   "allergy_groups": [
+    "morvex"
+   ],
+   "interactions": [
+    {
+     "id": "PULL-D0972-INT",
+     "with_class": "Dot-blockers",
+     "severity": "contraindicated",
+     "source": "PULL-D0974",
+     "note": "Pullosestal should not be combined with Dot-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Purvisondel solution",
+   "source_ids": [
+    "PURV-D1302",
+    "PURV-D1303",
+    "PURV-D1304"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "PURV-D1302-INT",
+     "with_class": "Por-blockers",
+     "severity": "contraindicated",
+     "source": "PURV-D1304",
+     "note": "Purvisondel solution should not be combined with Por-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Putsenumide",
+   "source_ids": [
+    "PUTS-D0872",
+    "PUTS-D0873",
+    "PUTS-D0874"
+   ],
+   "allergy_groups": [
+    "hossel"
+   ],
+   "interactions": [
+    {
+     "id": "PUTS-D0872-INT",
+     "with_class": "Tel-blockers",
+     "severity": "contraindicated",
+     "source": "PUTS-D0874",
+     "note": "Putsenumide should not be combined with Tel-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 30.0
+   }
+  },
+  {
+   "name": "Redbinostan complex",
+   "source_ids": [
+    "REDB-D1352",
+    "REDB-D1353",
+    "REDB-D1354"
+   ],
+   "allergy_groups": [
+    "praxel"
+   ],
+   "interactions": [
+    {
+     "id": "REDB-D1352-INT",
+     "with_class": "Fol-blockers",
+     "severity": "contraindicated",
+     "source": "REDB-D1354",
+     "note": "Redbinostan complex should not be combined with Fol-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Relmumufen",
+   "source_ids": [
+    "RELM-D0442",
+    "RELM-D0443",
+    "RELM-D0444"
+   ],
+   "allergy_groups": [
+    "lunate"
+   ],
+   "interactions": [
+    {
+     "id": "RELM-D0442-INT",
+     "with_class": "Rer-blockers",
+     "severity": "contraindicated",
+     "source": "RELM-D0444",
+     "note": "Relmumufen should not be combined with Rer-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Remdodaprex suspension",
+   "source_ids": [
+    "REMD-D0882",
+    "REMD-D0883",
+    "REMD-D0884"
+   ],
+   "allergy_groups": [
+    "irenic"
+   ],
+   "interactions": [
+    {
+     "id": "REMD-D0882-INT",
+     "with_class": "Nom-blockers",
+     "severity": "contraindicated",
+     "source": "REMD-D0884",
+     "note": "Remdodaprex suspension should not be combined with Nom-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Retkunorphil suspension",
+   "source_ids": [
+    "RETK-D0572",
+    "RETK-D0573",
+    "RETK-D0574"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "RETK-D0572-INT",
+     "with_class": "Vel-blockers",
+     "severity": "contraindicated",
+     "source": "RETK-D0574",
+     "note": "Retkunorphil suspension should not be combined with Vel-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Retmetoxine",
+   "source_ids": [
+    "RETM-D0782",
+    "RETM-D0783",
+    "RETM-D0784"
+   ],
+   "allergy_groups": [
+    "brindyl"
+   ],
+   "interactions": [
+    {
+     "id": "RETM-D0782-INT",
+     "with_class": "Kal-blockers",
+     "severity": "contraindicated",
+     "source": "RETM-D0784",
+     "note": "Retmetoxine should not be combined with Kal-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mL",
+    "frequency": "once every morning",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Ridgilavine suspension",
+   "source_ids": [
+    "RIDG-D0122",
+    "RIDG-D0123",
+    "RIDG-D0124"
+   ],
+   "allergy_groups": [
+    "wendal"
+   ],
+   "interactions": [
+    {
+     "id": "RIDG-D0122-INT",
+     "with_class": "Vid-blockers",
+     "severity": "contraindicated",
+     "source": "RIDG-D0124",
+     "note": "Ridgilavine suspension should not be combined with Vid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 80.0
+   }
+  },
+  {
+   "name": "Rinmalendal",
+   "source_ids": [
+    "RINM-D0042",
+    "RINM-D0043",
+    "RINM-D0044"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "RINM-D0042-INT",
+     "with_class": "Kum-blockers",
+     "severity": "contraindicated",
+     "source": "RINM-D0044",
+     "note": "Rinmalendal should not be combined with Kum-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 50.0,
+    "unit": "mcg",
+    "frequency": "once every morning",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Rirgetumide complex",
+   "source_ids": [
+    "RIRG-D1452",
+    "RIRG-D1453",
+    "RIRG-D1454"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "RIRG-D1452-INT",
+     "with_class": "San-blockers",
+     "severity": "contraindicated",
+     "source": "RIRG-D1454",
+     "note": "Rirgetumide complex should not be combined with San-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 75.0
+   }
+  },
+  {
+   "name": "Rispumirin suspension",
+   "source_ids": [
+    "RISP-D1312",
+    "RISP-D1313",
+    "RISP-D1314"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "RISP-D1312-INT",
+     "with_class": "Sed-blockers",
+     "severity": "contraindicated",
+     "source": "RISP-D1314",
+     "note": "Rispumirin suspension should not be combined with Sed-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 80.0
+   }
+  },
+  {
+   "name": "Rodbimizane",
+   "source_ids": [
+    "RODB-D1382",
+    "RODB-D1383",
+    "RODB-D1384"
+   ],
+   "allergy_groups": [
+    "wendal"
+   ],
+   "interactions": [
+    {
+     "id": "RODB-D1382-INT",
+     "with_class": "Lot-blockers",
+     "severity": "contraindicated",
+     "source": "RODB-D1384",
+     "note": "Rodbimizane should not be combined with Lot-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mL",
+    "frequency": "once every morning",
+    "max_daily": 75.0
+   }
+  },
+  {
+   "name": "Ronladoxine complex",
+   "source_ids": [
+    "RONL-D0022",
+    "RONL-D0023",
+    "RONL-D0024"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "RONL-D0022-INT",
+     "with_class": "Bes-blockers",
+     "severity": "contraindicated",
+     "source": "RONL-D0024",
+     "note": "Ronladoxine complex should not be combined with Bes-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mL",
+    "frequency": "twice daily",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Rotmitufen",
+   "source_ids": [
+    "ROTM-D0602",
+    "ROTM-D0603",
+    "ROTM-D0604"
+   ],
+   "allergy_groups": [
+    "brindyl"
+   ],
+   "interactions": [
+    {
+     "id": "ROTM-D0602-INT",
+     "with_class": "Mat-blockers",
+     "severity": "contraindicated",
+     "source": "ROTM-D0604",
+     "note": "Rotmitufen should not be combined with Mat-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 15.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 15.0
+   }
+  },
+  {
+   "name": "Rulpuraprex",
+   "source_ids": [
+    "RULP-D0412",
+    "RULP-D0413",
+    "RULP-D0414"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "RULP-D0412-INT",
+     "with_class": "Sil-blockers",
+     "severity": "contraindicated",
+     "source": "RULP-D0414",
+     "note": "Rulpuraprex should not be combined with Sil-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Runkenizane complex",
+   "source_ids": [
+    "RUNK-D1252",
+    "RUNK-D1253",
+    "RUNK-D1254"
+   ],
+   "allergy_groups": [
+    "jadrin"
+   ],
+   "interactions": [
+    {
+     "id": "RUNK-D1252-INT",
+     "with_class": "Mul-blockers",
+     "severity": "contraindicated",
+     "source": "RUNK-D1254",
+     "note": "Runkenizane complex should not be combined with Mul-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 75.0
+   }
+  },
+  {
+   "name": "Runsanufen suspension",
+   "source_ids": [
+    "RUNS-D1212",
+    "RUNS-D1213",
+    "RUNS-D1214"
+   ],
+   "allergy_groups": [
+    "yarnic"
+   ],
+   "interactions": [
+    {
+     "id": "RUNS-D1212-INT",
+     "with_class": "Par-blockers",
+     "severity": "contraindicated",
+     "source": "RUNS-D1214",
+     "note": "Runsanufen suspension should not be combined with Par-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Samdodirin complex",
+   "source_ids": [
+    "SAMD-D1082",
+    "SAMD-D1083",
+    "SAMD-D1084"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "SAMD-D1082-INT",
+     "with_class": "Ned-blockers",
+     "severity": "contraindicated",
+     "source": "SAMD-D1084",
+     "note": "Samdodirin complex should not be combined with Ned-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Samtidirin",
+   "source_ids": [
+    "SAMT-D0152",
+    "SAMT-D0153",
+    "SAMT-D0154"
+   ],
+   "allergy_groups": [
+    "hossel"
+   ],
+   "interactions": [
+    {
+     "id": "SAMT-D0152-INT",
+     "with_class": "Van-blockers",
+     "severity": "contraindicated",
+     "source": "SAMT-D0154",
+     "note": "Samtidirin should not be combined with Van-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 2.5
+   }
+  },
+  {
+   "name": "Sedgerulex",
+   "source_ids": [
+    "SEDG-D0562",
+    "SEDG-D0563",
+    "SEDG-D0564"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "SEDG-D0562-INT",
+     "with_class": "Lat-blockers",
+     "severity": "contraindicated",
+     "source": "SEDG-D0564",
+     "note": "Sedgerulex should not be combined with Lat-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 150.0
+   }
+  },
+  {
+   "name": "Sednelostan solution",
+   "source_ids": [
+    "SEDN-D0012",
+    "SEDN-D0013",
+    "SEDN-D0014"
+   ],
+   "allergy_groups": [
+    "kessel"
+   ],
+   "interactions": [
+    {
+     "id": "SEDN-D0012-INT",
+     "with_class": "Led-blockers",
+     "severity": "contraindicated",
+     "source": "SEDN-D0014",
+     "note": "Sednelostan solution should not be combined with Led-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 75.0
+   }
+  },
+  {
+   "name": "Sestamavine",
+   "source_ids": [
+    "SEST-D1192",
+    "SEST-D1193",
+    "SEST-D1194"
+   ],
+   "allergy_groups": [
+    "ulmate"
+   ],
+   "interactions": [
+    {
+     "id": "SEST-D1192-INT",
+     "with_class": "Bid-blockers",
+     "severity": "contraindicated",
+     "source": "SEST-D1194",
+     "note": "Sestamavine should not be combined with Bid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Sesvusaleen",
+   "source_ids": [
+    "SESV-D1332",
+    "SESV-D1333",
+    "SESV-D1334"
+   ],
+   "allergy_groups": [
+    "morvex"
+   ],
+   "interactions": [
+    {
+     "id": "SESV-D1332-INT",
+     "with_class": "Mid-blockers",
+     "severity": "contraindicated",
+     "source": "SESV-D1334",
+     "note": "Sesvusaleen should not be combined with Mid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Simfadufen",
+   "source_ids": [
+    "SIMF-D0092",
+    "SIMF-D0093",
+    "SIMF-D0094"
+   ],
+   "allergy_groups": [
+    "praxel"
+   ],
+   "interactions": [
+    {
+     "id": "SIMF-D0092-INT",
+     "with_class": "Bet-blockers",
+     "severity": "contraindicated",
+     "source": "SIMF-D0094",
+     "note": "Simfadufen should not be combined with Bet-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 2.5
+   }
+  },
+  {
+   "name": "Simkasestal",
+   "source_ids": [
+    "SIMK-D1152",
+    "SIMK-D1153",
+    "SIMK-D1154"
+   ],
+   "allergy_groups": [
+    "morvex"
+   ],
+   "interactions": [
+    {
+     "id": "SIMK-D1152-INT",
+     "with_class": "Gas-blockers",
+     "severity": "contraindicated",
+     "source": "SIMK-D1154",
+     "note": "Simkasestal should not be combined with Gas-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mL",
+    "frequency": "once daily",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Simvurostan",
+   "source_ids": [
+    "SIMV-D0242",
+    "SIMV-D0243",
+    "SIMV-D0244"
+   ],
+   "allergy_groups": [
+    "brindyl"
+   ],
+   "interactions": [
+    {
+     "id": "SIMV-D0242-INT",
+     "with_class": "Sid-blockers",
+     "severity": "contraindicated",
+     "source": "SIMV-D0244",
+     "note": "Simvurostan should not be combined with Sid-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 200.0
+   }
+  },
+  {
+   "name": "Sirfalorphil solution",
+   "source_ids": [
+    "SIRF-D0612",
+    "SIRF-D0613",
+    "SIRF-D0614"
+   ],
+   "allergy_groups": [
+    "morvex"
+   ],
+   "interactions": [
+    {
+     "id": "SIRF-D0612-INT",
+     "with_class": "Rum-blockers",
+     "severity": "contraindicated",
+     "source": "SIRF-D0614",
+     "note": "Sirfalorphil solution should not be combined with Rum-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Sitsulaleen complex",
+   "source_ids": [
+    "SITS-D0862",
+    "SITS-D0863",
+    "SITS-D0864"
+   ],
+   "allergy_groups": [
+    "glenor"
+   ],
+   "interactions": [
+    {
+     "id": "SITS-D0862-INT",
+     "with_class": "Fil-blockers",
+     "severity": "contraindicated",
+     "source": "SITS-D0864",
+     "note": "Sitsulaleen complex should not be combined with Fil-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Solromondel",
+   "source_ids": [
+    "SOLR-D0982",
+    "SOLR-D0983",
+    "SOLR-D0984"
+   ],
+   "allergy_groups": [
+    "lunate"
+   ],
+   "interactions": [
+    {
+     "id": "SOLR-D0982-INT",
+     "with_class": "Gis-blockers",
+     "severity": "contraindicated",
+     "source": "SOLR-D0984",
+     "note": "Solromondel should not be combined with Gis-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 10.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Sosgaraleen suspension",
+   "source_ids": [
+    "SOSG-D0342",
+    "SOSG-D0343",
+    "SOSG-D0344"
+   ],
+   "allergy_groups": [
+    "irenic"
+   ],
+   "interactions": [
+    {
+     "id": "SOSG-D0342-INT",
+     "with_class": "Nen-blockers",
+     "severity": "contraindicated",
+     "source": "SOSG-D0344",
+     "note": "Sosgaraleen suspension should not be combined with Nen-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mL",
+    "frequency": "once every morning",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Sumlaladine suspension",
+   "source_ids": [
+    "SUML-D0902",
+    "SUML-D0903",
+    "SUML-D0904"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "SUML-D0902-INT",
+     "with_class": "Ges-blockers",
+     "severity": "contraindicated",
+     "source": "SUML-D0904",
+     "note": "Sumlaladine suspension should not be combined with Ges-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 75.0
+   }
+  },
+  {
+   "name": "Tamdamravil suspension",
+   "source_ids": [
+    "TAMD-D0252",
+    "TAMD-D0253",
+    "TAMD-D0254"
+   ],
+   "allergy_groups": [
+    "morvex"
+   ],
+   "interactions": [
+    {
+     "id": "TAMD-D0252-INT",
+     "with_class": "Vis-blockers",
+     "severity": "contraindicated",
+     "source": "TAMD-D0254",
+     "note": "Tamdamravil suspension should not be combined with Vis-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Targulufen",
+   "source_ids": [
+    "TARG-D0742",
+    "TARG-D0743",
+    "TARG-D0744"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "TARG-D0742-INT",
+     "with_class": "Bud-blockers",
+     "severity": "contraindicated",
+     "source": "TARG-D0744",
+     "note": "Targulufen should not be combined with Bud-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Tasfutirin complex",
+   "source_ids": [
+    "TASF-D1232",
+    "TASF-D1233",
+    "TASF-D1234"
+   ],
+   "allergy_groups": [
+    "hossel"
+   ],
+   "interactions": [
+    {
+     "id": "TASF-D1232-INT",
+     "with_class": "Tal-blockers",
+     "severity": "contraindicated",
+     "source": "TASF-D1234",
+     "note": "Tasfutirin complex should not be combined with Tal-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Tetbetumide",
+   "source_ids": [
+    "TETB-D0592",
+    "TETB-D0593",
+    "TETB-D0594"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "TETB-D0592-INT",
+     "with_class": "Gis-blockers",
+     "severity": "contraindicated",
+     "source": "TETB-D0594",
+     "note": "Tetbetumide should not be combined with Gis-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 5.0
+   }
+  },
+  {
+   "name": "Tisrusorphil suspension",
+   "source_ids": [
+    "TISR-D0842",
+    "TISR-D0843",
+    "TISR-D0844"
+   ],
+   "allergy_groups": [
+    "wendal"
+   ],
+   "interactions": [
+    {
+     "id": "TISR-D0842-INT",
+     "with_class": "Mod-blockers",
+     "severity": "contraindicated",
+     "source": "TISR-D0844",
+     "note": "Tisrusorphil suspension should not be combined with Mod-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Tomgutoltin solution",
+   "source_ids": [
+    "TOMG-D1242",
+    "TOMG-D1243",
+    "TOMG-D1244"
+   ],
+   "allergy_groups": [
+    "irenic"
+   ],
+   "interactions": [
+    {
+     "id": "TOMG-D1242-INT",
+     "with_class": "Nor-blockers",
+     "severity": "contraindicated",
+     "source": "TOMG-D1244",
+     "note": "Tomgutoltin solution should not be combined with Nor-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Tosdutravil",
+   "source_ids": [
+    "TOSD-D1262",
+    "TOSD-D1263",
+    "TOSD-D1264"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "TOSD-D1262-INT",
+     "with_class": "Den-blockers",
+     "severity": "contraindicated",
+     "source": "TOSD-D1264",
+     "note": "Tosdutravil should not be combined with Den-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mcg",
+    "frequency": "once every morning",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Tuldadaleen",
+   "source_ids": [
+    "TULD-D0322",
+    "TULD-D0323",
+    "TULD-D0324"
+   ],
+   "allergy_groups": [
+    "glenor"
+   ],
+   "interactions": [
+    {
+     "id": "TULD-D0322-INT",
+     "with_class": "Das-blockers",
+     "severity": "contraindicated",
+     "source": "TULD-D0324",
+     "note": "Tuldadaleen should not be combined with Das-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mL",
+    "frequency": "every 12 hours",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Tummoririn",
+   "source_ids": [
+    "TUMM-D0522",
+    "TUMM-D0523",
+    "TUMM-D0524"
+   ],
+   "allergy_groups": [
+    "irenic"
+   ],
+   "interactions": [
+    {
+     "id": "TUMM-D0522-INT",
+     "with_class": "Sat-blockers",
+     "severity": "contraindicated",
+     "source": "TUMM-D0524",
+     "note": "Tummoririn should not be combined with Sat-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 20.0
+   }
+  },
+  {
+   "name": "Vadrumestal solution",
+   "source_ids": [
+    "VADR-D0652",
+    "VADR-D0653",
+    "VADR-D0654"
+   ],
+   "allergy_groups": [
+    "ulmate"
+   ],
+   "interactions": [
+    {
+     "id": "VADR-D0652-INT",
+     "with_class": "Tol-blockers",
+     "severity": "contraindicated",
+     "source": "VADR-D0654",
+     "note": "Vadrumestal solution should not be combined with Tol-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Vamsemoltin solution",
+   "source_ids": [
+    "VAMS-D1292",
+    "VAMS-D1293",
+    "VAMS-D1294"
+   ],
+   "allergy_groups": [
+    "vexin"
+   ],
+   "interactions": [
+    {
+     "id": "VAMS-D1292-INT",
+     "with_class": "Non-blockers",
+     "severity": "contraindicated",
+     "source": "VAMS-D1294",
+     "note": "Vamsemoltin solution should not be combined with Non-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mcg",
+    "frequency": "twice daily",
+    "max_daily": 200.0
+   }
+  },
+  {
+   "name": "Varloraprex",
+   "source_ids": [
+    "VARL-D0542",
+    "VARL-D0543",
+    "VARL-D0544"
+   ],
+   "allergy_groups": [
+    "drovin"
+   ],
+   "interactions": [
+    {
+     "id": "VARL-D0542-INT",
+     "with_class": "Vem-blockers",
+     "severity": "contraindicated",
+     "source": "VARL-D0544",
+     "note": "Varloraprex should not be combined with Vem-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mL",
+    "frequency": "twice daily",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Vatviloxine solution",
+   "source_ids": [
+    "VATV-D0082",
+    "VATV-D0083",
+    "VATV-D0084"
+   ],
+   "allergy_groups": [
+    "lunate"
+   ],
+   "interactions": [
+    {
+     "id": "VATV-D0082-INT",
+     "with_class": "Sum-blockers",
+     "severity": "contraindicated",
+     "source": "VATV-D0084",
+     "note": "Vatviloxine solution should not be combined with Sum-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "once every morning",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Velvalondel",
+   "source_ids": [
+    "VELV-D1482",
+    "VELV-D1483",
+    "VELV-D1484"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "VELV-D1482-INT",
+     "with_class": "Rul-blockers",
+     "severity": "contraindicated",
+     "source": "VELV-D1484",
+     "note": "Velvalondel should not be combined with Rul-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mL",
+    "frequency": "twice daily",
+    "max_daily": 50.0
+   }
+  },
+  {
+   "name": "Verbelaprex",
+   "source_ids": [
+    "VERB-D1392",
+    "VERB-D1393",
+    "VERB-D1394"
+   ],
+   "allergy_groups": [
+    "yarnic"
+   ],
+   "interactions": [
+    {
+     "id": "VERB-D1392-INT",
+     "with_class": "Fon-blockers",
+     "severity": "contraindicated",
+     "source": "VERB-D1394",
+     "note": "Verbelaprex should not be combined with Fon-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 75.0,
+    "unit": "mL",
+    "frequency": "once every morning",
+    "max_daily": 75.0
+   }
+  },
+  {
+   "name": "Vespesumide",
+   "source_ids": [
+    "VESP-D0202",
+    "VESP-D0203",
+    "VESP-D0204"
+   ],
+   "allergy_groups": [
+    "tarnil"
+   ],
+   "interactions": [
+    {
+     "id": "VESP-D0202-INT",
+     "with_class": "Mim-blockers",
+     "severity": "contraindicated",
+     "source": "VESP-D0204",
+     "note": "Vespesumide should not be combined with Mim-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Vesrisoxine",
+   "source_ids": [
+    "VESR-D0832",
+    "VESR-D0833",
+    "VESR-D0834"
+   ],
+   "allergy_groups": [
+    "ulmate"
+   ],
+   "interactions": [
+    {
+     "id": "VESR-D0832-INT",
+     "with_class": "Nem-blockers",
+     "severity": "contraindicated",
+     "source": "VESR-D0834",
+     "note": "Vesrisoxine should not be combined with Nem-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mcg",
+    "frequency": "once every morning",
+    "max_daily": 2.5
+   }
+  },
+  {
+   "name": "Vimsudoltin",
+   "source_ids": [
+    "VIMS-D0942",
+    "VIMS-D0943",
+    "VIMS-D0944"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "VIMS-D0942-INT",
+     "with_class": "Bor-blockers",
+     "severity": "contraindicated",
+     "source": "VIMS-D0944",
+     "note": "Vimsudoltin should not be combined with Bor-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Vinvatumide suspension",
+   "source_ids": [
+    "VINV-D0352",
+    "VINV-D0353",
+    "VINV-D0354"
+   ],
+   "allergy_groups": [
+    "jadrin"
+   ],
+   "interactions": [
+    {
+     "id": "VINV-D0352-INT",
+     "with_class": "Nur-blockers",
+     "severity": "contraindicated",
+     "source": "VINV-D0354",
+     "note": "Vinvatumide suspension should not be combined with Nur-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mcg",
+    "frequency": "once daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Virselravil suspension",
+   "source_ids": [
+    "VIRS-D0472",
+    "VIRS-D0473",
+    "VIRS-D0474"
+   ],
+   "allergy_groups": [
+    "ulmate"
+   ],
+   "interactions": [
+    {
+     "id": "VIRS-D0472-INT",
+     "with_class": "Bon-blockers",
+     "severity": "contraindicated",
+     "source": "VIRS-D0474",
+     "note": "Virselravil suspension should not be combined with Bon-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 20.0,
+    "unit": "mcg",
+    "frequency": "every 12 hours",
+    "max_daily": 40.0
+   }
+  },
+  {
+   "name": "Visfatostan",
+   "source_ids": [
+    "VISF-D0232",
+    "VISF-D0233",
+    "VISF-D0234"
+   ],
+   "allergy_groups": [
+    "sennate"
+   ],
+   "interactions": [
+    {
+     "id": "VISF-D0232-INT",
+     "with_class": "Lem-blockers",
+     "severity": "contraindicated",
+     "source": "VISF-D0234",
+     "note": "Visfatostan should not be combined with Lem-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 100.0
+   }
+  },
+  {
+   "name": "Vitfataprex",
+   "source_ids": [
+    "VITF-D0452",
+    "VITF-D0453",
+    "VITF-D0454"
+   ],
+   "allergy_groups": [
+    "praxel"
+   ],
+   "interactions": [
+    {
+     "id": "VITF-D0452-INT",
+     "with_class": "Pis-blockers",
+     "severity": "contraindicated",
+     "source": "VITF-D0454",
+     "note": "Vitfataprex should not be combined with Pis-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 2.5,
+    "unit": "mg",
+    "frequency": "once daily",
+    "max_daily": 2.5
+   }
+  },
+  {
+   "name": "Vodfonravil suspension",
+   "source_ids": [
+    "VODF-D1042",
+    "VODF-D1043",
+    "VODF-D1044"
+   ],
+   "allergy_groups": [
+    "glenor"
+   ],
+   "interactions": [
+    {
+     "id": "VODF-D1042-INT",
+     "with_class": "Len-blockers",
+     "severity": "contraindicated",
+     "source": "VODF-D1044",
+     "note": "Vodfonravil suspension should not be combined with Len-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 5.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 10.0
+   }
+  },
+  {
+   "name": "Vomverumide complex",
+   "source_ids": [
+    "VOMV-D0272",
+    "VOMV-D0273",
+    "VOMV-D0274"
+   ],
+   "allergy_groups": [
+    "praxel"
+   ],
+   "interactions": [
+    {
+     "id": "VOMV-D0272-INT",
+     "with_class": "Gim-blockers",
+     "severity": "contraindicated",
+     "source": "VOMV-D0274",
+     "note": "Vomverumide complex should not be combined with Gim-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 100.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 200.0
+   }
+  },
+  {
+   "name": "Vorlimirin complex",
+   "source_ids": [
+    "VORL-D0402",
+    "VORL-D0403",
+    "VORL-D0404"
+   ],
+   "allergy_groups": [
+    "orlin"
+   ],
+   "interactions": [
+    {
+     "id": "VORL-D0402-INT",
+     "with_class": "Pem-blockers",
+     "severity": "contraindicated",
+     "source": "VORL-D0404",
+     "note": "Vorlimirin complex should not be combined with Pem-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "every 12 hours",
+    "max_daily": 80.0
+   }
+  },
+  {
+   "name": "Votditestal",
+   "source_ids": [
+    "VOTD-D1422",
+    "VOTD-D1423",
+    "VOTD-D1424"
+   ],
+   "allergy_groups": [
+    "irenic"
+   ],
+   "interactions": [
+    {
+     "id": "VOTD-D1422-INT",
+     "with_class": "Vul-blockers",
+     "severity": "contraindicated",
+     "source": "VOTD-D1424",
+     "note": "Votditestal should not be combined with Vul-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 25.0,
+    "unit": "mcg",
+    "frequency": "once every morning",
+    "max_daily": 25.0
+   }
+  },
+  {
+   "name": "Vuspemoxine",
+   "source_ids": [
+    "VUSP-D0532",
+    "VUSP-D0533",
+    "VUSP-D0534"
+   ],
+   "allergy_groups": [
+    "jadrin"
+   ],
+   "interactions": [
+    {
+     "id": "VUSP-D0532-INT",
+     "with_class": "Fom-blockers",
+     "severity": "contraindicated",
+     "source": "VUSP-D0534",
+     "note": "Vuspemoxine should not be combined with Fom-blockers."
+    }
+   ],
+   "adult_dose": {
+    "amount": 40.0,
+    "unit": "mg",
+    "frequency": "twice daily",
+    "max_daily": 80.0
+   }
+  }
+ ]
+}

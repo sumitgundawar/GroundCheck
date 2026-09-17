@@ -160,6 +160,11 @@ OIDC_AUTO_CREATE = _get("OIDC_AUTO_CREATE", "true").lower() in ("1", "true", "ye
 OIDC_REQUIRE_MFA = _get("OIDC_REQUIRE_MFA", "false").lower() in ("1", "true", "yes")
 PASSWORD_SIGN_IN = _get("PASSWORD_SIGN_IN", "true").lower() in ("1", "true", "yes")
 
+# --- Patient-aware checks (see app/formulary.py and app/patient_checks.py) ---
+# Medicine rules in the app/data/formulary.json format. The default is the
+# synthetic demo formulary; replace it with your organisation's licensed data.
+FORMULARY_PATH = Path(_get("FORMULARY_PATH", str(DATA_DIR / "formulary.json")))
+
 # --- Imaging model training (see app/training/) ---
 # Folders the training studio may read images from, comma-separated. The
 # default is the repository's data/datasets folder and your home folder, for

@@ -387,7 +387,7 @@ def ask(body: AskRequest, request: Request,
     fwd = request.headers.get("x-forwarded-for", "")
     client_id = fwd.split(",")[0].strip() if fwd else (
         request.client.host if request.client else "global")
-    return pipeline.run(body.query, body.settings, client_id=client_id,
+    return pipeline.run(body.query, body.settings, client_id=client_id, patient=body.patient,
                         user_id=user.id if user else None)
 
 
