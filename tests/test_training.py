@@ -157,17 +157,6 @@ def test_threshold_needs_the_lower_bound_to_meet_the_target():
     assert hopeless == {**hopeless, "met": False, "threshold": 1.0, "coverage": 0.0}
 
 
-def test_novelty_flags_features_far_from_every_class():
-    rng = np.random.default_rng(0)
-    features = np.concatenate([rng.normal(0, 1, (200, 8)), rng.normal(5, 1, (200, 8))])
-    labels = np.array([0] * 200 + [1] * 200)
-    stats = novelty.fit(features, labels, 2)
-    familiar = novelty.distances(rng.normal(5, 1, (50, 8)), stats)
-    strange = novelty.distances(rng.normal(-20, 1, (50, 8)), stats)
-    cutoff = novelty.cutoff(novelty.distances(features, stats))
-    assert (familiar <= cutoff).mean() > 0.9 and (strange > cutoff).all()
-
-
 # --- Starting runs ---------------------------------------------------------------
 
 @pytest.mark.parametrize("change, message", [

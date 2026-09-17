@@ -209,6 +209,19 @@ MODEL_TARGET_ACCURACY = _get_float("MODEL_TARGET_ACCURACY", 0.95)
 # with many classes, a top class at 30% means the model is torn.
 MODEL_MIN_CONFIDENCE = _get_float("MODEL_MIN_CONFIDENCE", 0.5)
 
+# --- CT and MRI imaging (see app/imaging/) ---
+# Your organisation's name, recorded in signed imaging reports.
+ORGANISATION_NAME = _get("ORGANISATION_NAME", "")
+# Where imported series are stored, encrypted when DATA_ENCRYPTION_KEYS is set.
+IMAGING_DIR = Path(_get("IMAGING_DIR", str(ROOT_DIR / "data" / "imaging"))).resolve()
+# A PACS or VNA to query, retrieve from and send reports to, over DICOMweb
+# (QIDO-RS, WADO-RS, STOW-RS). Empty turns the PACS panel off.
+DICOMWEB_URL = _get("DICOMWEB_URL", "").rstrip("/")
+# "Basic <base64 user:password>" or "Bearer <token>", sent to the PACS only.
+DICOMWEB_AUTHORIZATION = _get("DICOMWEB_AUTHORIZATION", "")
+# Largest upload, in megabytes.
+IMAGING_MAX_UPLOAD_MB = _get_int("IMAGING_MAX_UPLOAD_MB", 1024)
+
 # --- Retention (see app/retention.py). 0 keeps records for ever. ---
 AUDIT_RETENTION_DAYS = _get_int("AUDIT_RETENTION_DAYS", 0)
 REVIEW_RETENTION_DAYS = _get_int("REVIEW_RETENTION_DAYS", 0)

@@ -406,6 +406,84 @@ class Hazard(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
 
 
+class ImagingSeries(Base):
+    """A CT or MR series, de-identified at import. The pixels are in a file in
+    IMAGING_DIR; what the database holds is what describes and finds them."""
+
+    __tablename__ = "imaging_series"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    uid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)       # de-identified SeriesInstanceUID
+    study_uid: Mapped[str] = mapped_column(String(64), nullable=False)
+    source: Mapped[str] = mapped_column(String(10), nullable=False, default="upload")  # upload, pacs
+    label: Mapped[str] = mapped_column(EncryptedText("imaging_series.label"), nullable=False, default="")
+    modality: Mapped[str] = mapped_column(String(4), nullable=False)
+    description: Mapped[str] = mapped_column(EncryptedText("imaging_series.description"), nullable=False, default="")
+    body_part: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    slices: Mapped[int] = mapped_column(Integer, nullable=False)
+    rows: Mapped[int] = mapped_column(Integer, nullable=False)
+    columns: Mapped[int] = mapped_column(Integer, nullable=False)
+    meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    original: Mapped[dict | None] = mapped_column(EncryptedJSON("imaging_series.original"), nullable=True)
+    file: Mapped[str] = mapped_column(String(80), nullable=False)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+
+    analyses: Mapped[list["ImagingAnalysis"]] = relationship(
+        back_populates="series", cascade="all, delete-orphan", order_by="ImagingAnalysis.id")
+    reports: Mapped[list["ImagingReport"]] = relationship(
+        back_populates="series", cascade="all, delete-orphan", order_by="ImagingReport.id")
+
+
+class ImagingAnalysis(Base):
+    """A model run over a series."""
+
+    __tablename__ = "imaging_analyses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    series_id: Mapped[int] = mapped_column(ForeignKey("imaging_series.id", ondelete="CASCADE"), nullable=False)
+    model_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="queued")  # queued, running, done, refused, failed
+    progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    requested_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+    series: Mapped[ImagingSeries] = relationship(back_populates="analyses")
+
+    __table_args__ = (Index("ix_imaging_analyses_series_id", "series_id"),)
+
+
+class ImagingReport(Base):
+    """A clinician's report on a series: a draft, then signed. A signed report
+    can't be edited; an amendment is a new report that supersedes it."""
+
+    __tablename__ = "imaging_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    series_id: Mapped[int] = mapped_column(ForeignKey("imaging_series.id", ondelete="CASCADE"), nullable=False)
+    analysis_id: Mapped[int | None] = mapped_column(ForeignKey("imaging_analyses.id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="draft")  # draft, signed, superseded
+    agreement: Mapped[str] = mapped_column(String(12), nullable=False, default="not_used")  # agree, partly, disagree, not_used
+    findings: Mapped[str] = mapped_column(EncryptedText("imaging_reports.findings"), nullable=False, default="")
+    impression: Mapped[str] = mapped_column(EncryptedText("imaging_reports.impression"), nullable=False, default="")
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    author_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    signed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    replaces_id: Mapped[int | None] = mapped_column(ForeignKey("imaging_reports.id", ondelete="SET NULL"), nullable=True)
+    sr_uid: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+    series: Mapped[ImagingSeries] = relationship(back_populates="reports")
+
+    __table_args__ = (Index("ix_imaging_reports_series_id", "series_id"),)
+
+
 # --------------------------------------------------------------------------
 # Engine and sessions
 # --------------------------------------------------------------------------

@@ -35,6 +35,10 @@ async def lifespan(_: FastAPI):
     # Warm the model and load the prebuilt index before serving traffic. On a
     # new server whose index lives on an empty data volume, build it first.
     retrieval.get_model()
+    if db.ready():
+        from .imaging import store as imaging_store
+
+        imaging_store.recover_interrupted()
     try:
         retrieval.load_index()
     except FileNotFoundError:
@@ -1345,6 +1349,236 @@ async def models_predict(model_id: str, request: Request,
         return await run_in_threadpool(library.predict, model_id, data)
     except Exception as exc:  # noqa: BLE001
         raise _training_error(exc) from exc
+
+
+class ModelImagingRequest(BaseModel):
+    modality: str
+    window: str | None = None
+    orientation: str = "identity"
+    patch_mm: float | None = None
+    note: str = ""
+
+
+@app.put("/api/models/{model_id}/imaging")
+def models_set_imaging(model_id: str, body: ModelImagingRequest, request: Request) -> dict:
+    from .training import library
+
+    require_manager(request, "admin")
+    try:
+        return {"imaging": library.set_imaging(model_id, body.model_dump())}
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+@app.delete("/api/models/{model_id}/imaging")
+def models_remove_imaging(model_id: str, request: Request) -> dict:
+    from .training import library
+
+    require_manager(request, "admin")
+    try:
+        return {"imaging": library.set_imaging(model_id, None)}
+    except Exception as exc:  # noqa: BLE001
+        raise _training_error(exc) from exc
+
+
+# --- CT and MRI imaging -------------------------------------------------------
+
+def _imaging_error(exc: Exception) -> HTTPException:
+    from .imaging import dicomweb, store
+
+    if isinstance(exc, LookupError):
+        return HTTPException(status_code=404, detail="No such series or report.")
+    if isinstance(exc, store.ImagingError):
+        return HTTPException(status_code=400, detail=str(exc))
+    if isinstance(exc, dicomweb.PacsError):
+        return HTTPException(status_code=502, detail=str(exc))
+    raise exc
+
+
+def _imaging_user(request: Request, role: str = "clinician") -> auth.Principal | None:
+    user = require_manager(request, role)
+    if not db.ready():
+        raise HTTPException(status_code=503, detail="Imaging needs a database, and it isn't available.")
+    return user
+
+
+@app.get("/api/imaging")
+def imaging_home(request: Request) -> dict:
+    from .imaging import dicom, dicomweb, store
+
+    _imaging_user(request)
+    return {"series": store.list_series(), "models": store.imaging_models(), "pacs": dicomweb.enabled(),
+            "windows": {k: list(v) for k, v in dicom.WINDOWS.items()},
+            "max_upload_mb": config.IMAGING_MAX_UPLOAD_MB}
+
+
+@app.post("/api/imaging/upload")
+async def imaging_upload(request: Request) -> dict:
+    from .imaging import store
+
+    user = _imaging_user(request)
+    limit = config.IMAGING_MAX_UPLOAD_MB * 1024**2
+    if int(request.headers.get("content-length") or 0) > limit + 1024**2:
+        raise HTTPException(status_code=413, detail=f"Uploads can be up to {config.IMAGING_MAX_UPLOAD_MB} MB.")
+    form = await request.form(max_files=3000, max_part_size=200 * 1024**2)
+    uploads, total = [], 0
+    for item in form.getlist("files"):
+        if not hasattr(item, "read"):
+            continue
+        data = await item.read()
+        total += len(data)
+        if total > limit:
+            raise HTTPException(status_code=413, detail=f"Uploads can be up to {config.IMAGING_MAX_UPLOAD_MB} MB.")
+        uploads.append((item.filename or "upload", data))
+    if not uploads:
+        raise HTTPException(status_code=400, detail="Choose DICOM files, a folder of them, or a zip.")
+    try:
+        return await run_in_threadpool(store.import_series, uploads, "upload", str(form.get("label") or ""),
+                                       user.id if user else None)
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+
+
+@app.get("/api/imaging/series/{series_id}")
+def imaging_series(series_id: int, request: Request) -> dict:
+    from .imaging import store
+
+    _imaging_user(request)
+    try:
+        return {"series": store.get_series(series_id)}
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+
+
+@app.delete("/api/imaging/series/{series_id}")
+def imaging_delete(series_id: int, request: Request) -> dict:
+    from .imaging import store
+
+    _imaging_user(request, "reviewer")
+    try:
+        store.delete_series(series_id)
+        return {"deleted": series_id}
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+
+
+@app.get("/api/imaging/series/{series_id}/slices/{index}.png")
+async def imaging_slice(series_id: int, index: int, request: Request, window: str | None = None) -> Response:
+    from .imaging import store
+
+    _imaging_user(request)
+    try:
+        png = await run_in_threadpool(store.slice_png, series_id, index, window)
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+    return Response(png, media_type="image/png", headers={"Cache-Control": "private, max-age=600"})
+
+
+class ImagingAnalyseRequest(BaseModel):
+    model_id: str
+
+
+@app.post("/api/imaging/series/{series_id}/analyses")
+def imaging_analyse(series_id: int, body: ImagingAnalyseRequest, request: Request) -> dict:
+    from .imaging import store
+
+    user = _imaging_user(request)
+    try:
+        return {"analysis": store.start_analysis(series_id, body.model_id, user.id if user else None)}
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+
+
+class ImagingReportRequest(BaseModel):
+    findings: str = ""
+    impression: str = ""
+    agreement: str = "not_used"
+    analysis_id: int | None = None
+    sign: bool = False
+    report_id: int | None = None
+
+
+@app.post("/api/imaging/series/{series_id}/reports")
+def imaging_report(series_id: int, body: ImagingReportRequest, request: Request) -> dict:
+    from .imaging import store
+
+    user = _imaging_user(request)
+    try:
+        return {"report": store.save_report(
+            series_id, findings=body.findings, impression=body.impression, agreement=body.agreement,
+            analysis_id=body.analysis_id, sign=body.sign, report_id=body.report_id,
+            author_id=user.id if user else None, author_name=(user.name or user.email) if user else "Local user")}
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+
+
+@app.get("/api/imaging/reports/{report_id}/sr.dcm")
+async def imaging_report_download(report_id: int, request: Request) -> Response:
+    from .imaging import store
+
+    _imaging_user(request)
+    try:
+        data, info = await run_in_threadpool(store.report_sr, report_id, False)
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+    return Response(data, media_type="application/dicom",
+                    headers={"Content-Disposition": f'attachment; filename="report-{report_id}.dcm"'})
+
+
+@app.post("/api/imaging/reports/{report_id}/send")
+async def imaging_report_send(report_id: int, request: Request) -> dict:
+    from .imaging import dicomweb, store
+
+    _imaging_user(request)
+    try:
+        data, info = await run_in_threadpool(store.report_sr, report_id, True)
+        await run_in_threadpool(dicomweb.store, [data], info["study"])
+        await run_in_threadpool(store.mark_sent, report_id)
+        return {"sent": True, "sop_instance_uid": info["sop_instance_uid"]}
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+
+
+@app.get("/api/imaging/pacs/studies")
+async def imaging_pacs_studies(request: Request, patient_id: str = "", patient_name: str = "", accession: str = "",
+                               study_date: str = "", modality: str = "") -> dict:
+    from .imaging import dicomweb
+
+    _imaging_user(request)
+    try:
+        return {"studies": await run_in_threadpool(dicomweb.search_studies, patient_id, patient_name, accession,
+                                                   study_date, modality)}
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+
+
+@app.get("/api/imaging/pacs/studies/{study_uid}/series")
+async def imaging_pacs_series(study_uid: str, request: Request) -> dict:
+    from .imaging import dicomweb
+
+    _imaging_user(request)
+    try:
+        return {"series": await run_in_threadpool(dicomweb.search_series, study_uid)}
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
+
+
+class PacsRetrieveRequest(BaseModel):
+    study_uid: str
+    series_uid: str
+    label: str = ""
+
+
+@app.post("/api/imaging/pacs/retrieve")
+async def imaging_pacs_retrieve(body: PacsRetrieveRequest, request: Request) -> dict:
+    from .imaging import dicomweb, store
+
+    user = _imaging_user(request)
+    try:
+        files = await run_in_threadpool(dicomweb.retrieve_series, body.study_uid, body.series_uid)
+        return await run_in_threadpool(store.import_series, files, "pacs", body.label, user.id if user else None)
+    except Exception as exc:  # noqa: BLE001
+        raise _imaging_error(exc) from exc
 
 
 # The dashboard loads nothing from other sites, so the policy allows only this

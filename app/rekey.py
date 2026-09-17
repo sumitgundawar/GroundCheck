@@ -72,4 +72,7 @@ def reencrypt(batch_size: int = 500) -> dict:
                             obj.query_key = ring.lookup_hash(re.sub(r"\s+", " ", obj.query.strip().lower()))
                 rewritten += len(stale)
         counts[table.name] = rewritten
+    from .imaging import store
+
+    counts["imaging files"] = store.reencrypt_files()
     return {"encryption": ring.summary(), "rewritten": counts}

@@ -12,3 +12,4 @@ data/groundcheck.db*
 models/
 data/datasets/
 deploy/.env
+data/imaging-samples/

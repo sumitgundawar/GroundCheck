@@ -112,16 +112,18 @@ def _recalibrate_batch_norm(model, images, device, batch_size, mean, std, in_cha
 
 
 def _features(model, arch, images, device, batch_size, mean, std, in_channels, progress):
-    import torch
-
-    extractor = novelty.feature_extractor(model, arch)
-    out = []
-    with torch.no_grad():
-        for start in range(0, len(images), batch_size):
-            progress.check_cancel()
-            xb = preprocess.normalise(images[start:start + batch_size].to(device), mean, std, in_channels)
-            out.append(extractor(xb).float().cpu().numpy())
-    return np.concatenate(out) if out else np.zeros((0, 0), dtype=np.float32)
+    """Per-block features for novelty detection, as a list with one array per block."""
+    per_block: list[list] = []
+    model.eval()
+    for start in range(0, len(images), batch_size):
+        progress.check_cancel()
+        xb = preprocess.normalise(images[start:start + batch_size].to(device), mean, std, in_channels)
+        _, feats = novelty.forward(model, arch, xb)
+        if not per_block:
+            per_block = [[] for _ in feats]
+        for i, f in enumerate(feats):
+            per_block[i].append(f)
+    return [np.concatenate(parts) for parts in per_block]
 
 
 def _predict(model, images, labels, device, batch_size, mean, std, in_channels, progress, what):
@@ -276,21 +278,19 @@ def train(run_dir: Path, resume: bool = False) -> None:
 
     progress.update(force=True, message="Learning what the training images look like")
     train_subset = torch.randperm(len(tensors["train"]))[:20000]
-    stats = novelty.fit(_features(model, arch, tensors["train"][train_subset], device, batch_size * 2, mean, std,
-                                  in_channels, progress),
-                        labels["train"][train_subset].numpy(), len(classes))
-    val_distances = novelty.distances(_features(model, arch, tensors["val"], device, batch_size * 2, mean, std,
-                                                in_channels, progress), stats)
-    novelty_cutoff = novelty.cutoff(val_distances)
+    stats, novelty_cutoffs = novelty.fit_layers(
+        _features(model, arch, tensors["train"][train_subset], device, batch_size * 2, mean, std, in_channels, progress),
+        labels["train"][train_subset].numpy(), len(classes),
+        _features(model, arch, tensors["val"], device, batch_size * 2, mean, std, in_channels, progress))
 
     test = None
     if len(tensors["test"]):
         test_probs, _ = _predict(model, tensors["test"], labels["test"], device, batch_size * 2, mean, std,
                                  in_channels, progress, "test")
         test = metrics.evaluate(test_probs, labels["test"].numpy(), classes, threshold["threshold"])
-        test_distances = novelty.distances(_features(model, arch, tensors["test"], device, batch_size * 2, mean,
-                                                     std, in_channels, progress), stats)
-        test["novelty_flagged"] = float((test_distances > novelty_cutoff).mean())
+        test_flags, _ = novelty.flagged(_features(model, arch, tensors["test"], device, batch_size * 2, mean, std,
+                                                  in_channels, progress), stats, novelty_cutoffs)
+        test["novelty_flagged"] = float(test_flags.mean())
         test["target_met"] = (test["abstention"]["answered_accuracy"] or 0) >= config.MODEL_TARGET_ACCURACY
 
     progress.update(force=True, phase="saving", message="Saving to the model library")
@@ -298,8 +298,7 @@ def train(run_dir: Path, resume: bool = False) -> None:
     target = config.MODEL_LIBRARY_DIR / model_id
     target.mkdir(parents=True, exist_ok=False)
     save_file({k: v.contiguous() for k, v in best["state"].items()}, str(target / "weights.safetensors"))
-    save_file({"means": torch.from_numpy(stats["means"]), "precision": torch.from_numpy(stats["precision"])},
-              str(target / "novelty.safetensors"))
+    novelty.save(target / "novelty.safetensors", stats)
     card = {
         "id": model_id,
         "name": run["name"],
@@ -310,7 +309,7 @@ def train(run_dir: Path, resume: bool = False) -> None:
         "input": {"image_size": size, "channels": channels, "model_channels": in_channels,
                   "mean": mean, "std": std},
         "threshold": threshold,
-        "novelty": {"method": "mahalanobis", "cutoff": novelty_cutoff, "flag_rate": novelty.FLAG_RATE},
+        "novelty": {"method": "mahalanobis-per-block", "cutoffs": novelty_cutoffs, "flag_rate": novelty.FLAG_RATE},
         "validation": validation,
         "test": test,
         "history": history,

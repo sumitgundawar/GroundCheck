@@ -4,7 +4,8 @@
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
 #
 # Optional services: add --profile local-ai for Ollama, --profile qdrant for
-# a Qdrant vector database. See docs/on-premises.md.
+# a Qdrant vector database, --profile pacs for an Orthanc PACS to test the
+# imaging workflow against. See docs/on-premises.md.
 
 name: groundcheck
 
@@ -31,6 +32,7 @@ services:
       MODEL_LIBRARY_DIR: /data/models/library
       TRAINING_RUNS_DIR: /data/models/runs
       TRAINING_DATA_DIRS: /datasets
+      IMAGING_DIR: /data/imaging
       OLLAMA_HOST: http://ollama:11434
     volumes:
       - app-data:/data
@@ -106,6 +108,21 @@ services:
       - ollama-data:/root/.ollama
     networks: [internal]
 
+  # A test PACS with DICOMweb, reachable only from the app. For production,
+  # point DICOMWEB_URL at your own PACS or vendor-neutral archive instead.
+  pacs:
+    image: orthancteam/orthanc:latest
+    profiles: [pacs]
+    restart: unless-stopped
+    environment:
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+      ORTHANC__NAME: GroundCheck test PACS
+      ORTHANC__AUTHENTICATION_ENABLED: "true"
+      ORTHANC__REGISTERED_USERS: '{"groundcheck": "${PACS_PASSWORD:-change-me}"}'
+    volumes:
+      - pacs-data:/var/lib/orthanc/db
+    networks: [internal]
+
   qdrant:
     image: qdrant/qdrant:latest
     profiles: [qdrant]
@@ -126,3 +143,4 @@ volumes:
   caddy-config:
   ollama-data:
   qdrant-data:
+  pacs-data:

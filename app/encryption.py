@@ -32,6 +32,7 @@ import threading
 from . import config
 
 PREFIX = "gcenc:v1:"
+BYTES_PREFIX = b"GCENC1"
 KEY_BYTES = 32
 NONCE_BYTES = 12
 
@@ -107,6 +108,30 @@ class Keyring:
             return cipher.decrypt(raw[:NONCE_BYTES], raw[NONCE_BYTES:], context.encode("utf-8")).decode("utf-8")
         except InvalidTag as exc:
             raise EncryptionError(f"An encrypted value in {context} failed its integrity check.") from exc
+
+    def encrypt_bytes(self, data: bytes, context: str) -> bytes:
+        """Files, such as stored images: the same scheme, in binary."""
+        if not self.enabled:
+            return data
+        nonce = os.urandom(NONCE_BYTES)
+        sealed = self._ciphers[self.primary].encrypt(nonce, data, context.encode("utf-8"))
+        return BYTES_PREFIX + self.primary.encode("ascii") + nonce + sealed
+
+    def decrypt_bytes(self, data: bytes, context: str) -> bytes:
+        if not data.startswith(BYTES_PREFIX):
+            return data
+        start = len(BYTES_PREFIX)
+        kid = data[start:start + 8].decode("ascii", "replace")
+        cipher = self._ciphers.get(kid)
+        if cipher is None:
+            raise EncryptionError(f"A file was encrypted with key {kid}, which isn't in DATA_ENCRYPTION_KEYS.")
+        from cryptography.exceptions import InvalidTag
+
+        nonce = data[start + 8:start + 8 + NONCE_BYTES]
+        try:
+            return cipher.decrypt(nonce, data[start + 8 + NONCE_BYTES:], context.encode("utf-8"))
+        except InvalidTag as exc:
+            raise EncryptionError(f"The encrypted file {context} failed its integrity check.") from exc
 
     def lookup_hash(self, text: str) -> str:
         """A hash for finding equal values, such as a repeated question. Keyed

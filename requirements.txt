@@ -24,3 +24,6 @@ python-multipart==0.0.*
 # Training studio: images, and the ResNet-18 architecture (optional; the small CNN needs neither extra).
 pillow==12.*
 torchvision==0.*
+# CT and MRI: reading DICOM, and writing signed reports as DICOM SR.
+pydicom==3.*
+highdicom==0.28.*
