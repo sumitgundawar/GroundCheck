@@ -91,7 +91,8 @@ Full instructions, including configuration and Windows, are in
 12. [Using the API](#using-the-api)
 13. [Using your own documents](#using-your-own-documents)
 14. [Clinical review and governance](#clinical-review-and-governance)
-15. [Training imaging models](#training-imaging-models)
+15. [Patient-aware checks](#patient-aware-checks)
+16. [Training imaging models](#training-imaging-models)
 16. [Configuration](#configuration)
 17. [Local development](#local-development)
 18. [Running the checks](#running-the-checks)
@@ -586,6 +587,44 @@ sign-off by your clinical safety officer.
 
 ---
 
+## Patient-aware checks
+
+On the Ask page, open **For a specific patient** and enter what you know: age,
+sex, weight, eGFR or serum creatinine, Child-Pugh class, pregnancy,
+breastfeeding, allergies, current medicines, conditions and lab results. No
+names or record numbers: the API rejects fields it doesn't know. Through the
+API, send a `patient` object with `POST /api/ask`.
+
+For every formulary medicine named in the question or the answer, GroundCheck
+checks:
+
+| Check | Refuses when | Warns when |
+| --- | --- | --- |
+| Allergies and conditions | The patient is allergic to the medicine, its class or a group it's ruled out for, or has a contraindicated condition | The question isn't about giving it (what it's for, say) |
+| Interactions | A current medicine or class is contraindicated with it | The interaction is major, or the patient takes another medicine of the same class |
+| Children | The formulary has no dosing for the patient's age, or the answer gives an adult dose (the weight-based dose is shown) | |
+| Kidney and liver | The rule says avoid, or the answer's dose is above the reduced dose | The rule says caution, or a reduced dose applies |
+| Pregnancy and breastfeeding | The medicine is to be avoided, or has no pregnancy safety information | There's no breastfeeding information |
+| Lab results | A value crosses an avoid threshold | A value crosses a caution threshold |
+| Dose | The answer's dose is above the patient's maximum | The medicine is high alert |
+| Missing data | A dose question lacks what the rules need: age, weight, kidney or liver function | |
+
+Creatinine clearance is calculated with Cockcroft-Gault when eGFR isn't given.
+Every finding names its rule and source, and the trace records the checks.
+
+The rules come from a formulary in a validated JSON format (`app/formulary.py`).
+The demo formulary is generated from the synthetic corpus by
+`scripts/build_formulary.py`, with illustrative kidney, liver, weight, child,
+pregnancy, lab and high-alert rules. **For clinical use, replace it** with rules
+from a licensed drug database and point `FORMULARY_PATH` at the file; it's
+validated when the app starts. The **Medicines** page shows every rule.
+
+`eval/patient_cases.json` holds 383 patient scenarios (regenerate with
+`scripts/generate_patient_cases.py`), and `scripts/run_eval.py` fails the build
+if any scenario that must be refused is answered.
+
+---
+
 ## Training imaging models
 
 The **Training** page trains an image classifier on a folder of your own
@@ -675,6 +714,7 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `LLM_TIMEOUT_SECONDS` | `8` | Outbound call timeout. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests per minute, per client IP. |
 | `AUDIT_PERSIST` | `true` | Persist the audit trail to disk. |
+| `FORMULARY_PATH` | `app/data/formulary.json` | Medicine rules for patient-aware checks. Replace the synthetic demo formulary before clinical use. |
 | `TRAINING_DATA_DIRS` | `data/datasets` and your home folder | Folders the training studio may read images from, comma-separated. On a shared server, list only dataset folders. |
 | `MODEL_LIBRARY_DIR` | `models/library` | Where trained models are saved. |
 | `TRAINING_RUNS_DIR` | `models/runs` | Training run settings, progress and logs. |
