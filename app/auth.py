@@ -157,6 +157,7 @@ def update_user(user_id: int, *, role: str | None = None, is_active: bool | None
                 user.site_id = sites.check(s, site_id)
             except sites.SiteError as exc:
                 raise AuthError(str(exc)) from exc
+            sites.forget_user(user_id)
         if is_active is not None:
             user.is_active = is_active
             if not is_active:

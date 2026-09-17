@@ -140,3 +140,14 @@ def test_the_site_comes_from_the_identity_provider_when_configured(group, monkey
         for claims in ({}, {"site": "nowhere"}, {"site": ["north", "south"]}):
             with pytest.raises(sso.SsoError, match="site"):
                 sso._site_from_claims(s, claims)
+
+
+def test_a_move_between_sites_takes_effect(group):
+    north, south, client = group
+    from app import sites
+
+    group_admin = client("group-admin")
+    person = next(u["id"] for u in group_admin.get("/api/users").json()["users"] if u["name"] == "north-clin")
+    assert sites.of_user(person) == north["id"]
+    group_admin.patch(f"/api/users/{person}", json={"site_id": south["id"]})
+    assert sites.of_user(person) == south["id"]     # not the remembered site

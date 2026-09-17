@@ -11,6 +11,8 @@ Without any sites, nothing changes: everyone sees everything."""
 from __future__ import annotations
 
 import re
+import threading
+import time
 
 from sqlalchemy import select
 
@@ -72,12 +74,36 @@ def check(s, site_id: int | None) -> int | None:
     return int(site_id)
 
 
+# A person's site changes rarely and is read on every question, so it is
+# remembered briefly rather than fetched each time. A move between sites takes
+# effect within a minute.
+_OF_USER_SECONDS = 60
+_of_user_cache: dict[int, tuple[float, int | None]] = {}
+_of_user_lock = threading.Lock()
+
+
 def of_user(user_id: int | None) -> int | None:
     """The site a person belongs to, for tagging what they create."""
     if not user_id or not db.ready():
         return None
+    now = time.monotonic()
+    with _of_user_lock:
+        found = _of_user_cache.get(user_id)
+        if found and now - found[0] < _OF_USER_SECONDS:
+            return found[1]
     with db.session() as s:
-        return s.scalar(select(User.site_id).where(User.id == user_id))
+        site_id = s.scalar(select(User.site_id).where(User.id == user_id))
+    with _of_user_lock:
+        if len(_of_user_cache) > 10000:
+            _of_user_cache.clear()
+        _of_user_cache[user_id] = (now, site_id)
+    return site_id
+
+
+def forget_user(user_id: int | None = None) -> None:
+    """Drop what was remembered, after a change of site."""
+    with _of_user_lock:
+        _of_user_cache.pop(user_id, None) if user_id else _of_user_cache.clear()
 
 
 def visible(row_site_id: int | None, scope: int | None) -> bool:
