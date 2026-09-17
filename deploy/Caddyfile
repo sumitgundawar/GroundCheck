@@ -1,0 +1,21 @@
+# HTTPS in front of GroundCheck. TLS_SETTING is "internal" (a certificate
+# from Caddy's own authority, for internal networks; install its root on
+# client machines), an email address (a public certificate from Let's
+# Encrypt, for a host reachable from the internet), or paths to your
+# organisation's certificate and key: "/data/certs/cert.pem /data/certs/key.pem".
+
+{$GROUNDCHECK_HOSTNAME} {
+	tls {$TLS_SETTING}
+	encode zstd gzip
+	request_body {
+		max_size 60MB
+	}
+	reverse_proxy app:8000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+	log {
+		output stdout
+		format json
+	}
+}

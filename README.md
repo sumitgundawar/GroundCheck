@@ -681,6 +681,7 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `AUDIT_SIGNING_KEYS` | _empty_ | Base64 keys to sign the audit chain. The first signs. |
 | `AUDIT_RETENTION_DAYS` | `0` | Delete audit records older than this when retention runs. 0 keeps them. |
 | `REVIEW_RETENTION_DAYS` | `0` | Delete resolved review cases older than this when retention runs. 0 keeps them. |
+| `API_DOCS` | `true` | Serve interactive API docs at `/docs`. Set `false` in production. |
 | `REVIEW_QUEUE` | `true` | Open a review case for every refusal. |
 | `REVIEW_SLA_HOURS` | `72` | When a refusal case is due. |
 | `FLAGGED_SLA_HOURS` | `24` | When a flagged answer case is due. |
@@ -762,7 +763,12 @@ test suite on every push and pull request.
 
 ## Deployment
 
-The app is one container that listens on the port given by `app_port` (7860 on
+**In a hospital or clinic network**, use the hardened stack in `deploy/`
+(GroundCheck, PostgreSQL and HTTPS, with no internet access at runtime) and
+follow [docs/on-premises.md](docs/on-premises.md): installation, single
+sign-on, keys, scheduled jobs, backups, upgrades and a hardening checklist.
+
+**As a public demo**, the app is one container that listens on the port given by `app_port` (7860 on
 Hugging Face Spaces). The search index and evaluation are built inside the image,
 so startup is instant and no model download happens at runtime.
 

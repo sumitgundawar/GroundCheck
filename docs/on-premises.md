@@ -1,0 +1,198 @@
+# Running GroundCheck on your own servers
+
+This guide is for IT teams installing GroundCheck inside a hospital or clinic
+network. It covers the architecture, installation, sign-in, keys, backups,
+upgrades, monitoring and a hardening checklist.
+
+GroundCheck is not a certified medical device. Your organisation is
+responsible for clinical safety sign-off (for example DCB0129 and DCB0160 in
+England), a data protection impact assessment, and any regulatory approval
+for how you use it.
+
+## Architecture
+
+```
+  clinicians' browsers
+          │ HTTPS (443)
+  ┌───────▼────────┐
+  │  proxy (Caddy) │  TLS, compression, request size limits
+  └───────┬────────┘
+          │ internal network, no internet access
+  ┌───────▼────────┐      ┌──────────────┐
+  │   app          │──────▶  PostgreSQL  │  users, audit trail, reviews, documents
+  │  (GroundCheck) │      └──────────────┘
+  │                │──────▶ Ollama (optional)  local language model
+  │                │──────▶ Qdrant (optional)  vector database for large collections
+  └────────────────┘
+      /data volume: search index, trained models, training runs
+      /datasets (read-only): image folders for the training studio
+```
+
+`deploy/docker-compose.yml` defines this stack. The app container:
+
+- runs as a non-root user with a read-only filesystem, no Linux capabilities
+  and `no-new-privileges`
+- sits on an internal network with no route to the internet: the embedding
+  model is built into the image, and nothing is downloaded at runtime
+- requires sign-in (`AUTH_REQUIRED=true`), sends session cookies over HTTPS
+  only, and disables management from the server itself (`ADMIN_ACCESS=none`)
+- sends a strict Content Security Policy, HSTS, and headers that stop
+  framing, content sniffing and access to cameras or microphones
+- loads no fonts, scripts or styles from other sites
+
+## Sizing (starting points)
+
+| Deployment | CPU | Memory | Disk | Notes |
+| --- | --- | --- | --- | --- |
+| Pilot, up to 50 users, documents only | 4 cores | 8 GB | 40 GB | Extractive answers, no local model |
+| Department, local language model | 8 cores | 32 GB | 100 GB | Llama 3.2 3B or Qwen 2.5 7B on CPU is slow; prefer a GPU |
+| With a GPU | 8 cores | 32 GB | 200 GB | NVIDIA with 12 GB or more for 7B models and image training |
+
+PostgreSQL grows with the audit trail: roughly 20 KB per question, so
+100,000 questions a year need about 2 GB.
+
+## Install
+
+On a Linux host with Docker Engine 24 or later and Docker Compose v2:
+
+```bash
+git clone https://github.com/sumitgundawar/GroundCheck.git
+cd GroundCheck
+cp deploy/.env.example deploy/.env
+```
+
+Edit `deploy/.env`:
+
+1. `GROUNDCHECK_HOSTNAME`: the name in DNS that people will use.
+2. `TLS_SETTING`: `internal` for a certificate from Caddy's own authority (then
+   install its root certificate, from the `caddy-data` volume at
+   `/data/caddy/pki/authorities/local/root.crt`, on client machines through
+   group policy), or the paths to your organisation's certificate and key.
+3. `POSTGRES_PASSWORD`: a long random value.
+4. `DATA_ENCRYPTION_KEYS` and `AUDIT_SIGNING_KEYS`: generate each with
+   `docker compose -f deploy/docker-compose.yml run --rm --no-deps app python -m app.cli generate-key`.
+   Store copies in your secrets manager before going further. Without the
+   encryption key, encrypted data can't be recovered.
+5. Single sign-on settings, if you use it (below).
+
+Build and start:
+
+```bash
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env ps
+```
+
+The first start creates the database schema and builds the search index.
+Then create the first admin:
+
+```bash
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec app \
+  python -m app.cli create-user --email admin@your-trust.nhs.uk --role admin
+```
+
+Keep this account as the emergency account, even when everyone else signs in
+through single sign-on.
+
+## Sign-in
+
+Register GroundCheck with your identity provider (Entra ID, Okta, Keycloak,
+ADFS or any OpenID Connect provider) as a web application with the redirect
+address `https://<GROUNDCHECK_HOSTNAME>/api/auth/sso/callback`. Create app
+roles or groups for admins and reviewers, and set the `OIDC_*` values in
+`deploy/.env`. See "Single sign-on" in the README for each setting.
+
+Recommended: `OIDC_REQUIRE_MFA=true`, `OIDC_ALLOWED_DOMAINS` set to your
+domains, and `PASSWORD_SIGN_IN=false` once single sign-on works.
+
+## Scheduled jobs
+
+Run these from the host's scheduler (cron or systemd timers):
+
+| When | Command | Why |
+| --- | --- | --- |
+| Hourly | `python -m app.cli escalate-reviews` | Escalate overdue review cases |
+| Daily | `python -m app.cli purge-sessions` | Remove expired sign-in sessions |
+| Daily | `python -m app.cli verify-audit` | Exits with 2 if the audit trail has changed |
+| Daily | `python -m app.cli audit-head` | Record the chain head in a system the database administrators can't change |
+| Weekly | `python -m app.cli retention --apply` | Delete records past their retention period |
+
+Run each as
+`docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec -T app <command>`.
+Alert on a non-zero exit from `verify-audit`.
+
+## Backups
+
+Back up three things, and test restoring them at least every quarter:
+
+1. **The database.** `docker compose ... exec -T db pg_dump -U groundcheck -Fc groundcheck > groundcheck-$(date +%F).dump`
+   Encrypt backups and keep them off the host.
+2. **The data volume** (`app-data`): the search index, trained models and
+   training runs. The index can be rebuilt; trained models can't.
+3. **The keys** in `deploy/.env`, kept separately from the backups they
+   protect.
+
+To restore, start a fresh stack with the same keys, then
+`pg_restore -U groundcheck -d groundcheck --clean groundcheck-<date>.dump`
+and copy the data volume back. Run `python -m app.cli verify-audit` afterwards.
+
+## Upgrades
+
+1. Read the release notes.
+2. Back up the database and the data volume.
+3. `git pull`, then `docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build`.
+   Database migrations run automatically when the app starts.
+4. Check `docker compose ... ps` shows the app as healthy, and run
+   `python -m app.cli verify-audit`.
+
+To roll back, restore the backup taken in step 2 and check out the previous
+release.
+
+## Rotating keys
+
+- **Encryption:** put the new key first in `DATA_ENCRYPTION_KEYS` and the old
+  one in `DATA_ENCRYPTION_RETIRED_KEYS`, restart, run
+  `python -m app.cli reencrypt`, then remove the old key and restart.
+- **Audit signing:** put the new key first in `AUDIT_SIGNING_KEYS` and keep
+  the old one after it, so older records still verify.
+- **Database password and client secret:** change them in the database or
+  identity provider and in `deploy/.env`, then restart.
+
+## Monitoring
+
+- `GET /api/health` returns 200 when the app is serving, with the size of the
+  search index. The compose file uses it as the container health check.
+- Caddy writes JSON access logs to standard output, and the app writes its logs
+  there too: collect them with your log platform.
+- The **Usage** page shows questions, refusals and response times; **Review**
+  shows open and overdue cases; **Data protection** verifies the audit trail.
+
+## Network access
+
+At runtime, nothing leaves your network unless you configure it:
+
+| Destination | Needed for | When |
+| --- | --- | --- |
+| Hugging Face | Embedding model | Image build only |
+| Your identity provider | Single sign-on | Every sign-in |
+| ollama.com registry | Downloading local models | Only when an admin downloads one |
+| An OpenAI-compatible API (`GROQ_BASE_URL`) | Cloud language model | Only if `GROQ_API_KEY` is set; leave it empty to keep questions in your network |
+
+To pull Ollama models on an internal network, download them on a connected
+machine and copy the Ollama data volume across.
+
+## Hardening checklist
+
+- [ ] `AUTH_REQUIRED=true`, and single sign-on with MFA required
+- [ ] `PASSWORD_SIGN_IN=false`, with one emergency local admin whose password is in a safe
+- [ ] `DATA_ENCRYPTION_KEYS` and `AUDIT_SIGNING_KEYS` set, with copies in a secrets manager
+- [ ] `GROQ_API_KEY` empty, unless a cloud model has been approved by information governance
+- [ ] `INCLUDE_DEMO_CORPUS=false`, so only your approved documents are cited
+- [ ] `API_DOCS=false`
+- [ ] Retention periods agreed with information governance and set
+- [ ] The host's disk encrypted (LUKS, BitLocker or your storage's encryption)
+- [ ] Only ports 80 and 443 open, and only from your clinical network
+- [ ] Scheduled jobs running, with alerts on `verify-audit` failures
+- [ ] Backups encrypted, off the host, and a restore tested
+- [ ] `TRAINING_DATA_DIRS` limited to approved de-identified dataset folders
+- [ ] Clinical safety case and hazard log reviewed and signed off
+- [ ] Penetration test before go-live, and after major changes

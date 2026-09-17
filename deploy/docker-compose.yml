@@ -1,0 +1,128 @@
+# GroundCheck on your own servers: the app, PostgreSQL, and Caddy for HTTPS.
+#
+#   cp deploy/.env.example deploy/.env    # then fill it in
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+#
+# Optional services: add --profile local-ai for Ollama, --profile qdrant for
+# a Qdrant vector database. See docs/on-premises.md.
+
+name: groundcheck
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: groundcheck:${GROUNDCHECK_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # The embedding model is built into the image; never reach out for it.
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      DATABASE_URL: postgresql+psycopg://groundcheck:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@db:5432/groundcheck
+      AUTH_REQUIRED: "true"
+      SESSION_COOKIE_SECURE: "true"
+      ADMIN_ACCESS: "none"
+      PORT: "8000"
+      AUDIT_LOG_PATH: /data/audit/audit_log.jsonl
+      LOCAL_AI_STATE_PATH: /data/local_ai.json
+      INDEX_DIR: /data/index
+      MODEL_LIBRARY_DIR: /data/models/library
+      TRAINING_RUNS_DIR: /data/models/runs
+      TRAINING_DATA_DIRS: /datasets
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      - app-data:/data
+      - ${DATASETS_DIR:-./datasets}:/datasets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks: [internal]
+    # Uncomment to train on NVIDIA GPUs (needs the NVIDIA Container Toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: groundcheck
+      POSTGRES_USER: groundcheck
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U groundcheck -d groundcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    networks: [internal]
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      GROUNDCHECK_HOSTNAME: ${GROUNDCHECK_HOSTNAME:?Set GROUNDCHECK_HOSTNAME in deploy/.env}
+      TLS_SETTING: ${TLS_SETTING:-internal}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks: [internal, public]
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [local-ai]
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    networks: [internal]
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    profiles: [qdrant]
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks: [internal]
+
+networks:
+  internal:
+    internal: true   # no route to the internet from the app, database or models
+  public: {}
+
+volumes:
+  app-data:
+  db-data:
+  caddy-data:
+  caddy-config:
+  ollama-data:
+  qdrant-data:

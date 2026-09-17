@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import ipaddress
+import logging
 import json
 from urllib.parse import quote
 from contextlib import asynccontextmanager
@@ -30,13 +31,22 @@ async def lifespan(_: FastAPI):
     # run without the protection that was asked for.
     encryption.keyring()
     integrity.signing_summary()
-    # Warm the model and load the prebuilt index before serving traffic.
+    # Warm the model and load the prebuilt index before serving traffic. On a
+    # new server whose index lives on an empty data volume, build it first.
     retrieval.get_model()
-    retrieval.load_index()
+    try:
+        retrieval.load_index()
+    except FileNotFoundError:
+        from . import knowledge
+
+        logging.getLogger("groundcheck").warning("No search index found in %s; building it now.", config.INDEX_DIR)
+        knowledge.rebuild_index()
     yield
 
 
-app = FastAPI(title="GroundCheck", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="GroundCheck", version="1.0.0", lifespan=lifespan,
+              docs_url="/docs" if config.API_DOCS else None, redoc_url="/redoc" if config.API_DOCS else None,
+              openapi_url="/openapi.json" if config.API_DOCS else None)
 
 
 # --- Accounts ---------------------------------------------------------------
@@ -1109,6 +1119,40 @@ async def models_predict(model_id: str, request: Request,
         return await run_in_threadpool(library.predict, model_id, data)
     except Exception as exc:  # noqa: BLE001
         raise _training_error(exc) from exc
+
+
+# The dashboard loads nothing from other sites, so the policy allows only this
+# origin. FastAPI's interactive docs (/docs, /redoc) load from a CDN, so they
+# get a looser policy and can be switched off with API_DOCS=false.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; "
+    "connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+)
+DOCS_POLICY = (
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://fastapi.tiangolo.com; "
+    "frame-ancestors 'none'"
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    headers = response.headers
+    headers.setdefault("X-Content-Type-Options", "nosniff")
+    headers.setdefault("Referrer-Policy", "same-origin")
+    headers.setdefault("X-Frame-Options", "DENY")
+    headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
+    headers.setdefault("Content-Security-Policy",
+                       DOCS_POLICY if path in ("/docs", "/redoc", "/docs/oauth2-redirect") else CONTENT_SECURITY_POLICY)
+    forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    if forwarded_proto == "https":
+        headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if path.startswith("/api/"):
+        headers.setdefault("Cache-Control", "no-store")
+    return response
 
 
 @app.middleware("http")

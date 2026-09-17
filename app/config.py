@@ -140,6 +140,9 @@ DATA_ENCRYPTION_RETIRED_KEYS = os.environ.get("DATA_ENCRYPTION_RETIRED_KEYS", ""
 # Comma-separated base64 keys; the first signs the audit chain, all verify.
 AUDIT_SIGNING_KEYS = os.environ.get("AUDIT_SIGNING_KEYS", "").strip()
 
+# Serve interactive API docs at /docs. Turn off in production if not needed.
+API_DOCS = _get("API_DOCS", "true").lower() in ("1", "true", "yes")
+
 # --- Single sign-on with OpenID Connect (see app/sso.py) ---
 OIDC_ISSUER = _get("OIDC_ISSUER", "").rstrip("/")
 OIDC_CLIENT_ID = _get("OIDC_CLIENT_ID", "")

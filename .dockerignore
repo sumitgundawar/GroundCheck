@@ -9,3 +9,8 @@ eval/eval_summary.json
 audit/
 local_ai.json
 data/groundcheck.db*
+models/
+data/datasets/
+site/
+.tracker/
+deploy/.env

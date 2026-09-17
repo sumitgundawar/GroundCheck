@@ -1,3 +1,12 @@
+/* Fonts are served from this app, so nothing is fetched from another site and
+   the dashboard works offline. SIL Open Font License: see fonts/OFL.txt. */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 600; font-display: swap;
+  src: url("/fonts/jetbrains-mono-latin.woff2") format("woff2"); }
+@font-face { font-family: "Newsreader"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("/fonts/newsreader-latin.woff2") format("woff2"); }
+
 /* GroundCheck design system.
    Light, instrument-grade, calibrated to Vercel Geist: a near-white canvas, a
    single near-black ink, a deep neutral gray scale, hairline borders, stacked

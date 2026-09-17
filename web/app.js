@@ -998,7 +998,13 @@ function jsonNode(value, key, open, depth = 0) {
   const sum = document.createElement("summary");
   sum.className = "j-summary";
   const label = key !== null ? `${key}` : (arr ? "array" : "object");
-  sum.innerHTML = `<span class="j-key">${label}</span> <span class="j-meta">${arr ? "[" + entries.length + "]" : "{" + entries.length + "}"}</span>`;
+  const keySpan = document.createElement("span");
+  keySpan.className = "j-key";
+  keySpan.textContent = label;
+  const metaSpan = document.createElement("span");
+  metaSpan.className = "j-meta";
+  metaSpan.textContent = arr ? `[${entries.length}]` : `{${entries.length}}`;
+  sum.append(keySpan, " ", metaSpan);
   det.appendChild(sum);
   const body = document.createElement("div");
   body.className = "j-body";

@@ -324,3 +324,18 @@ def test_session_cookie_is_http_only_and_strict(client):
     r = _sign_in(client, "ada@example.org")
     cookie = r.headers["set-cookie"].lower()
     assert "httponly" in cookie and "samesite=strict" in cookie
+
+
+def test_security_headers_and_no_third_party_resources():
+    from app.main import app
+
+    with TestClient(app) as c:
+        page = c.get("/")
+        csp = page.headers["content-security-policy"]
+        assert "default-src 'self'" in csp and "frame-ancestors 'none'" in csp and "unsafe-inline" not in csp
+        assert page.headers["x-frame-options"] == "DENY" and page.headers["x-content-type-options"] == "nosniff"
+        assert "googleapis" not in page.text and "gstatic" not in page.text
+        assert "strict-transport-security" not in page.headers
+        assert c.get("/", headers={"X-Forwarded-Proto": "https"}).headers["strict-transport-security"].startswith("max-age=")
+        assert c.get("/api/health").headers["cache-control"] == "no-store"
+        assert c.get("/fonts/inter-latin.woff2").status_code == 200
