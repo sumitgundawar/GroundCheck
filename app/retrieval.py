@@ -58,7 +58,7 @@ def get_model():
     do not pay the import cost."""
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer(config.EMBED_MODEL)
+    return SentenceTransformer(config.EMBED_MODEL, device=config.EMBED_DEVICE)
 
 
 def embedding_dimension() -> int:
@@ -224,6 +224,12 @@ def is_known_term(word: str) -> bool:
     """Whether a word appears in the indexed documents."""
     candidate = getattr(_override, "state", None) or _active
     return candidate is not None and word.lower() in candidate.lexical.postings
+
+
+def document_frequency(word: str) -> int:
+    """How many passages in the index contain this word."""
+    state = getattr(_override, "state", None) or _active
+    return len(state.lexical.postings.get(word.lower(), ())) if state is not None else 0
 
 
 def tokenize(text: str) -> list[str]:

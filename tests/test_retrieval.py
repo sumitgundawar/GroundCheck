@@ -85,3 +85,21 @@ def test_retrieval_gate_uses_best_score_not_first_result():
     r = pipeline.run("What are the side effects of Remdodaprex?")
     gate = next(s for s in r.trace if s.name == "retrieval gate")
     assert gate.data["best_score"] == pytest.approx(max(s.score for s in r.sources), abs=1e-4)
+
+
+def test_embeddings_are_safe_for_concurrent_requests():
+    """The model runs on the configured device (the CPU by default), and
+    embedding from many threads at once neither crashes nor changes results."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    import numpy as np
+
+    from app import config, retrieval
+
+    model = retrieval.get_model()
+    assert str(model.device).startswith(config.EMBED_DEVICE)
+    queries = [f"What is the standard dose of drug {i}?" for i in range(40)]
+    expected = retrieval.embed(queries)
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        got = list(pool.map(lambda q: retrieval.embed([q])[0], queries))
+    assert np.allclose(np.stack(got), expected, atol=1e-5)

@@ -62,6 +62,10 @@ LOCAL_AI_STATE_PATH = ROOT_DIR / _get("LOCAL_AI_STATE_PATH", "local_ai.json")
 
 # --- Embeddings + retrieval ------------------------------------------------
 EMBED_MODEL = _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+# Where query embeddings run. The CPU by default: a question is embedded in a
+# few milliseconds there, and it's safe for concurrent requests. On Apple
+# silicon, the GPU (mps) aborts the process when requests embed at once.
+EMBED_DEVICE = _get("EMBED_DEVICE", "cpu")
 TOP_K = _get_int("TOP_K", 4)
 # Where embeddings are stored and searched: "local" (exact search in-process,
 # the default) or "qdrant" (a vector database; see app/vectorstore.py).

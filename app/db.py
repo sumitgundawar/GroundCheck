@@ -35,6 +35,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
     event,
+    text,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
@@ -672,8 +673,19 @@ def migrate() -> None:
     cfg = Config(str(config.ROOT_DIR / "alembic.ini"))
     cfg.set_main_option("script_location", str(config.ROOT_DIR / "migrations"))
     with engine().begin() as connection:
-        cfg.attributes["connection"] = connection
-        command.upgrade(cfg, "head")
+        # Several workers or replicas start at once: take a lock so one
+        # migrates and the others wait, then find nothing left to do.
+        dialect = connection.dialect.name
+        if dialect == "postgresql":
+            connection.execute(text("SELECT pg_advisory_xact_lock(724315001)"))
+        elif dialect in ("mysql", "mariadb"):
+            connection.execute(text("SELECT GET_LOCK('groundcheck_migrate', 600)"))
+        try:
+            cfg.attributes["connection"] = connection
+            command.upgrade(cfg, "head")
+        finally:
+            if dialect in ("mysql", "mariadb"):
+                connection.execute(text("SELECT RELEASE_LOCK('groundcheck_migrate')"))
 
 
 _ready = False

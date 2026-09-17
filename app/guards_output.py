@@ -103,6 +103,11 @@ _CONVERSATIONAL = {
 _CONTRACTION = re.compile(r"(?:'s|'re|'ve|'ll|'d|'m|n't)$")
 
 
+# Short words that still change the question: another species, a route or a unit.
+_SHORT_SALIENT = {"cat", "cats", "dog", "dogs", "pet", "pets", "cow", "pig", "rat", "rats", "horse", "iv", "im",
+                  "gram", "kg", "mcg", "ml"}
+
+
 def _salient_terms(query: str) -> list[str]:
     from .deid import PLACEHOLDER
 
@@ -110,7 +115,7 @@ def _salient_terms(query: str) -> list[str]:
     terms = []
     for match in _WORD.finditer(query.lower().replace("’", "'")):
         word = _CONTRACTION.sub("", match.group(0))
-        if len(word) < 4 or word in _STOPWORDS or word in _CONVERSATIONAL:
+        if (len(word) < 4 and word not in _SHORT_SALIENT) or word in _STOPWORDS or word in _CONVERSATIONAL:
             continue
         terms.append(word)
     # Preserve order, drop duplicates.
@@ -136,13 +141,34 @@ def _shared_prefix_len(a: str, b: str) -> int:
     return n
 
 
+# Word endings that don't change what a word is about: "monitored" and
+# "monitoring", "treat" and "treatment". Only these may differ between a
+# question word and a source word. A shared prefix alone isn't enough: it let
+# one-letter misspellings of medicine names ("Rotmiitufen" for "Rotmitufen")
+# count as covered.
+_ENDINGS = ("", "s", "es", "ed", "d", "ing", "ly", "ment", "ments", "al", "ally", "ation", "ations", "ion", "ions",
+            "er", "ers", "ive", "ity", "ies", "y", "ic", "ical", "ness", "ance", "ence", "ant", "ent")
+
+
+def _stems(word: str) -> set[str]:
+    out = {word}
+    for ending in _ENDINGS:
+        if ending and word.endswith(ending) and len(word) - len(ending) >= 3:
+            stem = word[: -len(ending)]
+            out.add(stem)
+            if stem.endswith("i"):          # therapies -> therapy
+                out.add(stem[:-1] + "y")
+            if len(stem) > 3 and stem[-1] == stem[-2]:   # stopped -> stop
+                out.add(stem[:-1])
+            out.add(stem + "e")             # dosed -> dose, managing -> manage
+    return out
+
+
 def _covered(term: str, vocab: set[str]) -> bool:
-    for word in vocab:
-        # Tolerate plural/verb-form variation via a shared prefix.
-        threshold = min(5, len(term), len(word))
-        if _shared_prefix_len(term, word) >= threshold and threshold >= 4:
-            return True
-    return False
+    if term in vocab:
+        return True
+    term_stems = _stems(term)
+    return any(term_stems & _stems(word) for word in vocab if abs(len(word) - len(term)) <= 6 and word[:3] == term[:3])
 
 
 # Qualifiers that change what a correct answer is. When one of these is
@@ -253,6 +279,28 @@ def _prioritise(terms: list[str], query: str) -> list[str]:
     return sorted(terms, key=rank)
 
 
+def _sources_about(query: str, covered: list[str], sources: list[dict]) -> list[dict]:
+    """The sources about the question's subject: those naming a capitalised
+    name from the question, or, without one, its most specific covered term."""
+    if not sources or not covered:
+        return sources
+    words = [(_source_vocabulary(f"{r.get('title', '')} {r.get('text', '')}")) for r in sources]
+    names = [t for t in covered if t in {w.lower() for w in re.findall(r"\b[A-Z][a-zA-Z'-]+", query)}
+             and t not in _STOPWORDS and sum(t in w for w in words) < len(sources)]
+    if not names:
+        # The rarest covered word across the whole index is the question's
+        # subject: a medicine's name is in a few passages, "daily" in hundreds.
+        from . import retrieval
+
+        rarity = {t: retrieval.document_frequency(t) for t in covered}
+        known = [t for t in covered if rarity[t] > 0]
+        if not known:
+            return sources
+        names = [min(known, key=lambda t: (rarity[t], -len(t)))]
+    about = [r for r, w in zip(sources, words) if any(_covered(n, w) for n in names)]
+    return about or sources
+
+
 def coverage_report(query: str, sources: list[dict]) -> dict:
     """Everything the coverage check looked at, for the trace: question terms
     found or missing in the retrieved sources, doses stated in the question,
@@ -262,8 +310,12 @@ def coverage_report(query: str, sources: list[dict]) -> dict:
     covered = [t for t in terms if _covered(t, vocab)]
     uncovered = _prioritise([t for t in terms if not _covered(t, vocab)], query)
 
+    # A dose the question states must come from a source about what the
+    # question names, not from another medicine's passage that happened to be
+    # retrieved alongside it ("50 mcg of Rulpuraprex" is not supported by
+    # "Lembitulex is given as 50 mcg").
     source_values: set[str] = set()
-    for record in sources:
+    for record in _sources_about(query, covered, sources):
         source_values |= _canonical_pairs(record.get("text", ""))
     question_values = sorted(_canonical_pairs(query))
     unsupported_values = [v for v in question_values if v not in source_values]

@@ -27,6 +27,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import secrets
 import shutil
 import threading
 import time
@@ -104,14 +106,24 @@ def _live(s) -> Release | None:
 # ---------------------------------------------------------------- snapshots
 
 def _write_snapshot(number: int, records: list[dict], vectors: np.ndarray) -> None:
+    """Write a snapshot atomically. Instances sharing a volume may write the
+    same release at once: each uses its own temporary folder, and the first
+    to finish wins."""
     target = _dir(number)
-    tmp = target.with_name(target.name + ".tmp")
-    shutil.rmtree(tmp, ignore_errors=True)
+    tmp = target.with_name(f"{target.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
     tmp.mkdir(parents=True)
-    (tmp / "records.json").write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
-    np.save(tmp / "vectors.npy", np.ascontiguousarray(vectors, dtype="float32"))
-    shutil.rmtree(target, ignore_errors=True)
-    tmp.replace(target)
+    try:
+        (tmp / "records.json").write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
+        np.save(tmp / "vectors.npy", np.ascontiguousarray(vectors, dtype="float32"))
+        if target.is_dir():
+            return
+        try:
+            tmp.rename(target)
+        except OSError:
+            if not target.is_dir():
+                raise
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _read_snapshot(number: int) -> tuple[list[dict], np.ndarray]:
@@ -223,14 +235,14 @@ def create(records: list[dict], vectors: np.ndarray, reason: str, user_id: int |
                 retrieval.write_index(records, vectors)
                 retrieval.load_index()
                 return {**_summary(live), "unchanged": True}
-            _write_snapshot(number, records, vectors)
             row = Release(number=number, status="checking", reason=reason[:300], created_by=user_id,
                           created_by_name=name[:200], passages=len(records),
                           demo_passages=sum(1 for r in records if r.get("source_id") is None),
                           documents=_documents(records), content_sha256=fingerprint,
                           formulary_sha256=_formulary_fingerprint())
             s.add(row)
-            s.flush()
+            s.flush()   # claims the number; a concurrent rebuild elsewhere fails here and can retry
+            _write_snapshot(number, records, vectors)
             release_id = row.id
         try:
             result = check(records, vectors) if config.RELEASE_CHECKS else \
@@ -295,18 +307,24 @@ def baseline() -> dict | None:
             return None
     state = retrieval._state()
     records, vectors = list(state.metadata), state.store.vectors()
-    with _lock, db.session() as s:
-        if s.scalar(select(func.count(Release.id))):
-            return None
-        _write_snapshot(1, records, vectors)
-        row = Release(number=1, status="live", reason="The index in use when releases began", created_by_name="GroundCheck",
-                      passages=len(records), demo_passages=sum(1 for r in records if r.get("source_id") is None),
-                      documents=_documents(records), content_sha256=_fingerprint(records),
-                      formulary_sha256=_formulary_fingerprint(), check={"passed": True, "skipped": True},
-                      live_at=_now(), live_by_name="GroundCheck")
-        s.add(row)
-        s.flush()
-        return _summary(row)
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        with _lock, db.session() as s:
+            if s.scalar(select(func.count(Release.id))):
+                return None
+            row = Release(number=1, status="live", reason="The index in use when releases began",
+                          created_by_name="GroundCheck", passages=len(records),
+                          demo_passages=sum(1 for r in records if r.get("source_id") is None),
+                          documents=_documents(records), content_sha256=_fingerprint(records),
+                          formulary_sha256=_formulary_fingerprint(), check={"passed": True, "skipped": True},
+                          live_at=_now(), live_by_name="GroundCheck")
+            s.add(row)
+            s.flush()   # another instance that got here first makes this fail
+            _write_snapshot(1, records, vectors)
+            return _summary(row)
+    except IntegrityError:
+        return None
 
 
 def list_releases() -> dict:
