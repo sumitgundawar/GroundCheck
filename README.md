@@ -92,7 +92,8 @@ Full instructions, including configuration and Windows, are in
 13. [Using your own documents](#using-your-own-documents)
 14. [Clinical review and governance](#clinical-review-and-governance)
 15. [Patient-aware checks](#patient-aware-checks)
-16. [Training imaging models](#training-imaging-models)
+16. [EHR integration](#ehr-integration)
+17. [Training imaging models](#training-imaging-models)
 16. [Configuration](#configuration)
 17. [Local development](#local-development)
 18. [Running the checks](#running-the-checks)
@@ -625,6 +626,57 @@ if any scenario that must be refused is answered.
 
 ---
 
+## EHR integration
+
+GroundCheck works with electronic health records through HL7 FHIR R4, SMART
+on FHIR and CDS Hooks. Admins see the addresses to register and a CDS console
+on the **EHR integration** page.
+
+### Reading a patient
+
+From a patient's FHIR record GroundCheck reads age and sex, the latest eGFR,
+serum creatinine, weight, potassium, sodium, INR, platelets, ALT, QTc and
+pregnancy status (by LOINC, with units converted), active allergies,
+medicines and conditions. Names, identifiers and contact details are never
+copied. Results that are old (`FHIR_LAB_MAX_AGE_DAYS`), in units it can't
+convert, or implausible are flagged or left out. The patient is kept,
+encrypted, for `EHR_CONTEXT_MINUTES` for that browser.
+
+- **SMART on FHIR launch.** Register GroundCheck with your EHR using the launch
+  URL `https://<your GroundCheck>/api/ehr/launch` and redirect URL
+  `https://<your GroundCheck>/api/ehr/callback`, then set `SMART_CLIENT_ID`
+  and `SMART_ALLOWED_ISSUERS` (your EHR's FHIR base URL). EHR launch and
+  standalone launch both use PKCE, and only allowed issuers can launch.
+- **Open FHIR servers.** For development, list servers in `FHIR_OPEN_SERVERS`
+  (for example `https://hapi.fhir.org/baseR4`) to load a patient by ID from the
+  patient panel.
+
+### Saving to the record
+
+With `SMART_WRITE_NOTES=true`, a clinician can save an answer asked for the
+launched patient to their record as a preliminary `DocumentReference`: the
+question, the answer or reason, cited sources, the patient checks, their
+comment and the audit record ID. The EHR's access token is kept encrypted
+server-side and never sent to the browser.
+
+### CDS Hooks
+
+The discovery endpoint is `https://<your GroundCheck>/cds-services`. The
+`order-select` and `order-sign` services check each draft `MedicationRequest`
+against the prefetched patient and return a card per finding: **critical** for
+unsafe orders (with override reasons), **warning** and **info** otherwise, each
+naming its formulary rule. Calls must carry a JWT from a trusted EHR:
+`CDS_HOOKS_TRUSTED=https://ehr.example.org=https://ehr.example.org/jwks.json`.
+`CDS_HOOKS_ALLOW_UNSIGNED=true` is for sandbox testing only.
+
+### Testing against public sandboxes
+
+`RUN_LIVE_EHR=1 pytest tests/test_ehr.py` loads patients from the public HAPI
+FHIR server, and runs a full SMART launch, patient load and note write
+against the [SMART Health IT launcher](https://launch.smarthealthit.org).
+
+---
+
 ## Training imaging models
 
 The **Training** page trains an image classifier on a folder of your own
@@ -714,6 +766,15 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `LLM_TIMEOUT_SECONDS` | `8` | Outbound call timeout. |
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests per minute, per client IP. |
 | `AUDIT_PERSIST` | `true` | Persist the audit trail to disk. |
+| `FHIR_OPEN_SERVERS` | _empty_ | FHIR servers a patient can be loaded from without SMART, comma-separated. For development. |
+| `SMART_CLIENT_ID` | _empty_ | GroundCheck's client ID registered with the EHR. |
+| `SMART_CLIENT_SECRET` | _empty_ | The client secret, for confidential clients. |
+| `SMART_ALLOWED_ISSUERS` | _empty_ | FHIR base URLs of EHRs allowed to launch GroundCheck, comma-separated. |
+| `SMART_WRITE_NOTES` | `false` | Ask for write permission and let clinicians save reviewed answers as notes. |
+| `EHR_CONTEXT_MINUTES` | `60` | How long a patient loaded from an EHR is kept. |
+| `FHIR_LAB_MAX_AGE_DAYS` | `90` | Lab results older than this are flagged as possibly out of date. |
+| `CDS_HOOKS_TRUSTED` | _empty_ | EHRs allowed to call the CDS services, as `issuer=JWKS URL` pairs. |
+| `CDS_HOOKS_ALLOW_UNSIGNED` | `false` | Accept unsigned CDS calls. Testing only. |
 | `FORMULARY_PATH` | `app/data/formulary.json` | Medicine rules for patient-aware checks. Replace the synthetic demo formulary before clinical use. |
 | `TRAINING_DATA_DIRS` | `data/datasets` and your home folder | Folders the training studio may read images from, comma-separated. On a shared server, list only dataset folders. |
 | `MODEL_LIBRARY_DIR` | `models/library` | Where trained models are saved. |
