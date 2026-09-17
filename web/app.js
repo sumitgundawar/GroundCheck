@@ -22,10 +22,21 @@ const PIPELINE_STAGES = [
   ["decision", "Answer with citations, or refuse with a specific reason and route for review."],
 ];
 
+// Display names for pipeline stages whose internal names read awkwardly.
+const STAGE_LABELS = { "pii redaction": "De-identification" };
+
 // Plain-language explanation shown in the refusal callout, keyed by a stable
 // phrase found in the refusal reason.
 function refusalExplanation(reason) {
   const r = (reason || "").toLowerCase();
+  if (r.includes("in the question does not appear"))
+    return "The question states a value that no trusted source supports, so confirming it could be unsafe.";
+  if (r.includes("no trusted source covers"))
+    return "The question is about a patient group the sources don't cover, so an answer written for adults could be unsafe.";
+  if (r.includes("states a maximum") || r.includes("states a minimum"))
+    return "The sources give a dose but no limit, so they can't answer a question about a maximum or minimum.";
+  if (r.includes("must not be combined"))
+    return "The sources say these must not be used together, so there is no safe combined dose to give.";
   if (r.includes("not appear in any trusted source") || r.includes("do not cover"))
     return "The question names something the trusted sources never mention, so there is nothing to ground an answer on.";
   if (r.includes("no sufficiently relevant source"))
@@ -777,7 +788,7 @@ function renderTrace(steps) {
     main.className = "trace-main";
     const name = document.createElement("div");
     name.className = "trace-name";
-    name.textContent = step.name;
+    name.textContent = STAGE_LABELS[step.name] || step.name;
     const detail = document.createElement("div");
     detail.className = "trace-detail";
     detail.textContent = step.detail;

@@ -1240,3 +1240,13 @@ body { background: var(--canvas); color: var(--text); }
 .dataset-note a, .hero-dataset a, .page-sub a, .step-sub a, .run-result a { color: var(--ink); text-decoration: underline; text-underline-offset: 0.18em; }
 .local-ai-model.fit-too-large { opacity: 1; background: var(--bg-subtle); }
 .local-ai-model.fit-too-large .local-ai-model-name { color: var(--text-faint); }
+
+/* Refusal and trace: plain language in the reading face; the reason is
+   already in the heading, so it isn't repeated in the box. */
+.refuse-callout p { font-family: var(--font-sans); font-size: 15px; }
+#refuse-detail { display: none; }
+.refuse-callout { background: color-mix(in srgb, var(--danger-bg) 70%, var(--bg)); }
+.refuse-callout .eyebrow { color: var(--danger); }
+.trace-name { font-family: var(--font-sans); font-size: 14px; font-weight: 600; }
+.trace-name::first-letter { text-transform: uppercase; }
+.decision-reason::first-letter { text-transform: uppercase; }

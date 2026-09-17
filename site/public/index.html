@@ -222,38 +222,46 @@
       <div class="wrap">
         <div class="section-intro">
           <h2 id="tour-title">Explore the dashboard</h2>
-          <p>Unedited screenshots of the app in this repository.</p>
+          <p>Unedited screenshots of the app in this repository, in light and dark mode, with synthetic data.</p>
         </div>
 
         <div class="tour" data-tour>
           <div class="tour-tabs" role="tablist" aria-label="Dashboard views" aria-orientation="vertical" hidden>
             <button class="tour-tab" type="button" role="tab" id="tour-tab-ask" aria-controls="tour-panel-ask" aria-selected="true">
               <span class="tour-tab-title">Ask a question</span>
-              <span class="tour-tab-desc">Type your own, or start from grouped examples that answer and refuse.</span>
+              <span class="tour-tab-desc">Type your own, or start from examples that answer and refuse.</span>
             </button>
             <button class="tour-tab" type="button" role="tab" id="tour-tab-answer" aria-controls="tour-panel-answer" aria-selected="false" tabindex="-1">
               <span class="tour-tab-title">Get a cited answer</span>
-              <span class="tour-tab-desc">Every claim is tagged with the ID of the source it came from.</span>
+              <span class="tour-tab-desc">Every statement is tagged with the source it came from.</span>
             </button>
             <button class="tour-tab" type="button" role="tab" id="tour-tab-refusal" aria-controls="tour-panel-refusal" aria-selected="false" tabindex="-1">
               <span class="tour-tab-title">See why it refused</span>
-              <span class="tour-tab-desc">The reason in plain language, and the exact stage that stopped the run.</span>
+              <span class="tour-tab-desc">A plain-language reason, and the exact check that stopped it.</span>
             </button>
             <button class="tour-tab" type="button" role="tab" id="tour-tab-evidence" aria-controls="tour-panel-evidence" aria-selected="false" tabindex="-1">
               <span class="tour-tab-title">Inspect the evidence</span>
-              <span class="tour-tab-desc">Retrieved passages with similarity scores, next to a trace of every stage.</span>
+              <span class="tour-tab-desc">Retrieved passages with scores, next to every stage of the run.</span>
             </button>
-            <button class="tour-tab" type="button" role="tab" id="tour-tab-tuning" aria-controls="tour-panel-tuning" aria-selected="false" tabindex="-1">
-              <span class="tour-tab-title">Tune the guards</span>
-              <span class="tour-tab-desc">Move a threshold or switch a guard off, then ask again to compare.</span>
+            <button class="tour-tab" type="button" role="tab" id="tour-tab-review" aria-controls="tour-panel-review" aria-selected="false" tabindex="-1">
+              <span class="tour-tab-title">Review refusals and flags</span>
+              <span class="tour-tab-desc">Every refusal and flagged answer becomes a case with a due date.</span>
             </button>
-            <button class="tour-tab" type="button" role="tab" id="tour-tab-corpus" aria-controls="tour-panel-corpus" aria-selected="false" tabindex="-1">
-              <span class="tour-tab-title">Explore the corpus</span>
-              <span class="tour-tab-desc">A 3D map of every document, with this question’s sources highlighted.</span>
+            <button class="tour-tab" type="button" role="tab" id="tour-tab-usage" aria-controls="tour-panel-usage" aria-selected="false" tabindex="-1">
+              <span class="tour-tab-title">See how it’s used</span>
+              <span class="tour-tab-desc">Questions, refusals, response times and what needs attention.</span>
             </button>
-            <button class="tour-tab" type="button" role="tab" id="tour-tab-audit" aria-controls="tour-panel-audit" aria-selected="false" tabindex="-1">
-              <span class="tour-tab-title">Read the audit record</span>
-              <span class="tour-tab-desc">The full record of each request, saved to an append-only log.</span>
+            <button class="tour-tab" type="button" role="tab" id="tour-tab-training" aria-controls="tour-panel-training" aria-selected="false" tabindex="-1">
+              <span class="tour-tab-title">Train on your own scans</span>
+              <span class="tour-tab-desc">Pick a folder and a GPU, then watch loss and accuracy live.</span>
+            </button>
+            <button class="tour-tab" type="button" role="tab" id="tour-tab-model" aria-controls="tour-panel-model" aria-selected="false" tabindex="-1">
+              <span class="tour-tab-title">Use a trained model</span>
+              <span class="tour-tab-desc">Accuracy per class, and it abstains when unsure.</span>
+            </button>
+            <button class="tour-tab" type="button" role="tab" id="tour-tab-protection" aria-controls="tour-panel-protection" aria-selected="false" tabindex="-1">
+              <span class="tour-tab-title">Protect the data</span>
+              <span class="tour-tab-desc">Verify the audit trail, with encryption and retention status.</span>
             </button>
             <button class="tour-tab" type="button" role="tab" id="tour-tab-evaluation" aria-controls="tour-panel-evaluation" aria-selected="false" tabindex="-1">
               <span class="tour-tab-title">Check the evaluation</span>
@@ -264,63 +272,79 @@
             <div class="tour-panel" role="tabpanel" id="tour-panel-ask" aria-labelledby="tour-tab-ask">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/overview.webp" aria-label="Open full-size screenshot"><img src="/screenshots/overview.webp" width="1280" height="820" alt="The GroundCheck dashboard: a question box with example questions grouped into core demo, more answers and more refusals." fetchpriority="low" decoding="async"></a>
+                <a class="lightbox-link" href="/screenshots/ask.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/ask-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/ask.webp" width="1440" height="900" fetchpriority="low" decoding="async" alt="The GroundCheck app: a sidebar of pages, and the Ask page with a question box and example questions that answer and refuse."></picture></a>
               </div>
-              <figcaption><strong>Ask a question.</strong> Type your own, or start from grouped examples that answer and refuse.</figcaption>
+              <figcaption><strong>Ask a question.</strong> Type your own, or start from examples that answer and refuse.</figcaption>
             </figure>
             </div>
             <div class="tour-panel" role="tabpanel" id="tour-panel-answer" aria-labelledby="tour-tab-answer">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/answer.webp" aria-label="Open full-size screenshot"><img src="/screenshots/answer.webp" width="932" height="211" alt="An answer about Caloradine's dose and interactions, with each sentence followed by a source ID such as CALO-001." loading="lazy" decoding="async"></a>
+                <a class="lightbox-link" href="/screenshots/answer.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/answer-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/answer.webp" width="1040" height="239" loading="lazy" decoding="async" alt="An answer about Caloradine's standard dose, with each sentence followed by a source ID such as CALO-001, and a button to flag the answer for review."></picture></a>
               </div>
-              <figcaption><strong>Get a cited answer.</strong> Every claim is tagged with the ID of the source it came from.</figcaption>
+              <figcaption><strong>Get a cited answer.</strong> Every statement is tagged with the source it came from.</figcaption>
             </figure>
             </div>
             <div class="tour-panel" role="tabpanel" id="tour-panel-refusal" aria-labelledby="tour-tab-refusal">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/refusal.webp" aria-label="Open full-size screenshot"><img src="/screenshots/refusal.webp" width="812" height="1027" alt="A refused question about Zalortin. The trace shows every stage passing until source coverage fails; later stages are marked not reached." loading="lazy" decoding="async"></a>
+                <a class="lightbox-link" href="/screenshots/refusal.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/refusal-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/refusal.webp" width="1056" height="677" loading="lazy" decoding="async" alt="A refused question about a 5-year-old. The reason says no trusted source covers children, and the pipeline trace shows the source coverage check failing."></picture></a>
               </div>
-              <figcaption><strong>See why it refused.</strong> The reason in plain language, and the exact stage that stopped the run.</figcaption>
+              <figcaption><strong>See why it refused.</strong> A plain-language reason, and the exact check that stopped it.</figcaption>
             </figure>
             </div>
             <div class="tour-panel" role="tabpanel" id="tour-panel-evidence" aria-labelledby="tour-tab-evidence">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/sources-trace.webp" aria-label="Open full-size screenshot"><img src="/screenshots/sources-trace.webp" width="932" height="1061" alt="Retrieved source cards with IDs, sections and cosine scores, beside a pipeline trace with a status and timing for each stage." loading="lazy" decoding="async"></a>
+                <a class="lightbox-link" href="/screenshots/evidence.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/evidence-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/evidence.webp" width="1040" height="980" loading="lazy" decoding="async" alt="Retrieved source cards with IDs, sections and similarity scores, beside a pipeline trace with a status and timing for each stage."></picture></a>
               </div>
-              <figcaption><strong>Inspect the evidence.</strong> Retrieved passages with similarity scores, next to a trace of every stage.</figcaption>
+              <figcaption><strong>Inspect the evidence.</strong> Retrieved passages with scores, next to every stage of the run.</figcaption>
             </figure>
             </div>
-            <div class="tour-panel" role="tabpanel" id="tour-panel-tuning" aria-labelledby="tour-tab-tuning">
+            <div class="tour-panel" role="tabpanel" id="tour-panel-review" aria-labelledby="tour-tab-review">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/tuning.webp" aria-label="Open full-size screenshot"><img src="/screenshots/tuning.webp" width="932" height="589" alt="The tuning panel with sliders for retrieval gate, grounding threshold, sources retrieved and temperature, and switches for each guard." loading="lazy" decoding="async"></a>
+                <a class="lightbox-link" href="/screenshots/review.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/review-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/review.webp" width="1440" height="900" loading="lazy" decoding="async" alt="The Review page: a queue of open cases, including a flagged answer and refusals, each with its type, how often it was asked, due date and assignee."></picture></a>
               </div>
-              <figcaption><strong>Tune the guards.</strong> Move a threshold or switch a guard off, then ask again to compare.</figcaption>
+              <figcaption><strong>Review refusals and flags.</strong> Every refusal and flagged answer becomes a case with a due date.</figcaption>
             </figure>
             </div>
-            <div class="tour-panel" role="tabpanel" id="tour-panel-corpus" aria-labelledby="tour-tab-corpus">
+            <div class="tour-panel" role="tabpanel" id="tour-panel-usage" aria-labelledby="tour-tab-usage">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/corpus-map.webp" aria-label="Open full-size screenshot"><img src="/screenshots/corpus-map.webp" width="972" height="967" alt="Corpus statistics above a 3D scatter plot of document embeddings, coloured by document type, with the four retrieved sources labelled." loading="lazy" decoding="async"></a>
+                <a class="lightbox-link" href="/screenshots/usage.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/usage-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/usage.webp" width="1440" height="900" loading="lazy" decoding="async" alt="The Usage page: tiles for questions, refusal rate, response time, model drafting, identifiers removed and open reviews, above a chart of questions per day."></picture></a>
               </div>
-              <figcaption><strong>Explore the corpus.</strong> A 3D map of every document, with this question’s sources highlighted.</figcaption>
+              <figcaption><strong>See how it’s used.</strong> Questions, refusals, response times and what needs attention.</figcaption>
             </figure>
             </div>
-            <div class="tour-panel" role="tabpanel" id="tour-panel-audit" aria-labelledby="tour-tab-audit">
+            <div class="tour-panel" role="tabpanel" id="tour-panel-training" aria-labelledby="tour-tab-training">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/audit.webp" aria-label="Open full-size screenshot"><img src="/screenshots/audit.webp" width="932" height="578" alt="A collapsible JSON tree of an audit record showing the decision, answer text, claims, sources, trace and settings." loading="lazy" decoding="async"></a>
+                <a class="lightbox-link" href="/screenshots/training.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/training-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/training.webp" width="1040" height="544" loading="lazy" decoding="async" alt="A finished training run for an abdominal CT organ classifier on the Apple GPU, with loss and accuracy charts over ten epochs."></picture></a>
               </div>
-              <figcaption><strong>Read the audit record.</strong> The full record of each request, saved to an append-only log.</figcaption>
+              <figcaption><strong>Train on your own scans.</strong> Pick a folder and a GPU, then watch loss and accuracy live.</figcaption>
+            </figure>
+            </div>
+            <div class="tour-panel" role="tabpanel" id="tour-panel-model" aria-labelledby="tour-tab-model">
+              <figure class="tour-figure">
+              <div class="lightbox">
+                <a class="lightbox-link" href="/screenshots/model.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/model-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/model.webp" width="860" height="864" loading="lazy" decoding="async" alt="A model card for the abdominal CT organ classifier: a CT slice classified as liver, with 96.3% accuracy on 17,778 test images and per-class figures."></picture></a>
+              </div>
+              <figcaption><strong>Use a trained model.</strong> Accuracy per class, and it abstains when unsure.</figcaption>
+            </figure>
+            </div>
+            <div class="tour-panel" role="tabpanel" id="tour-panel-protection" aria-labelledby="tour-tab-protection">
+              <figure class="tour-figure">
+              <div class="lightbox">
+                <a class="lightbox-link" href="/screenshots/protection.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/protection-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/protection.webp" width="1440" height="900" loading="lazy" decoding="async" alt="The Data protection page: the audit trail verified as intact and signed, AES-256-GCM encryption on, and retention periods set."></picture></a>
+              </div>
+              <figcaption><strong>Protect the data.</strong> Verify the audit trail, with encryption and retention status.</figcaption>
             </figure>
             </div>
             <div class="tour-panel" role="tabpanel" id="tour-panel-evaluation" aria-labelledby="tour-tab-evaluation">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/evaluation.webp" aria-label="Open full-size screenshot"><img src="/screenshots/evaluation.webp" width="932" height="1186" alt="Evaluation panel: 2,008 of 2,008 cases pass, a sample of cases, and 16 of 16 adversarial probes behaving as intended." loading="lazy" decoding="async"></a>
+                <a class="lightbox-link" href="/screenshots/evaluation.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/evaluation-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/evaluation.webp" width="1440" height="900" loading="lazy" decoding="async" alt="The Evaluation page: 2,008 of 2,008 cases pass, a sample of cases, and 16 of 16 adversarial probes behaving as intended."></picture></a>
               </div>
               <figcaption><strong>Check the evaluation.</strong> Golden-set results and adversarial probes, failures included.</figcaption>
             </figure>
@@ -520,7 +544,7 @@
         </div>
 
         <figure class="shot">
-          <img src="/screenshots/local-ai.webp" width="932" height="665" loading="lazy" decoding="async" alt="The dashboard's Local AI panel: the machine's Apple M1, 16 GB memory and Apple silicon GPU, and a list of models with fit, download size, memory needed and licence, with Llama 3.2 3B in use.">
+          <picture><source srcset="/screenshots/local-ai-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/local-ai.webp" width="1040" height="1092" loading="lazy" decoding="async" alt="The Local AI page: this machine's Apple M1 with 16 GB of memory, and open-source models with how well each fits, download size and licence."></picture>
           <figcaption>The Local AI panel in the dashboard.</figcaption>
         </figure>
       </div>
@@ -596,7 +620,7 @@
           </table>
         </div>
         <figure class="shot">
-          <img src="/screenshots/corpus-map.webp" width="972" height="967" loading="lazy" decoding="async" alt="The dashboard's 3D corpus map: document embeddings coloured by type, with the four sources retrieved for a question labelled.">
+          <picture><source srcset="/screenshots/corpus-map-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/corpus-map.webp" width="990" height="588" loading="lazy" decoding="async" alt="The 3D map of passage embeddings, coloured by document type, with the sources retrieved for a question labelled."></picture>
           <figcaption>The corpus map in the dashboard. Retrieved sources are labelled.</figcaption>
         </figure>
       </div>
@@ -716,7 +740,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
         </div>
         <ul class="limits">
           <li><strong>Word-based coverage check</strong>Unusual phrasing can still cause a refusal.</li>
-          <li><strong>Basic PII redaction</strong>Emails and long numbers only. Not de-identification.</li>
+          <li><strong>Rule-based de-identification</strong>Catches common identifiers, not every way a person can be identified.</li>
           <li><strong>Synthetic tuning</strong>Thresholds need re-tuning for real documents.</li>
           <li><strong>Self-referential tests</strong>Answerable cases come from the corpus itself.</li>
           <li><strong>Text-layer documents only</strong>Scanned PDFs need OCR before import.</li>
@@ -785,12 +809,6 @@ docker run -p 7860:7860 groundcheck</code></pre>
                 <li>Sign-in with Argon2id-hashed passwords, lockout, and authenticator-app two-factor</li>
                 <li>Clinician, reviewer and admin roles, with every audit record tied to a user</li>
               </ul>
-            </details>
-          </li>
-                <li>Pluggable vector database: exact local search, or Qdrant at scale</li>
-                <li>Sign-in with securely hashed passwords, multi-factor authentication and session management</li>
-                <li>Clinician, reviewer and admin roles, with every audit record tied to a user</li>
-                </ul>
             </details>
           </li>
 

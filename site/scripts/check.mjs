@@ -9,6 +9,7 @@
 //   - is missing lang, a title, a meta description, or exactly one h1
 //   - skips a heading level
 //   - has an image without alt text, or JSON-LD that does not parse
+//   - has unbalanced or misnested tags, or list items outside a list
 //
 // Usage: node scripts/check.mjs
 
@@ -52,6 +53,28 @@ const checkHtml = async (name, html) => {
     name: m[1].toLowerCase(),
     attrs: attrs(m[2]),
   }));
+
+  // Tag balance and list structure. Comments, scripts and styles are skipped.
+  const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr",
+    "path", "circle", "line", "rect", "polyline", "polygon", "ellipse", "use", "stop"]);
+  const stripped = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, "");
+  const stack = [];
+  for (const m of stripped.matchAll(/<(\/?)([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*?(\/?)>/g)) {
+    const [, closing, rawName, selfClosing] = m;
+    const tag = rawName.toLowerCase();
+    if (VOID.has(tag) || selfClosing || tag === "!doctype") continue;
+    const line = stripped.slice(0, m.index).split("\n").length;
+    if (!closing) {
+      if (tag === "li" && !["ul", "ol", "menu"].includes(stack.at(-1)?.tag)) fail(name, `<li> outside a list near line ${line}`);
+      stack.push({ tag, line });
+    } else if (stack.at(-1)?.tag === tag) {
+      stack.pop();
+    } else {
+      fail(name, `</${tag}> near line ${line} doesn't close <${stack.at(-1)?.tag ?? "nothing"}>`);
+      break;
+    }
+  }
+  if (stack.length) fail(name, `unclosed <${stack.at(-1).tag}> from line ${stack.at(-1).line}`);
 
   // Document basics.
   if (!/<html[^>]*\blang="[a-z-]+"/i.test(html)) fail(name, "missing <html lang>");

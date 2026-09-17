@@ -36,7 +36,7 @@ not sure is safer than one that always answers.**
 > regulator. All demo data is synthetic: every condition, medication, lab
 > marker, dosage, and procedure is fictional.
 
-![The GroundCheck dashboard](site/public/screenshots/overview.webp)
+![The GroundCheck app: a sidebar of pages and the Ask page](site/public/screenshots/ask.webp)
 
 ---
 
@@ -125,36 +125,40 @@ break on stage.
 
 ## Screenshots
 
-These are unedited screenshots of the dashboard running locally in extractive
-mode (no API key).
+Unedited screenshots of the app running locally, with synthetic data. The app
+has light and dark themes.
 
 **A cited answer.** Every claim is tagged with the source it came from.
 
 ![An answer with source citations](site/public/screenshots/answer.webp)
 
-**A refusal, with its reason.** The trace shows exactly which stage stopped the
-run; later stages are marked not reached.
+**A refusal, with its reason.** The trace shows exactly which check stopped the
+run.
 
 ![A refused question and its pipeline trace](site/public/screenshots/refusal.webp)
 
 <details>
-<summary>More screenshots: evidence, tuning, corpus map, audit record, evaluation</summary>
+<summary>More screenshots: review, usage, training, model library, data protection, evaluation</summary>
 
-**Retrieved sources and the pipeline trace**
+**Review queue**
 
-![Retrieved sources with similarity scores beside the pipeline trace](site/public/screenshots/sources-trace.webp)
+![Refusals and flagged answers waiting for review](site/public/screenshots/review.webp)
 
-**Tuning panel**
+**Usage**
 
-![Sliders for thresholds and switches for each guard](site/public/screenshots/tuning.webp)
+![Questions per day, refusal rate and response times](site/public/screenshots/usage.webp)
 
-**Corpus map**
+**Training a model on CT scans**
 
-![A 3D map of document embeddings with retrieved sources highlighted](site/public/screenshots/corpus-map.webp)
+![Live loss and accuracy while training an abdominal CT organ classifier](site/public/screenshots/training.webp)
 
-**Audit record**
+**A trained model, tried on an image**
 
-![A collapsible JSON audit record](site/public/screenshots/audit.webp)
+![A model card with per-class accuracy and a CT slice classified as liver](site/public/screenshots/model.webp)
+
+**Data protection, in dark mode**
+
+![The audit trail verified, with encryption and retention status](site/public/screenshots/protection-dark.webp)
 
 **Evaluation**
 
