@@ -206,6 +206,35 @@ class SsoLogin(Base):
     expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
 
+class EhrLaunch(Base):
+    """A SMART on FHIR launch between sending the browser to the EHR's
+    authorisation server and its return. The state is stored as a hash."""
+
+    __tablename__ = "ehr_launches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    issuer: Mapped[str] = mapped_column(String(500), nullable=False)
+    code_verifier: Mapped[str] = mapped_column(EncryptedText("ehr_launches.code_verifier"), nullable=False)
+    token_endpoint: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class EhrContext(Base):
+    """A patient loaded from an EHR for one browser, for a limited time. The
+    patient details are encrypted when DATA_ENCRYPTION_KEYS is set; the browser
+    holds only a random token, stored here as a hash."""
+
+    __tablename__ = "ehr_contexts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    data: Mapped[dict] = mapped_column(EncryptedJSON("ehr_contexts.data"), nullable=False)
+
+
 class RetentionRun(Base):
     """A record of each time retention deleted data: what, up to when, and who."""
 

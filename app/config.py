@@ -165,6 +165,29 @@ PASSWORD_SIGN_IN = _get("PASSWORD_SIGN_IN", "true").lower() in ("1", "true", "ye
 # synthetic demo formulary; replace it with your organisation's licensed data.
 FORMULARY_PATH = Path(_get("FORMULARY_PATH", str(DATA_DIR / "formulary.json")))
 
+# --- EHR integration (see app/fhir.py, app/smart.py, app/cds_hooks.py) ---
+def _list(name: str, default: str = "") -> list[str]:
+    return [v.strip().rstrip("/") for v in _get(name, default).split(",") if v.strip()]
+
+
+# FHIR servers GroundCheck may read patients from without SMART authorisation:
+# public sandboxes for development, or an internal server behind your network.
+FHIR_OPEN_SERVERS = _list("FHIR_OPEN_SERVERS")
+# SMART on FHIR app launch. Issuers are the EHRs' FHIR base URLs allowed to launch GroundCheck.
+SMART_CLIENT_ID = _get("SMART_CLIENT_ID", "")
+SMART_CLIENT_SECRET = os.environ.get("SMART_CLIENT_SECRET", "").strip()
+SMART_ALLOWED_ISSUERS = _list("SMART_ALLOWED_ISSUERS")
+SMART_SCOPES = _get("SMART_SCOPES", "launch launch/patient openid fhirUser patient/Patient.read patient/Observation.read "
+                    "patient/AllergyIntolerance.read patient/MedicationRequest.read patient/MedicationStatement.read "
+                    "patient/Condition.read")
+SMART_REDIRECT_URL = _get("SMART_REDIRECT_URL", "")   # default: <this site>/api/ehr/callback
+# Lab results older than this are flagged as possibly out of date.
+FHIR_LAB_MAX_AGE_DAYS = _get_int("FHIR_LAB_MAX_AGE_DAYS", 90)
+EHR_CONTEXT_MINUTES = _get_int("EHR_CONTEXT_MINUTES", 60)
+# CDS Hooks: EHRs allowed to call the services, as issuer=JWKS URL pairs.
+CDS_HOOKS_TRUSTED = dict(pair.split("=", 1) for pair in _list("CDS_HOOKS_TRUSTED") if "=" in pair)
+CDS_HOOKS_ALLOW_UNSIGNED = _get("CDS_HOOKS_ALLOW_UNSIGNED", "false").lower() in ("1", "true", "yes")
+
 # --- Imaging model training (see app/training/) ---
 # Folders the training studio may read images from, comma-separated. The
 # default is the repository's data/datasets folder and your home folder, for

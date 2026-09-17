@@ -86,7 +86,8 @@ async def reject_cross_site_writes(request: Request, call_next):
 
 # Reachable without signing in, even when accounts are required.
 PUBLIC_API = {"/api/health", "/api/auth/me", "/api/auth/login", "/api/auth/mfa",
-              "/api/auth/logout", "/api/auth/first-admin", "/api/auth/sso/start", "/api/auth/sso/callback"}
+              "/api/auth/logout", "/api/auth/first-admin", "/api/auth/sso/start", "/api/auth/sso/callback",
+              "/api/ehr/launch", "/api/ehr/callback"}
 
 
 @app.middleware("http")
@@ -926,6 +927,161 @@ def governance_safety_case(request: Request, days: int = 30) -> Response:
         raise _governance_error(exc) from exc
     return Response(text, media_type="text/markdown; charset=utf-8", headers={
         "Content-Disposition": 'attachment; filename="groundcheck-safety-case.md"'})
+
+
+# --- EHR integration --------------------------------------------------------------
+#
+# SMART on FHIR launch and patient loading (/api/ehr/...), and a CDS Hooks
+# service (/cds-services) that EHRs call during medication ordering.
+
+EHR_COOKIE = "gc_ehr"
+EHR_STATE_COOKIE = "gc_ehr_state"
+
+
+class EhrLoadRequest(BaseModel):
+    server: str
+    patient_id: str
+
+
+@app.get("/api/ehr/config")
+def ehr_config(request: Request) -> dict:
+    from . import smart
+
+    return {"smart_enabled": smart.enabled(), "open_servers": config.FHIR_OPEN_SERVERS,
+            "cds_discovery_url": f"{_base_url(request)}/cds-services",
+            "cds_unsigned": config.CDS_HOOKS_ALLOW_UNSIGNED, "cds_trusted": sorted(config.CDS_HOOKS_TRUSTED)}
+
+
+@app.get("/api/ehr/launch")
+def ehr_launch(request: Request, iss: str = "", launch: str = "") -> Response:
+    from . import smart
+
+    _require_database()
+    try:
+        url, state = smart.start(iss, launch or None, _base_url(request))
+    except smart.SmartError as exc:
+        return _continue_page(f"/?ehr_error={quote(str(exc))}", "Launch failed")
+    response = RedirectResponse(url, status_code=302)
+    response.set_cookie(EHR_STATE_COOKIE, state, httponly=True, samesite="lax", secure=config.SESSION_COOKIE_SECURE,
+                        max_age=smart.LAUNCH_MINUTES * 60, path="/api/ehr")
+    return response
+
+
+@app.get("/api/ehr/callback")
+def ehr_callback(request: Request, code: str = "", state: str = "", error: str = "",
+                 error_description: str = "") -> Response:
+    from . import smart
+
+    _require_database()
+    if error:
+        response = _continue_page(f"/?ehr_error={quote(('The EHR ended the launch: ' + (error_description or error))[:300])}",
+                                  "Launch failed")
+    else:
+        try:
+            token = smart.finish(code, state, request.cookies.get(EHR_STATE_COOKIE), _base_url(request))
+        except smart.SmartError as exc:
+            response = _continue_page(f"/?ehr_error={quote(str(exc))}", "Launch failed")
+        else:
+            response = _continue_page("/?ehr=1#/ask", "Opening the patient")
+            response.set_cookie(EHR_COOKIE, token, httponly=True, samesite="strict", path="/",
+                                secure=config.SESSION_COOKIE_SECURE, max_age=config.EHR_CONTEXT_MINUTES * 60)
+    response.delete_cookie(EHR_STATE_COOKIE, path="/api/ehr")
+    return response
+
+
+@app.get("/api/ehr/context")
+def ehr_context(request: Request, user: auth.Principal | None = Depends(require_role("clinician"))) -> dict:
+    from . import smart
+
+    _require_database()
+    return {"context": smart.get(request.cookies.get(EHR_COOKIE))}
+
+
+@app.delete("/api/ehr/context")
+def ehr_clear(request: Request, response: Response,
+              user: auth.Principal | None = Depends(require_role("clinician"))) -> dict:
+    from . import smart
+
+    _require_database()
+    smart.clear(request.cookies.get(EHR_COOKIE))
+    response.delete_cookie(EHR_COOKIE, path="/")
+    return {"cleared": True}
+
+
+@app.post("/api/ehr/load")
+async def ehr_load(body: EhrLoadRequest, request: Request, response: Response,
+                   user: auth.Principal | None = Depends(require_role("clinician"))) -> dict:
+    from . import smart
+
+    _require_database()
+    if not config.AUTH_REQUIRED:
+        require_manager(request, "clinician")
+    try:
+        token, context = await run_in_threadpool(smart.load_open, body.server, body.patient_id)
+    except smart.SmartError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    response.set_cookie(EHR_COOKIE, token, httponly=True, samesite="strict", path="/",
+                        secure=config.SESSION_COOKIE_SECURE, max_age=config.EHR_CONTEXT_MINUTES * 60)
+    return {"context": context}
+
+
+CDS_CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type", "Access-Control-Max-Age": "600"}
+
+
+@app.options("/cds-services")
+@app.options("/cds-services/{service_id}")
+@app.options("/cds-services/{service_id}/feedback")
+def cds_preflight() -> Response:
+    return Response(status_code=204, headers=CDS_CORS)
+
+
+@app.get("/cds-services")
+def cds_discovery() -> JSONResponse:
+    from . import cds_hooks
+
+    return JSONResponse(cds_hooks.discovery(), headers=CDS_CORS)
+
+
+@app.post("/cds-services/{service_id}")
+async def cds_service(service_id: str, request: Request) -> JSONResponse:
+    from . import cds_hooks
+
+    if service_id not in {s["id"] for s in cds_hooks.discovery()["services"]}:
+        return JSONResponse({"detail": "No such service."}, status_code=404, headers=CDS_CORS)
+    try:
+        await run_in_threadpool(cds_hooks.verify, request.headers.get("authorization"),
+                                f"{_base_url(request)}/cds-services/{service_id}")
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise cds_hooks.CdsError("The request must be a JSON object.")
+        result = await run_in_threadpool(cds_hooks.cards_for, body)
+    except cds_hooks.CdsError as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=exc.status, headers=CDS_CORS)
+    except ValueError:
+        return JSONResponse({"detail": "The request isn't valid JSON."}, status_code=400, headers=CDS_CORS)
+    logging.getLogger("groundcheck.cds").info("CDS %s: %d cards for hook instance %s", service_id,
+                                              len(result["cards"]), cds_hooks.safe_hook_instance(body))
+    return JSONResponse(result, headers=CDS_CORS)
+
+
+@app.post("/cds-services/{service_id}/feedback")
+async def cds_feedback(service_id: str, request: Request) -> JSONResponse:
+    from . import cds_hooks
+
+    try:
+        await run_in_threadpool(cds_hooks.verify, request.headers.get("authorization"),
+                                f"{_base_url(request)}/cds-services/{service_id}/feedback")
+        body = await request.json()
+    except cds_hooks.CdsError as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=exc.status, headers=CDS_CORS)
+    except ValueError:
+        return JSONResponse({"detail": "The request isn't valid JSON."}, status_code=400, headers=CDS_CORS)
+    for item in (body.get("feedback") or [])[:50] if isinstance(body, dict) else []:
+        logging.getLogger("groundcheck.cds").info(
+            "CDS feedback %s: card %s %s, reason %s", service_id, str(item.get("card", ""))[:64],
+            str(item.get("outcome", ""))[:20], str((item.get("overrideReason") or {}).get("reason", {}).get("code", ""))[:40])
+    return JSONResponse({}, headers=CDS_CORS)
 
 
 # --- Data protection -----------------------------------------------------------

@@ -107,7 +107,8 @@ def _singular(text: str) -> str:
     return re.sub(r"s\b", "", formulary.normalise(text))
 
 
-def review(query: str, claims: list[Claim], patient: PatientContext | None) -> Review:
+def review(query: str, claims: list[Claim], patient: PatientContext | None, subject: str = "answer") -> Review:
+    """subject names what's being checked in messages: "answer", or "order" for CDS Hooks."""
     result = Review()
     if patient is None or patient.is_empty():
         return result
@@ -126,7 +127,9 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None) -> R
     kidney = patient.egfr if patient.egfr is not None else crcl
     if crcl is not None:
         result.derived["creatinine_clearance"] = crcl
-    current = [(text, idx.find(text)) for text in patient.medicines]
+    # EHRs write medicines with strength and form ("Tessorin 10 mg tablet"), so
+    # a formulary name inside the text counts.
+    current = [(text, idx.find(text) or next(iter(idx.mentioned(text)), None)) for text in patient.medicines]
 
     for med in medicines:
         stop = "block" if prescribing else "warn"
@@ -233,7 +236,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None) -> R
             too_high = _exceeds(amounts, capped, dose.unit)
             if too_high is not None or amounts:
                 result.add("block", "paediatric_dose", med,
-                           f"The answer gives an adult dose. For this child the formulary gives {_fmt(round(capped, 2))} "
+                           f"The {subject} gives an adult dose. For this child the formulary gives {_fmt(round(capped, 2))} "
                            f"{dose.unit} {dose.frequency} ({calc}).", source="Formulary")
             else:
                 result.add("info", "paediatric_dose", med,
@@ -259,7 +262,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None) -> R
                 too_high = _exceeds(amounts, rule.dose.amount, rule.dose.unit)
                 result.add("block" if too_high is not None else "warn",
                            "renal_dose" if hasattr(rule, "egfr_below") else "hepatic_dose", med,
-                           (f"The answer's {_fmt(too_high)} {rule.dose.unit} is too high: the patient's {where}. "
+                           (f"The {subject}'s {_fmt(too_high)} {rule.dose.unit} is too high: the patient's {where}. "
                             if too_high is not None else "") +
                            f"{rule.note} The formulary gives {_dose_text(rule.dose)}.", rule.id, rule.source)
             else:
@@ -282,7 +285,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None) -> R
             if too_high is not None and not any(f.code in ("renal_dose", "hepatic_dose") for f in result.findings
                                                 if f.medicine == med.name):
                 result.add("block", "dose_above_maximum", med,
-                           f"The answer's {_fmt(too_high)} {limit.unit} is above the maximum for {med.name} "
+                           f"The {subject}'s {_fmt(too_high)} {limit.unit} is above the maximum for {med.name} "
                            f"({_dose_text(limit)}).", source=", ".join(med.source_ids[:1]))
 
     return result
