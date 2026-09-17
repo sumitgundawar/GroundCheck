@@ -96,18 +96,19 @@ Full instructions, including configuration and Windows, are in
 17. [Training imaging models](#training-imaging-models)
 18. [CT and MRI](#ct-and-mri)
 19. [Monitoring and alerts](#monitoring-and-alerts)
-20. [Configuration](#configuration)
-21. [Local development](#local-development)
-22. [Running the checks](#running-the-checks)
-23. [Troubleshooting](#troubleshooting)
-24. [Deployment](#deployment)
-25. [Project layout](#project-layout)
-26. [Honest limitations](#honest-limitations)
-27. [Reporting issues](#reporting-issues)
-28. [Contributing](#contributing)
-29. [Security](#security)
-30. [License](#license)
-31. [Credits](#credits)
+20. [Incident reporting](#incident-reporting)
+21. [Configuration](#configuration)
+22. [Local development](#local-development)
+23. [Running the checks](#running-the-checks)
+24. [Troubleshooting](#troubleshooting)
+25. [Deployment](#deployment)
+26. [Project layout](#project-layout)
+27. [Honest limitations](#honest-limitations)
+28. [Reporting issues](#reporting-issues)
+29. [Contributing](#contributing)
+30. [Security](#security)
+31. [License](#license)
+32. [Credits](#credits)
 
 ---
 
@@ -858,6 +859,37 @@ is loaded, for load balancers and Kubernetes readiness probes.
 
 ---
 
+## Incident reporting
+
+Anyone signed in can **report an incident**: from the Incidents page, from
+an answer (with its audit ID filled in), or from a firing alert. An incident
+records what it concerns (an answer or refusal, a patient safety check,
+imaging, EHR integration, data protection, an outage, or something else),
+the harm to a patient graded as in NHS patient safety reporting (none or near
+miss, low, moderate, severe, death), when it happened, and a description.
+
+Reviewers and admins see every incident; clinicians see the ones they
+reported and can add comments. Reviewers take ownership, regrade the harm,
+record the root cause, the actions taken and any external report, link a
+hazard log entry, and close the incident. Closing needs a root cause and
+actions. Every change and comment goes into the incident's timeline.
+
+Two kinds of incident show a deadline and can't be closed until an external
+report reference, or the reason it isn't reportable, is recorded:
+
+- **Personal data breaches**: a notifiable breach must be reported to the
+  data protection authority within 72 hours of becoming aware of it (UK and
+  EU GDPR article 33). The deadline counts from when the incident was
+  reported, and can be corrected.
+- **Severe harm or death**: the organisation decides whether to report to
+  the medical device regulator, such as the MHRA or the FDA's MedWatch.
+
+Titles, descriptions, root causes, actions and comments are encrypted with
+`DATA_ENCRYPTION_KEYS`. **Download CSV** exports the log for your safety
+committee or quality system.
+
+---
+
 ## Configuration
 
 All settings are read from the environment with safe defaults (`app/config.py`).
@@ -1046,6 +1078,7 @@ groundcheck/
     training/          training studio: datasets, worker process, model library
     imaging/           DICOM import and de-identification, analysis, reports, DICOMweb
     monitoring.py      Prometheus metrics, alert rules and notifications
+    incidents.py       incident reporting, investigation and regulator deadlines
     data/              synthetic corpus and demo example queries
   scripts/
     generate_corpus.py  builds the synthetic corpus

@@ -28,6 +28,7 @@
     <symbol id="i-folder-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></symbol>
     <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><ellipse cx="12" cy="12" rx="5" ry="6"/><path d="M12 6v12"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+    <symbol id="i-siren" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
     <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
@@ -195,6 +196,81 @@
       <ol class="case-timeline" id="case-timeline"></ol>
     </section>
     <p class="modal-message" id="case-message" role="status" hidden></p>
+  </dialog>
+
+  <!-- Reporting an incident -->
+  <dialog class="modal modal-wide" id="incident-report-dialog" aria-labelledby="incident-report-title">
+    <div class="modal-head">
+      <h2 id="incident-report-title">Report an incident</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="modal-status">Anything that went wrong, or nearly did. Don’t enter patient names or identifiers.</p>
+    <form class="hazard-form" id="incident-report-form" novalidate>
+      <div class="field hazard-wide">
+        <label for="ir-title">What happened, in a few words</label>
+        <input id="ir-title" class="text-input" maxlength="200" required placeholder="e.g. Answer gave the tablet dose for the oral solution">
+      </div>
+      <div class="field">
+        <label for="ir-category">It concerns</label>
+        <select id="ir-category" class="text-input"></select>
+      </div>
+      <div class="field">
+        <label for="ir-harm">Harm to a patient</label>
+        <select id="ir-harm" class="text-input"></select>
+      </div>
+      <div class="field">
+        <label for="ir-occurred">When it happened <span class="optional">optional</span></label>
+        <input id="ir-occurred" class="text-input" type="datetime-local">
+      </div>
+      <div class="field">
+        <label for="ir-audit">Audit ID <span class="optional">optional, from the answer</span></label>
+        <input id="ir-audit" class="text-input mono" maxlength="16" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field hazard-wide">
+        <label for="ir-description">Description</label>
+        <textarea id="ir-description" class="text-input" rows="5" maxlength="20000" placeholder="What happened, what was the effect, and what was done at the time"></textarea>
+      </div>
+      <p class="field-hint hazard-wide" id="ir-links" hidden></p>
+      <p class="modal-message hazard-wide" id="ir-message" role="status" hidden></p>
+      <div class="hazard-wide report-actions"><button type="submit" class="btn btn-primary" id="ir-submit">Report incident</button></div>
+    </form>
+  </dialog>
+
+  <!-- An incident -->
+  <dialog class="modal modal-wide" id="incident-dialog" aria-labelledby="incident-dialog-title">
+    <div class="modal-head">
+      <h2 id="incident-dialog-title">Incident</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="modal-status" id="incident-meta"></p>
+    <div class="incident-deadlines" id="incident-deadlines"></div>
+    <p class="case-answer" id="incident-description"></p>
+    <p class="modal-status" id="incident-links"></p>
+    <section class="modal-section" id="incident-manage" aria-labelledby="incident-manage-title">
+      <h3 id="incident-manage-title">Investigation</h3>
+      <form class="hazard-form" id="incident-form" novalidate>
+        <div class="field"><label for="if-status">Status</label>
+          <select id="if-status" class="text-input"><option value="open">Open</option><option value="investigating">Investigating</option><option value="closed">Closed</option></select></div>
+        <div class="field"><label for="if-owner">Owner</label><select id="if-owner" class="text-input"></select></div>
+        <div class="field"><label for="if-harm">Harm</label><select id="if-harm" class="text-input"></select></div>
+        <div class="field"><label for="if-category">Concerns</label><select id="if-category" class="text-input"></select></div>
+        <div class="field hazard-wide"><label for="if-root">Root cause</label><textarea id="if-root" class="text-input" rows="3" maxlength="20000"></textarea></div>
+        <div class="field hazard-wide"><label for="if-actions">Actions taken</label><textarea id="if-actions" class="text-input" rows="3" maxlength="20000"></textarea></div>
+        <div class="field"><label for="if-external">External report <span class="optional">reference, or why not reportable</span></label><input id="if-external" class="text-input" maxlength="500"></div>
+        <div class="field"><label for="if-hazard">Hazard log entry <span class="optional">number</span></label><input id="if-hazard" class="text-input" type="number" min="1" step="1" inputmode="numeric"></div>
+        <p class="modal-message hazard-wide" id="if-message" role="status" hidden></p>
+        <div class="hazard-wide report-actions"><button type="submit" class="btn btn-sm btn-primary">Save changes</button></div>
+      </form>
+    </section>
+    <section class="modal-section" aria-labelledby="incident-timeline-title">
+      <h3 id="incident-timeline-title">Timeline</h3>
+      <ol class="case-timeline" id="incident-timeline"></ol>
+      <form class="case-form incident-comment" id="incident-comment-form" novalidate>
+        <label for="incident-comment">Add a comment</label>
+        <textarea id="incident-comment" rows="2" maxlength="4000"></textarea>
+        <div class="flag-actions"><button type="submit" class="btn btn-sm btn-ghost">Add comment</button></div>
+      </form>
+    </section>
   </dialog>
 
   <!-- Hazard -->
@@ -380,6 +456,10 @@
             <svg class="nav-icon" aria-hidden="true"><use href="#i-user-check"/></svg>
             <span>Review</span>
             <span class="nav-count" id="nav-review-count" hidden></span>
+          </a>
+          <a class="nav-link" href="#/incidents" data-view="incidents">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-siren"/></svg>
+            <span>Incidents</span>
           </a>
         </div>
         <div class="nav-group">
@@ -579,6 +659,7 @@
         <div class="answer-body" id="answer-body"></div>
         <div class="flag-row" id="flag-row" hidden>
           <button type="button" class="btn btn-sm btn-ghost" id="flag-open">Flag this answer for review</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="incident-from-answer">Report an incident</button>
           <form class="case-form flag-form" id="flag-form" hidden novalidate>
             <label for="flag-note">What looks wrong?</label>
             <textarea id="flag-note" rows="2" placeholder="e.g. The dose doesn't match our renal guidance"></textarea>
@@ -1197,6 +1278,40 @@
               </table>
             </div>
             <p class="auth-hint" id="runs-empty" hidden>No training runs yet.</p>
+          </section>
+        </section>
+
+        <!-- Incidents -->
+        <section class="view" id="view-incidents" data-title="Incidents" aria-labelledby="incidents-title" hidden>
+          <header class="page-head">
+            <div>
+              <h1 class="page-title" id="incidents-title">Incidents</h1>
+              <p class="page-sub" id="incidents-sub">Report anything that went wrong, or nearly did. Reviewers investigate, record the root cause and the actions taken, and close it.</p>
+            </div>
+            <div class="page-actions">
+              <a class="btn btn-sm btn-ghost" href="/api/incidents/export.csv" id="incidents-export" hidden>Download CSV</a>
+              <button type="button" class="btn btn-sm btn-primary" id="incident-new">Report an incident</button>
+            </div>
+          </header>
+          <p class="modal-message" id="incidents-message" role="status" hidden></p>
+          <section class="panel" aria-labelledby="incident-list-title">
+            <div class="review-toolbar">
+              <h2 class="panel-heading flush" id="incident-list-title">Reported incidents</h2>
+              <div class="review-filters">
+                <label for="incident-status-filter">Status</label>
+                <select id="incident-status-filter"><option value="active">Open or investigating</option><option value="open">Open</option><option value="investigating">Investigating</option><option value="closed">Closed</option><option value="">All</option></select>
+                <label for="incident-category-filter">Concerns</label>
+                <select id="incident-category-filter"><option value="">Anything</option></select>
+              </div>
+            </div>
+            <div class="review-counts" id="incident-counts"></div>
+            <div class="users-table-wrap">
+              <table class="users-table review-table incident-table">
+                <thead><tr><th scope="col">Incident</th><th scope="col">Harm</th><th scope="col">Status</th><th scope="col">Reported</th><th scope="col">Owner</th></tr></thead>
+                <tbody id="incident-rows"></tbody>
+              </table>
+            </div>
+            <p class="auth-hint" id="incident-empty" hidden>No incidents match.</p>
           </section>
         </section>
 

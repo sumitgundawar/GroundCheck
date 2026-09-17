@@ -3633,6 +3633,215 @@ function wireEhr() {
   });
 }
 
+// ---------- Incidents ----------
+const incidentState = { labels: null, people: [], canManage: false, current: null, links: {} };
+const INCIDENT_CATEGORIES = { answer: "An answer or refusal", patient_check: "A patient safety check", imaging: "Imaging", ehr: "EHR integration",
+  data_protection: "Data protection or security", availability: "Outage or slowness", other: "Something else" };
+const INCIDENT_HARM = { none: "No harm or near miss", low: "Low harm", moderate: "Moderate harm", severe: "Severe harm", death: "Death" };
+const INCIDENT_STATUS = { open: "Open", investigating: "Investigating", closed: "Closed" };
+
+function fillSelect(select, options, chosen) {
+  const keep = chosen ?? select.value;
+  select.textContent = "";
+  Object.entries(options).forEach(([value, label]) => { const o = el("option", "", label); o.value = value; select.appendChild(o); });
+  if (keep !== undefined && keep !== null && keep in options) select.value = keep;
+}
+
+function harmPill(harm) {
+  return el("span", `harm harm-${harm}`, INCIDENT_HARM[harm]);
+}
+
+function statusPill(status) {
+  return el("span", `status-pill ${status === "closed" ? "status-retired" : status === "investigating" ? "status-investigating" : "status-pending"}`, INCIDENT_STATUS[status]);
+}
+
+async function loadIncidents() {
+  const params = new URLSearchParams({ status: $("incident-status-filter").value, category: $("incident-category-filter").value });
+  let data;
+  try { data = await api(`/api/incidents?${params}`); }
+  catch (err) { showMessage("incidents-message", err.message, true); return; }
+  incidentState.canManage = data.can_manage;
+  incidentState.people = data.people || [];
+  $("incidents-export").hidden = !data.can_manage;
+  $("incidents-sub").textContent = data.can_manage
+    ? "Report anything that went wrong, or nearly did. Investigate, record the root cause and the actions taken, and close it."
+    : "Report anything that went wrong, or nearly did. You can follow the incidents you reported here.";
+  const category = $("incident-category-filter");
+  if (category.options.length === 1) Object.entries(INCIDENT_CATEGORIES).forEach(([v, l]) => { const o = el("option", "", l); o.value = v; category.appendChild(o); });
+
+  const counts = $("incident-counts");
+  counts.textContent = "";
+  if (data.can_manage) {
+    [["Open", data.counts.open], ["Investigating", data.counts.investigating], ["Closed", data.counts.closed], ["Moderate harm or worse, not closed", data.serious_active]]
+      .forEach(([label, n], i) => {
+        const c = el("span", `review-count${i === 3 && n ? " bad" : ""}`);
+        c.append(el("strong", "", String(n)), ` ${label}`);
+        counts.appendChild(c);
+      });
+  }
+  const rows = $("incident-rows");
+  rows.textContent = "";
+  $("incident-empty").hidden = data.incidents.length > 0;
+  data.incidents.forEach((i) => {
+    const tr = document.createElement("tr");
+    if (["moderate", "severe", "death"].includes(i.harm) && i.status !== "closed") tr.className = "serious";
+    const name = document.createElement("td");
+    const open = el("button", "incident-open", i.title);
+    open.type = "button";
+    open.addEventListener("click", () => openIncident(i.id));
+    name.append(el("span", "incident-ref", `${i.reference}, ${i.category_label.toLowerCase()}`), open);
+    const harm = document.createElement("td"); harm.dataset.label = "Harm"; harm.appendChild(harmPill(i.harm));
+    const status = document.createElement("td"); status.dataset.label = "Status"; status.appendChild(statusPill(i.status));
+    const reported = el("td", "", `${dateTime(i.reported_at)}, ${i.reported_by}`); reported.dataset.label = "Reported";
+    const owner = el("td", i.owner ? "" : "muted", i.owner || "Nobody yet"); owner.dataset.label = "Owner";
+    tr.append(name, harm, status, reported, owner);
+    rows.appendChild(tr);
+  });
+}
+
+function openIncidentReport(links = {}) {
+  incidentState.links = links;
+  const form = $("incident-report-form");
+  form.reset();
+  fillSelect($("ir-category"), INCIDENT_CATEGORIES, links.category || "answer");
+  fillSelect($("ir-harm"), INCIDENT_HARM, "none");
+  $("ir-audit").value = links.audit_id || "";
+  const described = [links.alert_id && `alert: ${links.alert_title}`, links.imaging_series_id && `imaging series ${links.imaging_series_id}`,
+    links.review_case_id && `review case ${links.review_case_id}`].filter(Boolean);
+  $("ir-links").hidden = described.length === 0;
+  $("ir-links").textContent = described.length ? `Linked to the ${described.join(" and the ")}.` : "";
+  if (links.title) $("ir-title").value = links.title;
+  $("ir-message").hidden = true;
+  $("incident-report-dialog").showModal();
+  $("ir-title").focus();
+}
+
+async function submitIncidentReport(event) {
+  event.preventDefault();
+  const title = $("ir-title").value.trim();
+  const description = $("ir-description").value.trim();
+  if (!title) { showMessage("ir-message", "Add a short title.", true); $("ir-title").focus(); return; }
+  if (!description) { showMessage("ir-message", "Describe what happened.", true); $("ir-description").focus(); return; }
+  const occurred = $("ir-occurred").value;
+  const body = {
+    title, description, category: $("ir-category").value, harm: $("ir-harm").value,
+    occurred_at: occurred ? new Date(occurred).toISOString() : null,
+    audit_id: $("ir-audit").value.trim() || null,
+    alert_id: incidentState.links.alert_id || null, imaging_series_id: incidentState.links.imaging_series_id || null,
+    review_case_id: incidentState.links.review_case_id || null,
+  };
+  const form = $("incident-report-form");
+  formBusy(form, true);
+  try {
+    const { incident } = await api("/api/incidents", { method: "POST", body });
+    $("incident-report-dialog").close();
+    if (currentView() === "incidents") loadIncidents();
+    const message = `Reported as ${incident.reference}.`;
+    if (currentView() === "incidents") showMessage("incidents-message", message);
+    else if (currentView() === "monitoring") showMessage("monitoring-message", message);
+    else showMessage("flag-message", message);
+  } catch (err) {
+    showMessage("ir-message", err.message, true);
+  } finally {
+    formBusy(form, false);
+  }
+}
+
+async function openIncident(id) {
+  let data;
+  try { data = await api(`/api/incidents/${id}`); }
+  catch (err) { showMessage("incidents-message", err.message, true); return; }
+  renderIncident(data.incident, data.can_manage);
+  if (!$("incident-dialog").open) $("incident-dialog").showModal();
+}
+
+function renderIncident(i, canManage) {
+  incidentState.current = i;
+  $("incident-dialog-title").textContent = `${i.reference}: ${i.title}`;
+  $("incident-meta").textContent = `${i.category_label}. ${i.harm_label}. ${INCIDENT_STATUS[i.status]}. Reported by ${i.reported_by} on ${dateTime(i.reported_at)}${i.occurred_at ? `; happened ${dateTime(i.occurred_at)}` : ""}.`;
+  const deadlines = $("incident-deadlines");
+  deadlines.textContent = "";
+  i.deadlines.forEach((d) => {
+    const p = el("p", `deadline${d.done ? " done" : ""}`);
+    p.append(el("strong", "", d.done ? "Recorded" : d.due_at ? `Due by ${dateTime(d.due_at)}` : "Decision needed"), d.text);
+    deadlines.appendChild(p);
+  });
+  $("incident-description").textContent = i.description;
+  const links = [i.links.audit_id && `audit record ${i.links.audit_id}`, i.links.review_case_id && `review case ${i.links.review_case_id}`,
+    i.links.alert_id && `alert ${i.links.alert_id}`, i.links.imaging_series_id && `imaging series ${i.links.imaging_series_id}`,
+    i.links.hazard_id && `hazard ${i.links.hazard_id}`].filter(Boolean);
+  $("incident-links").textContent = links.length ? `Linked to ${links.join(", ")}.` : "";
+  $("incident-links").hidden = !links.length;
+
+  $("incident-manage").hidden = !canManage;
+  if (canManage) {
+    $("if-status").value = i.status;
+    const owner = $("if-owner");
+    owner.textContent = "";
+    const none = el("option", "", "Nobody yet"); none.value = ""; owner.appendChild(none);
+    incidentState.people.forEach((p) => { const o = el("option", "", p.name); o.value = p.id; owner.appendChild(o); });
+    owner.value = i.owner_id ?? "";
+    fillSelect($("if-harm"), INCIDENT_HARM, i.harm);
+    fillSelect($("if-category"), INCIDENT_CATEGORIES, i.category);
+    $("if-root").value = i.root_cause;
+    $("if-actions").value = i.actions;
+    $("if-external").value = i.external_reference;
+    $("if-hazard").value = i.links.hazard_id ?? "";
+    $("if-message").hidden = true;
+  }
+  const timeline = $("incident-timeline");
+  timeline.textContent = "";
+  i.timeline.forEach((e) => {
+    const li = document.createElement("li");
+    const head = el("div", "timeline-head");
+    head.append(el("strong", "", { reported: "Reported", updated: "Updated", comment: "Comment" }[e.action] || e.action), el("span", "muted", `${e.by}, ${dateTime(e.at)}`));
+    li.append(head, el("p", "", e.note));
+    timeline.appendChild(li);
+  });
+  $("incident-comment").value = "";
+}
+
+async function saveIncident(event) {
+  event.preventDefault();
+  const i = incidentState.current;
+  const hazard = $("if-hazard").value.trim();
+  const body = {
+    status: $("if-status").value, owner_id: $("if-owner").value ? Number($("if-owner").value) : null, harm: $("if-harm").value,
+    category: $("if-category").value, root_cause: $("if-root").value, actions: $("if-actions").value,
+    external_reference: $("if-external").value, hazard_id: hazard ? Number(hazard) : null,
+  };
+  const form = $("incident-form");
+  formBusy(form, true);
+  try {
+    const { incident } = await api(`/api/incidents/${i.id}`, { method: "PATCH", body });
+    renderIncident(incident, true);
+    showMessage("if-message", "Saved.");
+    loadIncidents();
+  } catch (err) {
+    showMessage("if-message", err.message, true);
+  } finally {
+    formBusy(form, false);
+  }
+}
+
+function wireIncidents() {
+  $("incident-new").addEventListener("click", () => openIncidentReport());
+  $("incident-report-form").addEventListener("submit", submitIncidentReport);
+  $("incident-form").addEventListener("submit", saveIncident);
+  $("incident-status-filter").addEventListener("change", loadIncidents);
+  $("incident-category-filter").addEventListener("change", loadIncidents);
+  $("incident-from-answer").addEventListener("click", () => openIncidentReport({ audit_id: $("flag-row").dataset.auditId, category: "answer" }));
+  $("incident-comment-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const note = $("incident-comment").value.trim();
+    if (!note) return;
+    try {
+      const { incident } = await api(`/api/incidents/${incidentState.current.id}/comments`, { method: "POST", body: { note } });
+      renderIncident(incident, !$("incident-manage").hidden);
+    } catch (err) { showMessage("if-message", err.message, true); }
+  });
+}
+
 // ---------- Monitoring ----------
 const RULE_NOW = { firing: "Firing", ok: "OK", off: "Off" };
 
@@ -3712,6 +3921,10 @@ function renderMonitoring(data) {
         catch (err) { showMessage("monitoring-message", err.message, true); e.target.disabled = false; }
       }));
     }
+    actions.appendChild(button("Report an incident", "btn-ghost", false, () => openIncidentReport({
+      alert_id: a.id, alert_title: a.title, title: a.title,
+      category: a.rule === "audit_chain" ? "data_protection" : a.rule === "imaging_failures" ? "imaging" : a.rule === "latency" || a.rule === "server_errors" ? "availability" : "answer",
+    })));
     li.append(body, actions);
     list.appendChild(li);
   });
@@ -3779,7 +3992,7 @@ function el(tag, className, text) {
   return node;
 }
 
-function shortDate(iso) {
+function dateTime(iso) {
   return iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
 }
 
@@ -3807,7 +4020,7 @@ function renderImagingList() {
     if (sub) name.appendChild(el("span", "series-sub", sub));
     const images = el("td", "mono", `${s.slices} × ${s.columns}×${s.rows}`);
     images.dataset.label = "Images";
-    const when = el("td", "", shortDate(s.created_at));
+    const when = el("td", "", dateTime(s.created_at));
     when.dataset.label = "Imported";
     const model = document.createElement("td");
     model.dataset.label = "Model";
@@ -4159,7 +4372,7 @@ function renderAnalysis(s) {
   const map = $("slice-map");
   map.textContent = "";
   if (!a || running) return;
-  out.appendChild(el("p", "field-hint", `${a.model_name}, ${shortDate(a.finished_at || a.created_at)}`));
+  out.appendChild(el("p", "field-hint", `${a.model_name}, ${dateTime(a.finished_at || a.created_at)}`));
   if (a.status === "refused" || a.status === "failed") {
     const note = el("div", "analysis-note refused");
     note.append(el("strong", "", a.status === "refused" ? "The model refused this series" : "The analysis didn’t finish"), el("span", "", a.error || ""));
@@ -4249,7 +4462,7 @@ function renderReport(s) {
     card.append(el("h3", "", signed.replaces_id ? "Signed amendment" : "Signed report"),
       el("p", "signed-impression", signed.impression));
     if (signed.findings) card.appendChild(el("p", "", signed.findings));
-    card.appendChild(el("p", "signed-meta", `${AGREEMENT_LABELS[signed.agreement]}. Signed by ${signed.author_name || "unknown"} on ${shortDate(signed.signed_at)}.${signed.sent_at ? ` Sent to the PACS on ${shortDate(signed.sent_at)}.` : ""}`));
+    card.appendChild(el("p", "signed-meta", `${AGREEMENT_LABELS[signed.agreement]}. Signed by ${signed.author_name || "unknown"} on ${dateTime(signed.signed_at)}.${signed.sent_at ? ` Sent to the PACS on ${dateTime(signed.sent_at)}.` : ""}`));
     const actions = el("div", "signed-actions");
     const download = el("a", "btn btn-sm btn-ghost", "Download DICOM SR");
     download.href = `/api/imaging/reports/${signed.id}/sr.dcm`;
@@ -4276,7 +4489,7 @@ function renderReport(s) {
   if (draft) {
     form.hidden = false;
     if (imaging.editing !== `draft-${draft.id}`) { fillReportForm(draft, draft.id); imaging.editing = `draft-${draft.id}`; }
-    $("report-draft-note").textContent = `Draft saved ${shortDate(draft.updated_at)}.`;
+    $("report-draft-note").textContent = `Draft saved ${dateTime(draft.updated_at)}.`;
   } else if (signed && imaging.editing !== signed.id) {
     form.hidden = true;
   } else if (!signed && imaging.editing === null) {
@@ -4292,7 +4505,7 @@ function renderReport(s) {
   list.textContent = "";
   superseded.forEach((r) => {
     const li = document.createElement("li");
-    li.append(el("p", "", r.impression), el("p", "signed-meta", `Signed by ${r.author_name || "unknown"} on ${shortDate(r.signed_at)}. Replaced by an amendment.`));
+    li.append(el("p", "", r.impression), el("p", "signed-meta", `Signed by ${r.author_name || "unknown"} on ${dateTime(r.signed_at)}. Replaced by an amendment.`));
     list.appendChild(li);
   });
 }
@@ -4431,6 +4644,7 @@ const VIEWS = {
   models: { load: () => loadModels() },
   imaging: { load: () => loadImaging() },
   monitoring: { load: () => loadMonitoring() },
+  incidents: { load: () => loadIncidents() },
 };
 
 function currentView() {
@@ -4479,6 +4693,7 @@ function wireNavigation() {
   });
   wireTraining();
   wireImaging();
+  wireIncidents();
   $("monitoring-check").addEventListener("click", async (e) => { e.target.disabled = true; await loadMonitoring(true); e.target.disabled = false; });
   $("mi-modality").addEventListener("change", (e) => fillImagingWindows(e.target.value));
   $("model-imaging-form").addEventListener("submit", (e) => { e.preventDefault(); saveModelImaging(false); });

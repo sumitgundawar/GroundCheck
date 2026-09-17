@@ -435,6 +435,51 @@ class Alert(Base):
     __table_args__ = (Index("ix_alerts_rule_status", "rule", "status"),)
 
 
+class Incident(Base):
+    """Something that went wrong, or nearly did (app/incidents.py)."""
+
+    __tablename__ = "incidents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(EncryptedText("incidents.title"), nullable=False)
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    harm: Mapped[str] = mapped_column(String(10), nullable=False, default="none")
+    status: Mapped[str] = mapped_column(String(15), nullable=False, default="open")   # open, investigating, closed
+    description: Mapped[str] = mapped_column(EncryptedText("incidents.description"), nullable=False, default="")
+    occurred_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    reported_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    aware_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    reported_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reporter_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    root_cause: Mapped[str] = mapped_column(EncryptedText("incidents.root_cause"), nullable=False, default="")
+    actions: Mapped[str] = mapped_column(EncryptedText("incidents.actions"), nullable=False, default="")
+    external_reference: Mapped[str] = mapped_column(EncryptedText("incidents.external_reference"), nullable=False, default="")
+    audit_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    review_case_id: Mapped[int | None] = mapped_column(ForeignKey("review_cases.id", ondelete="SET NULL"), nullable=True)
+    alert_id: Mapped[int | None] = mapped_column(ForeignKey("alerts.id", ondelete="SET NULL"), nullable=True)
+    imaging_series_id: Mapped[int | None] = mapped_column(ForeignKey("imaging_series.id", ondelete="SET NULL"), nullable=True)
+    hazard_id: Mapped[int | None] = mapped_column(ForeignKey("hazards.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+    __table_args__ = (Index("ix_incidents_status", "status"), Index("ix_incidents_reported_at", "reported_at"))
+
+
+class IncidentEvent(Base):
+    __tablename__ = "incident_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    incident_id: Mapped[int] = mapped_column(ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False)
+    at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    action: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str] = mapped_column(EncryptedText("incident_events.note"), nullable=False, default="")
+
+    __table_args__ = (Index("ix_incident_events_incident_id", "incident_id"),)
+
+
 class ImagingSeries(Base):
     """A CT or MR series, de-identified at import. The pixels are in a file in
     IMAGING_DIR; what the database holds is what describes and finds them."""

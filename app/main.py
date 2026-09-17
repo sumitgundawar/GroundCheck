@@ -1403,6 +1403,138 @@ def models_remove_imaging(model_id: str, request: Request) -> dict:
         raise _training_error(exc) from exc
 
 
+# --- Incidents ------------------------------------------------------------------
+# Anyone signed in can report an incident and follow their own; reviewers and
+# admins see and manage all of them.
+
+def _incident_error(exc: Exception) -> HTTPException:
+    from . import incidents
+
+    if isinstance(exc, LookupError):
+        return HTTPException(status_code=404, detail="No such incident.")
+    if isinstance(exc, incidents.IncidentError):
+        return HTTPException(status_code=400, detail=str(exc))
+    raise exc
+
+
+def _incident_user(request: Request) -> tuple[auth.Principal | None, bool]:
+    """The user, and whether they can manage every incident."""
+    _require_database()
+    if config.AUTH_REQUIRED:
+        user = require_manager(request, "clinician")
+        return user, bool(user and user.can("reviewer"))
+    return require_manager(request, "reviewer"), True
+
+
+def _who(user: auth.Principal | None) -> tuple[int | None, str]:
+    return (user.id, user.name or user.email) if user else (None, "Local user")
+
+
+class IncidentRequest(BaseModel):
+    title: str
+    category: str
+    harm: str = "none"
+    description: str
+    occurred_at: str | None = None
+    audit_id: str | None = None
+    review_case_id: int | None = None
+    alert_id: int | None = None
+    imaging_series_id: int | None = None
+    hazard_id: int | None = None
+
+
+class IncidentUpdate(BaseModel):
+    model_config = {"extra": "forbid"}
+    status: str | None = None
+    harm: str | None = None
+    category: str | None = None
+    owner_id: int | None = None
+    root_cause: str | None = None
+    actions: str | None = None
+    external_reference: str | None = None
+    hazard_id: int | None = None
+    aware_at: str | None = None
+
+
+class IncidentComment(BaseModel):
+    note: str
+
+
+@app.post("/api/incidents")
+def incidents_report(body: IncidentRequest, request: Request) -> dict:
+    from . import incidents
+
+    user, _ = _incident_user(request)
+    try:
+        return {"incident": incidents.report(body.model_dump(), *_who(user))}
+    except Exception as exc:  # noqa: BLE001
+        raise _incident_error(exc) from exc
+
+
+@app.get("/api/incidents")
+def incidents_list(request: Request, status: str = "", category: str = "") -> dict:
+    from . import incidents
+
+    user, manager = _incident_user(request)
+    try:
+        data = incidents.list_incidents(status, category, None if manager else (user.id if user else None))
+    except Exception as exc:  # noqa: BLE001
+        raise _incident_error(exc) from exc
+    if manager:
+        with db.session() as s:
+            data["people"] = [{"id": u.id, "name": u.name or u.email} for u in
+                              s.scalars(select(db.User).where(db.User.role.in_(("reviewer", "admin")),
+                                                              db.User.is_active.is_(True)))]
+    return {**data, "can_manage": manager}
+
+
+@app.get("/api/incidents/export.csv")
+def incidents_export(request: Request) -> Response:
+    from . import incidents
+
+    _, manager = _incident_user(request)
+    if not manager:
+        raise HTTPException(status_code=403, detail="Your role doesn't allow this.")
+    return Response(incidents.export_csv(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="incidents.csv"'})
+
+
+@app.get("/api/incidents/{incident_id}")
+def incidents_get(incident_id: int, request: Request) -> dict:
+    from . import incidents
+
+    user, manager = _incident_user(request)
+    try:
+        return {"incident": incidents.get(incident_id, None if manager else (user.id if user else None)),
+                "can_manage": manager}
+    except Exception as exc:  # noqa: BLE001
+        raise _incident_error(exc) from exc
+
+
+@app.patch("/api/incidents/{incident_id}")
+def incidents_update(incident_id: int, body: IncidentUpdate, request: Request) -> dict:
+    from . import incidents
+
+    user, manager = _incident_user(request)
+    if not manager:
+        raise HTTPException(status_code=403, detail="Your role doesn't allow this.")
+    try:
+        return {"incident": incidents.update(incident_id, body.model_dump(exclude_unset=True), *_who(user))}
+    except Exception as exc:  # noqa: BLE001
+        raise _incident_error(exc) from exc
+
+
+@app.post("/api/incidents/{incident_id}/comments")
+def incidents_comment(incident_id: int, body: IncidentComment, request: Request) -> dict:
+    from . import incidents
+
+    user, manager = _incident_user(request)
+    try:
+        return {"incident": incidents.comment(incident_id, body.note, *_who(user), reporter_only=not manager)}
+    except Exception as exc:  # noqa: BLE001
+        raise _incident_error(exc) from exc
+
+
 # --- CT and MRI imaging -------------------------------------------------------
 
 def _imaging_error(exc: Exception) -> HTTPException:
