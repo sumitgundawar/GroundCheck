@@ -423,6 +423,22 @@ def evaluate() -> dict:
     return changes
 
 
+def _instance() -> dict:
+    """What this instance is running on, and what it chose from that."""
+    from . import pipeline, resources, retrieval
+
+    caches = retrieval.cache_stats()
+    return {
+        "name": config.INSTANCE_NAME,
+        "version": config.VERSION,
+        **resources.summary(),
+        "answers_cached": pipeline.answer_cache_stats()["answers"],
+        "answer_cache_seconds": config.ANSWER_CACHE_SECONDS,
+        "questions_cached": caches["questions"],
+        "passages_cached": caches["passages"],
+    }
+
+
 def _alert(a) -> dict:
     return {"id": a.id, "rule": a.rule, "severity": a.severity, "status": a.status, "title": a.title,
             "detail": a.detail, "value": a.value, "first_seen": a.first_seen.isoformat(),
@@ -484,6 +500,7 @@ def overview() -> dict:
             {"rule": "imaging_failures", "name": "Imaging failures", "limit": "Any failed analysis in the last day"},
             {"rule": "release_blocked", "name": "Knowledge releases", "limit": "The newest release failed its safety check"},
         ],
+        "instance": _instance(),
         "disabled": sorted(config.ALERT_DISABLED_RULES),
         "webhook": bool(config.ALERT_WEBHOOK_URL),
         "interval_seconds": config.ALERT_INTERVAL_SECONDS,

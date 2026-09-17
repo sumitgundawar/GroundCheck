@@ -153,3 +153,12 @@ def test_monitoring_needs_a_reviewer(mon, monkeypatch):
     monkeypatch.setattr(config, "ADMIN_ACCESS", "none")
     assert mon.get("/api/monitoring").status_code == 403
     assert mon.post("/api/monitoring/evaluate").status_code == 403
+
+
+def test_the_overview_says_what_this_instance_runs_on(mon):
+    instance = mon.get("/api/monitoring").json()["instance"]
+    assert instance["cpus"] >= 0.5 and instance["memory_gb"] > 0
+    assert instance["accelerator"] in ("cpu", "mps", "cuda")
+    assert instance["embed_batch"] >= 32 and instance["web_workers"] >= 1
+    assert instance["answer_cache_seconds"] == config.ANSWER_CACHE_SECONDS
+    assert "passages_cached" in instance and instance["version"] == config.VERSION

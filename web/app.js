@@ -4127,6 +4127,19 @@ function renderMonitoring(data) {
     tr.append(el("td", "", r.name), el("td", "", r.limit), cell);
     rows.appendChild(tr);
   });
+  const instance = data.instance || {};
+  const details = $("instance-details");
+  details.textContent = "";
+  const gpu = { cpu: "None, using the processor", mps: "Apple GPU", cuda: "NVIDIA GPU" }[instance.accelerator] || instance.accelerator;
+  [["Name", `${instance.name} (version ${instance.version})`],
+   ["Hardware", `${instance.cpus} cores, ${instance.memory_gb} GB memory`],
+   ["Accelerator", `${gpu}${instance.accelerator !== "cpu" ? `, ${instance.accelerator_memory_gb} GB` : ""}`],
+   ["Batch sizes", `${instance.embed_batch} passages, ${instance.imaging_batch} image regions`],
+   ["Workers this machine fits", String(instance.web_workers)],
+   ["Answers remembered", instance.answer_cache_seconds ? `${instance.answers_cached} for ${instance.answer_cache_seconds} s` : "Cache off"],
+   ["Embeddings remembered", `${instance.questions_cached.toLocaleString()} questions, ${instance.passages_cached.toLocaleString()} passages`],
+   ["Running for", formatDuration(data.now.uptime_seconds)]]
+    .forEach(([k, v]) => { details.append(el("dt", "", k), el("dd", "", v)); });
   $("monitor-notify").textContent = data.webhook
     ? "Alerts are also posted to the configured webhook when they fire and resolve."
     : "Set ALERT_WEBHOOK_URL to post alerts to Slack, Teams or a paging service.";
