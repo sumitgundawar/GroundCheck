@@ -587,6 +587,7 @@ function wireForm() {
     e.preventDefault();
     const q = $("query").value.trim();
     if (q) submitQuery(q);
+    else $("query").focus();
   });
 }
 
@@ -596,12 +597,21 @@ async function submitQuery(query) {
   inflight = true;
   setLoading(true);
   try {
+    const patient = readPatient();
+    if (patient === false) return;  // invalid details: the form says what to fix
     const res = await fetch("/api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, settings: readSettings() }),
+      body: JSON.stringify({ query, settings: readSettings(), ...(patient ? { patient } : {}) }),
     });
-    render(await res.json());
+    const data = await res.json();
+    if (res.status === 422) {
+      const problem = Array.isArray(data.detail) ? data.detail.map((d) => d.msg.replace(/^Value error, /, "")).join("; ") : data.detail;
+      $("patient-box").open = true;
+      $("pt-error").textContent = `Check the patient details: ${problem}`;
+      return;
+    }
+    render({ ...data, patient_given: Boolean(patient) });
     refreshReviewCount();
   } catch (_) {
     render({ decision: "refuse", answer_text: "The service is unreachable. Please try again.",
@@ -618,6 +628,12 @@ function setLoading(on) {
 // ---------- Render ----------
 function render(data) {
   renderDecision(data);
+  renderPatientFindings(data.patient_findings || [], data.patient_given);
+  const block = (data.patient_findings || []).find((f) => f.severity === "block");
+  if (data.decision === "refuse" && block && data.refused_reason && data.refused_reason.startsWith(block.message.charAt(0).toLowerCase() + block.message.slice(1, 20))) {
+    $("decision-reason").textContent = `Not safe for this patient: ${block.medicine}`;
+    $("refuse-explain").textContent = "The answer from the sources doesn't fit the patient you described. The check above names the rule, and what the formulary gives instead where it can.";
+  }
   renderSources(data);
   renderTrace(data.trace || []);
   renderAudit(data.audit_id);
@@ -3177,6 +3193,203 @@ function wireModels() {
   drop.addEventListener("drop", (e) => tryModel(e.dataTransfer.files[0]));
 }
 
+// ---------- Patient ----------
+const splitList = (value) => value.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean);
+const PATIENT_NUMBERS = [["pt-age", "age_years"], ["pt-weight", "weight_kg"], ["pt-egfr", "egfr"], ["pt-creatinine", "creatinine_umol_l"]];
+
+// The patient details as the API expects them: null when nothing is entered,
+// false when something entered can't be used.
+function readPatient({ quiet = false } = {}) {
+  if (!quiet) $("pt-error").textContent = "";
+  const p = {};
+  for (const [id, key] of PATIENT_NUMBERS) {
+    const el = $(id);
+    if (el.value === "") continue;
+    if (!el.checkValidity()) {
+      if (quiet) continue;
+      $("patient-box").open = true;
+      $("pt-error").textContent = `${el.labels[0].textContent.replace(/\s+/g, " ").trim()}: ${el.validationMessage}`;
+      el.focus();
+      return false;
+    }
+    p[key] = Number(el.value);
+  }
+  if ($("pt-sex").value) p.sex = $("pt-sex").value;
+  if ($("pt-liver").value) p.child_pugh = $("pt-liver").value;
+  if ($("pt-pregnant").checked) p.pregnant = true;
+  if ($("pt-breastfeeding").checked) p.breastfeeding = true;
+  for (const [id, key] of [["pt-allergies", "allergies"], ["pt-medicines", "medicines"], ["pt-conditions", "conditions"]]) {
+    const items = splitList($(id).value);
+    if (items.length) p[key] = items;
+  }
+  const labs = {};
+  document.querySelectorAll("[data-lab]").forEach((el) => { if (el.value !== "") labs[el.dataset.lab] = Number(el.value); });
+  if (Object.keys(labs).length) p.labs = labs;
+  return Object.keys(p).length ? p : null;
+}
+
+function updatePatientStatus() {
+  const p = readPatient({ quiet: true });
+  const status = $("patient-status");
+  if (!p) { status.textContent = "No patient details"; status.classList.remove("on"); return; }
+  const bits = [];
+  if (p.age_years !== undefined) bits.push(`${p.age_years} y`);
+  if (p.sex) bits.push(p.sex);
+  if (p.weight_kg !== undefined) bits.push(`${p.weight_kg} kg`);
+  if (p.egfr !== undefined) bits.push(`eGFR ${p.egfr}`);
+  if (p.pregnant) bits.push("pregnant");
+  if (p.allergies) bits.push(`${p.allergies.length} ${p.allergies.length === 1 ? "allergy" : "allergies"}`);
+  if (p.medicines) bits.push(plural(p.medicines.length, "medicine"));
+  status.textContent = bits.join(", ") || "Details entered";
+  status.classList.add("on");
+}
+
+const FINDING_LABEL = { block: "Unsafe for this patient", warn: "Check", info: "Note" };
+
+function renderPatientFindings(findings, given) {
+  const box = $("patient-findings");
+  const list = $("patient-findings-list");
+  list.textContent = "";
+  box.hidden = !given;
+  if (!given) return;
+  if (!findings.length) {
+    const li = document.createElement("li");
+    li.className = "finding pass";
+    li.textContent = "No problems found for this patient with the medicines in this answer.";
+    list.appendChild(li);
+    return;
+  }
+  const order = { block: 0, warn: 1, info: 2 };
+  [...findings].sort((a, b) => order[a.severity] - order[b.severity]).forEach((f) => {
+    const li = document.createElement("li");
+    li.className = `finding ${f.severity}`;
+    const tag = document.createElement("span");
+    tag.className = "finding-tag";
+    tag.textContent = FINDING_LABEL[f.severity];
+    const text = document.createElement("span");
+    text.className = "finding-text";
+    const med = document.createElement("strong");
+    med.textContent = `${f.medicine}: `;
+    text.append(med, f.message);
+    li.append(tag, text);
+    if (f.rule_id || f.source) {
+      const meta = document.createElement("span");
+      meta.className = "finding-meta mono";
+      meta.textContent = [f.rule_id, f.source].filter(Boolean).join(" · ");
+      li.appendChild(meta);
+    }
+    list.appendChild(li);
+  });
+}
+
+function wirePatient() {
+  const box = $("patient-box");
+  box.querySelectorAll("input, select").forEach((el) => el.addEventListener("input", updatePatientStatus));
+  box.querySelectorAll("input[type=checkbox], select").forEach((el) => el.addEventListener("change", updatePatientStatus));
+  $("pt-clear").addEventListener("click", () => {
+    box.querySelectorAll("input").forEach((el) => { if (el.type === "checkbox") el.checked = false; else el.value = ""; });
+    box.querySelectorAll("select").forEach((el) => { el.value = ""; });
+    updatePatientStatus();
+    $("pt-age").focus();
+  });
+  $("pt-sex").addEventListener("change", () => {
+    const male = $("pt-sex").value === "male";
+    ["pt-pregnant", "pt-breastfeeding"].forEach((id) => { $(id).disabled = male; if (male) $(id).checked = false; });
+  });
+  api("/api/formulary").then((data) => {
+    const list = $("formulary-names");
+    data.names.forEach((n) => { const o = document.createElement("option"); o.value = n; list.appendChild(o); });
+  }).catch(() => {});
+}
+
+// ---------- Medicines ----------
+let medicineTimer = null;
+async function loadMedicines() {
+  let data;
+  try { data = await api(`/api/formulary?q=${encodeURIComponent($("medicine-search").value)}`); }
+  catch (_) { return; }
+  $("formulary-synthetic").hidden = !data.synthetic;
+  $("medicines-summary").textContent = `${data.total.toLocaleString()} medicines, ${data.name} ${data.version}`;
+  const rows = $("medicine-rows");
+  rows.textContent = "";
+  $("medicines-empty").hidden = data.medicines.length > 0;
+  data.medicines.forEach((m) => {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    const n = document.createElement("div"); n.className = "user-name"; n.textContent = m.name;
+    if (m.high_alert) { const b = document.createElement("span"); b.className = "status-pill status-rejected"; b.textContent = "High alert"; n.append(" ", b); }
+    const c = document.createElement("div"); c.className = "user-email"; c.textContent = m.classes.join(", ");
+    name.append(n, c);
+    const dose = document.createElement("td");
+    dose.textContent = m.adult_dose ? `${m.adult_dose.amount} ${m.adult_dose.unit} ${m.adult_dose.frequency}` : "By weight or not stated";
+    const rules = document.createElement("td");
+    const group = document.createElement("div"); group.className = "pill-group";
+    const r = m.rules;
+    [[r.allergies, "Allergy"], [r.interactions, "Interactions"], [r.kidney, "Kidney"], [r.liver, "Liver"], [r.children, "Children"],
+     [r.weight, "Weight"], [r.labs, "Labs"], [r.pregnancy !== "no_data", `Pregnancy: ${r.pregnancy}`]]
+      .filter(([on]) => on).forEach(([, label]) => { const s = document.createElement("span"); s.className = "status-pill"; s.textContent = label; group.appendChild(s); });
+    rules.appendChild(group);
+    const act = document.createElement("td");
+    const actions = document.createElement("div"); actions.className = "document-actions";
+    actions.appendChild(button("View rules", "btn-ghost", false, () => openMedicine(m.name)));
+    act.appendChild(actions);
+    labelCells([name, dose, rules, act], ["", "Adult dose", "Rules", ""]);
+    tr.append(name, dose, rules, act);
+    rows.appendChild(tr);
+  });
+}
+
+async function openMedicine(name) {
+  let data;
+  try { data = await api(`/api/formulary/${encodeURIComponent(name)}`); } catch (_) { return; }
+  const m = data.medicine;
+  $("medicine-dialog-title").textContent = m.name;
+  const doseText = (d) => d ? `${d.amount} ${d.unit} ${d.frequency}${d.max_daily ? `, at most ${d.max_daily} ${d.unit} a day` : ""}` : "";
+  const weightText = (d) => d ? `${d.per_kg} ${d.unit}/kg ${d.frequency}${d.max_single ? `, at most ${d.max_single} ${d.unit} a dose` : ""}` : "";
+  const rows = [
+    ["Also called", m.aliases.join(", ")],
+    ["Classes", m.classes.join(", ")],
+    ["High alert", m.high_alert ? "Yes: use an independent double check" : ""],
+    ["Adult dose", doseText(m.adult_dose) + (m.adult_dose ? ` (from age ${m.adult_min_age})` : "")],
+    ["By weight", weightText(m.weight_dose)],
+    ["Children", m.paediatric_dose ? `${weightText(m.paediatric_dose)}${m.paediatric_min_age != null ? `, from age ${m.paediatric_min_age}` : ""}` : "No paediatric dosing: questions about children are refused"],
+    ["Allergies", m.allergy_groups.join(", ")],
+    ["Conditions", m.contraindicated_conditions.join(", ")],
+    ["Interactions", m.interactions.map((i) => `${i.with_medicine || i.with_class} (${i.severity})${i.note ? `: ${i.note}` : ""}`).join(" · ")],
+    ["Kidney", m.renal.map((r) => `eGFR below ${r.egfr_below}: ${r.action}${r.dose ? ` to ${doseText(r.dose)}` : ""}`).join(" · ")],
+    ["Liver", m.hepatic.map((r) => `Child-Pugh ${r.child_pugh}: ${r.action}`).join(" · ")],
+    ["Pregnancy", { avoid: "Avoid", no_data: "No safety information: refused", compatible: "Compatible" }[m.pregnancy]],
+    ["Breastfeeding", { avoid: "Avoid", no_data: "No safety information: warning", compatible: "Compatible" }[m.breastfeeding]],
+    ["Lab results", m.labs.map((l) => `${l.lab} ${l.above != null ? `above ${l.above}` : `below ${l.below}`}: ${l.action}`).join(" · ")],
+    ["Needs before dosing", m.requires.join(", ")],
+    ["Sources", m.source_ids.join(", ")],
+  ].filter(([, v]) => v);
+  const dl = $("medicine-rules");
+  dl.textContent = "";
+  rows.forEach(([k, v]) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); });
+  $("medicine-dialog").showModal();
+}
+
+function renderPatientEval(p) {
+  const wrap = $("patient-eval-block");
+  if (!wrap || !p || !p.total) { if (wrap) wrap.hidden = true; return; }
+  wrap.hidden = false;
+  wrap.textContent = "";
+  const head = document.createElement("div"); head.className = "adv-head";
+  const title = document.createElement("span"); title.className = "eyebrow"; title.textContent = "Patient scenarios";
+  const score = document.createElement("span"); score.className = "adv-score";
+  score.textContent = `${p.passed.toLocaleString()} of ${p.total.toLocaleString()} correct, ${plural(p.unsafe_answers, "unsafe answer")}`;
+  head.append(title, score);
+  const note = document.createElement("p"); note.className = "adv-note";
+  note.textContent = "The same questions asked for different patients: allergies, interactions, children, pregnancy, kidney and liver function, and missing details. Any unsafe answer fails the build.";
+  wrap.append(head, note);
+  if (p.failures && p.failures.length) {
+    const list = document.createElement("ul"); list.className = "eval-cases";
+    p.failures.forEach((f) => { const li = document.createElement("li"); li.className = "eval-case"; li.textContent = `${f.query}: expected ${f.expect}, got ${f.got}`; list.appendChild(li); });
+    wrap.appendChild(list);
+  }
+}
+
 // ---------- Navigation ----------
 // One page per area, addressed by the URL hash (#/review), so pages can be
 // bookmarked and the back button works.
@@ -3191,6 +3404,7 @@ const VIEWS = {
   "data-protection": { load: () => loadProtection() },
   users: { load: () => { $("users-message").hidden = true; loadUsers(); } },
   training: { load: () => loadTraining() },
+  medicines: { load: () => loadMedicines() },
   models: { load: () => loadModels() },
 };
 
@@ -3240,6 +3454,8 @@ function wireNavigation() {
   });
   wireTraining();
   wireModels();
+  wirePatient();
+  $("medicine-search").addEventListener("input", () => { clearTimeout(medicineTimer); medicineTimer = setTimeout(loadMedicines, 200); });
   applyRoleNavigation();
   route();
   refreshReviewCount();
@@ -3358,6 +3574,7 @@ async function loadEvalSummary() {
       ? `Showing a sample of ${shown}. Full suite of ${data.total.toLocaleString()} runs in the build.`
       : "";
     renderAdversarial(data.adversarial);
+    renderPatientEval(data.patient);
     $("eval-foot").textContent = foot;
   } catch (_) { $("eval-summary-inline").textContent = "unavailable"; }
 }

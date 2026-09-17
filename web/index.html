@@ -251,6 +251,15 @@
     <p class="modal-message" id="hazard-message" role="status" hidden></p>
   </dialog>
 
+  <!-- Medicine rules -->
+  <dialog class="modal modal-wide" id="medicine-dialog" aria-labelledby="medicine-dialog-title">
+    <div class="modal-head">
+      <h2 id="medicine-dialog-title">Medicine</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <dl class="protection-list" id="medicine-rules"></dl>
+  </dialog>
+
   <!-- Folder browser -->
   <dialog class="modal modal-wide" id="browse-dialog" aria-labelledby="browse-title">
     <div class="modal-head">
@@ -335,6 +344,10 @@
           <a class="nav-link" href="#/documents" data-view="documents">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-file-text"/></svg>
             <span>Documents</span>
+          </a>
+          <a class="nav-link" href="#/medicines" data-view="medicines">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-list-checks"/></svg>
+            <span>Medicines</span>
           </a>
           <a class="nav-link" href="#/evaluation" data-view="evaluation">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-list-checks"/></svg>
@@ -425,7 +438,7 @@
           </div>
         </header>
       <section class="panel ask-panel">
-        <form id="ask-form" class="ask-form" autocomplete="off">
+        <form id="ask-form" class="ask-form" autocomplete="off" novalidate>
           <label for="query" class="eyebrow">Ask a question</label>
           <div class="ask-row">
             <input
@@ -443,6 +456,48 @@
             </button>
           </div>
           <div class="chips" id="chips" aria-label="Example queries"></div>
+          <details class="patient-box" id="patient-box">
+            <summary>
+              <span class="patient-summary-title">For a specific patient</span>
+              <span class="patient-status" id="patient-status">No patient details</span>
+            </summary>
+            <div class="patient-body">
+              <p class="field-hint">Answers are checked against this patient’s allergies, medicines, kidney and liver function, age, weight and pregnancy. Don’t enter names or record numbers. Details stay in this page until you clear them or leave.</p>
+              <div class="patient-grid">
+                <div class="field"><label for="pt-age">Age (years)</label><input id="pt-age" class="text-input" type="number" min="0" max="130" step="0.1" inputmode="decimal"></div>
+                <div class="field"><label for="pt-sex">Sex</label>
+                  <select id="pt-sex" class="select"><option value="">Not given</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
+                <div class="field"><label for="pt-weight">Weight (kg)</label><input id="pt-weight" class="text-input" type="number" min="0.3" max="400" step="0.1" inputmode="decimal"></div>
+                <div class="field"><label for="pt-egfr">eGFR <span class="optional">mL/min/1.73 m²</span></label><input id="pt-egfr" class="text-input" type="number" min="0" max="200" step="1" inputmode="decimal"></div>
+                <div class="field"><label for="pt-creatinine">Serum creatinine <span class="optional">µmol/L</span></label><input id="pt-creatinine" class="text-input" type="number" min="1" max="3000" step="1" inputmode="decimal"></div>
+                <div class="field"><label for="pt-liver">Liver function</label>
+                  <select id="pt-liver" class="select"><option value="">Not given</option><option value="A">Child-Pugh A</option><option value="B">Child-Pugh B</option><option value="C">Child-Pugh C</option></select></div>
+                <div class="field field-checks">
+                  <label class="check"><input type="checkbox" id="pt-pregnant"> Pregnant</label>
+                  <label class="check"><input type="checkbox" id="pt-breastfeeding"> Breastfeeding</label>
+                </div>
+                <div class="field field-wide"><label for="pt-allergies">Allergies <span class="optional">separate with commas</span></label><input id="pt-allergies" class="text-input" placeholder="e.g. quorl, penicillin"></div>
+                <div class="field field-wide"><label for="pt-medicines">Current medicines <span class="optional">separate with commas</span></label><input id="pt-medicines" class="text-input" list="formulary-names" placeholder="e.g. Tessorin"></div>
+                <div class="field field-wide"><label for="pt-conditions">Conditions <span class="optional">separate with commas</span></label><input id="pt-conditions" class="text-input"></div>
+              </div>
+              <details class="advanced">
+                <summary>Lab results</summary>
+                <div class="patient-grid">
+                  <div class="field"><label for="pt-lab-potassium">Potassium <span class="optional">mmol/L</span></label><input id="pt-lab-potassium" data-lab="potassium" class="text-input" type="number" step="0.1"></div>
+                  <div class="field"><label for="pt-lab-sodium">Sodium <span class="optional">mmol/L</span></label><input id="pt-lab-sodium" data-lab="sodium" class="text-input" type="number" step="1"></div>
+                  <div class="field"><label for="pt-lab-inr">INR</label><input id="pt-lab-inr" data-lab="inr" class="text-input" type="number" step="0.1"></div>
+                  <div class="field"><label for="pt-lab-platelets">Platelets <span class="optional">×10⁹/L</span></label><input id="pt-lab-platelets" data-lab="platelets" class="text-input" type="number" step="1"></div>
+                  <div class="field"><label for="pt-lab-alt">ALT <span class="optional">U/L</span></label><input id="pt-lab-alt" data-lab="alt" class="text-input" type="number" step="1"></div>
+                  <div class="field"><label for="pt-lab-qtc">QTc <span class="optional">ms</span></label><input id="pt-lab-qtc" data-lab="qtc" class="text-input" type="number" step="1"></div>
+                </div>
+              </details>
+              <div class="patient-actions">
+                <button type="button" class="btn btn-sm btn-ghost" id="pt-clear">Clear patient</button>
+                <span class="field-hint" id="pt-error" role="alert"></span>
+              </div>
+            </div>
+          </details>
+          <datalist id="formulary-names"></datalist>
         </form>
       </section>
 
@@ -463,6 +518,10 @@
             </div>
           </form>
           <p class="modal-message" id="flag-message" role="status" hidden></p>
+        </div>
+        <div class="patient-findings" id="patient-findings" hidden>
+          <h3 class="patient-findings-title">Checked for this patient</h3>
+          <ul id="patient-findings-list"></ul>
         </div>
         <div class="refuse-callout" id="refuse-callout" hidden>
           <span class="eyebrow">Why it refused</span>
@@ -814,6 +873,30 @@
 
         </section>
 
+        <!-- Medicines -->
+        <section class="view" id="view-medicines" data-title="Medicines" aria-labelledby="medicines-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title" id="medicines-title">Medicines</h1>
+            <p class="page-sub">The formulary patient checks use: allergies, interactions, and dose rules for age, weight, kidney and liver function, pregnancy and lab results. <span class="page-stat" id="medicines-summary"></span></p>
+          </div>
+        </header>
+          <p class="notice warn" id="formulary-synthetic" hidden>This is the synthetic demo formulary: every medicine and rule is invented. Point <code>FORMULARY_PATH</code> at your organisation’s licensed data before clinical use.</p>
+          <section class="panel">
+            <div class="review-toolbar">
+              <label class="visually-hidden" for="medicine-search">Search medicines</label>
+              <input id="medicine-search" class="text-input medicine-search" type="search" placeholder="Search by name or class">
+            </div>
+            <div class="users-table-wrap">
+              <table class="users-table medicines-table">
+                <thead><tr><th scope="col">Medicine</th><th scope="col">Adult dose</th><th scope="col">Rules</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                <tbody id="medicine-rows"></tbody>
+              </table>
+            </div>
+            <p class="auth-hint" id="medicines-empty" hidden>No medicines match.</p>
+          </section>
+        </section>
+
         <!-- Evaluation -->
         <section class="view" id="view-evaluation" data-title="Evaluation" aria-labelledby="evaluation-title" hidden>
         <header class="page-head">
@@ -829,6 +912,7 @@
           <ul class="eval-cases" id="eval-cases"></ul>
           <p class="eval-foot" id="eval-foot"></p>
           <div class="adversarial-block" id="adversarial-block" hidden></div>
+          <div class="adversarial-block" id="patient-eval-block" hidden></div>
         </div>
       </section>
 

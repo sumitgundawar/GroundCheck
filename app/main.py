@@ -873,6 +873,42 @@ def usage_dashboard(request: Request, days: int = 30) -> dict:
         raise _governance_error(exc) from exc
 
 
+@app.get("/api/formulary")
+def formulary_list(q: str = "") -> dict:
+    """The medicines patient-aware checks know, with the kinds of rules each has."""
+    from . import formulary
+
+    f = formulary.index().formulary
+    needle = formulary.normalise(q)
+    rows = []
+    for m in f.medicines:
+        names = " ".join(formulary.normalise(n) for n in [m.name, *m.aliases, *m.classes])
+        if needle and needle not in names:
+            continue
+        rows.append({
+            "name": m.name, "aliases": m.aliases, "classes": m.classes, "high_alert": m.high_alert,
+            "adult_dose": m.adult_dose.model_dump() if m.adult_dose else None,
+            "rules": {
+                "allergies": len(m.allergy_groups), "conditions": len(m.contraindicated_conditions),
+                "interactions": len(m.interactions), "kidney": len(m.renal), "liver": len(m.hepatic),
+                "children": m.paediatric_dose is not None, "weight": m.weight_dose is not None,
+                "labs": len(m.labs), "pregnancy": m.pregnancy, "breastfeeding": m.breastfeeding,
+            },
+        })
+    return {"name": f.name, "version": f.version, "synthetic": f.synthetic, "total": len(f.medicines),
+            "medicines": rows[:500], "names": sorted({n for m in f.medicines for n in [m.name, *m.classes]})}
+
+
+@app.get("/api/formulary/{name}")
+def formulary_get(name: str) -> dict:
+    from . import formulary
+
+    medicine = formulary.index().find(name)
+    if medicine is None:
+        raise HTTPException(status_code=404, detail="That medicine isn't in the formulary.")
+    return {"medicine": medicine.model_dump()}
+
+
 @app.get("/api/embeddings")
 def embeddings_summary() -> dict:
     from . import knowledge
