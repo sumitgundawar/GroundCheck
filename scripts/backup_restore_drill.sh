@@ -12,23 +12,28 @@ set -euo pipefail
 
 COMPOSE=(docker compose "$@")
 BACKUP_DIR=${BACKUP_DIR:-./backups/$(date +%Y%m%d-%H%M%S)}
+# The app container drops every Linux capability, so it can't write files it
+# doesn't own: a small helper container handles the data volume instead.
+DATA_VOLUME=${DATA_VOLUME:-groundcheck_app-data}
+HELPER=${HELPER:-alpine:3}
 mkdir -p "$BACKUP_DIR"
 
 echo "== Backing up to $BACKUP_DIR"
 "${COMPOSE[@]}" exec -T db pg_dump -U groundcheck -d groundcheck --clean --if-exists > "$BACKUP_DIR/groundcheck.sql"
-"${COMPOSE[@]}" run --rm --no-deps --user root --entrypoint tar app -czf - -C /data . > "$BACKUP_DIR/data.tar.gz"
+docker run --rm -v "$DATA_VOLUME":/data "$HELPER" sh -c 'cd /data && tar -czf - .' > "$BACKUP_DIR/data.tar.gz"
 ls -la "$BACKUP_DIR"
 
 echo "== Destroying the stack, including its volumes"
 "${COMPOSE[@]}" down -v
 
 echo "== Starting a fresh stack"
+"${COMPOSE[@]}" up -d --no-start app    # creates the data volume for the restore
 "${COMPOSE[@]}" up -d db
 until "${COMPOSE[@]}" exec -T db pg_isready -U groundcheck -d groundcheck >/dev/null 2>&1; do sleep 2; done
 
 echo "== Restoring"
 "${COMPOSE[@]}" exec -T db psql -U groundcheck -d groundcheck < "$BACKUP_DIR/groundcheck.sql" > /dev/null
-"${COMPOSE[@]}" run --rm --no-deps --user root --entrypoint tar app -xzf - -C /data < "$BACKUP_DIR/data.tar.gz"
+docker run --rm -i -v "$DATA_VOLUME":/data "$HELPER" sh -c 'cd /data && tar -xzf - && chown -R 1000:1000 /data' < "$BACKUP_DIR/data.tar.gz"
 "${COMPOSE[@]}" up -d app
 
 echo "== Checking"

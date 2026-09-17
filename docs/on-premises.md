@@ -143,6 +143,12 @@ and the audit trail. Run it on a test deployment, not on production.
 bash scripts/backup_restore_drill.sh -f deploy/docker-compose.yml --env-file deploy/.env
 ```
 
+It uses a small helper container for the data volume, because the app
+container drops every Linux capability and can't write files it doesn't own.
+Set `DATA_VOLUME` if your project name isn't `groundcheck`. Back up while the
+app is healthy: a backup taken while it's still building its index on a new
+volume contains no index.
+
 ## Upgrades
 
 1. Read the release notes.
