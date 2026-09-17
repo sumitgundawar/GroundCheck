@@ -29,6 +29,7 @@
     <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><ellipse cx="12" cy="12" rx="5" ry="6"/><path d="M12 6v12"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
     <symbol id="i-siren" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
     <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
@@ -467,6 +468,10 @@
           <a class="nav-link" href="#/documents" data-view="documents">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-file-text"/></svg>
             <span>Documents</span>
+          </a>
+          <a class="nav-link" href="#/releases" data-view="releases">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-history"/></svg>
+            <span>Releases</span>
           </a>
           <a class="nav-link" href="#/medicines" data-view="medicines">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-list-checks"/></svg>
@@ -1278,6 +1283,27 @@
               </table>
             </div>
             <p class="auth-hint" id="runs-empty" hidden>No training runs yet.</p>
+          </section>
+        </section>
+
+        <!-- Releases -->
+        <section class="view" id="view-releases" data-title="Releases" aria-labelledby="releases-title" hidden>
+          <header class="page-head">
+            <div>
+              <h1 class="page-title" id="releases-title">Releases</h1>
+              <p class="page-sub">Every change to what answers are grounded in is checked against the safety tests before it goes live. If something is wrong, go back to the previous release in one step.</p>
+            </div>
+            <div class="page-actions">
+              <button type="button" class="btn btn-sm btn-ghost" id="release-rebuild" hidden>Rebuild and check</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="release-rollback" hidden>Roll back</button>
+            </div>
+          </header>
+          <p class="modal-message" id="releases-message" role="status" hidden></p>
+          <div class="live-release" id="live-release"></div>
+          <section class="panel" aria-labelledby="release-list-title">
+            <h2 class="panel-heading" id="release-list-title">History</h2>
+            <ol class="release-list" id="release-list"></ol>
+            <p class="field-hint" id="release-policy"></p>
           </section>
         </section>
 

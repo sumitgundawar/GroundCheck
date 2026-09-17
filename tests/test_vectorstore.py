@@ -79,8 +79,8 @@ def test_unknown_store_name_is_refused():
 def test_hybrid_retrieval_is_identical_on_local_and_qdrant(tmp_path, monkeypatch):
     """Build a Qdrant copy of the real index and compare results query by query."""
     retrieval.load_index()
-    local_store = retrieval._store
-    vectors = local_store.vectors()
+    live = retrieval._state()
+    vectors = live.store.vectors()
     qdrant = vectorstore.QdrantStore(url="", path=str(tmp_path / "corpus"), collection="corpus")
     qdrant.build(vectors, [{} for _ in range(len(vectors))])
 
@@ -93,9 +93,8 @@ def test_hybrid_retrieval_is_identical_on_local_and_qdrant(tmp_path, monkeypatch
     ]
     for query in queries:
         with_local = [(r["id"], round(s, 4)) for r, s in retrieval.search(query, 4, hybrid=True)]
-        monkeypatch.setattr(retrieval, "_store", qdrant)
-        with_qdrant = [(r["id"], round(s, 4)) for r, s in retrieval.search(query, 4, hybrid=True)]
-        monkeypatch.setattr(retrieval, "_store", local_store)
+        with retrieval.using(retrieval.make_state(qdrant, live.metadata)):
+            with_qdrant = [(r["id"], round(s, 4)) for r, s in retrieval.search(query, 4, hybrid=True)]
         assert with_local == with_qdrant, query
 
 

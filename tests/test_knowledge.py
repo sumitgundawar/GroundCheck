@@ -237,7 +237,7 @@ def test_an_empty_index_refuses_everything(isolated_index):
     assert status["documents"] == 0
     r = pipeline.run("What is the standard dose of Caloradine?")
     assert r.decision == "refuse"
-    assert retrieval.corpus_projection.__wrapped__() == []
+    assert retrieval.corpus_projection() == []
 
 
 def test_search_skips_rows_outside_their_dates(isolated_index):
@@ -246,7 +246,7 @@ def test_search_skips_rows_outside_their_dates(isolated_index):
     knowledge.rebuild_index()
     question = "How soon should a falls risk assessment be completed after admission?"
     assert retrieval.search(question, 4)
-    retrieval._not_after[:] = (now - timedelta(seconds=1)).timestamp()
+    retrieval._state().not_after[:] = (now - timedelta(seconds=1)).timestamp()
     assert retrieval.search(question, 4) == []
 
 

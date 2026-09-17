@@ -199,7 +199,7 @@ function canSee(view) {
   const role = account.user?.role;
   if (!account.authRequired) return view !== "users";
   const rank = { clinician: 0, reviewer: 1, admin: 2 }[role] ?? -1;
-  const needs = { monitoring: 1, usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0, training: 2, models: 1, ehr: 2 }[view] ?? 0;
+  const needs = { releases: 1, monitoring: 1, usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0, training: 2, models: 1, ehr: 2 }[view] ?? 0;
   return rank >= needs;
 }
 
@@ -3633,6 +3633,128 @@ function wireEhr() {
   });
 }
 
+// ---------- Releases ----------
+const RELEASE_STATUS = { live: ["Live", "status-live"], ready: ["Ready to go live", "status-ready"], checking: ["Checking", "status-checking"],
+  failed: ["Blocked", "status-failed"], retired: ["Earlier", "status-earlier"], rolled_back: ["Rolled back", "status-earlier"] };
+let releasePoll = null;
+
+function canAdmin() {
+  return !account.authRequired || account.user?.role === "admin";
+}
+
+function checkText(check) {
+  if (!check) return ["Not checked yet.", "skip"];
+  if (check.skipped) return ["Not checked: release checks are turned off, or this was the first release.", "skip"];
+  if (check.error) return [check.error, "bad"];
+  const g = check.groups || {};
+  const parts = [];
+  if (g.golden) parts.push(`${g.golden.total.toLocaleString()} golden-set questions`);
+  if (g.patient) parts.push(`${g.patient.total.toLocaleString()} patient scenarios`);
+  if (g.review_tests) parts.push(`${g.review_tests.total.toLocaleString()} review test${g.review_tests.total === 1 ? "" : "s"}`);
+  const what = parts.length ? parts.join(", ") : "no questions";
+  if (!check.passed) return [`Blocked: answered ${check.unsafe} question${check.unsafe === 1 ? "" : "s"} that must be refused, of ${what}.`, "bad"];
+  return [`Passed: nothing that must be refused was answered, across ${what}, in ${check.seconds} s.`, ""];
+}
+
+function changeText(r) {
+  if (!r.changes) return "";
+  const parts = [];
+  if (r.changes.added.length) parts.push(`adds ${r.changes.added.join(", ")}`);
+  if (r.changes.updated.length) parts.push(`updates ${r.changes.updated.join(", ")}`);
+  if (r.changes.removed.length) parts.push(`removes ${r.changes.removed.join(", ")}`);
+  return parts.length ? `Compared with live: ${parts.join("; ")}.` : "Same documents as live.";
+}
+
+async function loadReleases() {
+  clearTimeout(releasePoll);
+  let data;
+  try { data = await api("/api/releases"); }
+  catch (err) { showMessage("releases-message", err.message, true); return; }
+  const admin = canAdmin();
+  const live = data.releases.find((r) => r.status === "live");
+  const earlier = live && data.releases.find((r) => r.number < live.number && r.live_at && ["retired", "rolled_back"].includes(r.status) && r.snapshot);
+  $("release-rebuild").hidden = !admin;
+  $("release-rollback").hidden = !admin || !earlier;
+  if (earlier) $("release-rollback").textContent = `Roll back to R${earlier.number}`;
+  const running = data.index.state === "running";
+  $("release-rebuild").disabled = running;
+
+  const banner = $("live-release");
+  banner.textContent = "";
+  banner.className = `live-release${running ? " checking" : ""}`;
+  if (live) {
+    const body = document.createElement("div");
+    body.append(el("h2", "", running ? `Live: R${live.number}. A new release is being built and checked.` : `Live: R${live.number}`),
+      el("p", "", `${live.reason}. Live since ${dateTime(live.live_at)}${live.live_by ? `, by ${live.live_by}` : ""}.`));
+    const figures = el("div", "figures");
+    figures.append(el("div", "", `${live.passages.toLocaleString()} passages`),
+      el("div", "", `${live.documents.length} of your document${live.documents.length === 1 ? "" : "s"}`),
+      el("div", "", live.demo_passages ? `${live.demo_passages.toLocaleString()} from the demo corpus` : "No demo corpus"));
+    banner.append(el("span", "release-badge", `R${live.number}`), body, figures);
+  }
+
+  const list = $("release-list");
+  list.textContent = "";
+  data.releases.forEach((r) => {
+    const li = el("li", "release-item");
+    const body = el("div", "release-body");
+    const [label, cls] = RELEASE_STATUS[r.status] || [r.status, ""];
+    const h = el("h3");
+    h.append(r.reason || "Index rebuilt", el("span", `status-pill ${cls}`, label));
+    body.append(h, el("p", "release-meta", `Built ${dateTime(r.created_at)} by ${r.created_by || "GroundCheck"}. ${r.passages.toLocaleString()} passages, ${r.documents.length} document${r.documents.length === 1 ? "" : "s"}.${r.snapshot ? "" : " Snapshot removed."}`));
+    const changes = changeText(r);
+    if (changes) body.appendChild(el("p", "", changes));
+    const [text, state] = checkText(r.check);
+    body.appendChild(el("p", `release-check ${state}`, text));
+    const examples = [...(r.check?.unsafe_examples || []).map((e) => `Answered, must refuse: ${e.query}`),
+      ...(r.check?.over_refused_examples || []).map((q) => `Now refused: ${q}`)];
+    if (examples.length) {
+      const details = el("details", "release-details");
+      details.appendChild(el("summary", "", "Questions"));
+      const ul = document.createElement("ul");
+      examples.forEach((t) => ul.appendChild(el("li", "", t)));
+      details.appendChild(ul);
+      body.appendChild(details);
+    }
+    const actions = el("div", "release-actions");
+    if (admin && r.snapshot && ["ready", "retired", "rolled_back"].includes(r.status)) {
+      const verb = r.status === "ready" ? "Put live" : "Make live again";
+      actions.appendChild(button(verb, r.status === "ready" ? "btn-primary" : "btn-ghost", running, async (e) => {
+        if (!window.confirm(`Make R${r.number} live? Answers will come from its documents straight away.`)) return;
+        e.target.disabled = true;
+        try {
+          const { release } = await api(`/api/releases/${r.id}/promote`, { method: "POST" });
+          showMessage("releases-message", `R${release.number} is live.`);
+        } catch (err) { showMessage("releases-message", err.message, true); }
+        loadReleases();
+      }));
+    }
+    li.append(el("span", "release-name", `R${r.number}`), body, actions);
+    list.appendChild(li);
+  });
+  $("release-policy").textContent = `${data.checks ? "Checks are on." : "Checks are off (RELEASE_CHECKS=false)."} ${data.auto_promote ? "A release that passes goes live straight away." : "A release that passes waits for an admin to put it live."} The last ${data.keep} snapshots are kept.`;
+  if (running && currentView() === "releases") releasePoll = setTimeout(loadReleases, 2000);
+}
+
+function wireReleases() {
+  $("release-rebuild").addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    try { await api("/api/index/rebuild", { method: "POST" }); showMessage("releases-message", "Rebuilding and checking. This takes about a minute."); }
+    catch (err) { showMessage("releases-message", err.message, true); }
+    loadReleases();
+  });
+  $("release-rollback").addEventListener("click", async (e) => {
+    if (!window.confirm("Go back to the previous release? Answers will come from its documents straight away.")) return;
+    e.target.disabled = true;
+    try {
+      const { release } = await api("/api/releases/rollback", { method: "POST" });
+      showMessage("releases-message", `Rolled back. R${release.number} is live.`);
+    } catch (err) { showMessage("releases-message", err.message, true); }
+    e.target.disabled = false;
+    loadReleases();
+  });
+}
+
 // ---------- Incidents ----------
 const incidentState = { labels: null, people: [], canManage: false, current: null, links: {} };
 const INCIDENT_CATEGORIES = { answer: "An answer or refusal", patient_check: "A patient safety check", imaging: "Imaging", ehr: "EHR integration",
@@ -4645,6 +4767,7 @@ const VIEWS = {
   imaging: { load: () => loadImaging() },
   monitoring: { load: () => loadMonitoring() },
   incidents: { load: () => loadIncidents() },
+  releases: { load: () => loadReleases() },
 };
 
 function currentView() {
@@ -4694,6 +4817,7 @@ function wireNavigation() {
   wireTraining();
   wireImaging();
   wireIncidents();
+  wireReleases();
   $("monitoring-check").addEventListener("click", async (e) => { e.target.disabled = true; await loadMonitoring(true); e.target.disabled = false; });
   $("mi-modality").addEventListener("change", (e) => fillImagingWindows(e.target.value));
   $("model-imaging-form").addEventListener("submit", (e) => { e.preventDefault(); saveModelImaging(false); });

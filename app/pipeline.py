@@ -93,7 +93,9 @@ def _finish(
         llm_used=llm_used,
         patient_findings=patient_findings or [],
     )
-    saved = {k: v for k, v in extras.items() if k not in ("user_id", "review")}
+    if extras.get("check_only"):
+        return response
+    saved = {k: v for k, v in extras.items() if k not in ("user_id", "review", "check_only")}
     if not extras.get("review", True):
         saved["test_run"] = True  # kept in the audit trail, left out of usage reports
     audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"))
@@ -176,15 +178,25 @@ STAGE_EXPLAIN = {
 
 def run(raw_query: str, settings: "Settings | None" = None,
         client_id: str = "global", user_id: int | None = None,
-        review: bool = True, patient: PatientContext | None = None) -> AskResponse:
+        review: bool = True, patient: PatientContext | None = None, check_only: bool = False) -> AskResponse:
     """Run a question through the pipeline. review=False keeps a refusal out of
-    the review queue, for generated test questions."""
+    the review queue, for generated test questions. check_only=True is for
+    checking a release before it goes live: extractive answers, no rate limit,
+    and nothing recorded."""
+    if check_only:
+        with llm.extractive_only():
+            return _run(raw_query, settings, client_id, user_id, False, patient, True)
+    return _run(raw_query, settings, client_id, user_id, review, patient, False)
+
+
+def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: int | None,
+         review: bool, patient: PatientContext | None, check_only: bool) -> AskResponse:
     # Effective settings: an explicit object, or the configured defaults.
     cfg = settings or Settings()
     timer = _Timer()
     trace: list[TraceStep] = []
     extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump(), "user_id": user_id,
-                    "review": review}
+                    "review": review, "check_only": check_only}
     if patient is not None and not patient.is_empty():
         extras["patient"] = patient.model_dump(exclude_defaults=True)
 
@@ -215,7 +227,8 @@ def run(raw_query: str, settings: "Settings | None" = None,
                        refused_reason=scope.reason, claims=[], sources=[],
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
-    rate = guards_input.check_rate_limit(client_id)
+    rate = guards_input.GuardResult(True, detail="not applied to release checks") if check_only \
+        else guards_input.check_rate_limit(client_id)
     trace.append(TraceStep(
         name="rate limit",
         status="pass" if rate.ok else "fail",

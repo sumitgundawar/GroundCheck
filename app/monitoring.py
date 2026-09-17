@@ -19,6 +19,7 @@ answer, every ALERT_INTERVAL_SECONDS and on demand:
 - audit_chain: the tamper-evident audit trail doesn't verify
 - server_errors: this instance returned many 5xx responses recently
 - imaging_failures: imaging analyses failed in the last day
+- release_blocked: the newest knowledge release failed its safety check
 
 An alert fires once, stays firing while its condition holds, and resolves
 when it clears. Firing and resolving are posted to ALERT_WEBHOOK_URL as
@@ -336,6 +337,20 @@ def _rule_imaging_failures(s, now) -> dict | None:
             "value": failed}
 
 
+def _rule_release_blocked(s, now) -> dict | None:
+    from .db import Release
+
+    latest = s.scalar(select(Release).order_by(Release.number.desc()))
+    if latest is None or latest.status != "failed":
+        return None
+    unsafe = (latest.check or {}).get("unsafe")
+    return {"severity": "critical", "title": "A knowledge release failed its safety check",
+            "detail": f"R{latest.number} ({latest.reason}) " + (f"answered {unsafe} question{'s' if unsafe != 1 else ''} "
+                      "that must be refused" if unsafe else "couldn't be checked") +
+                      ", so it didn't go live and answers still come from the live release. See Releases.",
+            "value": unsafe or 0}
+
+
 RULES = {
     "refusal_rate": _rule_refusal_rate,
     "latency": _rule_latency,
@@ -345,6 +360,7 @@ RULES = {
     "audit_chain": _rule_audit_chain,
     "server_errors": _rule_server_errors,
     "imaging_failures": _rule_imaging_failures,
+    "release_blocked": _rule_release_blocked,
 }
 
 
@@ -466,6 +482,7 @@ def overview() -> dict:
             {"rule": "audit_chain", "name": "Audit trail", "limit": f"Any break, checked every {config.ALERT_CHAIN_CHECK_MINUTES} min"},
             {"rule": "server_errors", "name": "Server errors", "limit": "5% of requests in 15 min, on this instance"},
             {"rule": "imaging_failures", "name": "Imaging failures", "limit": "Any failed analysis in the last day"},
+            {"rule": "release_blocked", "name": "Knowledge releases", "limit": "The newest release failed its safety check"},
         ],
         "disabled": sorted(config.ALERT_DISABLED_RULES),
         "webhook": bool(config.ALERT_WEBHOOK_URL),

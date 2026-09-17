@@ -209,6 +209,17 @@ MODEL_TARGET_ACCURACY = _get_float("MODEL_TARGET_ACCURACY", 0.95)
 # with many classes, a top class at 30% means the model is torn.
 MODEL_MIN_CONFIDENCE = _get_float("MODEL_MIN_CONFIDENCE", 0.5)
 
+# --- Knowledge releases (see app/releases.py) ---
+# Where release snapshots are kept. Empty means INDEX_DIR/releases.
+RELEASES_DIR = _get("RELEASES_DIR", "")
+# Check every rebuilt index against the safety tests before it goes live.
+RELEASE_CHECKS = _get("RELEASE_CHECKS", "true").lower() in ("1", "true", "yes")
+# Put a release that passes live straight away. false waits for a reviewer.
+RELEASE_AUTO_PROMOTE = _get("RELEASE_AUTO_PROMOTE", "true").lower() in ("1", "true", "yes")
+# Also check that answerable golden questions are still answered (reported, not gating).
+RELEASE_CHECK_ANSWERABLE = _get("RELEASE_CHECK_ANSWERABLE", "false").lower() in ("1", "true", "yes")
+RELEASES_KEEP = _get_int("RELEASES_KEEP", 10)
+
 # --- Monitoring and alerts (see app/monitoring.py) ---
 VERSION = "1.0.0"
 # A name for this instance, included in alert notifications.

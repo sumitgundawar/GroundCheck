@@ -411,6 +411,29 @@ class Hazard(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
 
 
+class Release(Base):
+    """A snapshot of the search index that answers are grounded in (app/releases.py)."""
+
+    __tablename__ = "releases"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    number: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False)   # checking, failed, ready, live, retired, rolled_back
+    reason: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_by_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    passages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    demo_passages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    documents: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    formulary_sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    check: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    live_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    live_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    live_by_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+
+
 class Alert(Base):
     """An operational alert (app/monitoring.py): one row per episode, from
     firing until it resolves."""

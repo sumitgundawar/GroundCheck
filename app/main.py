@@ -22,8 +22,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from . import (
-    audit, auth, config, db, encryption, governance, integrity, llm, local_ai, monitoring, pipeline, retention, retrieval,
-    sso,
+    audit, auth, config, db, encryption, governance, integrity, llm, local_ai, monitoring, pipeline, releases, retention,
+    retrieval, sso,
 )
 from .schemas import AskRequest, AskResponse, Settings
 
@@ -44,6 +44,10 @@ async def lifespan(_: FastAPI):
         from .imaging import store as imaging_store
 
         imaging_store.recover_interrupted()
+        try:
+            releases.baseline()
+        except Exception:  # noqa: BLE001 - releases are an addition; never block startup
+            logging.getLogger("groundcheck").exception("Couldn't record the baseline release")
         if config.ALERT_INTERVAL_SECONDS > 0:
             checks = asyncio.create_task(_alert_loop())
     try:
@@ -700,7 +704,9 @@ def sources_review(source_id: int, decision: str, body: ReviewRequest, request: 
     except Exception as exc:  # noqa: BLE001
         raise _knowledge_error(exc) from exc
     if decision in ("approve", "retire"):
-        knowledge.rebuild_index_in_background()
+        verb = "Approved" if decision == "approve" else "Retired"
+        knowledge.rebuild_index_in_background(f"{verb} {source['title']} v{source.get('version', 1)}"[:300],
+                                              *_who(user))
     return {"source": source, "index": knowledge.index_status()}
 
 
@@ -708,8 +714,8 @@ def sources_review(source_id: int, decision: str, body: ReviewRequest, request: 
 def index_rebuild(request: Request) -> dict:
     from . import knowledge
 
-    require_manager(request, "admin")
-    knowledge.rebuild_index_in_background()
+    user = require_manager(request, "admin")
+    knowledge.rebuild_index_in_background("Rebuilt by hand", *_who(user))
     return {"index": knowledge.index_status()}
 
 
@@ -1733,6 +1739,45 @@ async def imaging_pacs_retrieve(body: PacsRetrieveRequest, request: Request) -> 
         return await run_in_threadpool(store.import_series, files, "pacs", body.label, user.id if user else None)
     except Exception as exc:  # noqa: BLE001
         raise _imaging_error(exc) from exc
+
+
+# --- Knowledge releases ---------------------------------------------------------
+
+def _release_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, LookupError):
+        return HTTPException(status_code=404, detail="No such release.")
+    if isinstance(exc, releases.ReleaseError):
+        return HTTPException(status_code=400, detail=str(exc))
+    raise exc
+
+
+@app.get("/api/releases")
+def releases_list(request: Request) -> dict:
+    from . import knowledge
+
+    require_manager(request, "reviewer")
+    _require_database()
+    return {**releases.list_releases(), "index": knowledge.index_status()}
+
+
+@app.post("/api/releases/{release_id}/promote")
+async def releases_promote(release_id: int, request: Request) -> dict:
+    user = require_manager(request, "admin")
+    _require_database()
+    try:
+        return {"release": await run_in_threadpool(releases.promote, release_id, *_who(user))}
+    except Exception as exc:  # noqa: BLE001
+        raise _release_error(exc) from exc
+
+
+@app.post("/api/releases/rollback")
+async def releases_rollback(request: Request) -> dict:
+    user = require_manager(request, "admin")
+    _require_database()
+    try:
+        return {"release": await run_in_threadpool(releases.rollback, *_who(user))}
+    except Exception as exc:  # noqa: BLE001
+        raise _release_error(exc) from exc
 
 
 # --- Monitoring -----------------------------------------------------------------

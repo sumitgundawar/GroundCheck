@@ -1306,6 +1306,43 @@ body { background: var(--canvas); color: var(--text); }
 .cds-card.info .finding-tag { color: var(--info); border-color: var(--info-border); }
 @media (max-width: 640px) { .ehr-load { grid-template-columns: minmax(0, 1fr); } }
 
+/* ---------- Releases ---------- */
+.live-release { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); align-items: center;
+  padding: var(--space-4); margin-bottom: var(--space-4); border: 1px solid var(--ok-border); background: var(--ok-bg); border-radius: var(--radius); }
+.live-release:empty { display: none; }
+.live-release.checking { border-color: var(--info-border); background: var(--info-bg); }
+.release-badge { display: grid; place-items: center; min-width: 56px; height: 56px; padding: 0 var(--space-2); border-radius: var(--radius-sm);
+  background: var(--ink); color: var(--on-ink); font: 700 18px var(--font-mono); }
+.live-release h2 { margin: 0; font-size: 16px; color: var(--ink); }
+.live-release p { margin: 2px 0 0; font-size: 13.5px; }
+.live-release .figures { text-align: right; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.release-list { list-style: none; margin: 0; padding: 0; }
+.release-item { position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.release-item:first-child { border-top: 0; }
+.release-name { font: 600 14px var(--font-mono); color: var(--ink); padding-top: 2px; }
+.release-body h3 { margin: 0; font-size: 14.5px; font-weight: 600; display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.release-body p { margin: 3px 0 0; font-size: 13px; color: var(--text-secondary); }
+.release-body .release-meta { color: var(--text-quiet); font-size: 12.5px; }
+.release-check { margin-top: 6px; font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
+.release-check::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); transform: translateY(-1px); }
+.release-check.bad::before { background: var(--danger); }
+.release-check.skip::before { background: var(--border-strong); }
+.release-details { margin-top: 4px; font-size: 12.5px; }
+.release-details summary { cursor: pointer; color: var(--text-muted); }
+.release-details ul { margin: 4px 0 0; padding-left: 18px; }
+.release-actions { display: flex; align-items: start; gap: var(--space-2); }
+.status-live { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-border); }
+.status-ready, .status-checking { background: var(--info-bg); color: var(--info); border-color: var(--info-border); }
+.status-failed { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border); }
+.status-earlier { color: var(--text-muted); }
+@media (max-width: 640px) {
+  .live-release { grid-template-columns: auto minmax(0, 1fr); }
+  .live-release .figures { grid-column: 1 / -1; text-align: left; }
+  .release-item { grid-template-columns: minmax(0, 1fr); }
+  .release-name { padding-top: 0; }
+}
+
 /* ---------- Incidents ---------- */
 .harm { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border-strong); white-space: nowrap; }
 .harm-low { background: var(--info-bg); color: var(--info); border-color: var(--info-border); }

@@ -208,6 +208,8 @@ def approved_records(now: datetime | None = None) -> list[dict]:
                 "text": chunk.text,
                 "source_id": source.id,
                 "source_version": source.version,
+                "document_key": source.document_key,
+                "document_title": source.title,
                 "effective_from": source.effective_from.isoformat() if source.effective_from else None,
                 "expires_on": source.expires_on.isoformat() if source.expires_on else None,
             })
@@ -225,6 +227,7 @@ class IndexStatus:
     embedded: int = 0
     reused: int = 0
     error: str | None = None
+    release: dict | None = None  # the release the last rebuild made
 
 
 _status = IndexStatus()
@@ -258,9 +261,11 @@ def _text_key(text: str) -> str:
     return "t" + hashlib.sha256(f"{config.EMBED_MODEL}\n{text}".encode("utf-8")).hexdigest()[:40]
 
 
-def rebuild_index() -> dict:
-    """Rebuild the search index from the demo corpus and approved documents,
-    then swap it in. Only one rebuild runs at a time."""
+def rebuild_index(reason: str = "Index rebuilt", user_id: int | None = None, user_name: str = "GroundCheck") -> dict:
+    """Rebuild the search index from the demo corpus and approved documents.
+    With a database, the result is a release that is checked before it goes
+    live (app/releases.py); without one, it's swapped in directly. Only one
+    rebuild runs at a time."""
     from . import retrieval  # imported here to avoid a cycle
 
     if not _index_lock.acquire(blocking=False):
@@ -283,8 +288,14 @@ def rebuild_index() -> dict:
             # Nothing to search yet: every question will be refused.
             dim = retrieval.get_model().get_sentence_embedding_dimension()
             vectors = np.zeros((0, dim), dtype="float32")
-        retrieval.write_index(records, vectors)
-        retrieval.load_index()
+        _status.release = None
+        if db.ready():
+            from . import releases
+
+            _status.release = releases.create(records, vectors, reason, user_id, user_name)
+        else:
+            retrieval.write_index(records, vectors)
+            retrieval.load_index()
         _status.documents, _status.embedded, _status.reused = len(records), len(missing), len(records) - len(missing)
         _status.state = "idle"
         return index_status()
@@ -297,10 +308,11 @@ def rebuild_index() -> dict:
         _index_lock.release()
 
 
-def rebuild_index_in_background() -> None:
+def rebuild_index_in_background(reason: str = "Index rebuilt", user_id: int | None = None,
+                                user_name: str = "GroundCheck") -> None:
     def run():
         try:
-            rebuild_index()
+            rebuild_index(reason, user_id, user_name)
         except Exception:  # noqa: BLE001 - recorded in the status
             pass
     threading.Thread(target=run, name="index-rebuild", daemon=True).start()

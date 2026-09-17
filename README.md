@@ -95,20 +95,21 @@ Full instructions, including configuration and Windows, are in
 16. [EHR integration](#ehr-integration)
 17. [Training imaging models](#training-imaging-models)
 18. [CT and MRI](#ct-and-mri)
-19. [Monitoring and alerts](#monitoring-and-alerts)
-20. [Incident reporting](#incident-reporting)
-21. [Configuration](#configuration)
-22. [Local development](#local-development)
-23. [Running the checks](#running-the-checks)
-24. [Troubleshooting](#troubleshooting)
-25. [Deployment](#deployment)
-26. [Project layout](#project-layout)
-27. [Honest limitations](#honest-limitations)
-28. [Reporting issues](#reporting-issues)
-29. [Contributing](#contributing)
-30. [Security](#security)
-31. [License](#license)
-32. [Credits](#credits)
+19. [Knowledge releases and rollback](#knowledge-releases-and-rollback)
+20. [Monitoring and alerts](#monitoring-and-alerts)
+21. [Incident reporting](#incident-reporting)
+22. [Configuration](#configuration)
+23. [Local development](#local-development)
+24. [Running the checks](#running-the-checks)
+25. [Troubleshooting](#troubleshooting)
+26. [Deployment](#deployment)
+27. [Project layout](#project-layout)
+28. [Honest limitations](#honest-limitations)
+29. [Reporting issues](#reporting-issues)
+30. [Contributing](#contributing)
+31. [Security](#security)
+32. [License](#license)
+33. [Credits](#credits)
 
 ---
 
@@ -816,6 +817,34 @@ from whole series the way they'll be analysed, and local validation.
 
 ---
 
+## Knowledge releases and rollback
+
+Every rebuild of the search index, whether after a document is approved or
+retired or by hand, makes a **release**: a snapshot of the passages and their
+vectors, with the documents it holds and fingerprints of its content and the
+formulary. Before a release goes live it's checked while live questions keep
+using the current index:
+
+- every must-refuse question in the golden set and every must-refuse patient
+  scenario, when the demo corpus is included
+- every test question added from a review
+
+If any question that must be refused is answered, the release is **blocked**:
+it never goes live, and the Monitoring page raises a critical alert.
+Answerable questions that are now refused are listed, but don't block it.
+Checks run in extractive mode, whatever model is configured, and record
+nothing in the audit trail; with the demo corpus they take about 35 seconds.
+
+A release that passes goes live straight away, or waits for an admin with
+`RELEASE_AUTO_PROMOTE=false`. The **Releases** page shows the history, what
+each release adds, updates or removes compared with the live one, and its
+check. **Roll back** makes the previous release live again from its
+snapshot, and any kept release can be made live again. The last
+`RELEASES_KEEP` (10) snapshots are kept, and always the live one and the one
+before it. The index in use when releases begin is recorded as the first.
+
+---
+
 ## Monitoring and alerts
 
 The **Monitoring** page (reviewers and admins) shows what's firing, the last
@@ -833,6 +862,7 @@ so every instance agrees, and on demand with **Check now**:
 | Audit trail | The tamper-evident audit chain doesn't verify, checked every `ALERT_CHAIN_CHECK_MINUTES` (360). |
 | Server errors | 5% of this instance's requests in 15 minutes failed. |
 | Imaging failures | An imaging analysis failed in the last day. |
+| Knowledge releases | The newest release failed its safety check. |
 
 Test questions are left out. An alert fires once, stays firing while the
 condition holds, can be acknowledged, and resolves by itself. With
@@ -937,6 +967,10 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `TRAINING_RUNS_DIR` | `models/runs` | Training run settings, progress and logs. |
 | `MODEL_TARGET_ACCURACY` | `0.95` | Accuracy a model must show on answered validation images when setting its confidence threshold. |
 | `MODEL_MIN_CONFIDENCE` | `0.5` | A trained model never answers below this confidence. |
+| `RELEASE_CHECKS` | `true` | Check each rebuilt index against the safety tests before it goes live. |
+| `RELEASE_AUTO_PROMOTE` | `true` | Put a release that passes live straight away. `false` waits for an admin. |
+| `RELEASES_KEEP` | `10` | How many release snapshots to keep. |
+| `RELEASES_DIR` | `INDEX_DIR/releases` | Where release snapshots are kept. |
 | `METRICS_TOKEN` | _empty_ | Bearer token for `/metrics`. Without it, only local requests are answered. |
 | `ALERT_WEBHOOK_URL` | _empty_ | Where alerts are posted when they fire and resolve. |
 | `ALERT_INTERVAL_SECONDS` | `60` | How often alert checks run. 0 turns background checks off. |
@@ -1077,6 +1111,7 @@ groundcheck/
     audit.py           in-memory ring buffer plus JSONL persistence
     training/          training studio: datasets, worker process, model library
     imaging/           DICOM import and de-identification, analysis, reports, DICOMweb
+    releases.py        checked knowledge releases, promotion and rollback
     monitoring.py      Prometheus metrics, alert rules and notifications
     incidents.py       incident reporting, investigation and regulator deadlines
     data/              synthetic corpus and demo example queries

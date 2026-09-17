@@ -16,7 +16,10 @@ from __future__ import annotations
 import json
 import math
 import re
+import threading
 import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime
 from collections import Counter, defaultdict
 from functools import lru_cache
@@ -26,13 +29,26 @@ import numpy as np
 
 from . import config, vectorstore
 
-# A parallel list of corpus records, populated when the index is loaded. Row i
-# of the vector store is _metadata[i].
-_metadata: list[dict] = []
-_store: "vectorstore.VectorStore | None" = None
-_not_before: np.ndarray = np.zeros(0)
-_not_after: np.ndarray = np.zeros(0)
-_lexical: "LexicalIndex | None" = None
+
+@dataclass
+class IndexState:
+    """A loaded index: the vector store, and a parallel list of passages (row i
+    of the store is metadata[i]), with the keyword index and each passage's
+    effective and expiry times. Derived lookups are cached on the state, so
+    they change when the index does."""
+
+    store: "vectorstore.VectorStore"
+    metadata: list[dict]
+    lexical: "LexicalIndex"
+    not_before: np.ndarray
+    not_after: np.ndarray
+    cache: dict = field(default_factory=dict)
+
+
+_active: IndexState | None = None
+# A release being evaluated before it goes live is searched only by the
+# thread evaluating it (see app/releases.py), never by live questions.
+_override = threading.local()
 
 
 @lru_cache(maxsize=1)
@@ -92,7 +108,7 @@ def write_index(records: list[dict], vectors: np.ndarray) -> None:
             "kind": classify_kind(r),
             "text": r["text"],
         }
-        for extra in ("source_id", "source_version", "effective_from", "expires_on"):
+        for extra in ("source_id", "source_version", "document_key", "document_title", "effective_from", "expires_on"):
             if r.get(extra) is not None:
                 entry[extra] = r[extra]
         metadata.append(entry)
@@ -127,7 +143,7 @@ def classify_kind(record: dict) -> str:
 
 def load_index() -> None:
     """Open the vector store and load the metadata and keyword index."""
-    global _store, _metadata, _lexical
+    global _active
     meta_path = config.INDEX_DIR / "metadata.json"
     store = vectorstore.create()
     try:
@@ -145,22 +161,54 @@ def load_index() -> None:
             f"The {store.name} store has {store.count()} vectors but the metadata lists "
             f"{len(metadata)} passages. Run scripts/build_index.py again."
         )
-    global _not_before, _not_after
-    _store, _metadata = store, metadata
-    _lexical = LexicalIndex([f"{r['title']} {r['text']}" for r in _metadata])
-    # Effective and expiry dates as timestamps (NaN when unset), so search can
-    # skip documents that aren't in force without a rebuild.
-    _not_before = np.array([_timestamp(r.get("effective_from")) for r in metadata], dtype="float64")
-    _not_after = np.array([_timestamp(r.get("expires_on")) for r in metadata], dtype="float64")
+    _active = make_state(store, metadata)
+
+
+def make_state(store: "vectorstore.VectorStore", metadata: list[dict]) -> IndexState:
+    return IndexState(
+        store=store, metadata=metadata,
+        lexical=LexicalIndex([f"{r['title']} {r['text']}" for r in metadata]),
+        # Effective and expiry dates as timestamps (NaN when unset), so search
+        # can skip documents that aren't in force without a rebuild.
+        not_before=np.array([_timestamp(r.get("effective_from")) for r in metadata], dtype="float64"),
+        not_after=np.array([_timestamp(r.get("expires_on")) for r in metadata], dtype="float64"),
+    )
+
+
+def state_from(metadata: list[dict], vectors: np.ndarray) -> IndexState:
+    """An index held in memory, for evaluating a release before it goes live."""
+    store = vectorstore.LocalStore()
+    store._matrix = np.ascontiguousarray(vectors, dtype="float32")
+    return make_state(store, metadata)
+
+
+@contextmanager
+def using(state: IndexState):
+    """Search `state` instead of the live index, in this thread only."""
+    previous = getattr(_override, "state", None)
+    _override.state = state
+    try:
+        yield
+    finally:
+        _override.state = previous
+
+
+def _state() -> IndexState:
+    candidate = getattr(_override, "state", None)
+    if candidate is not None:
+        return candidate
+    if _active is None:
+        load_index()
+    assert _active is not None
+    return _active
 
 
 def is_loaded() -> bool:
-    return _store is not None and bool(_metadata)
+    return _active is not None
 
 
 def _ensure_loaded() -> None:
-    if _store is None or not _metadata:
-        load_index()
+    _state()
 
 
 _TOKEN = re.compile(r"[a-z][a-z0-9'-]*")
@@ -168,7 +216,8 @@ _TOKEN = re.compile(r"[a-z][a-z0-9'-]*")
 
 def is_known_term(word: str) -> bool:
     """Whether a word appears in the indexed documents."""
-    return _lexical is not None and word.lower() in _lexical.postings
+    candidate = getattr(_override, "state", None) or _active
+    return candidate is not None and word.lower() in candidate.lexical.postings
 
 
 def tokenize(text: str) -> list[str]:
@@ -224,10 +273,10 @@ def _timestamp(iso: str | None) -> float:
     return datetime.fromisoformat(iso).timestamp()
 
 
-def _in_force(rows: np.ndarray) -> np.ndarray:
+def _in_force(state: IndexState, rows: np.ndarray) -> np.ndarray:
     """Which rows' documents are within their effective and expiry dates now."""
     now = time.time()
-    before, after = _not_before[rows], _not_after[rows]
+    before, after = state.not_before[rows], state.not_after[rows]
     return (np.isnan(before) | (before <= now)) & (np.isnan(after) | (after > now))
 
 
@@ -245,32 +294,31 @@ def search(query: str, k: int | None = None,
     blend of cosine score and keyword score, so the first result is not always
     the highest-scoring one; callers that need the best score should take the
     maximum."""
-    _ensure_loaded()
-    assert _store is not None and _lexical is not None
+    state = _state()
     k = k or config.TOP_K
     hybrid = config.HYBRID_RETRIEVAL if hybrid is None else hybrid
     query_vec = embed([query])[0]
 
     if not hybrid:
-        hits = _store.search(query_vec, k * 3)
+        hits = state.store.search(query_vec, k * 3)
         rows = np.array([row for row, _ in hits], dtype=int)
-        keep = _in_force(rows) if len(rows) else np.zeros(0, dtype=bool)
-        return [(_metadata[row], _cosine(score)) for (row, score), ok in zip(hits, keep) if ok][:k]
+        keep = _in_force(state, rows) if len(rows) else np.zeros(0, dtype=bool)
+        return [(state.metadata[row], _cosine(score)) for (row, score), ok in zip(hits, keep) if ok][:k]
 
     # Candidates: the nearest passages by meaning and the best by keywords.
     # Every store can answer this, and at corpus scale it matches a full scan.
     depth = max(_HYBRID_DEPTH, k * 25)
-    nearest = dict(_store.search(query_vec, depth))
-    keyword = _lexical.scores(query)
+    nearest = dict(state.store.search(query_vec, depth))
+    keyword = state.lexical.scores(query)
     by_keyword = [int(i) for i in np.argsort(-keyword)[:depth] if keyword[i] > 0]
     missing = [row for row in by_keyword if row not in nearest]
     if missing:
-        for row, vec in zip(missing, _store.vectors(missing)):
+        for row, vec in zip(missing, state.store.vectors(missing)):
             nearest[row] = float(np.dot(vec, query_vec))
 
     rows = np.fromiter(nearest.keys(), dtype=int)
     cosines = np.fromiter(nearest.values(), dtype="float32")
-    keep = _in_force(rows)
+    keep = _in_force(state, rows)
     rows, cosines = rows[keep], cosines[keep]
     if len(rows) == 0:
         return []
@@ -281,7 +329,7 @@ def search(query: str, k: int | None = None,
 
     # Ties break on cosine score, then corpus order, so results are stable.
     order = np.lexsort((rows, -cosines, -blended))[:k]
-    return [(_metadata[int(rows[i])], _cosine(cosines[i])) for i in order]
+    return [(state.metadata[int(rows[i])], _cosine(cosines[i])) for i in order]
 
 
 # How many candidates hybrid search takes from each of embedding and keyword
@@ -310,12 +358,15 @@ def best_sentence(query: str, passage_text: str) -> str:
     return sentences[int(np.argmax(sims))]
 
 
-@lru_cache(maxsize=1)
 def _topic_names() -> dict[str, str]:
     """Each corpus topic keyed by its distinctive first word, for example
     "caloradine" or "veltris". Reference topics are generic and skipped."""
+    state = _state()
+    if "topic_names" in state.cache:
+        return state.cache["topic_names"]
     names: dict[str, str] = {}
-    for record in all_metadata():
+    state.cache["topic_names"] = names
+    for record in state.metadata:
         if record.get("kind") == "reference":
             continue
         topic = record.get("topic", "").lower()
@@ -332,16 +383,14 @@ def topics_mentioned(query: str) -> dict[str, str]:
 
 
 def corpus_text_for(source_id: str) -> str | None:
-    _ensure_loaded()
-    for record in _metadata:
+    for record in _state().metadata:
         if record["id"] == source_id:
             return record["text"]
     return None
 
 
 def all_metadata() -> list[dict]:
-    _ensure_loaded()
-    return list(_metadata)
+    return list(_state().metadata)
 
 
 # --------------------------------------------------------------------------
@@ -349,17 +398,17 @@ def all_metadata() -> list[dict]:
 # statistics. Computed once and cached so the endpoint is instant.
 # --------------------------------------------------------------------------
 
-@lru_cache(maxsize=1)
 def corpus_projection(dims: int = 3) -> list[dict]:
     """Project all document vectors to 2D or 3D with PCA for the corpus map. The
     flat index stores the original (normalised) vectors, so we reconstruct them
     rather than re-embedding. Each axis is scaled independently into [-1, 1].
     Returns x, y, and (for 3D) z, so the frontend can render either."""
-    _ensure_loaded()
-    if not _metadata:
+    state = _state()
+    if not state.metadata:
         return []
-    assert _store is not None
-    vectors = _store.vectors()  # (n, dim), already L2-normalised
+    if ("projection", dims) in state.cache:
+        return state.cache[("projection", dims)]
+    vectors = state.store.vectors()  # (n, dim), already L2-normalised
 
     centred = vectors - vectors.mean(axis=0, keepdims=True)
     # Top principal directions via SVD on the centred matrix.
@@ -373,7 +422,7 @@ def corpus_projection(dims: int = 3) -> list[dict]:
     scaled = 2.0 * (coords - mins) / span - 1.0
 
     points = []
-    for record, row in zip(_metadata, scaled):
+    for record, row in zip(state.metadata, scaled):
         p = {
             "id": record["id"],
             "kind": record.get("kind", "condition"),
@@ -385,40 +434,40 @@ def corpus_projection(dims: int = 3) -> list[dict]:
         if k >= 3:
             p["z"] = round(float(row[2]), 4)
         points.append(p)
+    state.cache[("projection", dims)] = points
     return points
 
 
 def embedding_summary() -> dict:
     """The embedding model, vector store and search settings, for the
     Embeddings page."""
-    _ensure_loaded()
-    assert _store is not None
-    vectors = _store.vectors([0]) if _metadata else np.zeros((0, 0))
-    documents = sum(1 for r in _metadata if r.get("source_id"))
+    state = _state()
+    vectors = state.store.vectors([0]) if state.metadata else np.zeros((0, 0))
+    documents = sum(1 for r in state.metadata if r.get("source_id"))
     return {
         "model": config.EMBED_MODEL,
         "dimensions": int(vectors.shape[1]) if vectors.size else get_model().get_sentence_embedding_dimension(),
-        "passages": len(_metadata),
+        "passages": len(state.metadata),
         "from_your_documents": documents,
-        "from_demo_corpus": len(_metadata) - documents,
+        "from_demo_corpus": len(state.metadata) - documents,
         "include_demo_corpus": config.INCLUDE_DEMO_CORPUS,
-        "vector_store": getattr(_store, "name", config.VECTOR_STORE),
+        "vector_store": getattr(state.store, "name", config.VECTOR_STORE),
         "similarity": "cosine",
         "hybrid": {"enabled": config.HYBRID_RETRIEVAL, "embedding_weight": config.HYBRID_ALPHA,
                    "keyword_weight": round(1 - config.HYBRID_ALPHA, 3) if config.HYBRID_RETRIEVAL else 0},
         "top_k": config.TOP_K,
         "min_score": config.RETRIEVAL_MIN_SCORE,
-        "vocabulary": len(_lexical.postings) if _lexical is not None else 0,
+        "vocabulary": len(state.lexical.postings),
     }
 
 
 def corpus_stats() -> dict:
     """Aggregate counts for the corpus map header tiles."""
-    _ensure_loaded()
+    metadata = _state().metadata
     by_kind: dict[str, int] = {}
     by_section: dict[str, int] = {}
     topics: set[str] = set()
-    for r in _metadata:
+    for r in metadata:
         by_kind[r.get("kind", "condition")] = by_kind.get(r.get("kind", "condition"), 0) + 1
         section = r.get("section") or "Unlabelled"
         by_section[section] = by_section.get(section, 0) + 1
@@ -426,7 +475,7 @@ def corpus_stats() -> dict:
     # A topic, with its kind and document count, for the clickable topics list.
     topic_kind: dict[str, str] = {}
     topic_count: dict[str, int] = {}
-    for r in _metadata:
+    for r in metadata:
         t = r.get("topic", "")
         topic_kind[t] = r.get("kind", "condition")
         topic_count[t] = topic_count.get(t, 0) + 1
@@ -435,7 +484,7 @@ def corpus_stats() -> dict:
         for t in sorted(topics)
     ]
     return {
-        "total": len(_metadata),
+        "total": len(metadata),
         "topics": len(topics),
         "by_kind": by_kind,
         "by_section": dict(sorted(by_section.items(), key=lambda kv: -kv[1])),

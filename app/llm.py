@@ -10,6 +10,9 @@ the decision logic never depends on a live call succeeding."""
 
 from __future__ import annotations
 
+import threading
+from contextlib import contextmanager
+
 import json
 import re
 
@@ -21,10 +24,25 @@ from .schemas import LLMAnswer, LLMClaim
 LLM_AVAILABLE = config.llm_configured()
 
 
+_thread = threading.local()
+
+
+@contextmanager
+def extractive_only():
+    """Use extractive answers in this thread, whatever model is configured:
+    release checks test the retrieval and guards, deterministically."""
+    previous = getattr(_thread, "extractive", False)
+    _thread.extractive = True
+    try:
+        yield
+    finally:
+        _thread.extractive = previous
+
+
 def active_provider() -> dict | None:
     """The model that will draft the next answer, as
     {"kind": "local" | "cloud", "model": name}, or None for extractive mode."""
-    if config.FORCE_EXTRACTIVE:
+    if config.FORCE_EXTRACTIVE or getattr(_thread, "extractive", False):
         return None
     local = local_ai.active_model()
     if local:

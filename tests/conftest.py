@@ -14,6 +14,10 @@ os.environ.setdefault("DATABASE_URL", f"sqlite:///{_tmp / 'test.db'}")
 os.environ["AUDIT_LOG_PATH"] = str(_tmp / "audit.jsonl")
 os.environ["LOCAL_AI_STATE_PATH"] = str(_tmp / "local_ai.json")
 os.environ["SESSION_COOKIE_SECURE"] = "false"  # the test client talks plain HTTP
+# Checking a release runs over a thousand questions; tests/test_releases.py
+# turns it on with a small set.
+os.environ.setdefault("RELEASE_CHECKS", "false")
+os.environ.setdefault("ALERT_INTERVAL_SECONDS", "0")
 
 BACKENDS = ["sqlite"] + (["postgresql"] if os.environ.get("TEST_POSTGRES_URL") else [])
 
