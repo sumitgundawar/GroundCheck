@@ -338,4 +338,4 @@ def test_security_headers_and_no_third_party_resources():
         assert "strict-transport-security" not in page.headers
         assert c.get("/", headers={"X-Forwarded-Proto": "https"}).headers["strict-transport-security"].startswith("max-age=")
         assert c.get("/api/health").headers["cache-control"] == "no-store"
-        assert c.get("/fonts/inter-latin.woff2").status_code == 200
+        assert c.get("/fonts/atkinson-hyperlegible-next-latin.woff2").status_code == 200

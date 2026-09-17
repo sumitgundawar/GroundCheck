@@ -45,6 +45,7 @@ function refusalExplanation(reason) {
 
 // ---------- Boot ----------
 document.addEventListener("DOMContentLoaded", async () => {
+  wireTheme();
   loadLogo();
   loadHealth(); // public, so the header is complete even on the sign-in screen
   wireAccounts();
@@ -441,11 +442,11 @@ async function loadHealth() {
     const data = await (await fetch("/api/health")).json();
     llmAvailable = !!data.llm;
     const provider = data.provider;
-    if (provider && provider.kind === "local") { dot.className = "dot ok"; label.textContent = `llm: local ${provider.model}`; }
-    else if (provider) { dot.className = "dot ok"; label.textContent = `llm: ${provider.model}`; }
-    else { dot.className = "dot warn"; label.textContent = "llm: extractive"; }
+    if (provider && provider.kind === "local") { dot.className = "dot ok"; label.textContent = `Local model, ${provider.model}`; }
+    else if (provider) { dot.className = "dot ok"; label.textContent = `Cloud model, ${provider.model}`; }
+    else { dot.className = "dot warn"; label.textContent = "Extractive, no model"; }
     if (typeof data.corpus === "number") $("corpus-count").textContent = data.corpus.toLocaleString();
-  } catch (_) { dot.className = "dot warn"; label.textContent = "llm: extractive"; }
+  } catch (_) { dot.className = "dot warn"; label.textContent = "Extractive, no model"; }
 }
 
 // ---------- Examples (grouped) ----------
@@ -1042,16 +1043,21 @@ function renderHowStages() {
 }
 
 // ---------- Corpus map (3D canvas) ----------
-const KIND_COLOR = {
-  condition: "#8f8f8f", drug: "#0969da", reference: "#9a6700",
-  marker: "#0d9488", procedure: "#8250df",
-};
-// Concrete colours for the canvas (CSS vars are not available to canvas calls).
-const KIND_HEX = {
-  condition: "#8f8f8f", drug: "#0969da", reference: "#9a6700",
-  marker: "#0d9488", procedure: "#8250df",
-};
-const HIT_HEX = "#171717";
+// Canvas can't read CSS variables, so the theme's colours are copied here and
+// refreshed when the theme changes.
+const KIND_HEX = {};
+let HIT_HEX = "#0f2622";
+let HALO = "rgba(255,255,255,0.92)";
+function readMapColours() {
+  const css = getComputedStyle(document.documentElement);
+  for (const kind of ["condition", "drug", "reference", "marker", "procedure"]) {
+    KIND_HEX[kind] = css.getPropertyValue(`--kind-${kind}`).trim();
+  }
+  HIT_HEX = css.getPropertyValue("--map-hit").trim();
+  HALO = css.getPropertyValue("--map-halo").trim();
+}
+readMapColours();
+const KIND_COLOR = new Proxy(KIND_HEX, { get: (target, key) => `var(--kind-${String(key)})` });
 
 const map3d = {
   points: [],            // [{x,y,z,kind,id,title,section}]
@@ -1302,11 +1308,11 @@ function drawCorpus() {
     ctx.arc(q.sx, q.sy, 3.6 + q.depth * 1.6, 0, 6.2832);
     ctx.fill();
     ctx.lineWidth = 1.4;
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = HALO;
     ctx.stroke();
     // Label each retrieved point with its id (white halo for legibility).
     ctx.font = "600 10px ui-monospace, monospace";
-    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.92)";
+    ctx.lineWidth = 3; ctx.strokeStyle = HALO;
     ctx.strokeText(q.id, q.sx + 7, q.sy - 6);
     ctx.fillStyle = HIT_HEX;
     ctx.fillText(q.id, q.sx + 7, q.sy - 6);
@@ -1327,7 +1333,7 @@ function drawCorpus() {
     ctx.arc(hp.sx, hp.sy, 4.5, 0, 6.2832);
     ctx.fill();
     ctx.lineWidth = 1.6;
-    ctx.strokeStyle = "#171717";
+    ctx.strokeStyle = HIT_HEX;
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
@@ -1388,7 +1394,7 @@ function renderCorpusLegend(stats) {
     ["lab marker pages", KIND_COLOR.marker, stats.by_kind.marker || 0],
     ["diagnostic procedure pages", KIND_COLOR.procedure, stats.by_kind.procedure || 0],
     ["general reference notes", KIND_COLOR.reference, stats.by_kind.reference || 0],
-    ["retrieved for your question", "#171717", null],
+    ["retrieved for your question", "var(--map-hit)", null],
   ];
   items.forEach(([label, color, count]) => {
     const el = document.createElement("span");
@@ -3111,7 +3117,7 @@ function renderConfusion(container, classes, matrix) {
       td.textContent = v.toLocaleString();
       const share = v / total;
       td.style.setProperty("--share", Math.sqrt(v / max).toFixed(3));
-      td.className = i === j ? "diag" : v ? "off" : "zero";
+      td.className = i === j ? `diag${Math.sqrt(v / max) >= 0.5 ? " strong" : ""}` : v ? "off" : "zero";
       td.title = `${classes[i]} predicted as ${classes[j]}: ${v} (${Math.round(share * 100)}% of ${classes[i]})`;
       tr.appendChild(td);
     });
@@ -3240,6 +3246,38 @@ async function refreshReviewCount() {
     badge.classList.toggle("overdue", data.counts.overdue > 0);
     badge.title = `${n} open${data.counts.overdue ? `, ${data.counts.overdue} overdue` : ""}`;
   } catch (_) { /* no database or no access */ }
+}
+
+// ---------- Theme ----------
+function wireTheme() {
+  const render = () => {
+    const choice = window.gcTheme ? window.gcTheme.get() : "system";
+    document.querySelectorAll(".theme-switch [data-theme-choice]").forEach((b) => {
+      const on = b.dataset.themeChoice === choice;
+      b.setAttribute("aria-checked", String(on));
+      b.tabIndex = on ? 0 : -1;
+    });
+  };
+  document.querySelectorAll(".theme-switch").forEach((group) => {
+    const buttons = [...group.querySelectorAll("[data-theme-choice]")];
+    buttons.forEach((b, i) => {
+      b.addEventListener("click", () => window.gcTheme && window.gcTheme.set(b.dataset.themeChoice));
+      b.addEventListener("keydown", (e) => {
+        const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        const next = buttons[(i + step + buttons.length) % buttons.length];
+        window.gcTheme && window.gcTheme.set(next.dataset.themeChoice);
+        next.focus();
+      });
+    });
+  });
+  document.addEventListener("themechange", () => {
+    render();
+    readMapColours();
+    if (map3d.points.length) drawCorpus();
+  });
+  render();
 }
 
 // ---------- Collapsibles ----------

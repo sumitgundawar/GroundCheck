@@ -1,6 +1,4 @@
-Inter: Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
-JetBrains Mono: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
-Newsreader: Copyright 2020 The Newsreader Project Authors (https://github.com/productiontype/Newsreader)
+Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors (https://github.com/googlefonts/atkinson-hyperlegible-next)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

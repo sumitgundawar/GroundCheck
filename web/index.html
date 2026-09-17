@@ -6,7 +6,8 @@
   <title>GroundCheck</title>
   <meta name="description" content="A clinical retrieval demo that refuses to guess. Synthetic data only. Not medical advice." />
   <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
-  <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script src="/theme.js"></script>
+  <link rel="preload" href="/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -25,6 +26,9 @@
     <symbol id="i-brain-circuit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M9 13a4.5 4.5 0 0 0 3-4" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M12 13h4" /> <path d="M12 18h6a2 2 0 0 1 2 2v1" /> <path d="M12 8h8" /> <path d="M16 8V5a2 2 0 0 1 2-2" /> <circle cx="16" cy="13" r=".5" /> <circle cx="18" cy="3" r=".5" /> <circle cx="20" cy="21" r=".5" /> <circle cx="20" cy="8" r=".5" /></symbol>
     <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
     <symbol id="i-folder-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
   </svg>
@@ -67,6 +71,11 @@
       </form>
 
       <p class="auth-error" id="auth-error" role="alert" hidden></p>
+      <div class="theme-switch auth-theme" role="radiogroup" aria-label="Colour theme">
+        <button type="button" role="radio" data-theme-choice="system" aria-checked="true" title="Match this device"><svg aria-hidden="true"><use href="#i-monitor"/></svg><span>System</span></button>
+        <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light"><svg aria-hidden="true"><use href="#i-sun"/></svg><span>Light</span></button>
+        <button type="button" role="radio" data-theme-choice="dark" aria-checked="false" title="Dark"><svg aria-hidden="true"><use href="#i-moon"/></svg><span>Dark</span></button>
+      </div>
     </div>
   </section>
 
@@ -365,13 +374,21 @@
         </div>
       </nav>
       <div class="sidebar-foot">
-        <span class="pill provider" id="provider-pill" title="What drafts answers">
-          <span class="dot" id="provider-dot"></span>
-          <span id="provider-label">llm: …</span>
-        </span>
-        <span class="pill corpus-pill" id="corpus-pill" title="Indexed source passages">
-          corpus: <span id="corpus-count">…</span>
-        </span>
+        <div class="theme-switch" role="radiogroup" aria-label="Colour theme">
+          <button type="button" role="radio" data-theme-choice="system" aria-checked="true" title="Match this device"><svg aria-hidden="true"><use href="#i-monitor"/></svg><span>System</span></button>
+          <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light"><svg aria-hidden="true"><use href="#i-sun"/></svg><span>Light</span></button>
+          <button type="button" role="radio" data-theme-choice="dark" aria-checked="false" title="Dark"><svg aria-hidden="true"><use href="#i-moon"/></svg><span>Dark</span></button>
+        </div>
+        <dl class="system-status" aria-label="System status">
+          <div id="provider-pill" title="What drafts answers">
+            <dt>Answers</dt>
+            <dd><span class="dot" id="provider-dot"></span><span id="provider-label">…</span></dd>
+          </div>
+          <div id="corpus-pill" title="Indexed source passages">
+            <dt>Passages</dt>
+            <dd class="mono" id="corpus-count">…</dd>
+          </div>
+        </dl>
         <div class="account-menu" id="account-menu" hidden>
           <button type="button" class="account-button" id="account-button" aria-expanded="false" aria-controls="account-dropdown">
             <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
@@ -422,7 +439,7 @@
             />
             <button type="submit" class="btn btn-primary" id="ask-btn">
               <span class="btn-label">Ask</span>
-              <span class="spinner" id="spinner" hidden></span>
+              <canvas class="btn-orb" id="spinner" data-orb="searching" data-orb-size="20" data-orb-theme="inverse" aria-hidden="true" hidden></canvas>
             </button>
           </div>
           <div class="chips" id="chips" aria-label="Example queries"></div>
@@ -1118,5 +1135,6 @@
   </div>
 
   <script src="/app.js"></script>
+  <script type="module" src="/orbs.js"></script>
 </body>
 </html>
