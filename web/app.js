@@ -534,7 +534,13 @@ async function loadExamples() {
       if (!byGroup[g]) { byGroup[g] = []; groups.push(g); }
       byGroup[g].push(ex);
     });
-    groups.forEach((g) => {
+    // The first group is shown; the rest wait behind "More examples", so the
+    // page opens on the question box rather than three rows of buttons.
+    const more = document.createElement("details");
+    more.className = "examples-more";
+    const moreSummary = document.createElement("summary");
+    more.appendChild(moreSummary);
+    groups.forEach((g, index) => {
       const row = document.createElement("div");
       row.className = "chip-group";
       const label = document.createElement("span");
@@ -553,8 +559,13 @@ async function loadExamples() {
         chips.appendChild(chip);
       });
       row.appendChild(chips);
-      wrap.appendChild(row);
+      (index === 0 ? wrap : more).appendChild(row);
     });
+    if (groups.length > 1) {
+      const hidden = groups.slice(1).reduce((n, g) => n + byGroup[g].length, 0);
+      moreSummary.textContent = `More examples (${hidden})`;
+      wrap.appendChild(more);
+    }
   } catch (_) {}
 }
 
