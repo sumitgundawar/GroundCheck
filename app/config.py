@@ -66,6 +66,11 @@ EMBED_MODEL = _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 # few milliseconds there, and it's safe for concurrent requests. On Apple
 # silicon, the GPU (mps) aborts the process when requests embed at once.
 EMBED_DEVICE = _get("EMBED_DEVICE", "cpu")
+# Where batch work runs: building the index and analysing a scan, which embed
+# or classify thousands of items at once and are much faster on a GPU. "auto"
+# uses an NVIDIA GPU, then Apple's, then the CPU. Unlike a question's
+# embedding, batch work happens one job at a time, so a GPU is safe here.
+BATCH_DEVICE = _get("BATCH_DEVICE", "auto")
 TOP_K = _get_int("TOP_K", 4)
 # Where embeddings are stored and searched: "local" (exact search in-process,
 # the default) or "qdrant" (a vector database; see app/vectorstore.py).
@@ -217,6 +222,12 @@ MODEL_TARGET_ACCURACY = _get_float("MODEL_TARGET_ACCURACY", 0.95)
 # A model never answers below this confidence, however well it validated:
 # with many classes, a top class at 30% means the model is torn.
 MODEL_MIN_CONFIDENCE = _get_float("MODEL_MIN_CONFIDENCE", 0.5)
+
+# How long an identical question keeps its answer, in seconds. 0 turns the
+# answer cache off. Questions about a specific patient are never cached, and a
+# cached answer is dropped when the documents change.
+ANSWER_CACHE_SECONDS = _get_int("ANSWER_CACHE_SECONDS", 300)
+ANSWER_CACHE_SIZE = _get_int("ANSWER_CACHE_SIZE", 500)
 
 # --- Knowledge releases (see app/releases.py) ---
 # Where release snapshots are kept. Empty means INDEX_DIR/releases.

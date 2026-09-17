@@ -279,7 +279,7 @@ def rebuild_index(reason: str = "Index rebuilt", user_id: int | None = None, use
         missing = sorted({k for k in keys if k not in cache})
         if missing:
             texts = {k: r["text"] for k, r in zip(keys, records) if k in set(missing)}
-            vectors = retrieval.embed([texts[k] for k in missing])
+            vectors = retrieval.embed_batch([texts[k] for k in missing])
             cache.update(zip(missing, vectors))
             _save_cache({k: cache[k] for k in set(keys)})
         if keys:

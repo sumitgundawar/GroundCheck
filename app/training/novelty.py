@@ -64,14 +64,31 @@ def fit(features: np.ndarray, labels: np.ndarray, num_classes: int) -> dict:
     return {"means": means.astype(np.float32), "precision": np.linalg.pinv(covariance).astype(np.float32)}
 
 
+def _whitening(stats: dict) -> np.ndarray:
+    """A matrix W with W Wᵀ = precision, so Mahalanobis distance becomes plain
+    distance after multiplying by W. Computed once per model and kept: doing
+    it per class, per image, made a scan's check the slowest part of it."""
+    cached = stats.get("_whitening")
+    if cached is not None:
+        return cached
+    precision = stats["precision"].astype(np.float64)
+    precision = (precision + precision.T) / 2          # symmetric up to rounding
+    values, vectors = np.linalg.eigh(precision)
+    whitening = vectors * np.sqrt(np.clip(values, 0, None))
+    stats["_whitening"] = whitening
+    return whitening
+
+
 def distances(features: np.ndarray, stats: dict) -> np.ndarray:
-    """Distance from each image to its nearest class mean."""
-    means, precision = stats["means"].astype(np.float64), stats["precision"].astype(np.float64)
-    best = np.full(len(features), np.inf)
-    for mean in means:
-        diff = features.astype(np.float64) - mean
-        best = np.minimum(best, np.einsum("ij,jk,ik->i", diff, precision, diff))
-    return np.sqrt(np.maximum(best, 0))
+    """Distance from each image to its nearest class mean, measured with the
+    training data's own spread (Mahalanobis)."""
+    whitening = _whitening(stats)
+    points = np.nan_to_num(features.astype(np.float64)) @ whitening
+    centres = stats["means"].astype(np.float64) @ whitening
+    # |p - c|² for every point and centre, without building the differences.
+    squared = (np.square(points).sum(axis=1)[:, None] - 2 * points @ centres.T
+               + np.square(centres).sum(axis=1)[None, :])
+    return np.sqrt(np.maximum(squared.min(axis=1), 0))
 
 
 def cutoff(validation_distances: np.ndarray, layers: int = 1) -> float:

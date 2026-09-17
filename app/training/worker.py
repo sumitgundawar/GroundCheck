@@ -28,7 +28,11 @@ from .. import config
 from . import architectures, datasets, metrics, novelty, preprocess
 
 IMAGENET_MEAN, IMAGENET_STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
-CACHE_LIMIT_BYTES = 2 * 1024**3
+def _cache_limit_bytes() -> int:
+    """How much memory decoded training images may use on this machine."""
+    from .. import resources
+
+    return resources.training_cache_bytes()
 
 
 class Cancelled(Exception):
@@ -175,9 +179,10 @@ def train(run_dir: Path, resume: bool = False) -> None:
     in_channels = 3 if pretrained else channels
 
     estimated = len(items) * channels * size * size
-    if estimated > CACHE_LIMIT_BYTES:
-        raise RuntimeError(f"These images need {estimated / 1024**3:.1f} GB of memory at {size}px. "
-                           "Choose a smaller image size.")
+    limit = _cache_limit_bytes()
+    if estimated > limit:
+        raise RuntimeError(f"These images need {estimated / 1024**3:.1f} GB of memory at {size}px, and this machine "
+                           f"allows {limit / 1024**3:.1f} GB. Choose a smaller image size.")
     tensors, labels = {}, {}
     for split, group in by_split.items():
         tensors[split] = _load_images(folder, group, size, channels, progress, split)

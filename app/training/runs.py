@@ -17,7 +17,7 @@ from pathlib import Path
 
 from .. import config
 from . import architectures, datasets, hardware
-from .worker import CACHE_LIMIT_BYTES
+from .worker import _cache_limit_bytes
 
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,99}$")
 _processes: dict[str, subprocess.Popen] = {}
@@ -129,7 +129,7 @@ def start(settings: dict, user_name: str | None = None) -> dict:
 
     _, classes, items, summary = datasets.read(settings.get("dataset", ""), val_fraction, test_fraction)
     needed = len(items) * 3 * image_size * image_size
-    if needed > CACHE_LIMIT_BYTES:
+    if needed > _cache_limit_bytes():
         raise TrainingError(f"{len(items):,} images at {image_size}px need up to {needed / 1024**3:.1f} GB of "
                             "memory. Choose a smaller image size.")
 

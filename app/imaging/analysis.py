@@ -22,8 +22,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import numpy as np
-from PIL import Image
 
+from .. import config, resources, retrieval
 from ..training import library, novelty, preprocess
 from . import dicom
 
@@ -88,6 +88,11 @@ class LibraryModel:
         if check_modality and self.modality and modality != self.modality:
             raise AnalysisError(f"{self.name} was trained on {self.modality} images; this series is {modality}.")
         model, card = library._load(self.id)
+        # A series is thousands of patches, which a GPU classifies far faster.
+        # One job at a time (app/imaging/store.py runs them on one thread), so
+        # driving the GPU from here is safe.
+        device = torch.device(retrieval.resolve_device(config.BATCH_DEVICE))
+        model = model.to(device)
         spec = card["input"]
         stats = card.get("_novelty_stats")
         cutoffs = (card.get("novelty") or {}).get("cutoffs")
@@ -103,9 +108,13 @@ class LibraryModel:
         slices, totals = [], {"patches": 0, "unfamiliar": 0, "low_confidence": 0, "answered": 0}
         present: dict[str, list[int]] = {}
         best: dict[str, float] = {}
+        # Cut every slice's patches first, then classify them in large batches:
+        # one slice at a time leaves a GPU idle between small calls.
+        per_slice: list[list[tuple[int, int, int, int]]] = []
+        pieces: list[np.ndarray] = []
         for index in range(volume.shape[0]):
             grey = dicom.window(volume[index], modality, imaging.get("window"))
-            boxes, arrays = [], []
+            boxes = []
             for y in range(0, rows - patch + 1, stride):
                 for x in range(0, cols - patch + 1, stride):
                     piece = grey[y:y + patch, x:x + patch]
@@ -113,39 +122,65 @@ class LibraryModel:
                         piece = piece.T
                     if piece.mean() < 8:      # air or outside the body: nothing to classify
                         continue
-                    image = Image.fromarray(np.ascontiguousarray(piece)).resize((size, size), Image.Resampling.BILINEAR)
-                    arrays.append(preprocess.to_array(image, size, spec["channels"]))
+                    pieces.append(np.ascontiguousarray(piece))
                     boxes.append((x, y, x + patch, y + patch))
+            per_slice.append(boxes)
+            if progress:
+                progress(index + 1, volume.shape[0] * 2)     # cutting is the first half of the work
+
+        # Resize and classify in batches, on the GPU when there is one.
+        probs_all: list[np.ndarray] = []
+        unfamiliar_all: list[np.ndarray] = []
+        # Patches per call, from this machine's memory and accelerator: large
+        # enough to keep a GPU busy, small enough to fit.
+        batch_patches = resources.patch_batch_size(patch, spec["channels"])
+        for start in range(0, len(pieces), batch_patches):
+            block = pieces[start:start + batch_patches]
+            batch = torch.from_numpy(np.stack(block)).to(device).unsqueeze(1).float()
+            # antialias matches the CPU resize the models were trained with;
+            # without it, a downscaled patch looks unfamiliar to them.
+            batch = torch.nn.functional.interpolate(batch, size=(size, size), mode="bilinear",
+                                                    align_corners=False, antialias=True)
+            if spec["channels"] == 3:
+                batch = batch.repeat(1, 3, 1, 1)
+            x = preprocess.normalise(batch.round().clamp(0, 255).to(torch.uint8), spec["mean"], spec["std"],
+                                     spec["model_channels"])
+            logits, feats = novelty.forward(model, card["architecture"], x)
+            probs_all.append(torch.softmax(logits.float().cpu(), dim=1).numpy())
+            unfamiliar_all.append(novelty.flagged(feats, stats, cutoffs)[0] if stats is not None
+                                  else np.zeros(len(block), dtype=bool))
+            if progress:
+                progress(volume.shape[0] + int(volume.shape[0] * (start + len(block)) / max(1, len(pieces))),
+                         volume.shape[0] * 2)
+        probs = np.concatenate(probs_all) if probs_all else np.zeros((0, len(card["classes"])))
+        unfamiliar = np.concatenate(unfamiliar_all) if unfamiliar_all else np.zeros(0, dtype=bool)
+
+        at = 0
+        for index, boxes in enumerate(per_slice):
             findings: list[dict] = []
             counts = {"patches": len(boxes), "unfamiliar": 0, "low_confidence": 0, "answered": 0}
-            if boxes:
-                x = preprocess.normalise(torch.from_numpy(np.stack(arrays)), spec["mean"], spec["std"],
-                                         spec["model_channels"])
-                logits, feats = novelty.forward(model, card["architecture"], x)
-                probs = torch.softmax(logits, dim=1).numpy()
-                unfamiliar = novelty.flagged(feats, stats, cutoffs)[0] if stats is not None else None
-                accepted: dict[str, list] = {}
-                for k, box in enumerate(boxes):
-                    if unfamiliar is not None and unfamiliar[k]:
-                        counts["unfamiliar"] += 1
-                        continue
-                    confidence = float(probs[k].max())
-                    if confidence < threshold:
-                        counts["low_confidence"] += 1
-                        continue
-                    counts["answered"] += 1
-                    label = card["classes"][int(probs[k].argmax())]
-                    accepted.setdefault(label, []).append((*box, confidence))
-                for label, label_boxes in accepted.items():
-                    for region in _merge(label_boxes):
-                        findings.append({"label": label, **region})
-                    present.setdefault(label, []).append(index)
-                    best[label] = max(best.get(label, 0), max(b[4] for b in label_boxes))
+            accepted: dict[str, list] = {}
+            for box in boxes:
+                k = at
+                at += 1
+                if unfamiliar[k]:
+                    counts["unfamiliar"] += 1
+                    continue
+                confidence = float(probs[k].max())
+                if confidence < threshold:
+                    counts["low_confidence"] += 1
+                    continue
+                counts["answered"] += 1
+                label = card["classes"][int(probs[k].argmax())]
+                accepted.setdefault(label, []).append((*box, confidence))
+            for label, label_boxes in accepted.items():
+                for region in _merge(label_boxes):
+                    findings.append({"label": label, **region})
+                present.setdefault(label, []).append(index)
+                best[label] = max(best.get(label, 0), max(b[4] for b in label_boxes))
             for key in totals:
                 totals[key] += counts[key]
             slices.append({"index": index, "findings": sorted(findings, key=lambda f: -f["confidence"]), **counts})
-            if progress:
-                progress(index + 1, volume.shape[0])
 
         unfamiliar_share = totals["unfamiliar"] / totals["patches"] if totals["patches"] else 1.0
         unfamiliar_series = unfamiliar_share >= UNFAMILIAR_SERIES
@@ -169,5 +204,6 @@ class LibraryModel:
             "patch_pixels": patch, "patch_mm": patch_mm, "orientation": orientation,
             "threshold": threshold,
         }
+        model.to("cpu")   # leave the library's cached model where the rest of the app expects it
         return {"model_id": self.id, "model_name": self.name, "model_modality": self.modality,
                 "summary": summary, "slices": slices}

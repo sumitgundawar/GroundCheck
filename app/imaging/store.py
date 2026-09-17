@@ -30,7 +30,10 @@ from . import analysis, dicom
 AGREEMENTS = ("agree", "partly", "disagree", "not_used")
 _cache: "OrderedDict[int, np.ndarray]" = OrderedDict()
 _cache_lock = threading.Lock()
-_CACHE_SIZE = 3
+def _cache_size() -> int:
+    from .. import resources
+
+    return resources.volume_cache_size()
 _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="imaging-analysis")
 
 
@@ -84,7 +87,7 @@ def volume(series_id: int) -> np.ndarray:
     array = _read_volume(name)
     with _cache_lock:
         _cache[series_id] = array
-        while len(_cache) > _CACHE_SIZE:
+        while len(_cache) > _cache_size():
             _cache.popitem(last=False)
     return array
 

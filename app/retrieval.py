@@ -13,6 +13,7 @@ retrieval gate keeps its meaning."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -21,7 +22,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from functools import lru_cache
 from pathlib import Path
 
@@ -46,9 +47,57 @@ class IndexState:
 
 
 _active: IndexState | None = None
+# Bumped whenever the index is replaced, so anything cached against the old
+# one (embeddings, answers) is never reused.
+_version = 0
 # A release being evaluated before it goes live is searched only by the
 # thread evaluating it (see app/releases.py), never by live questions.
 _override = threading.local()
+
+
+def resolve_device(name: str) -> str:
+    """Turn "auto" into the fastest device this machine has."""
+    if name and name != "auto":
+        return name
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+            return "mps"
+    except Exception:  # noqa: BLE001 - no torch, or a broken driver: the CPU always works
+        pass
+    return "cpu"
+
+
+@lru_cache(maxsize=4)
+def _model_on(device: str):
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(config.EMBED_MODEL, device=device)
+
+
+# One GPU job at a time: Metal and CUDA are not safe to drive from several
+# threads at once, and batch jobs are serialised anyway.
+_batch_lock = threading.Lock()
+
+
+def embed_batch(texts: list[str], batch_size: int | None = None) -> np.ndarray:
+    """Embed many texts at once, on the GPU when BATCH_DEVICE allows, in
+    batches sized for this machine. Used for building the index, not for
+    answering a question."""
+    from . import resources
+
+    if not texts:
+        return np.zeros((0, embedding_dimension()), dtype="float32")
+    device = resolve_device(config.BATCH_DEVICE)
+    batch_size = batch_size or resources.embed_batch_size()
+    with _batch_lock:
+        model = _model_on(device)
+        vectors = model.encode(texts, convert_to_numpy=True, normalize_embeddings=True,
+                               show_progress_bar=False, batch_size=batch_size)
+    return np.asarray(vectors, dtype="float32")
 
 
 @lru_cache(maxsize=1)
@@ -167,7 +216,10 @@ def load_index() -> None:
             f"The {store.name} store has {store.count()} vectors but the metadata lists "
             f"{len(metadata)} passages. Run scripts/build_index.py again."
         )
+    global _version
     _active = make_state(store, metadata)
+    _version += 1
+    clear_caches()   # sentences and questions were embedded against the old index
 
 
 def make_state(store: "vectorstore.VectorStore", metadata: list[dict]) -> IndexState:
@@ -209,11 +261,21 @@ def _state() -> IndexState:
     return _active
 
 
+def index_version() -> int:
+    """Changes when the index changes. Part of every cache key."""
+    return _version
+
+
 def is_loaded() -> bool:
     return _active is not None
 
 
 def _ensure_loaded() -> None:
+    _state()
+
+
+def ensure_loaded() -> None:
+    """Load the index if it isn't loaded yet, so callers see a stable version."""
     _state()
 
 
@@ -309,7 +371,7 @@ def search(query: str, k: int | None = None,
     state = _state()
     k = k or config.TOP_K
     hybrid = config.HYBRID_RETRIEVAL if hybrid is None else hybrid
-    query_vec = embed([query])[0]
+    query_vec = embed_query(query)
 
     if not hybrid:
         hits = state.store.search(query_vec, k * 3)
@@ -357,23 +419,88 @@ def split_sentences(text: str) -> list[str]:
     return parts or [text.strip()]
 
 
+# A passage's sentences are the same for every question, so their embeddings
+# are worth keeping; a question is often asked again, so its embedding is too.
+# Both are pure functions of the text and the model, and both are dropped when
+# the index changes.
+_SENTENCE_VECTORS: "OrderedDict[str, tuple[list[str], np.ndarray]]" = OrderedDict()
+_QUERY_VECTORS: "OrderedDict[str, np.ndarray]" = OrderedDict()
+_CACHE_LOCK = threading.Lock()
+def _sentence_cache_size() -> int:
+    from . import resources
+
+    return resources.sentence_cache_size()
+
+
+QUERY_CACHE_SIZE = 4096
+
+
+def _cached(cache: "OrderedDict", key: str, size: int, make):
+    with _CACHE_LOCK:
+        if key in cache:
+            cache.move_to_end(key)
+            return cache[key]
+    value = make()
+    with _CACHE_LOCK:
+        cache[key] = value
+        while len(cache) > size:
+            cache.popitem(last=False)
+    return value
+
+
+def embed_query(query: str) -> np.ndarray:
+    """The question's vector, remembered so the same question isn't embedded
+    twice."""
+    return _cached(_QUERY_VECTORS, query.strip(), QUERY_CACHE_SIZE, lambda: embed([query])[0])
+
+
+def clear_caches() -> None:
+    with _CACHE_LOCK:
+        _SENTENCE_VECTORS.clear()
+        _QUERY_VECTORS.clear()
+
+
+def cache_stats() -> dict:
+    with _CACHE_LOCK:
+        return {"questions": len(_QUERY_VECTORS), "passages": len(_SENTENCE_VECTORS)}
+
+
 def best_sentences(query: str, passages: list[str]) -> list[str]:
-    """The sentence of each passage most similar to the query. Every sentence
-    across every passage is embedded in one call, with the query, because a
-    sentence-transformer batches far better than it repeats: answering a
-    question took two thirds of a second when each passage was embedded on
-    its own."""
+    """The sentence of each passage most similar to the query. Sentences are
+    embedded once per passage and kept, and the question once; a
+    sentence-transformer also batches far better than it repeats, so what is
+    left is embedded in a single call. Answering took two thirds of a second
+    when every passage was embedded on its own, for every question."""
     if not passages:
         return []
+    query_vec = embed_query(query)
     split = [split_sentences(text) for text in passages]
-    flat = [s for sentences in split for s in sentences]
-    vectors = embed([query] + flat)
-    query_vec, sentence_vecs = vectors[0], vectors[1:]
-    out, start = [], 0
-    for sentences in split:
-        sims = sentence_vecs[start:start + len(sentences)] @ query_vec
+    keys = [hashlib.sha256(text.encode("utf-8")).hexdigest() for text in passages]
+    known: dict[str, np.ndarray] = {}
+    missing: list[int] = []
+    with _CACHE_LOCK:
+        for i, key in enumerate(keys):
+            if key in _SENTENCE_VECTORS:
+                _SENTENCE_VECTORS.move_to_end(key)
+                known[key] = _SENTENCE_VECTORS[key]
+            else:
+                missing.append(i)
+    if missing:
+        flat = [s for i in missing for s in split[i]]
+        vectors = embed(flat)
+        start = 0
+        with _CACHE_LOCK:
+            for i in missing:
+                block = vectors[start:start + len(split[i])]
+                start += len(split[i])
+                known[keys[i]] = block
+                _SENTENCE_VECTORS[keys[i]] = block
+            while len(_SENTENCE_VECTORS) > _sentence_cache_size():
+                _SENTENCE_VECTORS.popitem(last=False)
+    out = []
+    for sentences, key in zip(split, keys):
+        sims = known[key] @ query_vec
         out.append(sentences[int(np.argmax(sims))])
-        start += len(sentences)
     return out
 
 

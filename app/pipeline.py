@@ -7,7 +7,11 @@ or any call fails, the extractive fallback keeps the whole pipeline working."""
 
 from __future__ import annotations
 
+import hashlib
+import json
+import threading
 import time
+from collections import OrderedDict
 
 from . import audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, retrieval
 from .schemas import AskResponse, Claim, PatientContext, PatientFinding, Settings, Source, TraceStep
@@ -95,7 +99,11 @@ def _finish(
     )
     if extras.get("check_only"):
         return response
-    saved = {k: v for k, v in extras.items() if k not in ("user_id", "review", "check_only")}
+    saved = {k: v for k, v in extras.items()
+             if k not in ("user_id", "review", "check_only", "remember", "raw_query")}
+    key = extras.get("remember")
+    if key and not any(step.name == "rate limit" and step.status == "fail" for step in trace):
+        _remember_answer(key, response, saved)
     if not extras.get("review", True):
         saved["test_run"] = True  # kept in the audit trail, left out of usage reports
     from . import sites
@@ -179,6 +187,54 @@ STAGE_EXPLAIN = {
 }
 
 
+# Answers to identical questions, for a few minutes. The same question asked
+# twice in a ward round shouldn't be computed twice. The key covers the
+# question, the tuning settings and the index it was answered from, so a
+# changed threshold or a new document never serves a stale answer. Questions
+# about a specific patient are never cached: their checks depend on that
+# patient. Every request is still recorded in the audit trail, and a refusal
+# still opens or updates its review case.
+_answers: "OrderedDict[str, tuple[float, AskResponse, dict]]" = OrderedDict()
+_answer_lock = threading.Lock()
+
+
+def _cache_key(raw_query: str, cfg: "Settings") -> str:
+    material = json.dumps([raw_query.strip(), cfg.model_dump(), retrieval.index_version()],
+                          sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _cached_answer(key: str) -> tuple[AskResponse, dict] | None:
+    now = time.monotonic()
+    with _answer_lock:
+        found = _answers.get(key)
+        if found is None:
+            return None
+        stored_at, response, extras = found
+        if now - stored_at > config.ANSWER_CACHE_SECONDS:
+            del _answers[key]
+            return None
+        _answers.move_to_end(key)
+        return response, extras
+
+
+def _remember_answer(key: str, response: AskResponse, extras: dict) -> None:
+    with _answer_lock:
+        _answers[key] = (time.monotonic(), response, extras)
+        while len(_answers) > config.ANSWER_CACHE_SIZE:
+            _answers.popitem(last=False)
+
+
+def clear_answer_cache() -> None:
+    with _answer_lock:
+        _answers.clear()
+
+
+def answer_cache_stats() -> dict:
+    with _answer_lock:
+        return {"answers": len(_answers), "seconds": config.ANSWER_CACHE_SECONDS}
+
+
 def run(raw_query: str, settings: "Settings | None" = None,
         client_id: str = "global", user_id: int | None = None,
         review: bool = True, patient: PatientContext | None = None, check_only: bool = False) -> AskResponse:
@@ -189,17 +245,49 @@ def run(raw_query: str, settings: "Settings | None" = None,
     if check_only:
         with llm.extractive_only():
             return _run(raw_query, settings, client_id, user_id, False, patient, True)
-    return _run(raw_query, settings, client_id, user_id, review, patient, False)
+    # Only real questions, answered deterministically, with no patient: a
+    # model's own wording varies, a patient's checks are their own, and a
+    # generated test question must never be served a real user's answer, or
+    # counted as use.
+    cacheable = (config.ANSWER_CACHE_SECONDS > 0 and review and (patient is None or patient.is_empty())
+                 and not llm.llm_available())
+    if not cacheable:
+        return _run(raw_query, settings, client_id, user_id, review, patient, False)
+    retrieval.ensure_loaded()      # the key names the index, so load it first
+    key = _cache_key(raw_query, settings or Settings())
+    hit = _cached_answer(key)
+    if hit is not None:
+        return _reuse(*hit, user_id=user_id, review=review)
+    return _run(raw_query, settings, client_id, user_id, review, patient, False, remember=key)
+
+
+def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool) -> AskResponse:
+    """Serve a remembered answer: the same decision, claims and trace, with its
+    own audit record, so the trail still has one entry per question asked and
+    a repeated refusal still adds to its review case."""
+    timer = _Timer()
+    from . import sites
+
+    response = cached.model_copy(deep=True)
+    response.audit_id = audit.store.new_id()
+    response.total_ms = timer.total_ms()
+    site_id = sites.of_user(user_id)
+    audit.store.save(response.audit_id, response, {**extras, "from_cache": True}, user_id=user_id, site_id=site_id)
+    monitoring.observe_answer(response.decision, response.total_ms, "cache")
+    if response.decision == "refuse" and review and audit.store.backend() == "database":
+        governance.record_refusal(response.audit_id, str(extras.get("redacted_query", "")),
+                                  response.refused_reason or "", site_id)
+    return response
 
 
 def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: int | None,
-         review: bool, patient: PatientContext | None, check_only: bool) -> AskResponse:
+         review: bool, patient: PatientContext | None, check_only: bool, remember: str | None = None) -> AskResponse:
     # Effective settings: an explicit object, or the configured defaults.
     cfg = settings or Settings()
     timer = _Timer()
     trace: list[TraceStep] = []
     extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump(), "user_id": user_id,
-                    "review": review, "check_only": check_only}
+                    "review": review, "check_only": check_only, "remember": remember}
     if patient is not None and not patient.is_empty():
         extras["patient"] = patient.model_dump(exclude_defaults=True)
 
