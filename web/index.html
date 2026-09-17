@@ -26,6 +26,7 @@
     <symbol id="i-brain-circuit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M9 13a4.5 4.5 0 0 0 3-4" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M12 13h4" /> <path d="M12 18h6a2 2 0 0 1 2 2v1" /> <path d="M12 8h8" /> <path d="M16 8V5a2 2 0 0 1 2-2" /> <circle cx="16" cy="13" r=".5" /> <circle cx="18" cy="3" r=".5" /> <circle cx="20" cy="21" r=".5" /> <circle cx="20" cy="8" r=".5" /></symbol>
     <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
     <symbol id="i-folder-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><ellipse cx="12" cy="12" rx="5" ry="6"/><path d="M12 6v12"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
     <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
@@ -275,6 +276,47 @@
     </div>
   </dialog>
 
+  <!-- How a model is applied to CT and MRI series -->
+  <dialog class="modal" id="model-imaging-dialog" aria-labelledby="model-imaging-title">
+    <div class="modal-head">
+      <h2 id="model-imaging-title">Use on CT and MRI</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="modal-status" id="model-imaging-meta">Tell GroundCheck how this model’s training images were made, so it can cut matching regions from a whole series.</p>
+    <form class="report-form" id="model-imaging-form" novalidate>
+      <div class="field">
+        <label for="mi-modality">Trained on</label>
+        <select id="mi-modality" class="text-input"><option value="CT">CT</option><option value="MR">MR</option></select>
+        <span class="field-hint">Series of any other modality are refused.</span>
+      </div>
+      <div class="field">
+        <label for="mi-window">Display window of the training images</label>
+        <select id="mi-window" class="text-input"></select>
+      </div>
+      <div class="field">
+        <label for="mi-orientation">Orientation of the training images</label>
+        <select id="mi-orientation" class="text-input">
+          <option value="identity">Standard radiological display</option>
+          <option value="transpose">Rows and columns swapped</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="mi-patch">Width of anatomy in each training image, in mm <span class="optional">optional</span></label>
+        <input id="mi-patch" class="text-input" type="number" min="10" max="600" step="any" inputmode="decimal">
+        <span class="field-hint">Left empty, the model sees each whole slice.</span>
+      </div>
+      <div class="field">
+        <label for="mi-note">Note <span class="optional">optional</span></label>
+        <input id="mi-note" class="text-input" maxlength="500">
+      </div>
+      <p class="modal-message" id="model-imaging-message" role="status" hidden></p>
+      <div class="report-actions">
+        <button type="button" class="btn btn-sm btn-ghost" id="mi-remove">Stop using on series</button>
+        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Model details and trying a model -->
   <dialog class="modal modal-wide" id="model-dialog" aria-labelledby="model-dialog-title">
     <div class="modal-head">
@@ -360,6 +402,11 @@
         </div>
         <div class="nav-group">
           <p class="nav-label">Imaging</p>
+          <a class="nav-link" href="#/imaging" data-view="imaging">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-scan"/></svg>
+            <span>CT and MRI</span>
+            <span class="nav-count nav-live" id="nav-imaging-live" hidden>running</span>
+          </a>
           <a class="nav-link" href="#/training" data-view="training">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-brain-circuit"/></svg>
             <span>Training</span>
@@ -1145,6 +1192,173 @@
             </div>
             <p class="auth-hint" id="runs-empty" hidden>No training runs yet.</p>
           </section>
+        </section>
+
+        <!-- CT and MRI -->
+        <section class="view" id="view-imaging" data-title="CT and MRI" aria-labelledby="imaging-title" hidden>
+          <div id="imaging-list">
+            <header class="page-head">
+              <div>
+                <h1 class="page-title" id="imaging-title">CT and MRI</h1>
+                <p class="page-sub">Import a series, run a model over it, read the images and sign a report. Series are de-identified as they’re imported. <span class="page-stat" id="imaging-summary"></span></p>
+              </div>
+            </header>
+            <p class="modal-message" id="imaging-message" role="status" hidden></p>
+
+            <section class="panel imaging-import" aria-labelledby="imaging-import-title">
+              <h2 class="panel-heading" id="imaging-import-title">Import a series</h2>
+              <div class="review-tabs" role="tablist" aria-label="Import from" id="imaging-import-tabs">
+                <button type="button" class="review-tab" role="tab" id="imaging-tab-upload" aria-controls="imaging-upload" aria-selected="true">Upload files</button>
+                <button type="button" class="review-tab" role="tab" id="imaging-tab-pacs" aria-controls="imaging-pacs" aria-selected="false" tabindex="-1">From the PACS</button>
+              </div>
+              <form id="imaging-upload" class="imaging-upload" role="tabpanel" aria-labelledby="imaging-tab-upload" novalidate>
+                <label class="dicom-drop" id="dicom-drop" for="dicom-files">
+                  <svg aria-hidden="true"><use href="#i-scan"/></svg>
+                  <span class="dicom-drop-main">Drop DICOM files, a folder or a zip here</span>
+                  <span class="dicom-drop-sub" id="dicom-drop-sub">CT and MR image storage. Up to 3,000 files.</span>
+                  <input id="dicom-files" type="file" multiple accept=".dcm,.zip,application/dicom,application/zip">
+                </label>
+                <div class="imaging-upload-side">
+                  <div class="field">
+                    <label for="dicom-label">Label <span class="optional">optional, not a patient identifier</span></label>
+                    <input id="dicom-label" class="text-input" maxlength="200" placeholder="e.g. Teaching case 12">
+                  </div>
+                  <div class="imaging-upload-actions">
+                    <button type="button" class="btn btn-sm btn-ghost" id="dicom-folder">Choose a folder</button>
+                    <input id="dicom-folder-input" type="file" webkitdirectory multiple hidden tabindex="-1" aria-hidden="true">
+                    <button type="submit" class="btn btn-primary" id="dicom-upload" disabled>Import</button>
+                  </div>
+                  <div class="upload-progress" id="dicom-progress" hidden>
+                    <div class="bar-track"><span class="bar-fill" id="dicom-progress-fill"></span></div>
+                    <span class="field-hint" id="dicom-progress-text" aria-live="polite"></span>
+                  </div>
+                </div>
+              </form>
+              <div id="imaging-pacs" role="tabpanel" aria-labelledby="imaging-tab-pacs" hidden>
+                <p class="step-sub flush" id="pacs-off" hidden>No PACS is connected. Set <code>DICOMWEB_URL</code> to search a PACS or vendor-neutral archive over DICOMweb.</p>
+                <form class="pacs-search" id="pacs-search" novalidate>
+                  <div class="field"><label for="pacs-patient-id">Patient ID</label><input id="pacs-patient-id" class="text-input" autocomplete="off"></div>
+                  <div class="field"><label for="pacs-patient-name">Patient name</label><input id="pacs-patient-name" class="text-input" autocomplete="off"></div>
+                  <div class="field"><label for="pacs-accession">Accession number</label><input id="pacs-accession" class="text-input" autocomplete="off"></div>
+                  <div class="field"><label for="pacs-date">Study date</label><input id="pacs-date" class="text-input" placeholder="YYYYMMDD or a range" autocomplete="off"></div>
+                  <div class="field"><label for="pacs-modality">Modality</label>
+                    <select id="pacs-modality" class="text-input"><option value="">Any</option><option>CT</option><option>MR</option></select></div>
+                  <div class="pacs-search-actions"><button type="submit" class="btn btn-primary" id="pacs-go">Search</button></div>
+                </form>
+                <div class="pacs-results" id="pacs-results" aria-live="polite"></div>
+              </div>
+            </section>
+
+            <section class="panel" aria-labelledby="imaging-series-title">
+              <h2 class="panel-heading" id="imaging-series-title">Series</h2>
+              <div class="users-table-wrap">
+                <table class="users-table imaging-table">
+                  <thead><tr><th scope="col">Series</th><th scope="col">Images</th><th scope="col">Imported</th><th scope="col">Model</th><th scope="col">Report</th></tr></thead>
+                  <tbody id="imaging-rows"></tbody>
+                </table>
+              </div>
+              <p class="auth-hint" id="imaging-empty" hidden>No series yet. Import one above. To try it with public data, run <code>python scripts/fetch_dicom_samples.py</code> and upload a folder from <code>data/imaging-samples</code>.</p>
+            </section>
+          </div>
+
+          <div id="imaging-viewer" hidden>
+            <header class="page-head viewer-head">
+              <div>
+                <a class="back-link" href="#/imaging">All series</a>
+                <h1 class="page-title" id="viewer-title">Series</h1>
+                <p class="page-sub" id="viewer-sub"></p>
+              </div>
+              <div class="page-actions">
+                <button type="button" class="btn btn-sm btn-ghost" id="viewer-delete" hidden>Delete series</button>
+              </div>
+            </header>
+            <p class="modal-message" id="viewer-message" role="status" hidden></p>
+            <div class="viewer-layout">
+              <section class="viewer-stage-wrap" aria-label="Image viewer">
+                <div class="viewer-toolbar">
+                  <div class="field inline-field">
+                    <label for="viewer-window">Window</label>
+                    <select id="viewer-window" class="text-input"></select>
+                  </div>
+                  <label class="check viewer-overlay-toggle"><input type="checkbox" id="viewer-overlay" checked> Model regions</label>
+                  <span class="viewer-slice-label mono" id="viewer-slice-label" aria-live="polite"></span>
+                </div>
+                <div class="viewer-stage" id="viewer-stage" tabindex="0" aria-describedby="viewer-keys">
+                  <div class="viewer-frame" id="viewer-frame">
+                    <img id="viewer-image" alt="">
+                    <svg class="viewer-overlay" id="viewer-regions" aria-hidden="true"></svg>
+                    <span class="orient orient-top" id="orient-top"></span>
+                    <span class="orient orient-bottom" id="orient-bottom"></span>
+                    <span class="orient orient-left" id="orient-left"></span>
+                    <span class="orient orient-right" id="orient-right"></span>
+                  </div>
+                </div>
+                <div class="viewer-scrub">
+                  <label class="visually-hidden" for="viewer-slice">Slice</label>
+                  <input type="range" id="viewer-slice" min="0" max="0" value="0">
+                  <div class="slice-map" id="slice-map" aria-label="Where the model reported each label, by slice"></div>
+                </div>
+                <p class="field-hint viewer-caption"><span class="mono" id="viewer-scale"></span></p>
+                <p class="field-hint" id="viewer-keys">Scroll, drag the slider or use the arrow keys to move through slices. Page Up and Page Down jump ten.</p>
+              </section>
+
+              <div class="viewer-side">
+                <section class="panel" aria-labelledby="analysis-title">
+                  <h2 class="panel-heading" id="analysis-title">Model analysis</h2>
+                  <form class="analysis-form" id="analysis-form" novalidate>
+                    <div class="field">
+                      <label for="analysis-model">Model</label>
+                      <select id="analysis-model" class="text-input"></select>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="analysis-run">Run</button>
+                  </form>
+                  <p class="field-hint" id="analysis-hint"></p>
+                  <div class="analysis-progress" id="analysis-progress" hidden>
+                    <div class="bar-track"><span class="bar-fill" id="analysis-progress-fill"></span></div>
+                    <span class="field-hint" id="analysis-progress-text" aria-live="polite"></span>
+                  </div>
+                  <div class="analysis-result" id="analysis-result" aria-live="polite"></div>
+                </section>
+
+                <section class="panel" aria-labelledby="report-title">
+                  <h2 class="panel-heading" id="report-title">Report</h2>
+                  <div id="report-signed"></div>
+                  <form class="report-form" id="report-form" novalidate>
+                    <fieldset class="agreement" id="report-agreement">
+                      <legend class="field-label">The model’s output</legend>
+                      <label class="agree-option"><input type="radio" name="agreement" value="agree"> Agree</label>
+                      <label class="agree-option"><input type="radio" name="agreement" value="partly"> Partly agree</label>
+                      <label class="agree-option"><input type="radio" name="agreement" value="disagree"> Disagree</label>
+                      <label class="agree-option"><input type="radio" name="agreement" value="not_used" checked> Not used</label>
+                    </fieldset>
+                    <div class="field">
+                      <label for="report-findings">Findings</label>
+                      <textarea id="report-findings" class="text-input" rows="5" maxlength="20000"></textarea>
+                    </div>
+                    <div class="field">
+                      <label for="report-impression">Impression</label>
+                      <textarea id="report-impression" class="text-input" rows="3" maxlength="5000"></textarea>
+                    </div>
+                    <p class="modal-message" id="report-message" role="status" hidden></p>
+                    <div class="report-actions">
+                      <button type="button" class="btn btn-sm btn-ghost" id="report-save">Save draft</button>
+                      <button type="submit" class="btn btn-sm btn-primary" id="report-sign">Sign report</button>
+                    </div>
+                    <p class="field-hint" id="report-draft-note"></p>
+                  </form>
+                  <details class="report-history" id="report-history" hidden>
+                    <summary>Earlier versions</summary>
+                    <ol id="report-history-list"></ol>
+                  </details>
+                </section>
+
+                <section class="panel" aria-labelledby="series-details-title">
+                  <h2 class="panel-heading" id="series-details-title">Series details</h2>
+                  <dl class="protection-list" id="series-details"></dl>
+                </section>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- Model library -->

@@ -94,18 +94,19 @@ Full instructions, including configuration and Windows, are in
 15. [Patient-aware checks](#patient-aware-checks)
 16. [EHR integration](#ehr-integration)
 17. [Training imaging models](#training-imaging-models)
-16. [Configuration](#configuration)
-17. [Local development](#local-development)
-18. [Running the checks](#running-the-checks)
-19. [Troubleshooting](#troubleshooting)
-20. [Deployment](#deployment)
-21. [Project layout](#project-layout)
-22. [Honest limitations](#honest-limitations)
-23. [Reporting issues](#reporting-issues)
-24. [Contributing](#contributing)
-25. [Security](#security)
-26. [License](#license)
-27. [Credits](#credits)
+18. [CT and MRI](#ct-and-mri)
+19. [Configuration](#configuration)
+20. [Local development](#local-development)
+21. [Running the checks](#running-the-checks)
+22. [Troubleshooting](#troubleshooting)
+23. [Deployment](#deployment)
+24. [Project layout](#project-layout)
+25. [Honest limitations](#honest-limitations)
+26. [Reporting issues](#reporting-issues)
+27. [Contributing](#contributing)
+28. [Security](#security)
+29. [License](#license)
+30. [Credits](#credits)
 
 ---
 
@@ -704,11 +705,16 @@ Every saved model refuses to guess, like the rest of GroundCheck:
   model abstains, and it never answers below `MODEL_MIN_CONFIDENCE` (50%). The
   library shows whether the target also held on the test
   images, and marks a model experimental if not.
-- **Unfamiliar images.** An image whose features are far from every class the
-  model learned (Mahalanobis distance, calibrated to flag 1% of validation
-  images) is refused rather than forced into a class. This catches noise,
-  blank images and very different images; it can miss images that are only
-  slightly different, such as another scanner's settings.
+- **Unfamiliar images.** At the end of every block of the network, the
+  model records the mean and spread of each feature map for its training
+  images, per class. An image whose statistics are far from every class at
+  any block (Mahalanobis distance, calibrated to flag about 2% of validation
+  images) is refused rather than forced into a class. Early blocks see
+  texture, contrast and noise, so they catch another modality or scanner;
+  late blocks catch the wrong anatomy. Checking the last block alone missed
+  every MRI patch shown to a CT model; checking every block flagged them.
+  Run `python scripts/refit_novelty.py <model id>` to refit a model trained
+  before this check.
 - **Model card.** Accuracy, balanced accuracy, AUC, calibration error,
   sensitivity, specificity and precision for every class, a confusion matrix,
   training history, the dataset's fingerprint and the hardware used.
@@ -729,8 +735,82 @@ written to `data/datasets/`, with a `DATASET.md` giving the source and
 citations. Then choose the folder on the Training page.
 
 Models trained here are for research and evaluation. They are not medical
-devices and haven't been validated for clinical use. DICOM and NIfTI input,
-3D volumes and using models inside the answer pipeline are planned.
+devices and haven't been validated for clinical use. To run a model over CT
+or MRI series, see [CT and MRI](#ct-and-mri).
+
+---
+
+## CT and MRI
+
+The **CT and MRI** page imports whole series, runs a model from the library
+over them, and lets a clinician read the images and sign a report that a PACS
+can store.
+
+**Importing.** Upload `.dcm` files, a folder or a zip (up to 3,000 files), or
+search a PACS and retrieve a series over DICOMweb (QIDO-RS and WADO-RS) when
+`DICOMWEB_URL` is set. CT and MR image storage is accepted. Every instance is
+de-identified before anything is stored, following the DICOM PS3.15 Basic
+Application Level Confidentiality Profile with the Retain Patient
+Characteristics and Clean Descriptors options:
+
+- names, IDs, dates and times, institutions, physicians, device serial
+  numbers, free-text comments and private tags are removed or emptied
+- UIDs are replaced consistently, so a series stays a series
+- the patient's own name and IDs are removed from descriptions, which then
+  pass through text de-identification
+- age (over 89 becomes 90), sex, size and weight are kept
+- images marked as having patient details burned into the pixels are refused
+
+Slices are ordered head to feet (axial), front to back (coronal) or right to
+left (sagittal) and turned to standard radiological display from
+`ImageOrientationPatient`, whatever order and orientation they were stored in.
+Pixels are stored in `IMAGING_DIR`, encrypted with `DATA_ENCRYPTION_KEYS` when
+set. For a series from a PACS, the original identifiers are kept, encrypted,
+only so a signed report can be filed with the right study.
+
+**Viewing.** Scroll, drag or use the arrow keys through the slices. CT has
+abdomen, soft tissue, lung, bone and brain windows. Orientation letters, the
+field of view and slice spacing are shown.
+
+**Running a model.** A model from the library needs imaging settings, set by
+an administrator in the Model library under **CT and MRI use**: the modality
+it was trained on, its training images' window and orientation, and the width
+of anatomy each training image showed. The series is searched slice by slice
+with overlapping regions of that physical size, so scanners with different
+pixel spacing are treated alike. Each region is answered, or abstained on
+when the model isn't confident or the region is unlike its training images.
+The model refuses a series of another modality, and abstains on the whole
+series when at least half of its regions are unfamiliar. Regions it answers
+are drawn on the images and shown as a map of slices per label.
+
+**Reporting.** The clinician records whether they agree with the model, or
+didn't use it, and writes findings and an impression. A signed report can't
+be edited: an amendment supersedes it and both are kept. A signed report
+downloads as a DICOM Comprehensive SR that references every image in the
+series, names the model and its output, and records the clinician's
+agreement. For a series retrieved from a PACS, **Send to the PACS** stores
+the report there with STOW-RS, under the original study.
+
+### Try it on public scans
+
+```bash
+python scripts/fetch_dicom_samples.py
+```
+
+This downloads an abdominal CT (Pancreas-CT, 181 slices) and a prostate MRI
+(Prostate-Diagnosis, 20 slices) from The Cancer Imaging Archive, under CC BY
+3.0, into `data/imaging-samples/`, with the citations. Upload a folder on the
+CT and MRI page.
+
+To try a PACS, `docker compose -f deploy/docker-compose.yml --profile pacs up`
+starts Orthanc with DICOMweb. The retrieval code is also tested against the
+public Orthanc demo server (`RUN_LIVE_PACS=1 pytest tests/test_imaging.py`).
+
+The demonstration CT model was trained on MedMNIST crops centred on single
+organs, not on whole CT slices. On a real abdominal CT it abstains, because
+78% of the regions are unlike its training images, and it refuses MRI. That
+is the check doing its job. A model for real use needs training images cut
+from whole series the way they'll be analysed, and local validation.
 
 ---
 
@@ -781,6 +861,11 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `TRAINING_RUNS_DIR` | `models/runs` | Training run settings, progress and logs. |
 | `MODEL_TARGET_ACCURACY` | `0.95` | Accuracy a model must show on answered validation images when setting its confidence threshold. |
 | `MODEL_MIN_CONFIDENCE` | `0.5` | A trained model never answers below this confidence. |
+| `IMAGING_DIR` | `data/imaging` | Where imported CT and MRI series are stored, encrypted when `DATA_ENCRYPTION_KEYS` is set. |
+| `IMAGING_MAX_UPLOAD_MB` | `1024` | Largest imaging upload. |
+| `DICOMWEB_URL` | _empty_ | A PACS or VNA's DICOMweb root, to search, retrieve series and send signed reports. |
+| `DICOMWEB_AUTHORIZATION` | _empty_ | The `Authorization` header sent to the PACS, such as `Bearer <token>`. |
+| `ORGANISATION_NAME` | _empty_ | Recorded as the verifying organisation in signed imaging reports. |
 | `DATA_ENCRYPTION_KEYS` | _empty_ | Base64 keys, comma-separated, to encrypt stored questions, answers and review notes. The first encrypts. |
 | `DATA_ENCRYPTION_RETIRED_KEYS` | _empty_ | Keys that only decrypt, for rotation. |
 | `AUDIT_SIGNING_KEYS` | _empty_ | Base64 keys to sign the audit chain. The first signs. |
@@ -909,6 +994,8 @@ groundcheck/
     guards_output.py   coverage, grounding, dosage guards
     llm.py             Groq client, prompts, extractive fallback
     audit.py           in-memory ring buffer plus JSONL persistence
+    training/          training studio: datasets, worker process, model library
+    imaging/           DICOM import and de-identification, analysis, reports, DICOMweb
     data/              synthetic corpus and demo example queries
   scripts/
     generate_corpus.py  builds the synthetic corpus
@@ -947,8 +1034,13 @@ In the spirit of the demo, these are real and worth knowing:
   but not every exotic format.
 - The coverage guard works on words. Contractions and common conversational
   words are handled, but unusual phrasing can still cause a refusal.
-- PII redaction covers email addresses and long digit runs only. It is not
-  de-identification.
+- De-identification of questions and DICOM text is rule-based. It catches
+  common names, identifiers and dates, and a DICOM series' own patient name
+  and IDs, but it can miss unusual ones. Pixel data isn't scanned for
+  burned-in text; images that declare it are refused.
+- The demonstration imaging models were trained on small public datasets and
+  abstain on most real scans. They show the workflow, not diagnostic
+  performance.
 - The safety case summary and hazard log are tools for your own clinical
   safety process. GroundCheck is not a certified medical device.
 

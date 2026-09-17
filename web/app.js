@@ -3059,6 +3059,10 @@ async function loadModels() {
     verdict.textContent = m.target_met === false
       ? `Below the ${pct(m.target_accuracy)} target on its ${m.evaluated_on} images when it answers. Treat as experimental.`
       : `Met the ${pct(m.target_accuracy)} target on its ${m.evaluated_on} images when it answers.`;
+    const use = document.createElement("p"); use.className = "model-meta";
+    use.textContent = m.imaging
+      ? `Used on ${m.imaging.modality} series${m.imaging.patch_mm ? `, ${Math.round(m.imaging.patch_mm)} mm regions` : ""}.`
+      : "Not set up for CT or MRI series.";
     const foot = document.createElement("p"); foot.className = "model-meta";
     foot.textContent = `Trained ${new Date(m.created_at).toLocaleDateString()} on ${m.device_name} in ${formatDuration(m.training_seconds)}${m.created_by ? ` by ${m.created_by}` : ""}. ${m.size_mb} MB.`;
     const actions = document.createElement("div"); actions.className = "model-actions";
@@ -3067,6 +3071,7 @@ async function loadModels() {
       const dl = document.createElement("a");
       dl.className = "btn btn-sm btn-ghost"; dl.href = `/api/models/${encodeURIComponent(m.id)}/download`; dl.textContent = "Download";
       actions.appendChild(dl);
+      actions.appendChild(button("CT and MRI use", "btn-ghost", false, () => openModelImaging(m)));
       actions.appendChild(button("Delete", "btn-ghost", false, async () => {
         if (!window.confirm(`Delete “${m.name}” from the library? This can’t be undone.`)) return;
         try { await api(`/api/models/${encodeURIComponent(m.id)}`, { method: "DELETE" }); showMessage("models-message", "Deleted."); }
@@ -3074,10 +3079,52 @@ async function loadModels() {
         loadModels();
       }));
     }
-    card.append(head, classes, figures, verdict, foot, actions);
+    card.append(head, classes, figures, verdict, use, foot, actions);
     grid.appendChild(card);
   });
   if (models.openAfterLoad) { const id = models.openAfterLoad; models.openAfterLoad = null; if (data.models.some((m) => m.id === id)) openModel(id); }
+}
+
+const IMAGING_WINDOWS = { CT: ["abdomen", "soft tissue", "lung", "bone", "brain"], MR: ["auto"] };
+
+function fillImagingWindows(modality, chosen) {
+  const select = $("mi-window");
+  select.textContent = "";
+  IMAGING_WINDOWS[modality].forEach((w) => {
+    const o = document.createElement("option");
+    o.value = w; o.textContent = w === "auto" ? "Automatic (1st to 99th percentile)" : w[0].toUpperCase() + w.slice(1);
+    select.appendChild(o);
+  });
+  if (chosen && IMAGING_WINDOWS[modality].includes(chosen)) select.value = chosen;
+}
+
+function openModelImaging(m) {
+  models.imagingFor = m;
+  const s = m.imaging || {};
+  $("model-imaging-title").textContent = `Use ${m.name} on CT and MRI`;
+  $("mi-modality").value = s.modality || "CT";
+  fillImagingWindows($("mi-modality").value, s.window);
+  $("mi-orientation").value = s.orientation || "identity";
+  $("mi-patch").value = s.patch_mm ?? "";
+  $("mi-note").value = s.note || "";
+  $("mi-remove").hidden = !m.imaging;
+  $("model-imaging-message").hidden = true;
+  $("model-imaging-dialog").showModal();
+}
+
+async function saveModelImaging(remove) {
+  const m = models.imagingFor;
+  const patch = $("mi-patch").value.trim();
+  const body = remove ? null : { modality: $("mi-modality").value, window: $("mi-window").value, orientation: $("mi-orientation").value,
+    patch_mm: patch === "" ? null : Number(patch), note: $("mi-note").value };
+  try {
+    await api(`/api/models/${encodeURIComponent(m.id)}/imaging`, remove ? { method: "DELETE" } : { method: "PUT", body });
+    $("model-imaging-dialog").close();
+    showMessage("models-message", remove ? `${m.name} is no longer used on series.` : `Saved. ${m.name} can now be run on ${body.modality} series.`);
+    loadModels();
+  } catch (err) {
+    showMessage("model-imaging-message", err.message, true);
+  }
 }
 
 async function openModel(id) {
@@ -3574,6 +3621,676 @@ function wireEhr() {
   });
 }
 
+// ---------- CT and MRI ----------
+// A list of imported series, and a viewer for one (#/imaging/12): slices with
+// windowing and the model's regions, the analysis, and the clinician's report.
+const imaging = { home: null, series: null, index: 0, window: null, poll: null, files: [], editing: null };
+const LABEL_COLOURS = 8;
+const ORIENTATION = {
+  axial: ["A", "P", "R", "L"], coronal: ["S", "I", "R", "L"], sagittal: ["S", "I", "A", "P"],
+};
+const AGREEMENT_LABELS = { agree: "Agrees with the model", partly: "Partly agrees with the model", disagree: "Disagrees with the model", not_used: "Model not used" };
+
+function canDeleteSeries() {
+  return !account.authRequired || ["reviewer", "admin"].includes(account.user?.role);
+}
+
+function imagingRoute() {
+  const match = location.hash.match(/^#\/imaging\/(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+async function loadImaging() {
+  clearTimeout(imaging.poll);
+  const id = imagingRoute();
+  $("imaging-list").hidden = id !== null;
+  $("imaging-viewer").hidden = id === null;
+  try { imaging.home = await api("/api/imaging"); }
+  catch (err) { showMessage(id === null ? "imaging-message" : "viewer-message", err.message, true); return; }
+  if (id === null) renderImagingList();
+  else openSeries(id);
+}
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = text;
+  return node;
+}
+
+function shortDate(iso) {
+  return iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
+}
+
+function seriesTitle(s) {
+  return s.label || s.description || `${s.modality} series ${s.id}`;
+}
+
+function renderImagingList() {
+  const { series, pacs } = imaging.home;
+  document.title = "CT and MRI · GroundCheck";
+  $("imaging-summary").textContent = series.length ? plural(series.length, "series").replace(/seriess$/, "series") : "";
+  $("pacs-off").hidden = pacs;
+  $("pacs-search").hidden = !pacs;
+  const rows = $("imaging-rows");
+  rows.textContent = "";
+  $("imaging-empty").hidden = series.length > 0;
+  series.forEach((s) => {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    const link = el("a", "series-link");
+    link.href = `#/imaging/${s.id}`;
+    link.append(el("span", "modality", s.modality), seriesTitle(s));
+    name.appendChild(link);
+    const sub = [s.label && s.description ? s.description : "", s.plane && s.plane !== "unknown" ? s.plane : "", s.source === "pacs" ? "from the PACS" : ""].filter(Boolean).join(", ");
+    if (sub) name.appendChild(el("span", "series-sub", sub));
+    const images = el("td", "mono", `${s.slices} × ${s.columns}×${s.rows}`);
+    images.dataset.label = "Images";
+    const when = el("td", "", shortDate(s.created_at));
+    when.dataset.label = "Imported";
+    const model = document.createElement("td");
+    model.dataset.label = "Model";
+    model.appendChild(analysisPill(s.analysis));
+    const report = document.createElement("td");
+    report.dataset.label = "Report";
+    report.appendChild(s.report === "signed" ? el("span", "status-pill status-approved", "Signed")
+      : s.report === "draft" ? el("span", "status-pill status-pending", "Draft") : el("span", "muted", "None"));
+    tr.append(name, images, when, model, report);
+    rows.appendChild(tr);
+  });
+}
+
+function analysisPill(a) {
+  if (!a) return el("span", "muted", "Not run");
+  if (a.status === "queued" || a.status === "running") return el("span", "status-pill status-running", "Running");
+  if (a.status === "refused") return el("span", "status-pill status-rejected", "Refused");
+  if (a.status === "failed") return el("span", "status-pill status-rejected", "Failed");
+  if (a.abstained) return el("span", "status-pill status-abstained", "Abstained");
+  return el("span", "status-pill status-approved", "Done");
+}
+
+// --- Import ---
+
+function setImportTab(which) {
+  const upload = which === "upload";
+  $("imaging-tab-upload").setAttribute("aria-selected", String(upload));
+  $("imaging-tab-pacs").setAttribute("aria-selected", String(!upload));
+  $("imaging-tab-upload").tabIndex = upload ? 0 : -1;
+  $("imaging-tab-pacs").tabIndex = upload ? -1 : 0;
+  $("imaging-upload").hidden = !upload;
+  $("imaging-pacs").hidden = upload;
+}
+
+function chooseDicomFiles(files) {
+  imaging.files = [...files].filter((f) => !f.name.startsWith("."));
+  const drop = $("dicom-drop");
+  drop.classList.toggle("chosen", imaging.files.length > 0);
+  const bytes = imaging.files.reduce((n, f) => n + f.size, 0);
+  $("dicom-drop-sub").textContent = imaging.files.length
+    ? `${plural(imaging.files.length, "file")} chosen, ${(bytes / 1024 ** 2).toFixed(1)} MB`
+    : "CT and MR image storage. Up to 3,000 files.";
+  $("dicom-upload").disabled = imaging.files.length === 0;
+}
+
+async function readDroppedEntries(items) {
+  const out = [];
+  const walk = async (entry) => {
+    if (entry.isFile) {
+      out.push(await new Promise((resolve, reject) => entry.file(resolve, reject)));
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      let batch;
+      do {
+        batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+        for (const child of batch) await walk(child);
+      } while (batch.length);
+    }
+  };
+  for (const item of items) {
+    const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+    if (entry) await walk(entry);
+    else if (item.getAsFile()) out.push(item.getAsFile());
+  }
+  return out;
+}
+
+function uploadDicom(event) {
+  event.preventDefault();
+  if (!imaging.files.length) return;
+  const limit = imaging.home?.max_upload_mb || 1024;
+  const bytes = imaging.files.reduce((n, f) => n + f.size, 0);
+  if (imaging.files.length > 3000) { showMessage("imaging-message", "Choose up to 3,000 files, or upload a zip.", true); return; }
+  if (bytes > limit * 1024 ** 2) { showMessage("imaging-message", `Uploads can be up to ${limit} MB.`, true); return; }
+  const form = new FormData();
+  imaging.files.forEach((f) => form.append("files", f, f.webkitRelativePath || f.name));
+  form.append("label", $("dicom-label").value.trim());
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/imaging/upload");
+  $("dicom-progress").hidden = false;
+  $("dicom-upload").disabled = true;
+  $("imaging-message").hidden = true;
+  xhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    const share = e.loaded / e.total;
+    $("dicom-progress-fill").style.width = `${Math.round(share * 100)}%`;
+    $("dicom-progress-text").textContent = share < 1 ? `Uploading, ${Math.round(share * 100)}%` : "De-identifying and reading the images";
+  };
+  xhr.onloadend = () => {
+    $("dicom-progress").hidden = true;
+    $("dicom-progress-fill").style.width = "0";
+    let data = null;
+    try { data = JSON.parse(xhr.responseText); } catch (_) { /* not JSON */ }
+    if (xhr.status !== 200) {
+      $("dicom-upload").disabled = false;
+      showMessage("imaging-message", (data && typeof data.detail === "string") ? data.detail : `The upload failed (${xhr.status || "network error"}).`, true);
+      return;
+    }
+    chooseDicomFiles([]);
+    $("dicom-files").value = "";
+    $("dicom-label").value = "";
+    importFinished(data);
+  };
+  xhr.send(form);
+}
+
+function importFinished(data) {
+  const added = data.added || [];
+  const existing = data.existing || [];
+  const parts = [];
+  if (added.length) parts.push(`Imported ${plural(added.length, "series").replace(/seriess$/, "series")}, ${plural(added.reduce((n, s) => n + s.slices, 0), "image")}.`);
+  if (existing.length) parts.push(`${existing.length === 1 ? "One series was" : `${existing.length} series were`} already imported.`);
+  const warnings = added.flatMap((s) => s.warnings || []);
+  showMessage("imaging-message", [...parts, ...warnings].join(" "));
+  const only = added.length + existing.length === 1 ? (added[0] || existing[0]) : null;
+  if (only) location.hash = `#/imaging/${only.id}`;
+  else loadImaging();
+}
+
+async function searchPacs(event) {
+  event.preventDefault();
+  const params = new URLSearchParams({
+    patient_id: $("pacs-patient-id").value, patient_name: $("pacs-patient-name").value,
+    accession: $("pacs-accession").value, study_date: $("pacs-date").value, modality: $("pacs-modality").value,
+  });
+  const out = $("pacs-results");
+  out.textContent = "";
+  $("pacs-go").disabled = true;
+  try {
+    const { studies } = await api(`/api/imaging/pacs/studies?${params}`);
+    if (!studies.length) out.appendChild(el("p", "auth-hint", "No studies match."));
+    studies.forEach((study) => out.appendChild(pacsStudy(study)));
+  } catch (err) {
+    out.appendChild(el("p", "modal-message error", err.message));
+  } finally {
+    $("pacs-go").disabled = false;
+  }
+}
+
+function pacsStudy(study) {
+  const card = el("article", "pacs-study");
+  const head = el("div", "pacs-study-head");
+  head.append(el("strong", "", study.patient_name || "Unnamed patient"),
+    el("span", "pacs-study-meta mono", [study.patient_id, study.study_date, study.accession].filter(Boolean).join("  ")));
+  const desc = el("p", "pacs-study-meta", [study.description, Array.isArray(study.modalities) ? study.modalities.join(", ") : study.modalities].filter(Boolean).join(". "));
+  const list = el("ul", "pacs-series");
+  const show = button("Show series", "btn-ghost", false, async () => {
+    show.disabled = true;
+    try {
+      const { series } = await api(`/api/imaging/pacs/studies/${encodeURIComponent(study.study_uid)}/series`);
+      list.textContent = "";
+      series.forEach((s) => {
+        const li = document.createElement("li");
+        const usable = ["CT", "MR"].includes(s.modality);
+        li.append(el("span", "", `${s.modality || "?"} ${s.description || "Series " + (s.number ?? "")}${s.instances ? `, ${plural(Number(s.instances), "image")}` : ""}`));
+        const importButton = button(usable ? "Import" : "Not CT or MR", usable ? "btn-primary" : "btn-ghost", !usable, async () => {
+          importButton.disabled = true;
+          importButton.textContent = "Retrieving…";
+          try {
+            importFinished(await api("/api/imaging/pacs/retrieve", { method: "POST", body: { study_uid: study.study_uid, series_uid: s.series_uid } }));
+          } catch (err) {
+            showMessage("imaging-message", err.message, true);
+            importButton.disabled = false;
+            importButton.textContent = "Import";
+          }
+        });
+        li.appendChild(importButton);
+        list.appendChild(li);
+      });
+      show.hidden = true;
+    } catch (err) {
+      showMessage("imaging-message", err.message, true);
+      show.disabled = false;
+    }
+  });
+  card.append(head, desc, show, list);
+  return card;
+}
+
+// --- Viewer ---
+
+async function openSeries(id, keepPlace = false) {
+  let data;
+  try { data = await api(`/api/imaging/series/${id}`); }
+  catch (err) { showMessage("viewer-message", err.message, true); return; }
+  if (imagingRoute() !== id) return;
+  const s = data.series;
+  const first = !imaging.series || imaging.series.id !== s.id;
+  imaging.series = s;
+  $("viewer-message").hidden = true;
+  if (first && !keepPlace) {
+    imaging.index = Math.floor(s.slices / 2);
+    const abdominal = /ABDOMEN|PANCREAS|LIVER|KIDNEY|PELVIS/i.test(`${s.body_part} ${s.description}`);
+    imaging.window = s.windows.includes("soft tissue") && !abdominal ? "soft tissue" : (s.windows[0] || null);
+    imaging.editing = null;
+  }
+  const title = seriesTitle(s);
+  $("viewer-title").textContent = title;
+  $("topbar-title").textContent = title;
+  document.title = `${title} · GroundCheck`;
+  $("viewer-sub").textContent = [s.modality, s.plane !== "unknown" ? s.plane : "", plural(s.slices, "image"), s.label && s.description ? s.description : ""].filter(Boolean).join(", ");
+  $("viewer-delete").hidden = !canDeleteSeries();
+
+  const windowSelect = $("viewer-window");
+  windowSelect.textContent = "";
+  s.windows.forEach((w) => { const o = el("option", "", w === "auto" ? "Automatic" : w[0].toUpperCase() + w.slice(1)); o.value = w; windowSelect.appendChild(o); });
+  windowSelect.value = imaging.window || "";
+  windowSelect.disabled = s.windows.length < 2;
+
+  const spacing = s.pixel_spacing || [1, 1];
+  $("viewer-frame").style.setProperty("--aspect", String((s.columns * spacing[1]) / (s.rows * spacing[0])));
+  $("viewer-regions").setAttribute("viewBox", `0 0 ${s.columns} ${s.rows}`);
+  $("viewer-regions").setAttribute("preserveAspectRatio", "none");
+  const [top, bottom, left, right] = ORIENTATION[s.plane] || ["", "", "", ""];
+  $("orient-top").textContent = top; $("orient-bottom").textContent = bottom;
+  $("orient-left").textContent = left; $("orient-right").textContent = right;
+  $("viewer-slice").max = String(s.slices - 1);
+  renderSeriesDetails(s);
+  renderAnalysis(s);
+  renderReport(s);
+  renderSlice();
+  const running = s.analyses.some((a) => a.status === "queued" || a.status === "running");
+  $("nav-imaging-live").hidden = !running;
+  if (running) imaging.poll = setTimeout(() => { if (imagingRoute() === id) openSeries(id, true); }, 1000);
+}
+
+function latestAnalysis(s) {
+  return s.analyses.length ? s.analyses[s.analyses.length - 1] : null;
+}
+
+function labelColour(label) {
+  const a = latestAnalysis(imaging.series);
+  const model = imaging.home?.models.find((m) => m.id === a?.model_id);
+  const classes = model?.classes || (a?.summary?.labels || []).map((l) => l.label);
+  const i = Math.max(0, classes.indexOf(label));
+  return `var(--label-${Math.min(i, LABEL_COLOURS - 1) + 1})`;
+}
+
+function sliceUrl(index) {
+  const s = imaging.series;
+  const w = imaging.window ? `?window=${encodeURIComponent(imaging.window)}` : "";
+  return `/api/imaging/series/${s.id}/slices/${index}.png${w}`;
+}
+
+function renderSlice() {
+  const s = imaging.series;
+  if (!s) return;
+  imaging.index = Math.max(0, Math.min(s.slices - 1, imaging.index));
+  const i = imaging.index;
+  $("viewer-image").src = sliceUrl(i);
+  $("viewer-image").alt = `${s.modality} slice ${i + 1} of ${s.slices}`;
+  $("viewer-slice").value = String(i);
+  $("viewer-slice").setAttribute("aria-valuetext", `Slice ${i + 1} of ${s.slices}`);
+  $("viewer-slice-label").textContent = `${i + 1} / ${s.slices}`;
+  const spacing = s.pixel_spacing || [1, 1];
+  $("viewer-scale").textContent = `${(s.columns * spacing[1]).toFixed(0)}×${(s.rows * spacing[0]).toFixed(0)} mm${s.slice_thickness || s.slice_spacing ? `, ${s.slice_thickness || s.slice_spacing} mm slices` : ""}`;
+  for (const d of [1, -1, 2, -2, 3]) {
+    const j = i + d;
+    if (j >= 0 && j < s.slices) new Image().src = sliceUrl(j);
+  }
+  const svg = $("viewer-regions");
+  svg.textContent = "";
+  const a = latestAnalysis(s);
+  $("viewer-overlay").disabled = !(a?.status === "done" && a.summary?.labels?.length);
+  const findings = $("viewer-overlay").checked && a?.status === "done" ? (a.slices?.[i]?.findings || []) : [];
+  const ns = "http://www.w3.org/2000/svg";
+  findings.forEach((f) => {
+    const [x0, y0, x1, y1] = f.box;
+    const colour = labelColour(f.label);
+    const rect = document.createElementNS(ns, "rect");
+    rect.setAttribute("x", x0); rect.setAttribute("y", y0);
+    rect.setAttribute("width", x1 - x0); rect.setAttribute("height", y1 - y0);
+    rect.setAttribute("rx", 3);
+    rect.style.stroke = colour;
+    const text = document.createElementNS(ns, "text");
+    text.setAttribute("x", x0 + 4); text.setAttribute("y", Math.max(12, y0 + 14));
+    text.style.fill = colour;
+    text.style.fontSize = `${Math.max(9, s.columns / 40)}px`;
+    text.textContent = `${f.label} ${Math.round(f.confidence * 100)}%`;
+    svg.append(rect, text);
+  });
+  document.querySelectorAll(".slice-bar b").forEach((b) => { b.style.left = `${((i + 0.5) / s.slices) * 100}%`; });
+}
+
+function moveSlice(delta) {
+  if (!imaging.series) return;
+  imaging.index += delta;
+  renderSlice();
+}
+
+function renderSeriesDetails(s) {
+  const dl = $("series-details");
+  dl.textContent = "";
+  const spacing = s.pixel_spacing || [];
+  const patient = s.patient || {};
+  const deidParts = [
+    [s.deid.removed, "removed"], [s.deid.emptied, "emptied"], [s.deid.private_removed, "private tags removed"],
+    [s.deid.uids_replaced, "identifiers replaced"], [s.deid.descriptors_cleaned, "descriptions cleaned"],
+  ].filter(([n]) => n).map(([n, what]) => `${n.toLocaleString()} ${what}`);
+  const rows = [
+    ["Modality", `${s.modality}${s.body_part ? `, ${s.body_part.toLowerCase()}` : ""}`],
+    ["Plane", s.plane === "unknown" ? "Unknown, shown as stored" : s.plane[0].toUpperCase() + s.plane.slice(1)],
+    ["Images", `${s.slices} slices, ${s.columns} × ${s.rows} pixels`],
+    ["Pixel spacing", spacing.length ? `${spacing.map((v) => v.toFixed(2)).join(" × ")} mm` : "Not recorded"],
+    ["Slice thickness", s.slice_thickness ? `${s.slice_thickness} mm` : "Not recorded"],
+    ["Slice spacing", s.slice_spacing ? `${s.slice_spacing} mm` : "Not recorded"],
+    ["Patient", [patient.PatientAge ? `age ${patient.PatientAge.replace(/^0+/, "").replace("Y", " years")}` : "", patient.PatientSex ? `sex ${patient.PatientSex}` : ""].filter(Boolean).join(", ") || "No characteristics recorded"],
+    ["Source", s.source === "pacs" ? "Retrieved from the PACS" : "Uploaded"],
+    ["De-identification", `DICOM PS3.15 basic profile. ${deidParts.join(", ") || "Nothing to remove"}.`],
+  ];
+  (s.warnings || []).forEach((w) => rows.push(["Note", w]));
+  rows.forEach(([k, v]) => { dl.append(el("dt", "", k), el("dd", "", v)); });
+}
+
+function rangesText(ranges) {
+  return ranges.map(([a, b]) => (a === b ? `${a + 1}` : `${a + 1}–${b + 1}`)).join(", ");
+}
+
+function renderAnalysis(s) {
+  const models = imaging.home?.models || [];
+  const select = $("analysis-model");
+  const previous = select.value;
+  select.textContent = "";
+  models.forEach((m) => {
+    const o = el("option", "", m.modality && m.modality !== s.modality ? `${m.name} (trained on ${m.modality})` : m.name);
+    o.value = m.id;
+    o.disabled = !!m.modality && m.modality !== s.modality;
+    select.appendChild(o);
+  });
+  const usable = models.filter((m) => !m.modality || m.modality === s.modality);
+  if (previous && usable.some((m) => m.id === previous)) select.value = previous;
+  else if (usable.length) select.value = usable[0].id;
+  const a = latestAnalysis(s);
+  const running = a && (a.status === "queued" || a.status === "running");
+  $("analysis-run").disabled = running || usable.length === 0;
+  $("analysis-model").disabled = running || models.length === 0;
+  $("analysis-hint").textContent = !models.length
+    ? "No imaging models yet. An administrator can add imaging settings to a model in the Model library."
+    : !usable.length ? `None of the models were trained on ${s.modality}.` : "";
+  $("analysis-hint").hidden = !$("analysis-hint").textContent;
+  $("analysis-progress").hidden = !running;
+  if (running) {
+    $("analysis-progress-fill").style.width = `${a.progress}%`;
+    $("analysis-progress-text").textContent = a.status === "queued" ? "Waiting to start" : `Analysing, ${a.progress}%`;
+  }
+
+  const out = $("analysis-result");
+  out.textContent = "";
+  const map = $("slice-map");
+  map.textContent = "";
+  if (!a || running) return;
+  out.appendChild(el("p", "field-hint", `${a.model_name}, ${shortDate(a.finished_at || a.created_at)}`));
+  if (a.status === "refused" || a.status === "failed") {
+    const note = el("div", "analysis-note refused");
+    note.append(el("strong", "", a.status === "refused" ? "The model refused this series" : "The analysis didn’t finish"), el("span", "", a.error || ""));
+    out.appendChild(note);
+    return;
+  }
+  const sum = a.summary;
+  if (sum.abstained) {
+    const note = el("div", "analysis-note");
+    note.appendChild(el("strong", "", "The model abstained on this series"));
+    note.appendChild(el("span", "", sum.unfamiliar_series
+      ? `${Math.round(sum.unfamiliar_share * 100)}% of the image regions it looked at were unlike its training images, so it reports nothing. Read the images without it.`
+      : "It wasn’t confident about any region, so it reports nothing."));
+    out.appendChild(note);
+  } else {
+    const list = el("ul", "label-list");
+    sum.labels.forEach((l) => {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.style.setProperty("--c", labelColour(l.label));
+      const name = el("span", "label-name", l.label);
+      name.appendChild(el("span", "label-where", `${plural(l.slices, "slice")}: ${rangesText(l.ranges)}`));
+      b.append(el("span", "label-swatch"), name, el("span", "label-conf", `${Math.round(l.max_confidence * 100)}%`));
+      b.title = "Go to the first slice";
+      b.addEventListener("click", () => { imaging.index = l.ranges[0][0]; renderSlice(); $("viewer-stage").focus(); });
+      li.appendChild(b);
+      list.appendChild(li);
+      const track = el("div", "slice-track");
+      track.style.setProperty("--c", labelColour(l.label));
+      track.appendChild(el("span", "", l.label));
+      const bar = document.createElement("button");
+      bar.type = "button";
+      bar.className = "slice-bar";
+      bar.setAttribute("aria-label", `${l.label}: slices ${rangesText(l.ranges)}. Go to the first.`);
+      l.ranges.forEach(([from, to]) => {
+        const seg = document.createElement("i");
+        seg.style.left = `${(from / s.slices) * 100}%`;
+        seg.style.width = `${((to - from + 1) / s.slices) * 100}%`;
+        bar.appendChild(seg);
+      });
+      bar.appendChild(document.createElement("b"));
+      bar.addEventListener("click", (e) => {
+        const rect = bar.getBoundingClientRect();
+        imaging.index = e.detail === 0 ? l.ranges[0][0] : Math.floor(((e.clientX - rect.left) / rect.width) * s.slices);
+        renderSlice();
+      });
+      track.appendChild(bar);
+      map.appendChild(track);
+    });
+    out.appendChild(list);
+  }
+  const t = sum.totals;
+  if (t.patches) {
+    const wrap = document.createElement("div");
+    wrap.appendChild(el("p", "field-label", `Image regions examined: ${t.patches.toLocaleString()}`));
+    const bar = el("div", "patch-bar");
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", `${t.answered} answered, ${t.low_confidence} not confident, ${t.unfamiliar} unfamiliar`);
+    const legend = el("ul", "patch-legend");
+    [["answered", t.answered, "Answered", "var(--ink)"], ["low", t.low_confidence, "Not confident", "var(--series-2)"], ["unfamiliar", t.unfamiliar, "Unlike its training images", "var(--warn)"]]
+      .forEach(([cls, n, label, colour]) => {
+        if (n) { const seg = el("span", cls); seg.style.flex = String(n); bar.appendChild(seg); }
+        const li = el("li", "", `${label} ${n.toLocaleString()}`);
+        li.style.setProperty("--c", colour);
+        legend.appendChild(li);
+      });
+    wrap.append(bar, legend);
+    out.appendChild(wrap);
+  }
+  out.appendChild(el("p", "research-note", "For research and evaluation. Not validated for clinical use; the reading clinician decides."));
+}
+
+function renderReport(s) {
+  const signed = [...s.reports].reverse().find((r) => r.status === "signed");
+  const draft = [...s.reports].reverse().find((r) => r.status === "draft");
+  const superseded = s.reports.filter((r) => r.status === "superseded");
+  const box = $("report-signed");
+  box.textContent = "";
+  const done = [...s.analyses].reverse().find((a) => a.status === "done");
+  document.querySelectorAll('#report-agreement input').forEach((input) => {
+    input.disabled = input.value !== "not_used" && !done;
+  });
+
+  if (signed) {
+    const card = el("article", "signed-report");
+    card.append(el("h3", "", signed.replaces_id ? "Signed amendment" : "Signed report"),
+      el("p", "signed-impression", signed.impression));
+    if (signed.findings) card.appendChild(el("p", "", signed.findings));
+    card.appendChild(el("p", "signed-meta", `${AGREEMENT_LABELS[signed.agreement]}. Signed by ${signed.author_name || "unknown"} on ${shortDate(signed.signed_at)}.${signed.sent_at ? ` Sent to the PACS on ${shortDate(signed.sent_at)}.` : ""}`));
+    const actions = el("div", "signed-actions");
+    const download = el("a", "btn btn-sm btn-ghost", "Download DICOM SR");
+    download.href = `/api/imaging/reports/${signed.id}/sr.dcm`;
+    actions.appendChild(download);
+    if (s.can_send_to_pacs) {
+      actions.appendChild(button(signed.sent_at ? "Send again" : "Send to the PACS", "btn-ghost", false, async (e) => {
+        e.target.disabled = true;
+        try { await api(`/api/imaging/reports/${signed.id}/send`, { method: "POST" }); showMessage("report-message", "Sent to the PACS."); openSeries(s.id, true); }
+        catch (err) { showMessage("viewer-message", err.message, true); e.target.disabled = false; }
+      }));
+    }
+    if (!draft && imaging.editing !== signed.id) {
+      actions.appendChild(button("Amend", "btn-ghost", false, () => {
+        imaging.editing = signed.id;
+        fillReportForm(signed, signed.id);
+        $("report-form").hidden = false;
+        $("report-findings").focus();
+      }));
+    }
+    card.appendChild(actions);
+    box.appendChild(card);
+  }
+  const form = $("report-form");
+  if (draft) {
+    form.hidden = false;
+    if (imaging.editing !== `draft-${draft.id}`) { fillReportForm(draft, draft.id); imaging.editing = `draft-${draft.id}`; }
+    $("report-draft-note").textContent = `Draft saved ${shortDate(draft.updated_at)}.`;
+  } else if (signed && imaging.editing !== signed.id) {
+    form.hidden = true;
+  } else if (!signed && imaging.editing === null) {
+    form.hidden = false;
+    fillReportForm(null, null);
+    imaging.editing = "new";
+  }
+  if (!draft) $("report-draft-note").textContent = imaging.editing === signed?.id ? "Signing creates an amendment. The signed report is kept." : "";
+  $("report-sign").textContent = imaging.editing === signed?.id || draft?.replaces_id ? "Sign amendment" : "Sign report";
+
+  $("report-history").hidden = superseded.length === 0;
+  const list = $("report-history-list");
+  list.textContent = "";
+  superseded.forEach((r) => {
+    const li = document.createElement("li");
+    li.append(el("p", "", r.impression), el("p", "signed-meta", `Signed by ${r.author_name || "unknown"} on ${shortDate(r.signed_at)}. Replaced by an amendment.`));
+    list.appendChild(li);
+  });
+}
+
+function fillReportForm(report, id) {
+  const form = $("report-form");
+  form.dataset.reportId = id ?? "";
+  $("report-findings").value = report?.findings || "";
+  $("report-impression").value = report?.impression || "";
+  const agreement = report?.agreement || "not_used";
+  const input = form.querySelector(`input[name="agreement"][value="${agreement}"]`);
+  (input && !input.disabled ? input : form.querySelector('input[value="not_used"]')).checked = true;
+  $("report-message").hidden = true;
+}
+
+async function saveReport(sign) {
+  const s = imaging.series;
+  const form = $("report-form");
+  const agreement = form.querySelector('input[name="agreement"]:checked')?.value || "not_used";
+  const done = [...s.analyses].reverse().find((a) => a.status === "done");
+  if (sign) {
+    if (!$("report-impression").value.trim()) { showMessage("report-message", "Write an impression before signing.", true); $("report-impression").focus(); return; }
+    if (!window.confirm("Sign this report? A signed report can’t be edited. Later changes are made as an amendment.")) return;
+  }
+  const body = {
+    findings: $("report-findings").value, impression: $("report-impression").value, agreement, sign,
+    analysis_id: agreement !== "not_used" && done ? done.id : null,
+    report_id: form.dataset.reportId ? Number(form.dataset.reportId) : null,
+  };
+  formBusy(form, true);
+  try {
+    const { report } = await api(`/api/imaging/series/${s.id}/reports`, { method: "POST", body });
+    imaging.editing = sign ? null : `draft-${report.id}`;
+    form.dataset.reportId = report.id;
+    await openSeries(s.id, true);
+    showMessage("report-message", sign ? "Signed." : "Draft saved.");
+    if (sign) $("report-message").hidden = true;
+  } catch (err) {
+    showMessage("report-message", err.message, true);
+  } finally {
+    formBusy(form, false);
+    renderReport(imaging.series);
+  }
+}
+
+function wireImaging() {
+  $("imaging-tab-upload").addEventListener("click", () => setImportTab("upload"));
+  $("imaging-tab-pacs").addEventListener("click", () => setImportTab("pacs"));
+  $("imaging-import-tabs").addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const toPacs = $("imaging-tab-upload").getAttribute("aria-selected") === "true";
+    setImportTab(toPacs ? "pacs" : "upload");
+    $(toPacs ? "imaging-tab-pacs" : "imaging-tab-upload").focus();
+  });
+  $("dicom-files").addEventListener("change", (e) => chooseDicomFiles(e.target.files));
+  $("dicom-folder").addEventListener("click", () => $("dicom-folder-input").click());
+  $("dicom-folder-input").addEventListener("change", (e) => chooseDicomFiles(e.target.files));
+  const drop = $("dicom-drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("dragging"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, () => drop.classList.remove("dragging")));
+  drop.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const items = [...(e.dataTransfer.items || [])];
+    chooseDicomFiles(items.length ? await readDroppedEntries(items) : e.dataTransfer.files);
+  });
+  $("imaging-upload").addEventListener("submit", uploadDicom);
+  $("pacs-search").addEventListener("submit", searchPacs);
+
+  $("viewer-slice").addEventListener("input", (e) => { imaging.index = Number(e.target.value); renderSlice(); });
+  $("viewer-window").addEventListener("change", (e) => { imaging.window = e.target.value; renderSlice(); });
+  $("viewer-overlay").addEventListener("change", renderSlice);
+  let wheelAccum = 0;
+  $("viewer-stage").addEventListener("wheel", (e) => {
+    e.preventDefault();
+    wheelAccum += e.deltaY;
+    const steps = Math.trunc(wheelAccum / 40);
+    if (steps) { wheelAccum -= steps * 40; moveSlice(steps); }
+  }, { passive: false });
+  $("viewer-stage").addEventListener("keydown", (e) => {
+    const moves = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1, PageUp: -10, PageDown: 10 };
+    if (e.key in moves) { e.preventDefault(); moveSlice(moves[e.key]); }
+    else if (e.key === "Home") { e.preventDefault(); imaging.index = 0; renderSlice(); }
+    else if (e.key === "End") { e.preventDefault(); imaging.index = imaging.series.slices - 1; renderSlice(); }
+  });
+  let touchY = null;
+  $("viewer-stage").addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  $("viewer-stage").addEventListener("touchmove", (e) => {
+    if (touchY === null) return;
+    const dy = e.touches[0].clientY - touchY;
+    if (Math.abs(dy) >= 12) { moveSlice(Math.sign(dy)); touchY = e.touches[0].clientY; }
+    e.preventDefault();
+  }, { passive: false });
+
+  $("analysis-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const s = imaging.series;
+    $("analysis-run").disabled = true;
+    try {
+      await api(`/api/imaging/series/${s.id}/analyses`, { method: "POST", body: { model_id: $("analysis-model").value } });
+      openSeries(s.id, true);
+    } catch (err) {
+      showMessage("viewer-message", err.message, true);
+      $("analysis-run").disabled = false;
+    }
+  });
+  $("report-form").addEventListener("submit", (e) => { e.preventDefault(); saveReport(true); });
+  $("report-save").addEventListener("click", () => saveReport(false));
+  $("viewer-delete").addEventListener("click", async () => {
+    const s = imaging.series;
+    if (!window.confirm(`Delete “${seriesTitle(s)}”, its analyses and its reports? This can’t be undone.`)) return;
+    try {
+      await api(`/api/imaging/series/${s.id}`, { method: "DELETE" });
+      imaging.series = null;
+      location.hash = "#/imaging";
+      showMessage("imaging-message", "Deleted.");
+    } catch (err) { showMessage("viewer-message", err.message, true); }
+  });
+}
+
 // ---------- Navigation ----------
 // One page per area, addressed by the URL hash (#/review), so pages can be
 // bookmarked and the back button works.
@@ -3591,6 +4308,7 @@ const VIEWS = {
   medicines: { load: () => loadMedicines() },
   ehr: { load: () => loadEhrPage() },
   models: { load: () => loadModels() },
+  imaging: { load: () => loadImaging() },
 };
 
 function currentView() {
@@ -3638,6 +4356,10 @@ function wireNavigation() {
     if (e.key === "Escape" && document.body.classList.contains("nav-open")) { setNavOpen(false); $("nav-open").focus(); }
   });
   wireTraining();
+  wireImaging();
+  $("mi-modality").addEventListener("change", (e) => fillImagingWindows(e.target.value));
+  $("model-imaging-form").addEventListener("submit", (e) => { e.preventDefault(); saveModelImaging(false); });
+  $("mi-remove").addEventListener("click", () => saveModelImaging(true));
   wireModels();
   wirePatient();
   wireEhr();
