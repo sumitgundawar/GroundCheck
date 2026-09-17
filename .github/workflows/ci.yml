@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"   # Monday, for the full safety evaluation and fresh advisories
 
 jobs:
   test:
@@ -23,7 +25,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build FAISS index from the synthetic corpus
+      - name: Build the search index from the synthetic corpus
         run: python scripts/build_index.py
 
       - name: Run the evaluation (offline, extractive mode)
@@ -31,6 +33,42 @@ jobs:
 
       - name: Run the test suite (no network)
         run: pytest -q
+
+      - name: Large safety evaluation (a sample on every push, all of it weekly)
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            python scripts/stress_eval.py
+          else
+            python scripts/stress_eval.py --sample 20000
+          fi
+
+      - name: Upload the safety evaluation summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-summary
+          path: eval/stress_summary.json
+
+  security:
+    name: Security checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the scanners
+        run: pip install pip-audit bandit
+
+      - name: Dependencies with known vulnerabilities
+        run: pip-audit -r requirements.txt --progress-spinner off
+
+      - name: Static analysis
+        run: bandit -r app -q -ll
 
   site:
     name: Website checks

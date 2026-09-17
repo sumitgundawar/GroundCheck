@@ -1062,13 +1062,53 @@ A local `.env` file (git-ignored) is also read on startup, so you can put
 ## Running the checks
 
 ```bash
-python scripts/run_eval.py     # writes eval/eval_summary.json, prints pass counts
-pytest -q                      # full test suite, no network required
+python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383 patient scenarios
+pytest -q                                   # 360 tests, including property-based fuzzing
+python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
+python scripts/stress_eval.py               # all 252,825 cases (about an hour on 7 cores)
 ```
 
-The evaluation runs in extractive mode so it is deterministic and offline. CI
-(`.github/workflows/ci.yml`) builds the index, runs the evaluation, and runs the
-test suite on every push and pull request.
+Everything runs in extractive mode, so it's deterministic and offline. CI
+(`.github/workflows/ci.yml`) builds the index, runs the evaluation, the test
+suite and a stress sample on every push and pull request.
+
+### The large evaluation
+
+`scripts/stress_eval.py` generates 252,825 questions and patient scenarios,
+with the expected decision taken from the corpus and the formulary, never from
+GroundCheck's own code. Any answer to a question that must be refused fails
+the run.
+
+| Family | Cases | Must |
+| --- | --- | --- |
+| `unknown_entity` | 91,840 | refuse: medicines and conditions that don't exist |
+| `population` | 60,175 | refuse: real topics for children, infants, ages 0 to 11, pregnancy |
+| `near_miss` | 41,300 | refuse: one-letter misspellings of real names |
+| `answerable` | 27,768 | answer: corpus questions in many phrasings, casings and spacings |
+| `injection` | 12,056 | refuse: answerable questions wrapped in instructions to ignore the sources |
+| `patient_*` | 12,765 | the formulary's own rules: allergy, interaction, child, pregnancy, missing data |
+| `wrong_dose` | 3,970 | refuse: a real medicine asserted at a dose the sources don't give |
+| `mixed_unknown` | 2,400 | refuse: a real medicine together with one that doesn't exist |
+| `absent_fact`, `out_of_scope` | 680 | refuse: alcohol, grams, cures, other species, everyday questions |
+
+A 5,000-case sample of the first run found two safety gaps that the 2,008-case
+evaluation missed, both now fixed with regression tests: misspelled medicine
+names were answered, and a dose stated in a question was accepted because an
+unrelated medicine's passage happened to contain that number.
+
+`tests/test_fuzz.py` checks the guards' invariants over thousands of generated
+inputs with Hypothesis, and `scripts/stress_eval.py --families ...` runs one
+family at a time.
+
+### Security testing
+
+| Check | Tool | Result |
+| --- | --- | --- |
+| Dependency vulnerabilities | `pip-audit -r requirements.txt` | 0 known advisories |
+| Static analysis | `bandit -r app` | no medium or high findings |
+| Web vulnerabilities | OWASP ZAP baseline and active API scan | 0 failures over 305 endpoint variants |
+
+Re-run them before a release, and after upgrading dependencies.
 
 ---
 
