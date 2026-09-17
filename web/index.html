@@ -376,6 +376,10 @@
             <svg class="nav-icon" aria-hidden="true"><use href="#i-cpu"/></svg>
             <span>Local AI</span>
           </a>
+          <a class="nav-link" href="#/ehr" data-view="ehr">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-network"/></svg>
+            <span>EHR integration</span>
+          </a>
           <a class="nav-link" href="#/data-protection" data-view="data-protection" data-nav="data-protection">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-lock-keyhole"/></svg>
             <span>Data protection</span>
@@ -463,13 +467,26 @@
             </summary>
             <div class="patient-body">
               <p class="field-hint">Answers are checked against this patient’s allergies, medicines, kidney and liver function, age, weight and pregnancy. Don’t enter names or record numbers. Details stay in this page until you clear them or leave.</p>
+              <div class="ehr-strip" id="ehr-strip" hidden>
+                <div class="ehr-strip-text">
+                  <strong id="ehr-source"></strong>
+                  <span id="ehr-meta"></span>
+                  <ul class="ehr-warnings" id="ehr-warnings"></ul>
+                </div>
+                <button type="button" class="btn btn-sm btn-ghost" id="ehr-forget">Forget EHR patient</button>
+              </div>
+              <div class="ehr-load" id="ehr-load" hidden>
+                <div class="field"><label for="ehr-server">FHIR server</label><select id="ehr-server" class="select"></select></div>
+                <div class="field"><label for="ehr-patient-id">Patient ID</label><input id="ehr-patient-id" class="text-input mono" autocomplete="off" spellcheck="false"></div>
+                <button type="button" class="btn btn-sm btn-primary" id="ehr-load-button">Load from EHR</button>
+              </div>
               <div class="patient-grid">
-                <div class="field"><label for="pt-age">Age (years)</label><input id="pt-age" class="text-input" type="number" min="0" max="130" step="0.1" inputmode="decimal"></div>
+                <div class="field"><label for="pt-age">Age (years)</label><input id="pt-age" class="text-input" type="number" min="0" max="130" step="any" inputmode="decimal"></div>
                 <div class="field"><label for="pt-sex">Sex</label>
                   <select id="pt-sex" class="select"><option value="">Not given</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
-                <div class="field"><label for="pt-weight">Weight (kg)</label><input id="pt-weight" class="text-input" type="number" min="0.3" max="400" step="0.1" inputmode="decimal"></div>
-                <div class="field"><label for="pt-egfr">eGFR <span class="optional">mL/min/1.73 m²</span></label><input id="pt-egfr" class="text-input" type="number" min="0" max="200" step="1" inputmode="decimal"></div>
-                <div class="field"><label for="pt-creatinine">Serum creatinine <span class="optional">µmol/L</span></label><input id="pt-creatinine" class="text-input" type="number" min="1" max="3000" step="1" inputmode="decimal"></div>
+                <div class="field"><label for="pt-weight">Weight (kg)</label><input id="pt-weight" class="text-input" type="number" min="0.3" max="400" step="any" inputmode="decimal"></div>
+                <div class="field"><label for="pt-egfr">eGFR <span class="optional">mL/min/1.73 m²</span></label><input id="pt-egfr" class="text-input" type="number" min="0" max="200" step="any" inputmode="decimal"></div>
+                <div class="field"><label for="pt-creatinine">Serum creatinine <span class="optional">µmol/L</span></label><input id="pt-creatinine" class="text-input" type="number" min="1" max="3000" step="any" inputmode="decimal"></div>
                 <div class="field"><label for="pt-liver">Liver function</label>
                   <select id="pt-liver" class="select"><option value="">Not given</option><option value="A">Child-Pugh A</option><option value="B">Child-Pugh B</option><option value="C">Child-Pugh C</option></select></div>
                 <div class="field field-checks">
@@ -483,12 +500,12 @@
               <details class="advanced">
                 <summary>Lab results</summary>
                 <div class="patient-grid">
-                  <div class="field"><label for="pt-lab-potassium">Potassium <span class="optional">mmol/L</span></label><input id="pt-lab-potassium" data-lab="potassium" class="text-input" type="number" step="0.1"></div>
-                  <div class="field"><label for="pt-lab-sodium">Sodium <span class="optional">mmol/L</span></label><input id="pt-lab-sodium" data-lab="sodium" class="text-input" type="number" step="1"></div>
-                  <div class="field"><label for="pt-lab-inr">INR</label><input id="pt-lab-inr" data-lab="inr" class="text-input" type="number" step="0.1"></div>
-                  <div class="field"><label for="pt-lab-platelets">Platelets <span class="optional">×10⁹/L</span></label><input id="pt-lab-platelets" data-lab="platelets" class="text-input" type="number" step="1"></div>
-                  <div class="field"><label for="pt-lab-alt">ALT <span class="optional">U/L</span></label><input id="pt-lab-alt" data-lab="alt" class="text-input" type="number" step="1"></div>
-                  <div class="field"><label for="pt-lab-qtc">QTc <span class="optional">ms</span></label><input id="pt-lab-qtc" data-lab="qtc" class="text-input" type="number" step="1"></div>
+                  <div class="field"><label for="pt-lab-potassium">Potassium <span class="optional">mmol/L</span></label><input id="pt-lab-potassium" data-lab="potassium" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-sodium">Sodium <span class="optional">mmol/L</span></label><input id="pt-lab-sodium" data-lab="sodium" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-inr">INR</label><input id="pt-lab-inr" data-lab="inr" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-platelets">Platelets <span class="optional">×10⁹/L</span></label><input id="pt-lab-platelets" data-lab="platelets" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-alt">ALT <span class="optional">U/L</span></label><input id="pt-lab-alt" data-lab="alt" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-qtc">QTc <span class="optional">ms</span></label><input id="pt-lab-qtc" data-lab="qtc" class="text-input" type="number" step="any"></div>
                 </div>
               </details>
               <div class="patient-actions">
@@ -1136,6 +1153,39 @@
             <p>Train one on a folder of images. To try it first, download a public CT dataset:</p>
             <pre><code>python scripts/fetch_scan_dataset.py organamnist</code></pre>
           </div>
+        </section>
+
+        <!-- EHR integration -->
+        <section class="view" id="view-ehr" data-title="EHR integration" aria-labelledby="ehr-title" hidden>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title" id="ehr-title">EHR integration</h1>
+            <p class="page-sub">Launch GroundCheck from a patient’s record with SMART on FHIR, and check medication orders inside the EHR with CDS Hooks.</p>
+          </div>
+        </header>
+          <div class="usage-grid">
+            <section class="panel" aria-labelledby="smart-title">
+              <h2 class="panel-heading" id="smart-title">SMART on FHIR app launch</h2>
+              <p class="step-sub flush" id="smart-status"></p>
+              <dl class="protection-list" id="smart-settings"></dl>
+            </section>
+            <section class="panel" aria-labelledby="cds-title">
+              <h2 class="panel-heading" id="cds-title">CDS Hooks</h2>
+              <p class="step-sub flush" id="cds-status"></p>
+              <dl class="protection-list" id="cds-settings"></dl>
+            </section>
+          </div>
+          <section class="panel" aria-labelledby="cds-console-title">
+            <div class="review-toolbar">
+              <h2 class="panel-heading flush" id="cds-console-title">Try a medication order</h2>
+              <button type="button" class="btn btn-sm btn-primary" id="cds-run">Send to the order-sign service</button>
+            </div>
+            <p class="step-sub flush">A CDS Hooks request as an EHR would send it, for a draft order of Caloradine for a patient with reduced kidney function. Edit it and send it to see the cards.</p>
+            <label class="visually-hidden" for="cds-request">CDS Hooks request</label>
+            <textarea id="cds-request" class="text-input code-input" rows="14" spellcheck="false"></textarea>
+            <p class="modal-message" id="cds-message" role="status" hidden></p>
+            <div class="cds-cards" id="cds-cards" aria-live="polite"></div>
+          </section>
         </section>
 
         <!-- Data protection -->

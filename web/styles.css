@@ -1285,3 +1285,23 @@ body { background: var(--canvas); color: var(--text); }
 .medicine-search { max-width: 420px; }
 .medicines-table td { white-space: normal; }
 @media (max-width: 560px) { .finding { grid-template-columns: minmax(0, 1fr); } .finding-meta { grid-column: 1; } }
+
+/* ---------- EHR ---------- */
+.ehr-strip { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--space-2) var(--space-4);
+  padding: var(--space-3); border-radius: var(--radius-sm); background: var(--info-bg); border: 1px solid var(--info-border); font-size: 13.5px; }
+.ehr-strip-text { min-width: 0; flex: 1 1 280px; }
+.ehr-warnings { margin: 6px 0 0; padding-left: 1.1em; color: var(--warn); }
+.ehr-warnings:empty { display: none; }
+.ehr-load { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: var(--space-3); align-items: end; }
+.step-sub.flush, .panel-heading.flush { margin-left: 0; }
+.code-input { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; resize: vertical; margin-bottom: var(--space-3); }
+.cds-cards { display: grid; gap: var(--space-3); }
+.cds-card { padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.cds-card p { margin: 6px 0 0; font-size: 14px; }
+.cds-card-head { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; }
+.cds-card.critical { background: color-mix(in srgb, var(--danger-bg) 70%, var(--bg)); border-color: var(--danger-border); }
+.cds-card.critical .finding-tag { color: var(--danger); border-color: var(--danger-border); }
+.cds-card.warning { background: color-mix(in srgb, var(--warn-bg) 70%, var(--bg)); border-color: var(--warn-border); }
+.cds-card.warning .finding-tag { color: var(--warn); border-color: var(--warn-border); }
+.cds-card.info .finding-tag { color: var(--info); border-color: var(--info-border); }
+@media (max-width: 640px) { .ehr-load { grid-template-columns: minmax(0, 1fr); } }

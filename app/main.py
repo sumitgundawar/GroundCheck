@@ -947,9 +947,13 @@ class EhrLoadRequest(BaseModel):
 def ehr_config(request: Request) -> dict:
     from . import smart
 
-    return {"smart_enabled": smart.enabled(), "open_servers": config.FHIR_OPEN_SERVERS,
-            "cds_discovery_url": f"{_base_url(request)}/cds-services",
-            "cds_unsigned": config.CDS_HOOKS_ALLOW_UNSIGNED, "cds_trusted": sorted(config.CDS_HOOKS_TRUSTED)}
+    base = _base_url(request)
+    return {"smart_enabled": smart.enabled(), "smart_client_id": config.SMART_CLIENT_ID,
+            "smart_allowed_issuers": config.SMART_ALLOWED_ISSUERS, "smart_launch_url": f"{base}/api/ehr/launch",
+            "smart_redirect_url": smart.redirect_url(base), "smart_scopes": config.SMART_SCOPES,
+            "open_servers": config.FHIR_OPEN_SERVERS, "cds_discovery_url": f"{base}/cds-services",
+            "cds_unsigned": config.CDS_HOOKS_ALLOW_UNSIGNED, "cds_trusted": sorted(config.CDS_HOOKS_TRUSTED),
+            "context_minutes": config.EHR_CONTEXT_MINUTES}
 
 
 @app.get("/api/ehr/launch")

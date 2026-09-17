@@ -191,7 +191,7 @@ function canSee(view) {
   const role = account.user?.role;
   if (!account.authRequired) return view !== "users";
   const rank = { clinician: 0, reviewer: 1, admin: 2 }[role] ?? -1;
-  const needs = { usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0, training: 2, models: 1 }[view] ?? 0;
+  const needs = { usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0, training: 2, models: 1, ehr: 2 }[view] ?? 0;
   return rank >= needs;
 }
 
@@ -3390,6 +3390,169 @@ function renderPatientEval(p) {
   }
 }
 
+// ---------- EHR ----------
+const ehr = { config: null };
+const CDS_EXAMPLE = {
+  hook: "order-sign",
+  hookInstance: "d1577c69-dfbe-44ad-ba6d-3e05e953b2ea",
+  context: {
+    userId: "Practitioner/example", patientId: "example",
+    draftOrders: { resourceType: "Bundle", entry: [{ resource: {
+      resourceType: "MedicationRequest", id: "order-1", status: "draft", intent: "order",
+      medicationCodeableConcept: { text: "Caloradine" },
+      dosageInstruction: [{ doseAndRate: [{ doseQuantity: { value: 15, unit: "mg" } }], timing: { repeat: { frequency: 1, period: 1, periodUnit: "d" } } }],
+    } }] },
+  },
+  prefetch: {
+    patient: { resourceType: "Patient", id: "example", birthDate: "1956-04-02", gender: "female" },
+    observations: { resourceType: "Bundle", entry: [{ resource: {
+      resourceType: "Observation", status: "final", code: { coding: [{ system: "http://loinc.org", code: "62238-1" }] },
+      effectiveDateTime: new Date(Date.now() - 2 * 86400000).toISOString(), valueQuantity: { value: 41, unit: "mL/min/1.73m2" },
+    } }] },
+    allergies: { resourceType: "Bundle", entry: [] },
+    medications: { resourceType: "Bundle", entry: [{ resource: { resourceType: "MedicationRequest", status: "active", intent: "order", medicationCodeableConcept: { text: "Mendel solution 5 mL" } } }] },
+    conditions: { resourceType: "Bundle", entry: [] },
+  },
+};
+
+function fillPatient(p) {
+  const set = (id, v) => { $(id).value = v ?? ""; };
+  set("pt-age", p.age_years); set("pt-sex", p.sex); set("pt-weight", p.weight_kg); set("pt-egfr", p.egfr);
+  set("pt-creatinine", p.creatinine_umol_l); set("pt-liver", p.child_pugh);
+  $("pt-pregnant").checked = !!p.pregnant; $("pt-breastfeeding").checked = !!p.breastfeeding;
+  set("pt-allergies", (p.allergies || []).join(", ")); set("pt-medicines", (p.medicines || []).join(", "));
+  set("pt-conditions", (p.conditions || []).join(", "));
+  document.querySelectorAll("[data-lab]").forEach((el) => { el.value = (p.labs || {})[el.dataset.lab] ?? ""; });
+  $("pt-sex").dispatchEvent(new Event("change"));
+  updatePatientStatus();
+}
+
+function applyEhrContext(context) {
+  const strip = $("ehr-strip");
+  if (!context) { strip.hidden = true; return; }
+  fillPatient(context.patient);
+  const source = context.source || {};
+  let host = source.server || "";
+  try { host = new URL(source.server).host; } catch (_) { /* keep as is */ }
+  $("ehr-source").textContent = `From ${source.system === "SMART on FHIR" ? "the EHR" : host}${source.patient ? `, ${source.patient}` : ""}`;
+  const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  $("ehr-meta").textContent = ` Loaded ${time(context.loaded_at)}, kept until ${time(context.expires_at)}. Check the details before asking.`;
+  const warnings = $("ehr-warnings");
+  warnings.textContent = "";
+  (context.warnings || []).forEach((w) => { const li = document.createElement("li"); li.textContent = w; warnings.appendChild(li); });
+  strip.hidden = false;
+  $("patient-box").open = true;
+}
+
+async function loadEhrForAsk() {
+  try { ehr.config = await api("/api/ehr/config"); } catch (_) { return; }
+  const servers = ehr.config.open_servers || [];
+  $("ehr-load").hidden = servers.length === 0;
+  const select = $("ehr-server");
+  select.textContent = "";
+  servers.forEach((s) => select.appendChild(new Option(s, s)));
+  try {
+    const data = await api("/api/ehr/context");
+    if (data.context) applyEhrContext(data.context);
+  } catch (_) { /* no database */ }
+  const params = new URLSearchParams(location.search);
+  if (params.get("ehr_error")) {
+    $("patient-box").open = true;
+    $("pt-error").textContent = params.get("ehr_error");
+  }
+  if (params.has("ehr") || params.has("ehr_error")) history.replaceState(null, "", location.pathname + location.hash);
+}
+
+async function loadEhrPage() {
+  let c;
+  try { c = await api("/api/ehr/config"); } catch (err) { return; }
+  const list = (id, rows) => {
+    const dl = $(id); dl.textContent = "";
+    rows.forEach(([k, v]) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); });
+  };
+  $("smart-status").textContent = c.smart_enabled
+    ? "Set up. Register these addresses with your EHR."
+    : "Not set up. Set SMART_CLIENT_ID and SMART_ALLOWED_ISSUERS, then register these addresses with your EHR.";
+  list("smart-settings", [
+    ["Launch URL", c.smart_launch_url], ["Redirect URL", c.smart_redirect_url],
+    ["Client ID", c.smart_client_id || "Not set"], ["Allowed EHRs", c.smart_allowed_issuers.join(", ") || "None"],
+    ["Scopes", c.smart_scopes], ["Open FHIR servers", c.open_servers.join(", ") || "None"],
+    ["Patient kept for", `${c.context_minutes} minutes`],
+  ]);
+  $("cds-status").textContent = c.cds_trusted.length
+    ? "Accepting signed calls from the EHRs below."
+    : c.cds_unsigned ? "Accepting unsigned calls: for testing only." : "No EHR is trusted yet. Set CDS_HOOKS_TRUSTED.";
+  list("cds-settings", [
+    ["Discovery URL", c.cds_discovery_url], ["Hooks", "order-select, order-sign"],
+    ["Trusted EHRs", c.cds_trusted.join(", ") || "None"], ["Unsigned calls", c.cds_unsigned ? "Allowed (testing)" : "Refused"],
+  ]);
+  if (!$("cds-request").value) $("cds-request").value = JSON.stringify(CDS_EXAMPLE, null, 2);
+}
+
+function renderCdsCards(cards) {
+  const wrap = $("cds-cards");
+  wrap.textContent = "";
+  if (!cards.length) {
+    const p = document.createElement("p"); p.className = "auth-hint"; p.textContent = "No cards: nothing to flag for this order.";
+    wrap.appendChild(p);
+    return;
+  }
+  cards.forEach((card) => {
+    const el = document.createElement("article");
+    el.className = `cds-card ${card.indicator}`;
+    const head = document.createElement("div"); head.className = "cds-card-head";
+    const tag = document.createElement("span"); tag.className = "finding-tag"; tag.textContent = { critical: "Critical", warning: "Warning", info: "Info" }[card.indicator];
+    const summary = document.createElement("strong"); summary.textContent = card.summary;
+    head.append(tag, summary);
+    const detail = document.createElement("p"); detail.textContent = card.detail.replace(/\*\*/g, "");
+    const source = document.createElement("p"); source.className = "finding-meta mono"; source.textContent = card.source.label;
+    el.append(head, detail, source);
+    if (card.overrideReasons && card.overrideReasons.length) {
+      const reasons = document.createElement("p"); reasons.className = "auth-hint";
+      reasons.textContent = `Override reasons offered: ${card.overrideReasons.map((r) => r.display).join("; ")}`;
+      el.appendChild(reasons);
+    }
+    wrap.appendChild(el);
+  });
+}
+
+function wireEhr() {
+  $("ehr-load-button").addEventListener("click", async (e) => {
+    const trigger = e.currentTarget;
+    const patientId = $("ehr-patient-id").value.trim();
+    if (!patientId) { $("pt-error").textContent = "Enter the patient's FHIR ID."; $("ehr-patient-id").focus(); return; }
+    trigger.disabled = true; trigger.textContent = "Loading…";
+    try {
+      const data = await api("/api/ehr/load", { method: "POST", body: { server: $("ehr-server").value, patient_id: patientId } });
+      $("pt-error").textContent = "";
+      applyEhrContext(data.context);
+    } catch (err) { $("pt-error").textContent = err.message; }
+    trigger.disabled = false; trigger.textContent = "Load from EHR";
+  });
+  $("ehr-forget").addEventListener("click", async () => {
+    await api("/api/ehr/context", { method: "DELETE" }).catch(() => {});
+    $("ehr-strip").hidden = true;
+    $("pt-clear").click();
+  });
+  $("cds-run").addEventListener("click", async () => {
+    $("cds-message").hidden = true;
+    let body;
+    try { body = JSON.parse($("cds-request").value); }
+    catch (_) { showMessage("cds-message", "The request isn't valid JSON.", true); return; }
+    const res = await fetch("/cds-services/groundcheck-medication-safety-order-sign", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      showMessage("cds-message", "This server only accepts calls signed by a trusted EHR. To try requests here, run a test server with CDS_HOOKS_ALLOW_UNSIGNED=true.", true);
+      $("cds-cards").textContent = "";
+      return;
+    }
+    if (!res.ok) { showMessage("cds-message", data.detail || `The service returned ${res.status}.`, true); return; }
+    renderCdsCards(data.cards);
+  });
+}
+
 // ---------- Navigation ----------
 // One page per area, addressed by the URL hash (#/review), so pages can be
 // bookmarked and the back button works.
@@ -3405,6 +3568,7 @@ const VIEWS = {
   users: { load: () => { $("users-message").hidden = true; loadUsers(); } },
   training: { load: () => loadTraining() },
   medicines: { load: () => loadMedicines() },
+  ehr: { load: () => loadEhrPage() },
   models: { load: () => loadModels() },
 };
 
@@ -3455,6 +3619,8 @@ function wireNavigation() {
   wireTraining();
   wireModels();
   wirePatient();
+  wireEhr();
+  loadEhrForAsk();
   $("medicine-search").addEventListener("input", () => { clearTimeout(medicineTimer); medicineTimer = setTimeout(loadMedicines, 200); });
   applyRoleNavigation();
   route();
