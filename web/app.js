@@ -186,7 +186,7 @@ function renderAccountMenu() {
   if (!user) return;
   $("account-label").textContent = user.name || user.email;
   $("account-email").textContent = user.email;
-  $("account-role").textContent = user.role;
+  $("account-role").textContent = user.site_name ? `${user.role}, ${user.site_name}` : user.role;
   const initials = (user.name || user.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
   $("account-avatar").textContent = initials;
   applyRoleNavigation();
@@ -337,10 +337,25 @@ function wireAccounts() {
       await api("/api/users", { method: "POST", body: {
         name: $("new-user-name").value, email: $("new-user-email").value,
         password: $("new-user-password").value, role: $("new-user-role").value,
+        site_id: $("new-user-site").value ? Number($("new-user-site").value) : null,
       } });
       form.reset();
       await loadUsers();
       showMessage("users-message", "User added. Share the temporary password with them securely.");
+    } catch (err) { showMessage("users-message", err.message, true); }
+    formBusy(form, false);
+  });
+  $("add-site-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const name = $("new-site-name").value.trim();
+    const key = $("new-site-key").value.trim() || name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    formBusy(form, true);
+    try {
+      await api("/api/sites", { method: "POST", body: { name, key } });
+      form.reset();
+      await loadUsers();
+      showMessage("users-message", `Added ${name}. Choose a site for each person below.`);
     } catch (err) { showMessage("users-message", err.message, true); }
     formBusy(form, false);
   });
@@ -373,6 +388,29 @@ async function loadUsers() {
   try { data = await api("/api/users"); }
   catch (err) { showMessage("users-message", err.message, true); return; }
   body.textContent = "";
+  const siteNames = Object.fromEntries(data.sites.map((x) => [x.id, x.name]));
+  const groupAdmin = data.my_site_id === null || data.my_site_id === undefined;
+  const showSites = data.sites.length > 0;
+  document.querySelectorAll(".site-col").forEach((c) => { c.hidden = !showSites; });
+  document.querySelectorAll(".site-field").forEach((c) => { c.hidden = !showSites || !groupAdmin; });
+  $("add-site-form").hidden = !groupAdmin;
+  $("sites-panel").hidden = !groupAdmin && !showSites;
+  const siteSelect = $("new-user-site");
+  const keep = siteSelect.value;
+  siteSelect.textContent = "";
+  [["", "Every site"], ...data.sites.map((x) => [String(x.id), x.name])].forEach(([v, l]) => {
+    const o = document.createElement("option"); o.value = v; o.textContent = l; siteSelect.appendChild(o);
+  });
+  siteSelect.value = keep;
+  const list = $("site-list");
+  list.textContent = "";
+  data.sites.forEach((x) => {
+    const li = document.createElement("li");
+    const n = document.createElement("span"); n.textContent = x.name;
+    const k = document.createElement("span"); k.className = "mono"; k.textContent = x.key;
+    li.append(n, k);
+    list.appendChild(li);
+  });
   data.users.forEach((u) => {
     const tr = document.createElement("tr");
 
@@ -395,6 +433,21 @@ async function loadUsers() {
     });
     select.addEventListener("change", () => updateUser(u.id, { role: select.value }, () => { select.value = u.role; }));
     roleCell.appendChild(select);
+
+    const siteCell = document.createElement("td");
+    siteCell.hidden = !showSites;
+    if (groupAdmin && !u.email.endsWith("@deleted.invalid")) {
+      const pick = document.createElement("select");
+      pick.setAttribute("aria-label", `Site for ${u.email}`);
+      [["", "Every site"], ...data.sites.map((x) => [String(x.id), x.name])].forEach(([v, l]) => {
+        const o = document.createElement("option"); o.value = v; o.textContent = l; pick.appendChild(o);
+      });
+      pick.value = u.site_id === null ? "" : String(u.site_id);
+      pick.addEventListener("change", () => updateUser(u.id, { site_id: pick.value ? Number(pick.value) : null }));
+      siteCell.appendChild(pick);
+    } else {
+      siteCell.textContent = u.site_id === null ? "Every site" : (siteNames[u.site_id] || "");
+    }
 
     const mfa = document.createElement("td");
     mfa.textContent = u.mfa_enabled ? "On" : "Off";
@@ -425,7 +478,7 @@ async function loadUsers() {
       select.disabled = true;
     }
 
-    tr.append(who, roleCell, mfa, last, status);
+    tr.append(who, roleCell, siteCell, mfa, last, status);
     body.appendChild(tr);
   });
 }

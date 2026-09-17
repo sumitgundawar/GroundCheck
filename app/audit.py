@@ -93,10 +93,11 @@ class AuditStore:
         return secrets.token_hex(4)  # 8 hex characters
 
     def save(self, audit_id: str, response: AskResponse, extras: dict[str, Any],
-             user_id: int | None = None) -> None:
+             user_id: int | None = None, site_id: int | None = None) -> None:
         record = {
             "audit_id": audit_id,
             "user_id": user_id,
+            "site_id": site_id,
             "response": response.model_dump(),
             **{k: v for k, v in extras.items() if k != "raw_query"},
         }
@@ -116,6 +117,7 @@ class AuditStore:
                         record=record,
                         test_run=bool(extras.get("test_run")),
                         top_score=_top_score(extras),
+                        site_id=site_id,
                     ))
             except Exception as exc:  # noqa: BLE001 - never fail a question over the audit
                 log.error("Couldn't write audit record %s to the database: %s", audit_id, exc)
@@ -135,14 +137,16 @@ class AuditStore:
                 return row.record if row else None
         return None
 
-    def recent(self, limit: int = 20, user_id: int | None = None) -> list[dict[str, Any]]:
+    def recent(self, limit: int = 20, user_id: int | None = None, site_id: int | None = None) -> list[dict[str, Any]]:
         """Most recent records first, lightweight fields only. With user_id,
-        only that user's records."""
+        only that user's records; with site_id, only that site's."""
         if self.backend() == "database":
             with db.session() as s:
                 q = select(db.AuditRecord).order_by(db.AuditRecord.created_at.desc(), db.AuditRecord.id.desc())
                 if user_id is not None:
                     q = q.where(db.AuditRecord.user_id == user_id)
+                if site_id is not None:
+                    q = q.where(db.AuditRecord.site_id == site_id)
                 rows = s.scalars(q.limit(limit)).all()
                 return [{
                     "audit_id": r.audit_id, "decision": r.decision, "query": r.query,

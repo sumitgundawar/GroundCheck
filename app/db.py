@@ -118,6 +118,19 @@ class Base(DeclarativeBase):
     pass
 
 
+class Site(Base):
+    """A hospital, clinic or other site in a group. People at a site see
+    that site's questions, reviews, incidents and imaging; people with no
+    site see every site's. Documents, the formulary and models are shared."""
+
+    __tablename__ = "sites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -127,6 +140,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="clinician")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
     mfa_secret: Mapped[str | None] = mapped_column(EncryptedText("users.mfa_secret"), nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     failed_logins: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -188,6 +202,7 @@ class AuditRecord(Base):
     # question, and the best retrieval score. Both are derived from `record`.
     test_run: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     top_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (
         Index("ix_audit_records_created_at", "created_at"),
@@ -346,6 +361,7 @@ class ReviewCase(Base):
     resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     outcome: Mapped[str] = mapped_column(String(30), nullable=False, default="")
     outcome_note: Mapped[str] = mapped_column(EncryptedText("review_cases.outcome_note"), nullable=False, default="")
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
 
     events: Mapped[list["ReviewEvent"]] = relationship(
         back_populates="case", cascade="all, delete-orphan", order_by="ReviewEvent.id")
@@ -485,6 +501,7 @@ class Incident(Base):
     hazard_id: Mapped[int | None] = mapped_column(ForeignKey("hazards.id", ondelete="SET NULL"), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
     closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (Index("ix_incidents_status", "status"), Index("ix_incidents_reported_at", "reported_at"))
 
@@ -525,6 +542,7 @@ class ImagingSeries(Base):
     file: Mapped[str] = mapped_column(String(80), nullable=False)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
 
     analyses: Mapped[list["ImagingAnalysis"]] = relationship(
         back_populates="series", cascade="all, delete-orphan", order_by="ImagingAnalysis.id")

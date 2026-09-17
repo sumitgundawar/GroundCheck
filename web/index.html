@@ -1638,17 +1638,19 @@
         <header class="page-head">
           <div>
             <h1 class="page-title"><span id="users-title">Users</span></h1>
-            <p class="page-sub">Everyone who can sign in, their role and two-factor status.</p>
+            <p class="page-sub">Everyone who can sign in, their role, site and two-factor status.</p>
           </div>
         </header>
           <p class="modal-message" id="users-message" role="status" hidden></p>
           <section class="panel">
-      <div class="users-table-wrap">
-            <table class="users-table">
-              <thead><tr><th scope="col">User</th><th scope="col">Role</th><th scope="col">2FA</th><th scope="col">Last sign-in</th><th scope="col">Status</th></tr></thead>
-              <tbody id="users-body"></tbody>
-            </table>
-          </div>
+            <div class="users-table-wrap">
+              <table class="users-table">
+                <thead><tr><th scope="col">User</th><th scope="col">Role</th><th scope="col" class="site-col" hidden>Site</th><th scope="col">2FA</th><th scope="col">Last sign-in</th><th scope="col">Status</th></tr></thead>
+                <tbody id="users-body"></tbody>
+              </table>
+            </div>
+          </section>
+          <div class="usage-grid">
           <section class="panel add-user-panel" aria-labelledby="add-user-title">
             <h3 id="add-user-title">Add a user</h3>
             <form class="auth-form add-user-form" id="add-user-form" novalidate>
@@ -1664,10 +1666,24 @@
                 <option value="reviewer">Reviewer: also reads the audit trail</option>
                 <option value="admin">Admin: also manages users and models</option>
               </select>
+              <label for="new-user-site" class="site-field" hidden>Site</label>
+              <select id="new-user-site" class="site-field" hidden></select>
               <button type="submit" class="btn btn-primary">Add user</button>
             </form>
           </section>
+          <section class="panel" id="sites-panel" aria-labelledby="sites-title">
+            <h3 id="sites-title">Sites</h3>
+            <p class="field-hint" id="sites-intro">For a group of hospitals or clinics. People at a site see only that site’s questions, reviews, incidents and imaging; people with no site see every site’s. Documents, medicines and models are shared.</p>
+            <ul class="site-list" id="site-list"></ul>
+            <form class="auth-form add-user-form" id="add-site-form" novalidate>
+              <label for="new-site-name">Name</label>
+              <input id="new-site-name" autocomplete="off" placeholder="e.g. St Mary’s Hospital">
+              <label for="new-site-key">Key <span class="optional">used by single sign-on, such as st-marys</span></label>
+              <input id="new-site-key" class="mono" autocomplete="off" spellcheck="false">
+              <button type="submit" class="btn btn-ghost">Add site</button>
+            </form>
           </section>
+          </div>
         </section>
 
         <footer class="footer">

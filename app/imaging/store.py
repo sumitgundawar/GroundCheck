@@ -129,7 +129,7 @@ def _series_summary(row: ImagingSeries) -> dict:
 
 
 def import_series(uploads: list[tuple[str, bytes]], source: str = "upload", label: str = "",
-                  user_id: int | None = None) -> dict:
+                  user_id: int | None = None, site_id: int | None = None) -> dict:
     try:
         found = dicom.read(uploads)
     except dicom.DicomError as exc:
@@ -139,6 +139,8 @@ def import_series(uploads: list[tuple[str, bytes]], source: str = "upload", labe
         with db.session() as s:
             row = s.scalar(select(ImagingSeries).where(ImagingSeries.uid == series.key))
             if row is not None:
+                if site_id is not None and row.site_id != site_id:
+                    raise ImagingError("This series has already been imported by another site.")
                 existing.append(_series_summary(row))
                 continue
         name = _write_volume(series.volume)
@@ -151,16 +153,17 @@ def import_series(uploads: list[tuple[str, bytes]], source: str = "upload", labe
                                 body_part=series.body_part[:64], slices=int(series.volume.shape[0]),
                                 rows=series.rows, columns=series.columns, meta=meta,
                                 original=series.original if source == "pacs" else None,
-                                file=name, created_by=user_id)
+                                file=name, created_by=user_id, site_id=site_id)
             s.add(row)
             s.flush()
             added.append({**_series_summary(row), "warnings": series.warnings})
     return {"added": added, "existing": existing}
 
 
-def list_series() -> list[dict]:
+def list_series(site_id: int | None = None) -> list[dict]:
     with db.session() as s:
-        rows = s.scalars(select(ImagingSeries).order_by(ImagingSeries.id.desc())).all()
+        q = select(ImagingSeries).order_by(ImagingSeries.id.desc())
+        rows = s.scalars(q if site_id is None else q.where(ImagingSeries.site_id == site_id)).all()
         return [_series_summary(r) for r in rows]
 
 
@@ -206,6 +209,18 @@ def _slice_spacing(meta: dict) -> float | None:
         return None
     gaps = np.abs(np.diff(positions))
     return round(float(np.median(gaps)), 2) if gaps.size and np.median(gaps) > 0 else None
+
+
+def visible(series_id: int | None = None, report_id: int | None = None, site_id: int | None = None) -> bool:
+    """Whether someone scoped to site_id may see this series, or the series a report is on."""
+    if site_id is None:
+        return True
+    with db.session() as s:
+        if report_id is not None:
+            report = s.get(ImagingReport, report_id)
+            series_id = report.series_id if report else None
+        row = s.get(ImagingSeries, series_id) if series_id is not None else None
+        return row is not None and row.site_id == site_id
 
 
 def delete_series(series_id: int) -> None:

@@ -447,6 +447,22 @@ Keep one local admin account for emergencies. With `PASSWORD_SIGN_IN=false`
 it can't sign in on the web, but `python -m app.cli set-password` still works
 on the server.
 
+### Several sites
+
+One installation can serve a group of hospitals or clinics. An admin adds
+**sites** on the Users page and chooses each person's site. People at a site
+see only their site's questions, audit records, review cases, usage reports,
+incidents and imaging series; people with no site ("Every site") see all of
+them. The same refused question at two sites opens a case at each. Approved
+documents, the formulary, trained models, releases and monitoring are shared
+by the group.
+
+Admins at a site manage only their site's people and can't move anyone
+between sites or add sites. With single sign-on, set `OIDC_SITE_CLAIM` to a
+claim holding the site's key; it sets the site at every sign-in, a missing
+or unknown site is refused, and `OIDC_ALL_SITES_VALUE` names the value for
+group-wide staff.
+
 ### Using PostgreSQL or MySQL
 
 Set `DATABASE_URL` and install the driver:
@@ -971,6 +987,8 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `RELEASE_AUTO_PROMOTE` | `true` | Put a release that passes live straight away. `false` waits for an admin. |
 | `RELEASES_KEEP` | `10` | How many release snapshots to keep. |
 | `RELEASES_DIR` | `INDEX_DIR/releases` | Where release snapshots are kept. |
+| `OIDC_SITE_CLAIM` | _empty_ | A claim with the key of the person's site. Missing or unknown sites are refused. |
+| `OIDC_ALL_SITES_VALUE` | _empty_ | The site claim value meaning every site. |
 | `METRICS_TOKEN` | _empty_ | Bearer token for `/metrics`. Without it, only local requests are answered. |
 | `ALERT_WEBHOOK_URL` | _empty_ | Where alerts are posted when they fire and resolve. |
 | `ALERT_INTERVAL_SECONDS` | `60` | How often alert checks run. 0 turns background checks off. |
@@ -1112,6 +1130,7 @@ groundcheck/
     training/          training studio: datasets, worker process, model library
     imaging/           DICOM import and de-identification, analysis, reports, DICOMweb
     releases.py        checked knowledge releases, promotion and rollback
+    sites.py           several hospitals or clinics in one installation
     monitoring.py      Prometheus metrics, alert rules and notifications
     incidents.py       incident reporting, investigation and regulator deadlines
     data/              synthetic corpus and demo example queries

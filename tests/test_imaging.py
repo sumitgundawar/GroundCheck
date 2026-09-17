@@ -425,3 +425,34 @@ def test_live_search_and_retrieve_from_the_orthanc_demo(imaging, monkeypatch):
     assert added["modality"] == "CT" and added["slices"] == int(ct[0]["instances"]) and added["source"] == "pacs"
     detail = imaging.get(f"/api/imaging/series/{added['id']}").json()["series"]
     assert detail["plane"] == "axial" and detail["deid"]["uids_replaced"] > 0
+
+
+@pytest.mark.skipif(not os.environ.get("RUN_LIVE_ORTHANC"), reason="set RUN_LIVE_ORTHANC=http://user:pass@host:8042 with a CT study loaded")
+def test_live_round_trip_with_a_local_orthanc(imaging, monkeypatch):
+    """Search, retrieve, report and send the report back to a real PACS."""
+    import base64
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(os.environ["RUN_LIVE_ORTHANC"])
+    base = f"{parts.scheme}://{parts.hostname}:{parts.port}"
+    token = base64.b64encode(f"{parts.username}:{parts.password}".encode()).decode()
+    monkeypatch.setattr(config, "DICOMWEB_URL", f"{base}/dicom-web")
+    monkeypatch.setattr(config, "DICOMWEB_AUTHORIZATION", f"Basic {token}")
+    monkeypatch.setattr(dicomweb, "transport", None)
+    client = imaging
+    [study] = client.get("/api/imaging/pacs/studies?modality=CT&study_date=19000101-20991231").json()["studies"]
+    [series] = client.get(f"/api/imaging/pacs/studies/{study['study_uid']}/series").json()["series"]
+    added = client.post("/api/imaging/pacs/retrieve", json={"study_uid": study["study_uid"],
+                                                          "series_uid": series["series_uid"]}).json()["added"][0]
+    assert added["slices"] == int(series["instances"])
+    report = client.post(f"/api/imaging/series/{added['id']}/reports", json={
+        "findings": "Test report.", "impression": "Round trip test.", "agreement": "not_used", "sign": True}).json()["report"]
+    sent = client.post(f"/api/imaging/reports/{report['id']}/send")
+    assert sent.status_code == 200, sent.text
+    after = {s["modality"] for s in dicomweb.search_series(study["study_uid"])}
+    assert after == {"CT", "SR"}
+    sr_series = [s for s in dicomweb.search_series(study["study_uid"]) if s["modality"] == "SR"][0]
+    stored = dicomweb.retrieve_series(study["study_uid"], sr_series["series_uid"])
+    sr = pydicom.dcmread(io.BytesIO(stored[0][1]))
+    assert sr.PatientID == study["patient_id"] and sr.StudyInstanceUID == study["study_uid"]
+    assert any(getattr(i, "TextValue", "") == "Round trip test." for i in sr.ContentSequence)

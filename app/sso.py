@@ -203,6 +203,21 @@ class Finished:
     next_path: str
 
 
+def _site_from_claims(s, claims: dict) -> int | None:
+    from . import sites
+
+    value = claims.get(config.OIDC_SITE_CLAIM)
+    if isinstance(value, list):
+        value = value[0] if len(value) == 1 else None
+    value = str(value or "").strip()
+    if config.OIDC_ALL_SITES_VALUE and value == config.OIDC_ALL_SITES_VALUE:
+        return None
+    site = sites.by_key(s, value) if value else None
+    if site is None:
+        raise SsoError("Your account isn't assigned to a GroundCheck site. Ask your administrator for access.")
+    return site.id
+
+
 def finish(code: str, state: str, cookie_state: str | None, base_url: str, ip: str = "",
            user_agent: str = "") -> Finished:
     if not enabled():
@@ -275,6 +290,8 @@ def finish(code: str, state: str, cookie_state: str | None, base_url: str, ip: s
             new_role = mapped_role or config.OIDC_DEFAULT_ROLE
             if new_role != user.role:
                 user.role = auth.check_role(new_role)
+        if config.OIDC_SITE_CLAIM:
+            user.site_id = _site_from_claims(s, claims)
         if not user.is_active:
             raise SsoError("Your GroundCheck account is deactivated.")
         if claims.get("name") and not user.name:

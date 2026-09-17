@@ -151,6 +151,11 @@ OIDC_PROVIDER_NAME = _get("OIDC_PROVIDER_NAME", "your organisation")
 OIDC_REDIRECT_URL = _get("OIDC_REDIRECT_URL", "")   # default: <this site>/api/auth/sso/callback
 OIDC_SCOPES = _get("OIDC_SCOPES", "openid email profile")
 OIDC_ROLES_CLAIM = _get("OIDC_ROLES_CLAIM", "roles")  # "groups" for many providers
+# A claim holding the key of the person's site (app/sites.py). When set, it
+# decides the site at every sign-in, and a missing or unknown site is refused.
+OIDC_SITE_CLAIM = _get("OIDC_SITE_CLAIM", "")
+# The claim value that means every site, for group-wide staff.
+OIDC_ALL_SITES_VALUE = _get("OIDC_ALL_SITES_VALUE", "")
 OIDC_ADMIN_VALUES = {v.strip() for v in _get("OIDC_ADMIN_VALUES", "").split(",") if v.strip()}
 OIDC_REVIEWER_VALUES = {v.strip() for v in _get("OIDC_REVIEWER_VALUES", "").split(",") if v.strip()}
 OIDC_CLINICIAN_VALUES = {v.strip() for v in _get("OIDC_CLINICIAN_VALUES", "").split(",") if v.strip()}

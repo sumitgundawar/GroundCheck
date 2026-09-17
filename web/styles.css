@@ -1306,6 +1306,14 @@ body { background: var(--canvas); color: var(--text); }
 .cds-card.info .finding-tag { color: var(--info); border-color: var(--info-border); }
 @media (max-width: 640px) { .ehr-load { grid-template-columns: minmax(0, 1fr); } }
 
+/* ---------- Sites ---------- */
+.site-list { list-style: none; margin: var(--space-3) 0; padding: 0; display: grid; gap: 4px; }
+.site-list:empty { display: none; }
+.site-list li { display: flex; justify-content: space-between; gap: var(--space-3); padding: 6px 0; border-top: 1px solid var(--border); font-size: 13.5px; }
+.site-list li:first-child { border-top: 0; }
+.site-list .mono { color: var(--text-quiet); font-size: 12.5px; }
+.account-site { display: block; font-size: 12px; color: var(--text-quiet); }
+
 /* ---------- Releases ---------- */
 .live-release { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); align-items: center;
   padding: var(--space-4); margin-bottom: var(--space-4); border: 1px solid var(--ok-border); background: var(--ok-bg); border-radius: var(--radius); }

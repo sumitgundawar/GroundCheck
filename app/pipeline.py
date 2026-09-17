@@ -98,13 +98,16 @@ def _finish(
     saved = {k: v for k, v in extras.items() if k not in ("user_id", "review", "check_only")}
     if not extras.get("review", True):
         saved["test_run"] = True  # kept in the audit trail, left out of usage reports
-    audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"))
+    from . import sites
+
+    site_id = sites.of_user(extras.get("user_id"))
+    audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"), site_id=site_id)
     if not saved.get("test_run"):
         kind = (extras.get("provider") or {}).get("kind") if llm_used else None
         monitoring.observe_answer(decision, response.total_ms,
                                   "local" if kind == "local" else "cloud" if llm_used else "extractive")
     if decision == "refuse" and extras.get("review", True) and audit.store.backend() == "database":
-        governance.record_refusal(audit_id, str(extras.get("redacted_query", "")), refused_reason or "")
+        governance.record_refusal(audit_id, str(extras.get("redacted_query", "")), refused_reason or "", site_id)
     return response
 
 

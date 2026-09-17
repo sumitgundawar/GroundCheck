@@ -116,7 +116,7 @@ def _case_summary(case: ReviewCase, names: dict[int, str], now: datetime) -> dic
 
 # --- Creating cases ------------------------------------------------------------
 
-def record_refusal(audit_id: str, query: str, reason: str) -> None:
+def record_refusal(audit_id: str, query: str, reason: str, site_id: int | None = None) -> None:
     """Open a review case for a refusal, or add to the open case for the same
     question. Never raises: a failure here must not affect the answer."""
     if not config.REVIEW_QUEUE or not db.ready() or not query.strip():
@@ -129,7 +129,8 @@ def record_refusal(audit_id: str, query: str, reason: str) -> None:
         now = utcnow()
         with db.session() as s:
             case = s.scalar(select(ReviewCase).where(
-                ReviewCase.query_key == key, ReviewCase.kind == "refusal", ReviewCase.status == "open"))
+                ReviewCase.query_key == key, ReviewCase.kind == "refusal", ReviewCase.status == "open",
+                ReviewCase.site_id.is_(None) if site_id is None else ReviewCase.site_id == site_id))
             if case is not None:
                 case.occurrences += 1
                 case.last_seen_at = now
@@ -139,7 +140,7 @@ def record_refusal(audit_id: str, query: str, reason: str) -> None:
                 kind="refusal", priority="normal", query=query.strip()[:2000], query_key=key,
                 reason=reason or "", reason_category=category, first_audit_id=audit_id,
                 last_audit_id=audit_id, created_at=now, last_seen_at=now,
-                due_at=now + timedelta(hours=config.REVIEW_SLA_HOURS), outcome_note="",
+                due_at=now + timedelta(hours=config.REVIEW_SLA_HOURS), outcome_note="", site_id=site_id,
             )
             s.add(case)
             s.flush()
@@ -150,14 +151,14 @@ def record_refusal(audit_id: str, query: str, reason: str) -> None:
         logging.getLogger("groundcheck.governance").exception("Couldn't record a review case for %s", audit_id)
 
 
-def flag_answer(audit_id: str, note: str, user_id: int | None) -> dict:
+def flag_answer(audit_id: str, note: str, user_id: int | None, site_scope: int | None = None) -> dict:
     """Flag an answer as possibly wrong. Opens a high-priority case."""
     note = (note or "").strip()
     if len(note) < 5:
         raise GovernanceError("Say briefly what looks wrong, so a reviewer can check it.")
     with db.session() as s:
         record = s.scalar(select(AuditRecord).where(AuditRecord.audit_id == audit_id))
-        if record is None:
+        if record is None or (site_scope is not None and record.site_id != site_scope):
             raise GovernanceError("That answer isn't in the audit trail.")
         if record.decision != "answer":
             raise GovernanceError("Only answers can be flagged. Refusals are reviewed automatically.")
@@ -167,6 +168,7 @@ def flag_answer(audit_id: str, note: str, user_id: int | None) -> dict:
             reason=note[:2000], reason_category="flagged answer", first_audit_id=audit_id,
             last_audit_id=audit_id, created_at=now, last_seen_at=now,
             due_at=now + timedelta(hours=config.FLAGGED_SLA_HOURS), flagged_by=user_id, outcome_note="",
+            site_id=record.site_id,
         )
         s.add(case)
         s.flush()
@@ -189,12 +191,23 @@ def escalate_overdue(now: datetime | None = None) -> int:
         return len(cases)
 
 
+def _scoped(q, site_id: int | None):
+    return q if site_id is None else q.where(ReviewCase.site_id == site_id)
+
+
+def _case(s, case_id: int, site_id: int | None) -> ReviewCase:
+    case = s.get(ReviewCase, case_id)
+    if case is None or (site_id is not None and case.site_id != site_id):
+        raise GovernanceError("No such case.")
+    return case
+
+
 def list_cases(status: str = "open", assigned_to: int | None = None, overdue_only: bool = False,
-               limit: int = 200) -> dict:
+               limit: int = 200, site_id: int | None = None) -> dict:
     escalate_overdue()
     now = utcnow()
     with db.session() as s:
-        q = select(ReviewCase)
+        q = _scoped(select(ReviewCase), site_id)
         if status != "all":
             q = q.where(ReviewCase.status == status)
         if assigned_to is not None:
@@ -206,8 +219,9 @@ def list_cases(status: str = "open", assigned_to: int | None = None, overdue_onl
         cases = s.scalars(q).all()
         names = _user_names(s, [c.assigned_to for c in cases] + [c.flagged_by for c in cases]
                             + [c.resolved_by for c in cases])
-        counts = dict(s.execute(select(ReviewCase.status, func.count(ReviewCase.id)).group_by(ReviewCase.status)).all())
-        overdue = s.scalar(select(func.count(ReviewCase.id)).where(
+        counts = dict(s.execute(_scoped(select(ReviewCase.status, func.count(ReviewCase.id)), site_id)
+                                .group_by(ReviewCase.status)).all())
+        overdue = s.scalar(_scoped(select(func.count(ReviewCase.id)), site_id).where(
             ReviewCase.status == "open", ReviewCase.due_at <= now)) or 0
         return {
             "cases": [_case_summary(c, names, now) for c in cases],
@@ -217,12 +231,10 @@ def list_cases(status: str = "open", assigned_to: int | None = None, overdue_onl
         }
 
 
-def get_case(case_id: int) -> dict:
+def get_case(case_id: int, site_id: int | None = None) -> dict:
     now = utcnow()
     with db.session() as s:
-        case = s.get(ReviewCase, case_id)
-        if case is None:
-            raise GovernanceError("No such case.")
+        case = _case(s, case_id, site_id)
         names = _user_names(s, [case.assigned_to, case.flagged_by, case.resolved_by]
                             + [e.user_id for e in case.events])
         summary = _case_summary(case, names, now)
@@ -237,36 +249,33 @@ def get_case(case_id: int) -> dict:
         return summary
 
 
-def assign(case_id: int, assignee_id: int | None, acting_user_id: int | None) -> dict:
+def assign(case_id: int, assignee_id: int | None, acting_user_id: int | None, site_id: int | None = None) -> dict:
     with db.session() as s:
-        case = s.get(ReviewCase, case_id)
-        if case is None:
-            raise GovernanceError("No such case.")
+        case = _case(s, case_id, site_id)
         if case.status != "open":
             raise GovernanceError("Only open cases can be assigned.")
         if assignee_id is not None:
             user = s.get(User, assignee_id)
-            if user is None or not user.is_active or user.role == "clinician":
-                raise GovernanceError("Assign cases to an active reviewer or admin.")
+            if user is None or not user.is_active or user.role == "clinician" or \
+                    (user.site_id is not None and user.site_id != case.site_id):
+                raise GovernanceError("Assign cases to an active reviewer or admin at this site.")
         case.assigned_to = assignee_id
         names = _user_names(s, [assignee_id])
         _event(s, case, "assigned", acting_user_id, f"Assigned to {names.get(assignee_id, 'nobody')}.")
-    return get_case(case_id)
+    return get_case(case_id, site_id)
 
 
-def comment(case_id: int, note: str, user_id: int | None) -> dict:
+def comment(case_id: int, note: str, user_id: int | None, site_id: int | None = None) -> dict:
     if not (note or "").strip():
         raise GovernanceError("Write a comment first.")
     with db.session() as s:
-        case = s.get(ReviewCase, case_id)
-        if case is None:
-            raise GovernanceError("No such case.")
+        case = _case(s, case_id, site_id)
         _event(s, case, "commented", user_id, note)
-    return get_case(case_id)
+    return get_case(case_id, site_id)
 
 
 def resolve(case_id: int, outcome: str, note: str, user_id: int | None,
-            expected_decision: str | None = None) -> dict:
+            expected_decision: str | None = None, site_id: int | None = None) -> dict:
     """Close a case with an outcome. "add_test" also adds the question to the
     evaluation, with the decision the reviewer says is correct."""
     if outcome not in OUTCOMES:
@@ -274,9 +283,7 @@ def resolve(case_id: int, outcome: str, note: str, user_id: int | None,
     if outcome == "add_test" and expected_decision not in ("answer", "refuse"):
         raise GovernanceError("Say whether the correct decision is to answer or to refuse.")
     with db.session() as s:
-        case = s.get(ReviewCase, case_id)
-        if case is None:
-            raise GovernanceError("No such case.")
+        case = _case(s, case_id, site_id)
         if case.status != "open":
             raise GovernanceError("This case is already closed.")
         now = utcnow()
@@ -289,14 +296,12 @@ def resolve(case_id: int, outcome: str, note: str, user_id: int | None,
         if outcome == "add_test":
             s.add(EvalCase(query=case.query, expect=expected_decision, note=case.outcome_note,
                            from_case_id=case.id, created_by=user_id))
-    return get_case(case_id)
+    return get_case(case_id, site_id)
 
 
-def reopen(case_id: int, note: str, user_id: int | None) -> dict:
+def reopen(case_id: int, note: str, user_id: int | None, site_id: int | None = None) -> dict:
     with db.session() as s:
-        case = s.get(ReviewCase, case_id)
-        if case is None:
-            raise GovernanceError("No such case.")
+        case = _case(s, case_id, site_id)
         if case.status == "open":
             raise GovernanceError("This case is already open.")
         case.status = "open"
@@ -305,7 +310,7 @@ def reopen(case_id: int, note: str, user_id: int | None) -> dict:
         case.due_at = utcnow() + timedelta(hours=config.REVIEW_SLA_HOURS)
         case.escalated_at = None
         _event(s, case, "reopened", user_id, note)
-    return get_case(case_id)
+    return get_case(case_id, site_id)
 
 
 # --- Evaluation cases from reviews -------------------------------------------
@@ -404,15 +409,17 @@ def list_hazards() -> list[dict]:
 
 # --- Reports -----------------------------------------------------------------
 
-def report(days: int = 30) -> dict:
+def report(days: int = 30, site_id: int | None = None) -> dict:
     """Usage, refusals, overrides, review performance and documents for a period."""
     if not 1 <= days <= 3660:
         raise GovernanceError("Choose a period of 1 to 3,660 days.")
     now = utcnow()
     since = now - timedelta(days=days)
+    audit_q = select(AuditRecord).where(AuditRecord.created_at >= since)
+    if site_id is not None:
+        audit_q = audit_q.where(AuditRecord.site_id == site_id)
     with db.session() as s:
-        records = [r for r in s.scalars(select(AuditRecord).where(AuditRecord.created_at >= since))
-                   if not r.record.get("test_run")]
+        records = [r for r in s.scalars(audit_q) if not r.record.get("test_run")]
         answered = sum(r.decision == "answer" for r in records)
         refused = len(records) - answered
         reasons: dict[str, int] = {}
@@ -428,7 +435,7 @@ def report(days: int = 30) -> dict:
                                                       "enable_dosage_guard")):
                 overrides += 1
 
-        cases = s.scalars(select(ReviewCase).where(ReviewCase.created_at >= since)).all()
+        cases = s.scalars(_scoped(select(ReviewCase), site_id).where(ReviewCase.created_at >= since)).all()
         resolved = [c for c in cases if c.resolved_at]
         hours = [(c.resolved_at - c.created_at).total_seconds() / 3600 for c in resolved]
         on_time = sum(c.resolved_at <= c.due_at for c in resolved)
@@ -460,15 +467,16 @@ def report(days: int = 30) -> dict:
                 "escalated": sum(c.escalated_at is not None for c in cases),
                 "median_hours_to_resolve": round(statistics.median(hours), 1) if hours else None,
                 "outcomes": outcomes,
-                "open_now": s.scalar(select(func.count(ReviewCase.id)).where(ReviewCase.status == "open")) or 0,
-                "overdue_now": s.scalar(select(func.count(ReviewCase.id)).where(
+                "open_now": s.scalar(_scoped(select(func.count(ReviewCase.id)), site_id)
+                                     .where(ReviewCase.status == "open")) or 0,
+                "overdue_now": s.scalar(_scoped(select(func.count(ReviewCase.id)), site_id).where(
                     ReviewCase.status == "open", ReviewCase.due_at <= now)) or 0,
             },
             "documents": {"approved": approved_docs, "retired": retired_docs},
         }
 
 
-def usage(days: int = 30) -> dict:
+def usage(days: int = 30, site_id: int | None = None) -> dict:
     """Day-by-day use for the usage dashboard: questions answered and refused,
     response times, what drafted answers, the most-cited sources, who asks, and
     how often identifiers were removed. Test runs are left out."""
@@ -486,8 +494,10 @@ def usage(days: int = 30) -> dict:
     deidentified = 0
     reasons: dict[str, int] = {}
     with db.session() as s:
-        records = [r for r in s.scalars(select(AuditRecord).where(AuditRecord.created_at >= since))
-                   if not r.record.get("test_run")]
+        usage_q = select(AuditRecord).where(AuditRecord.created_at >= since)
+        if site_id is not None:
+            usage_q = usage_q.where(AuditRecord.site_id == site_id)
+        records = [r for r in s.scalars(usage_q) if not r.record.get("test_run")]
         for r in records:
             day = daily.get(r.created_at.date())
             if day is not None:
@@ -512,8 +522,9 @@ def usage(days: int = 30) -> dict:
                    for step in response.get("trace", [])):
                 deidentified += 1
         names = _user_names(s, by_user.keys())
-        open_cases = s.scalar(select(func.count(ReviewCase.id)).where(ReviewCase.status == "open")) or 0
-        overdue = s.scalar(select(func.count(ReviewCase.id)).where(
+        open_cases = s.scalar(_scoped(select(func.count(ReviewCase.id)), site_id)
+                              .where(ReviewCase.status == "open")) or 0
+        overdue = s.scalar(_scoped(select(func.count(ReviewCase.id)), site_id).where(
             ReviewCase.status == "open", ReviewCase.due_at <= now)) or 0
 
     latencies.sort()
@@ -549,9 +560,9 @@ def usage(days: int = 30) -> dict:
     }
 
 
-def safety_case_markdown(days: int = 30) -> str:
+def safety_case_markdown(days: int = 30, site_id: int | None = None) -> str:
     """A clinical safety case summary for this release, as Markdown."""
-    r = report(days)
+    r = report(days, site_id)
     hazards = list_hazards()
     try:
         evaluation = json.loads(config.EVAL_SUMMARY_PATH.read_text(encoding="utf-8"))

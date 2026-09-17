@@ -144,7 +144,7 @@ def _check_links(s, data: dict) -> dict:
     return links
 
 
-def report(data: dict, user_id: int | None, user_name: str) -> dict:
+def report(data: dict, user_id: int | None, user_name: str, site_id: int | None = None) -> dict:
     category = data.get("category")
     if category not in CATEGORIES:
         raise IncidentError("Choose what the incident concerns.")
@@ -159,7 +159,7 @@ def report(data: dict, user_id: int | None, user_name: str) -> dict:
         links = _check_links(s, data)
         incident = Incident(title=title, category=category, harm=harm, status="open", description=description,
                             occurred_at=occurred_at, reported_at=now, aware_at=now, reported_by=user_id,
-                            reporter_name=user_name[:200], updated_at=now, **links)
+                            reporter_name=user_name[:200], updated_at=now, site_id=site_id, **links)
         s.add(incident)
         s.flush()
         s.add(IncidentEvent(incident_id=incident.id, user_id=user_id, user_name=user_name[:200], action="reported",
@@ -167,9 +167,12 @@ def report(data: dict, user_id: int | None, user_name: str) -> dict:
         return _detail(s, incident)
 
 
-def list_incidents(status: str = "", category: str = "", reporter_id: int | None = None) -> dict:
+def list_incidents(status: str = "", category: str = "", reporter_id: int | None = None,
+                   site_id: int | None = None) -> dict:
     with db.session() as s:
         q = select(Incident).order_by(Incident.reported_at.desc())
+        if site_id is not None:
+            q = q.where(Incident.site_id == site_id)
         if status:
             if status not in STATUSES and status != "active":
                 raise IncidentError("Unknown status.")
@@ -180,18 +183,23 @@ def list_incidents(status: str = "", category: str = "", reporter_id: int | None
             q = q.where(Incident.reported_by == reporter_id)
         rows = s.scalars(q.limit(500)).all()
         names = _names(s, [r.owner_id for r in rows])
-        counts = dict(s.execute(select(Incident.status, func.count(Incident.id)).group_by(Incident.status)).all())
-        serious = s.scalar(select(func.count(Incident.id)).where(
+        scoped = (lambda q: q if site_id is None else q.where(Incident.site_id == site_id))
+        counts = dict(s.execute(scoped(select(Incident.status, func.count(Incident.id))).group_by(Incident.status)).all())
+        serious = s.scalar(scoped(select(func.count(Incident.id))).where(
             Incident.status != "closed", Incident.harm.in_(("moderate", "severe", "death")))) or 0
         return {"incidents": [_summary(r, names) for r in rows],
                 "counts": {k: counts.get(k, 0) for k in STATUSES}, "serious_active": serious,
                 "categories": CATEGORIES, "harm": HARM}
 
 
-def get(incident_id: int, reporter_id: int | None = None) -> dict:
+def _visible(incident: Incident | None, site_id: int | None) -> bool:
+    return incident is not None and (site_id is None or incident.site_id == site_id)
+
+
+def get(incident_id: int, reporter_id: int | None = None, site_id: int | None = None) -> dict:
     with db.session() as s:
         incident = s.get(Incident, incident_id)
-        if incident is None or (reporter_id is not None and incident.reported_by != reporter_id):
+        if not _visible(incident, site_id) or (reporter_id is not None and incident.reported_by != reporter_id):
             raise LookupError(incident_id)
         return _detail(s, incident)
 
@@ -200,10 +208,10 @@ UPDATABLE = ("status", "harm", "category", "owner_id", "root_cause", "actions", 
              "hazard_id", "aware_at")
 
 
-def update(incident_id: int, changes: dict, user_id: int | None, user_name: str) -> dict:
+def update(incident_id: int, changes: dict, user_id: int | None, user_name: str, site_id: int | None = None) -> dict:
     with db.session() as s:
         incident = s.get(Incident, incident_id)
-        if incident is None:
+        if not _visible(incident, site_id):
             raise LookupError(incident_id)
         notes = []
         if "harm" in changes and changes["harm"] != incident.harm:
@@ -218,6 +226,8 @@ def update(incident_id: int, changes: dict, user_id: int | None, user_name: str)
             incident.category = changes["category"]
         if "owner_id" in changes and changes["owner_id"] != incident.owner_id:
             owner = s.get(User, int(changes["owner_id"])) if changes["owner_id"] else None
+            if owner is not None and owner.site_id is not None and owner.site_id != incident.site_id:
+                owner = None
             if changes["owner_id"] and owner is None:
                 raise IncidentError("That person doesn't have an account.")
             incident.owner_id = owner.id if owner else None
@@ -259,11 +269,12 @@ def update(incident_id: int, changes: dict, user_id: int | None, user_name: str)
         return _detail(s, incident)
 
 
-def comment(incident_id: int, note: str, user_id: int | None, user_name: str, reporter_only: bool = False) -> dict:
+def comment(incident_id: int, note: str, user_id: int | None, user_name: str, reporter_only: bool = False,
+            site_id: int | None = None) -> dict:
     note = _text(note, "comment", 4000, required=True)
     with db.session() as s:
         incident = s.get(Incident, incident_id)
-        if incident is None or (reporter_only and incident.reported_by != user_id):
+        if not _visible(incident, site_id) or (reporter_only and incident.reported_by != user_id):
             raise LookupError(incident_id)
         incident.updated_at = _now()
         s.add(IncidentEvent(incident_id=incident.id, user_id=user_id, user_name=user_name[:200], action="comment",
@@ -272,14 +283,15 @@ def comment(incident_id: int, note: str, user_id: int | None, user_name: str, re
         return _detail(s, incident)
 
 
-def export_csv() -> str:
+def export_csv(site_id: int | None = None) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(["Reference", "Title", "Concerns", "Harm", "Status", "Occurred", "Reported", "Reported by",
                      "Owner", "Closed", "Root cause", "Actions", "External report", "Audit ID", "Review case",
                      "Alert", "Imaging series", "Hazard"])
     with db.session() as s:
-        rows = s.scalars(select(Incident).order_by(Incident.reported_at)).all()
+        q = select(Incident).order_by(Incident.reported_at)
+        rows = s.scalars(q if site_id is None else q.where(Incident.site_id == site_id)).all()
         names = _names(s, [r.owner_id for r in rows])
         for i in rows:
             writer.writerow([reference(i.id, i.reported_at), i.title, CATEGORIES[i.category], HARM[i.harm], i.status,

@@ -55,6 +55,7 @@ class Principal:
     name: str
     role: str
     mfa_enabled: bool
+    site_id: int | None = None   # None: every site
 
     def can(self, role: str) -> bool:
         return _RANK[self.role] >= _RANK[role]
@@ -62,7 +63,7 @@ class Principal:
 
 def _principal(user: User) -> Principal:
     return Principal(id=user.id, email=user.email, name=user.name, role=user.role,
-                     mfa_enabled=user.mfa_enabled)
+                     mfa_enabled=user.mfa_enabled, site_id=user.site_id)
 
 
 # --- Validation ------------------------------------------------------------
@@ -90,14 +91,22 @@ def check_role(role: str) -> str:
 
 # --- Users -----------------------------------------------------------------
 
-def create_user(email: str, password: str, role: str = "clinician", name: str = "") -> Principal:
+def create_user(email: str, password: str, role: str = "clinician", name: str = "",
+                site_id: int | None = None) -> Principal:
+    from . import sites
+
     email = normalise_email(email)
     check_password_strength(password, email)
     check_role(role)
     with db.session() as s:
         if s.scalar(select(User).where(User.email == email)):
             raise AuthError("A user with that email already exists.")
-        user = User(email=email, name=name.strip()[:200], password_hash=_hasher.hash(password), role=role)
+        try:
+            site_id = sites.check(s, site_id)
+        except sites.SiteError as exc:
+            raise AuthError(str(exc)) from exc
+        user = User(email=email, name=name.strip()[:200], password_hash=_hasher.hash(password), role=role,
+                    site_id=site_id)
         s.add(user)
         s.flush()
         return _principal(user)
@@ -107,7 +116,7 @@ def list_users() -> list[dict]:
     with db.session() as s:
         users = s.scalars(select(User).order_by(User.created_at)).all()
         return [{
-            "id": u.id, "email": u.email, "name": u.name, "role": u.role,
+            "id": u.id, "email": u.email, "name": u.name, "role": u.role, "site_id": u.site_id,
             "is_active": u.is_active, "mfa_enabled": u.mfa_enabled,
             "created_at": u.created_at.isoformat(),
             "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
@@ -123,8 +132,13 @@ def _active_admins(s) -> int:
     return s.scalar(select(func.count(User.id)).where(User.role == "admin", User.is_active.is_(True))) or 0
 
 
+_UNCHANGED = object()
+
+
 def update_user(user_id: int, *, role: str | None = None, is_active: bool | None = None,
-                name: str | None = None, acting_user_id: int | None = None) -> dict:
+                name: str | None = None, acting_user_id: int | None = None, site_id=_UNCHANGED) -> dict:
+    from . import sites
+
     with db.session() as s:
         user = s.get(User, user_id)
         if user is None:
@@ -138,11 +152,17 @@ def update_user(user_id: int, *, role: str | None = None, is_active: bool | None
             user.role = check_role(role)
         if name is not None:
             user.name = name.strip()[:200]
+        if site_id is not _UNCHANGED:
+            try:
+                user.site_id = sites.check(s, site_id)
+            except sites.SiteError as exc:
+                raise AuthError(str(exc)) from exc
         if is_active is not None:
             user.is_active = is_active
             if not is_active:
                 s.execute(delete(AuthSession).where(AuthSession.user_id == user_id))
-        return {"id": user.id, "email": user.email, "role": user.role, "is_active": user.is_active}
+        return {"id": user.id, "email": user.email, "role": user.role, "is_active": user.is_active,
+                "site_id": user.site_id}
 
 
 def delete_user(user_id: int, acting_user_id: int | None = None) -> dict:

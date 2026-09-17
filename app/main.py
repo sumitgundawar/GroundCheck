@@ -23,7 +23,7 @@ from sqlalchemy import select
 
 from . import (
     audit, auth, config, db, encryption, governance, integrity, llm, local_ai, monitoring, pipeline, releases, retention,
-    retrieval, sso,
+    retrieval, sites, sso,
 )
 from .schemas import AskRequest, AskResponse, Settings
 
@@ -174,6 +174,7 @@ class NewUserRequest(BaseModel):
     password: str
     role: str = "clinician"
     name: str = ""
+    site_id: int | None = None
 
 
 class UserUpdateRequest(BaseModel):
@@ -181,6 +182,7 @@ class UserUpdateRequest(BaseModel):
     is_active: bool | None = None
     name: str | None = None
     password: str | None = None
+    site_id: int | None = None
 
 
 def _auth_error(exc: auth.AuthError, status: int = 400) -> HTTPException:
@@ -203,7 +205,8 @@ def auth_me(request: Request) -> JSONResponse:
             pending = auth.session_principal(token, allow_mfa_pending=True)
     return JSONResponse({
         "auth_required": config.AUTH_REQUIRED,
-        "user": principal.__dict__ if principal else None,
+        "user": _principal_out(principal) if principal else None,
+        "sites": bool(db.ready() and sites.list_sites()),
         "mfa_pending": pending is not None,
         "needs_first_admin": db.ready() and auth.count_users() == 0,
         "sso": {"enabled": sso.enabled(), "provider": config.OIDC_PROVIDER_NAME},
@@ -276,7 +279,7 @@ def auth_login(body: SignInRequest, request: Request, response: Response) -> dic
         raise _auth_error(exc, 401) from exc
     _set_session_cookie(response, result.token)
     return {"mfa_required": result.mfa_required,
-            "user": None if result.mfa_required else result.principal.__dict__}
+            "user": None if result.mfa_required else _principal_out(result.principal)}
 
 
 @app.post("/api/auth/mfa")
@@ -289,7 +292,7 @@ def auth_mfa(body: CodeRequest, request: Request) -> dict:
         principal = auth.verify_mfa(token, body.code)
     except auth.AuthError as exc:
         raise _auth_error(exc, 401) from exc
-    return {"user": principal.__dict__}
+    return {"user": _principal_out(principal)}
 
 
 @app.post("/api/auth/logout")
@@ -316,7 +319,7 @@ def auth_first_admin(body: NewUserRequest, request: Request, response: Response)
     except auth.AuthError as exc:
         raise _auth_error(exc) from exc
     _set_session_cookie(response, result.token)
-    return {"user": result.principal.__dict__}
+    return {"user": _principal_out(result.principal)}
 
 
 def _signed_in(user: auth.Principal | None = Depends(current_user)) -> auth.Principal:
@@ -374,32 +377,94 @@ def _admin(user: auth.Principal | None = Depends(current_user)) -> auth.Principa
     return user
 
 
+def _principal_out(principal: auth.Principal) -> dict:
+    return {**principal.__dict__, "site_name": _site_name(principal.site_id)}
+
+
+def _site_name(site_id: int | None) -> str | None:
+    if site_id is None:
+        return None
+    return next((x["name"] for x in sites.list_sites() if x["id"] == site_id), None)
+
+
+def _manageable(admin: auth.Principal, user_id: int) -> None:
+    """An admin at a site manages only that site's people."""
+    if admin.site_id is None:
+        return
+    if not any(u["id"] == user_id and u["site_id"] == admin.site_id for u in auth.list_users()):
+        raise HTTPException(status_code=404, detail="No such user.")
+
+
 @app.get("/api/users")
-def users_list(_: auth.Principal = Depends(_admin)) -> dict:
-    return {"users": auth.list_users()}
+def users_list(admin: auth.Principal = Depends(_admin)) -> dict:
+    users = [u for u in auth.list_users() if admin.site_id is None or u["site_id"] == admin.site_id]
+    return {"users": users, "sites": sites.list_sites(), "my_site_id": admin.site_id}
 
 
 @app.post("/api/users")
-def users_create(body: NewUserRequest, _: auth.Principal = Depends(_admin)) -> dict:
+def users_create(body: NewUserRequest, admin: auth.Principal = Depends(_admin)) -> dict:
+    site_id = admin.site_id if admin.site_id is not None else body.site_id
     try:
-        return {"user": auth.create_user(body.email, body.password, role=body.role, name=body.name).__dict__}
+        return {"user": auth.create_user(body.email, body.password, role=body.role, name=body.name,
+                                         site_id=site_id).__dict__}
     except auth.AuthError as exc:
         raise _auth_error(exc) from exc
 
 
 @app.patch("/api/users/{user_id}")
 def users_update(user_id: int, body: UserUpdateRequest, admin: auth.Principal = Depends(_admin)) -> dict:
+    _manageable(admin, user_id)
+    changes = body.model_dump(exclude_unset=True)
+    if "site_id" in changes and admin.site_id is not None:
+        raise HTTPException(status_code=403, detail="Only an admin for every site can move people between sites.")
     try:
         if body.password is not None:
             auth.set_password(user_id, body.password)
+        extra = {"site_id": changes["site_id"]} if "site_id" in changes else {}
         return {"user": auth.update_user(user_id, role=body.role, is_active=body.is_active,
-                                         name=body.name, acting_user_id=admin.id)}
+                                         name=body.name, acting_user_id=admin.id, **extra)}
     except auth.AuthError as exc:
         raise _auth_error(exc) from exc
 
 
+class SiteRequest(BaseModel):
+    key: str = ""
+    name: str
+
+
+def _group_admin(admin: auth.Principal) -> None:
+    if admin.site_id is not None:
+        raise HTTPException(status_code=403, detail="Only an admin for every site can manage sites.")
+
+
+@app.get("/api/sites")
+def sites_list(_: auth.Principal = Depends(_admin)) -> dict:
+    return {"sites": sites.list_sites()}
+
+
+@app.post("/api/sites")
+def sites_create(body: SiteRequest, admin: auth.Principal = Depends(_admin)) -> dict:
+    _group_admin(admin)
+    try:
+        return {"site": sites.create(body.key, body.name)}
+    except sites.SiteError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.patch("/api/sites/{site_id}")
+def sites_rename(site_id: int, body: SiteRequest, admin: auth.Principal = Depends(_admin)) -> dict:
+    _group_admin(admin)
+    try:
+        return {"site": sites.rename(site_id, body.name)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="No such site.") from exc
+    except sites.SiteError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.delete("/api/users/{user_id}")
 def users_delete(user_id: int, admin: auth.Principal = Depends(_admin)) -> dict:
+    _manageable(admin, user_id)
     try:
         return {"user": auth.delete_user(user_id, acting_user_id=admin.id)}
     except auth.AuthError as exc:
@@ -467,8 +532,13 @@ def list_audit(user: auth.Principal | None = Depends(current_user)) -> JSONRespo
         "persisted": audit.store.backend() is not None,
         "backend": audit.store.backend(),
         # Clinicians see their own questions; reviewers and admins see all.
-        "recent": audit.store.recent(20, user_id=_audit_scope(user)),
+        "recent": audit.store.recent(20, user_id=_audit_scope(user), site_id=_site(user)),
     })
+
+
+def _site(user: auth.Principal | None) -> int | None:
+    """The site whose records someone may see: theirs, or None for every site."""
+    return user.site_id if (config.AUTH_REQUIRED and user is not None) else None
 
 
 def _audit_scope(user: auth.Principal | None) -> int | None:
@@ -481,7 +551,8 @@ def _audit_scope(user: auth.Principal | None) -> int | None:
 def get_audit(audit_id: str, user: auth.Principal | None = Depends(current_user)) -> JSONResponse:
     record = audit.store.get(audit_id)
     scope = _audit_scope(user)
-    if record is None or (scope is not None and record.get("user_id") != scope):
+    if record is None or (scope is not None and record.get("user_id") != scope) or \
+            (_site(user) is not None and record.get("site_id") != _site(user)):
         raise HTTPException(status_code=404, detail="Audit record not found")
     return JSONResponse(record)
 
@@ -777,7 +848,7 @@ def flag_answer(audit_id: str, body: FlagRequest, request: Request,
     if not config.AUTH_REQUIRED:
         require_manager(request, "clinician")
     try:
-        return {"case": governance.flag_answer(audit_id, body.note, user.id if user else None)}
+        return {"case": governance.flag_answer(audit_id, body.note, user.id if user else None, _site(user))}
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
 
@@ -789,18 +860,19 @@ def reviews_list(request: Request, status: str = "open", mine: bool = False, ove
     if status not in ("open", "resolved", "dismissed", "all"):
         raise HTTPException(status_code=400, detail="Status must be open, resolved, dismissed or all.")
     reviewers = [{"id": u["id"], "name": u["name"] or u["email"]} for u in auth.list_users()
-                 if u["is_active"] and u["role"] in ("reviewer", "admin")]
+                 if u["is_active"] and u["role"] in ("reviewer", "admin")
+                 and (_site(user) is None or u["site_id"] in (None, _site(user)))]
     return {**governance.list_cases(status, assigned_to=user.id if (mine and user) else None,
-                                    overdue_only=overdue),
+                                    overdue_only=overdue, site_id=_site(user)),
             "reviewers": reviewers, "me": user.id if user else None}
 
 
 @app.get("/api/reviews/{case_id}")
 def reviews_get(case_id: int, request: Request) -> dict:
-    require_manager(request, "reviewer")
+    user = require_manager(request, "reviewer")
     _require_database()
     try:
-        return {"case": governance.get_case(case_id)}
+        return {"case": governance.get_case(case_id, _site(user))}
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
 
@@ -810,7 +882,7 @@ def reviews_assign(case_id: int, body: AssignRequest, request: Request) -> dict:
     user = require_manager(request, "reviewer")
     _require_database()
     try:
-        return {"case": governance.assign(case_id, body.user_id, user.id if user else None)}
+        return {"case": governance.assign(case_id, body.user_id, user.id if user else None, _site(user))}
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
 
@@ -820,7 +892,7 @@ def reviews_comment(case_id: int, body: CommentRequest, request: Request) -> dic
     user = require_manager(request, "reviewer")
     _require_database()
     try:
-        return {"case": governance.comment(case_id, body.note, user.id if user else None)}
+        return {"case": governance.comment(case_id, body.note, user.id if user else None, _site(user))}
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
 
@@ -831,7 +903,7 @@ def reviews_resolve(case_id: int, body: ResolveRequest, request: Request) -> dic
     _require_database()
     try:
         return {"case": governance.resolve(case_id, body.outcome, body.note, user.id if user else None,
-                                           body.expected_decision)}
+                                           body.expected_decision, _site(user))}
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
 
@@ -841,7 +913,7 @@ def reviews_reopen(case_id: int, body: CommentRequest, request: Request) -> dict
     user = require_manager(request, "reviewer")
     _require_database()
     try:
-        return {"case": governance.reopen(case_id, body.note, user.id if user else None)}
+        return {"case": governance.reopen(case_id, body.note, user.id if user else None, _site(user))}
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
 
@@ -889,20 +961,20 @@ def hazards_update(hazard_id: int, body: HazardRequest, request: Request) -> dic
 
 @app.get("/api/governance/report")
 def governance_report(request: Request, days: int = 30) -> dict:
-    require_manager(request, "reviewer")
+    user = require_manager(request, "reviewer")
     _require_database()
     try:
-        return governance.report(days)
+        return governance.report(days, _site(user))
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
 
 
 @app.get("/api/usage")
 def usage_dashboard(request: Request, days: int = 30) -> dict:
-    require_manager(request, "reviewer")
+    user = require_manager(request, "reviewer")
     _require_database()
     try:
-        return governance.usage(days)
+        return governance.usage(days, _site(user))
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
 
@@ -952,10 +1024,10 @@ def embeddings_summary() -> dict:
 
 @app.get("/api/governance/safety-case")
 def governance_safety_case(request: Request, days: int = 30) -> Response:
-    require_manager(request, "reviewer")
+    user = require_manager(request, "reviewer")
     _require_database()
     try:
-        text = governance.safety_case_markdown(days)
+        text = governance.safety_case_markdown(days, _site(user))
     except Exception as exc:  # noqa: BLE001
         raise _governance_error(exc) from exc
     return Response(text, media_type="text/markdown; charset=utf-8", headers={
@@ -1472,7 +1544,7 @@ def incidents_report(body: IncidentRequest, request: Request) -> dict:
 
     user, _ = _incident_user(request)
     try:
-        return {"incident": incidents.report(body.model_dump(), *_who(user))}
+        return {"incident": incidents.report(body.model_dump(), *_who(user), site_id=user.site_id if user else None)}
     except Exception as exc:  # noqa: BLE001
         raise _incident_error(exc) from exc
 
@@ -1483,14 +1555,15 @@ def incidents_list(request: Request, status: str = "", category: str = "") -> di
 
     user, manager = _incident_user(request)
     try:
-        data = incidents.list_incidents(status, category, None if manager else (user.id if user else None))
+        data = incidents.list_incidents(status, category, None if manager else (user.id if user else None), _site(user))
     except Exception as exc:  # noqa: BLE001
         raise _incident_error(exc) from exc
     if manager:
         with db.session() as s:
             data["people"] = [{"id": u.id, "name": u.name or u.email} for u in
                               s.scalars(select(db.User).where(db.User.role.in_(("reviewer", "admin")),
-                                                              db.User.is_active.is_(True)))]
+                                                              db.User.is_active.is_(True)))
+                              if _site(user) is None or u.site_id in (None, _site(user))]
     return {**data, "can_manage": manager}
 
 
@@ -1498,10 +1571,10 @@ def incidents_list(request: Request, status: str = "", category: str = "") -> di
 def incidents_export(request: Request) -> Response:
     from . import incidents
 
-    _, manager = _incident_user(request)
+    user, manager = _incident_user(request)
     if not manager:
         raise HTTPException(status_code=403, detail="Your role doesn't allow this.")
-    return Response(incidents.export_csv(), media_type="text/csv; charset=utf-8",
+    return Response(incidents.export_csv(_site(user)), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="incidents.csv"'})
 
 
@@ -1511,7 +1584,7 @@ def incidents_get(incident_id: int, request: Request) -> dict:
 
     user, manager = _incident_user(request)
     try:
-        return {"incident": incidents.get(incident_id, None if manager else (user.id if user else None)),
+        return {"incident": incidents.get(incident_id, None if manager else (user.id if user else None), _site(user)),
                 "can_manage": manager}
     except Exception as exc:  # noqa: BLE001
         raise _incident_error(exc) from exc
@@ -1525,7 +1598,7 @@ def incidents_update(incident_id: int, body: IncidentUpdate, request: Request) -
     if not manager:
         raise HTTPException(status_code=403, detail="Your role doesn't allow this.")
     try:
-        return {"incident": incidents.update(incident_id, body.model_dump(exclude_unset=True), *_who(user))}
+        return {"incident": incidents.update(incident_id, body.model_dump(exclude_unset=True), *_who(user), _site(user))}
     except Exception as exc:  # noqa: BLE001
         raise _incident_error(exc) from exc
 
@@ -1536,7 +1609,8 @@ def incidents_comment(incident_id: int, body: IncidentComment, request: Request)
 
     user, manager = _incident_user(request)
     try:
-        return {"incident": incidents.comment(incident_id, body.note, *_who(user), reporter_only=not manager)}
+        return {"incident": incidents.comment(incident_id, body.note, *_who(user), reporter_only=not manager,
+                                              site_id=_site(user))}
     except Exception as exc:  # noqa: BLE001
         raise _incident_error(exc) from exc
 
@@ -1555,10 +1629,16 @@ def _imaging_error(exc: Exception) -> HTTPException:
     raise exc
 
 
-def _imaging_user(request: Request, role: str = "clinician") -> auth.Principal | None:
+def _imaging_user(request: Request, role: str = "clinician", series_id: int | None = None,
+                  report_id: int | None = None) -> auth.Principal | None:
+    from .imaging import store
+
     user = require_manager(request, role)
     if not db.ready():
         raise HTTPException(status_code=503, detail="Imaging needs a database, and it isn't available.")
+    if (series_id is not None or report_id is not None) and \
+            not store.visible(series_id, report_id, _site(user)):
+        raise HTTPException(status_code=404, detail="No such series or report.")
     return user
 
 
@@ -1566,8 +1646,8 @@ def _imaging_user(request: Request, role: str = "clinician") -> auth.Principal |
 def imaging_home(request: Request) -> dict:
     from .imaging import dicom, dicomweb, store
 
-    _imaging_user(request)
-    return {"series": store.list_series(), "models": store.imaging_models(), "pacs": dicomweb.enabled(),
+    user = _imaging_user(request)
+    return {"series": store.list_series(_site(user)), "models": store.imaging_models(), "pacs": dicomweb.enabled(),
             "windows": {k: list(v) for k, v in dicom.WINDOWS.items()},
             "max_upload_mb": config.IMAGING_MAX_UPLOAD_MB}
 
@@ -1594,7 +1674,7 @@ async def imaging_upload(request: Request) -> dict:
         raise HTTPException(status_code=400, detail="Choose DICOM files, a folder of them, or a zip.")
     try:
         return await run_in_threadpool(store.import_series, uploads, "upload", str(form.get("label") or ""),
-                                       user.id if user else None)
+                                       user.id if user else None, _site(user))
     except Exception as exc:  # noqa: BLE001
         raise _imaging_error(exc) from exc
 
@@ -1603,7 +1683,7 @@ async def imaging_upload(request: Request) -> dict:
 def imaging_series(series_id: int, request: Request) -> dict:
     from .imaging import store
 
-    _imaging_user(request)
+    _imaging_user(request, series_id=series_id)
     try:
         return {"series": store.get_series(series_id)}
     except Exception as exc:  # noqa: BLE001
@@ -1614,7 +1694,7 @@ def imaging_series(series_id: int, request: Request) -> dict:
 def imaging_delete(series_id: int, request: Request) -> dict:
     from .imaging import store
 
-    _imaging_user(request, "reviewer")
+    _imaging_user(request, "reviewer", series_id=series_id)
     try:
         store.delete_series(series_id)
         return {"deleted": series_id}
@@ -1626,7 +1706,7 @@ def imaging_delete(series_id: int, request: Request) -> dict:
 async def imaging_slice(series_id: int, index: int, request: Request, window: str | None = None) -> Response:
     from .imaging import store
 
-    _imaging_user(request)
+    _imaging_user(request, series_id=series_id)
     try:
         png = await run_in_threadpool(store.slice_png, series_id, index, window)
     except Exception as exc:  # noqa: BLE001
@@ -1642,7 +1722,7 @@ class ImagingAnalyseRequest(BaseModel):
 def imaging_analyse(series_id: int, body: ImagingAnalyseRequest, request: Request) -> dict:
     from .imaging import store
 
-    user = _imaging_user(request)
+    user = _imaging_user(request, series_id=series_id)
     try:
         return {"analysis": store.start_analysis(series_id, body.model_id, user.id if user else None)}
     except Exception as exc:  # noqa: BLE001
@@ -1662,7 +1742,7 @@ class ImagingReportRequest(BaseModel):
 def imaging_report(series_id: int, body: ImagingReportRequest, request: Request) -> dict:
     from .imaging import store
 
-    user = _imaging_user(request)
+    user = _imaging_user(request, series_id=series_id)
     try:
         return {"report": store.save_report(
             series_id, findings=body.findings, impression=body.impression, agreement=body.agreement,
@@ -1676,7 +1756,7 @@ def imaging_report(series_id: int, body: ImagingReportRequest, request: Request)
 async def imaging_report_download(report_id: int, request: Request) -> Response:
     from .imaging import store
 
-    _imaging_user(request)
+    _imaging_user(request, report_id=report_id)
     try:
         data, info = await run_in_threadpool(store.report_sr, report_id, False)
     except Exception as exc:  # noqa: BLE001
@@ -1689,7 +1769,7 @@ async def imaging_report_download(report_id: int, request: Request) -> Response:
 async def imaging_report_send(report_id: int, request: Request) -> dict:
     from .imaging import dicomweb, store
 
-    _imaging_user(request)
+    _imaging_user(request, report_id=report_id)
     try:
         data, info = await run_in_threadpool(store.report_sr, report_id, True)
         await run_in_threadpool(dicomweb.store, [data], info["study"])
@@ -1736,7 +1816,8 @@ async def imaging_pacs_retrieve(body: PacsRetrieveRequest, request: Request) -> 
     user = _imaging_user(request)
     try:
         files = await run_in_threadpool(dicomweb.retrieve_series, body.study_uid, body.series_uid)
-        return await run_in_threadpool(store.import_series, files, "pacs", body.label, user.id if user else None)
+        return await run_in_threadpool(store.import_series, files, "pacs", body.label, user.id if user else None,
+                                       _site(user))
     except Exception as exc:  # noqa: BLE001
         raise _imaging_error(exc) from exc
 
