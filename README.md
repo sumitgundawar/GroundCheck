@@ -105,11 +105,12 @@ Full instructions, including configuration and Windows, are in
 26. [Deployment](#deployment)
 27. [Project layout](#project-layout)
 28. [Honest limitations](#honest-limitations)
-29. [Reporting issues](#reporting-issues)
-30. [Contributing](#contributing)
-31. [Security](#security)
-32. [License](#license)
-33. [Credits](#credits)
+29. [Changes](#changes)
+30. [Reporting issues](#reporting-issues)
+31. [Contributing](#contributing)
+32. [Security](#security)
+33. [License](#license)
+34. [Credits](#credits)
 
 ---
 
@@ -833,6 +834,49 @@ from whole series the way they'll be analysed, and local validation.
 
 ---
 
+## Speed, caching and hardware
+
+GroundCheck sizes itself to the machine it runs on, and does no work twice.
+
+**Where work runs.** A question's embedding runs on the CPU: it takes a few
+milliseconds, and it's safe to run from many requests at once. Batch work —
+building the index, analysing a scan — runs on an NVIDIA or Apple GPU when
+there is one (`BATCH_DEVICE=auto`), one job at a time. On an M1 laptop that
+is 2,000 passages embedded in 2.2 seconds instead of 38.5, and a 181-slice CT
+analysed in 3.4 seconds instead of 31.
+
+> Don't set `EMBED_DEVICE=mps`. Apple's GPU aborts the process when several
+> requests embed at the same time, which is why per-request work stays on the
+> CPU.
+
+**What is cached.**
+
+| Cache | Holds | Dropped when |
+| --- | --- | --- |
+| Question embeddings | The vector for a question | The index changes |
+| Sentence embeddings | Each passage's sentence vectors | The index changes |
+| Answers | The decision, claims, sources and trace for an identical question with identical settings | `ANSWER_CACHE_SECONDS` (300) passes, or the index changes |
+
+A cached answer is never shared across a change of documents or settings, and
+questions about a specific patient, questions answered by a language model,
+and generated test questions are never cached at all. Every request still
+writes its own audit record, and a repeated refusal still adds to its review
+case. `ANSWER_CACHE_SECONDS=0` turns the answer cache off.
+
+**Sizing.** `app/resources.py` reads the cores, memory and accelerator this
+process really has — including a container's cgroup limits, so a 2-core, 4 GB
+pod sizes itself as 2 cores and 4 GB — and derives the embedding batch size,
+the imaging batch size, how many series stay in memory, how large the
+sentence cache is, how much memory a training run may use, and how many web
+workers the machine can run. Override any of them with `EMBED_BATCH_SIZE`,
+`IMAGING_BATCH_SIZE`, `IMAGING_CACHE_SERIES`, `SENTENCE_CACHE_SIZE`,
+`TRAINING_CACHE_MB` or `WEB_WORKERS`.
+
+**Measured on an M1 laptop, extractive mode:** 61 ms to answer a question,
+9 ms to refuse one, 24 ms for a repeated question.
+
+---
+
 ## Knowledge releases and rollback
 
 Every rebuild of the search index, whether after a document is approved or
@@ -994,6 +1038,10 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `TRAINING_RUNS_DIR` | `models/runs` | Training run settings, progress and logs. |
 | `MODEL_TARGET_ACCURACY` | `0.95` | Accuracy a model must show on answered validation images when setting its confidence threshold. |
 | `MODEL_MIN_CONFIDENCE` | `0.5` | A trained model never answers below this confidence. |
+| `BATCH_DEVICE` | `auto` | Where batch work runs: `auto`, `cuda`, `mps` or `cpu`. |
+| `EMBED_DEVICE` | `cpu` | Where a question's embedding runs. Leave it on the CPU. |
+| `ANSWER_CACHE_SECONDS` | `300` | How long an identical question keeps its answer. 0 turns it off. |
+| `ANSWER_CACHE_SIZE` | `500` | How many answers to keep. |
 | `RELEASE_CHECKS` | `true` | Check each rebuilt index against the safety tests before it goes live. |
 | `RELEASE_AUTO_PROMOTE` | `true` | Put a release that passes live straight away. `false` waits for an admin. |
 | `RELEASES_KEEP` | `10` | How many release snapshots to keep. |
@@ -1184,6 +1232,7 @@ groundcheck/
     imaging/           DICOM import and de-identification, analysis, reports, DICOMweb
     releases.py        checked knowledge releases, promotion and rollback
     sites.py           several hospitals or clinics in one installation
+    resources.py       the machine's cores, memory and accelerator, and the sizes they imply
     monitoring.py      Prometheus metrics, alert rules and notifications
     incidents.py       incident reporting, investigation and regulator deadlines
     data/              synthetic corpus and demo example queries
