@@ -135,6 +135,14 @@ To restore, start a fresh stack with the same keys, then
 `pg_restore -U groundcheck -d groundcheck --clean groundcheck-<date>.dump`
 and copy the data volume back. Run `python -m app.cli verify-audit` afterwards.
 
+`scripts/backup_restore_drill.sh` does the whole drill against a running
+stack: back up, destroy it, restore into a fresh one, and check the accounts
+and the audit trail. Run it on a test deployment, not on production.
+
+```bash
+bash scripts/backup_restore_drill.sh -f deploy/docker-compose.yml --env-file deploy/.env
+```
+
 ## Upgrades
 
 1. Read the release notes.
@@ -210,6 +218,10 @@ machine and copy the Ollama data volume across.
 - [ ] `GROQ_API_KEY` empty, unless a cloud model has been approved by information governance
 - [ ] `INCLUDE_DEMO_CORPUS=false`, so only your approved documents are cited
 - [ ] `API_DOCS=false`
+- [ ] `METRICS_TOKEN` set, and `/metrics` reachable only from your monitoring system
+- [ ] `ALERT_WEBHOOK_URL` pointing at a channel someone watches
+- [ ] Sites created and everyone assigned, if you run more than one hospital or clinic
+- [ ] `RELEASE_CHECKS=true`, so a document change is checked before it goes live
 - [ ] Retention periods agreed with information governance and set
 - [ ] The host's disk encrypted (LUKS, BitLocker or your storage's encryption)
 - [ ] Only ports 80 and 443 open, and only from your clinical network
@@ -218,3 +230,4 @@ machine and copy the Ollama data volume across.
 - [ ] `TRAINING_DATA_DIRS` limited to approved de-identified dataset folders
 - [ ] Clinical safety case and hazard log reviewed and signed off
 - [ ] Penetration test before go-live, and after major changes
+- [ ] `pip-audit` and the safety evaluation re-run on the version you're deploying
