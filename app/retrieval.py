@@ -154,6 +154,10 @@ def load_index() -> None:
     _not_after = np.array([_timestamp(r.get("expires_on")) for r in metadata], dtype="float64")
 
 
+def is_loaded() -> bool:
+    return _store is not None and bool(_metadata)
+
+
 def _ensure_loaded() -> None:
     if _store is None or not _metadata:
         load_index()

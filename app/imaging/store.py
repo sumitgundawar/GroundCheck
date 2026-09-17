@@ -271,6 +271,9 @@ def _run(analysis_id: int) -> None:
         status, error = "refused", str(exc)
     except Exception as exc:  # noqa: BLE001 - recorded for the person who asked
         status, error = "failed", f"The analysis failed: {type(exc).__name__}."
+    from .. import monitoring
+
+    monitoring.observe_imaging(status)
     with db.session() as s:
         row = s.get(ImagingAnalysis, analysis_id)
         if row is None:

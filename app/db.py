@@ -25,6 +25,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -183,6 +184,10 @@ class AuditRecord(Base):
     prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     entry_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     chain_alg: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # For monitoring without decrypting records: whether this was a test
+    # question, and the best retrieval score. Both are derived from `record`.
+    test_run: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    top_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     __table_args__ = (
         Index("ix_audit_records_created_at", "created_at"),
@@ -404,6 +409,30 @@ class Hazard(Base):
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+
+
+class Alert(Base):
+    """An operational alert (app/monitoring.py): one row per episode, from
+    firing until it resolves."""
+
+    __tablename__ = "alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rule: Mapped[str] = mapped_column(String(40), nullable=False)
+    severity: Mapped[str] = mapped_column(String(10), nullable=False)     # warning, critical
+    status: Mapped[str] = mapped_column(String(10), nullable=False)       # firing, resolved
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    first_seen: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    acknowledged_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    acknowledged_by_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (Index("ix_alerts_rule_status", "rule", "status"),)
 
 
 class ImagingSeries(Base):

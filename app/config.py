@@ -209,6 +209,25 @@ MODEL_TARGET_ACCURACY = _get_float("MODEL_TARGET_ACCURACY", 0.95)
 # with many classes, a top class at 30% means the model is torn.
 MODEL_MIN_CONFIDENCE = _get_float("MODEL_MIN_CONFIDENCE", 0.5)
 
+# --- Monitoring and alerts (see app/monitoring.py) ---
+VERSION = "1.0.0"
+# A name for this instance, included in alert notifications.
+INSTANCE_NAME = _get("INSTANCE_NAME", "") or __import__("socket").gethostname()
+# Bearer token Prometheus sends to /metrics. Without it, /metrics answers only
+# requests from this machine.
+METRICS_TOKEN = _get("METRICS_TOKEN", "")
+ALERT_INTERVAL_SECONDS = _get_int("ALERT_INTERVAL_SECONDS", 60)   # 0 turns background checks off
+ALERT_WEBHOOK_URL = _get("ALERT_WEBHOOK_URL", "")
+ALERT_WINDOW_MINUTES = _get_int("ALERT_WINDOW_MINUTES", 60)
+ALERT_MIN_QUESTIONS = _get_int("ALERT_MIN_QUESTIONS", 20)
+ALERT_REFUSAL_RISE = _get_float("ALERT_REFUSAL_RISE", 0.15)
+ALERT_LATENCY_P95_MS = _get_int("ALERT_LATENCY_P95_MS", 15000)
+ALERT_DRIFT_PSI = _get_float("ALERT_DRIFT_PSI", 0.25)
+ALERT_OVERDUE_CRITICAL = _get_int("ALERT_OVERDUE_CRITICAL", 10)
+ALERT_DOCUMENT_EXPIRY_DAYS = _get_int("ALERT_DOCUMENT_EXPIRY_DAYS", 14)
+ALERT_CHAIN_CHECK_MINUTES = _get_int("ALERT_CHAIN_CHECK_MINUTES", 360)
+ALERT_DISABLED_RULES = {r.strip() for r in _get("ALERT_DISABLED_RULES", "").split(",") if r.strip()}
+
 # --- CT and MRI imaging (see app/imaging/) ---
 # Your organisation's name, recorded in signed imaging reports.
 ORGANISATION_NAME = _get("ORGANISATION_NAME", "")

@@ -78,6 +78,14 @@ function startDashboard() {
   wireForm();
   wireCollapsibles();
   wireNavigation();
+  refreshAlertBadge();
+  setInterval(refreshAlertBadge, 60000);
+}
+
+// The sidebar shows how many alerts are firing, for people who can see them.
+async function refreshAlertBadge() {
+  if (!canSee("monitoring") || document.hidden) return;
+  try { updateAlertBadge((await api("/api/monitoring")).firing); } catch (_) { /* shown on the page itself */ }
 }
 
 // ---------- Accounts ----------
@@ -191,7 +199,7 @@ function canSee(view) {
   const role = account.user?.role;
   if (!account.authRequired) return view !== "users";
   const rank = { clinician: 0, reviewer: 1, admin: 2 }[role] ?? -1;
-  const needs = { usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0, training: 2, models: 1, ehr: 2 }[view] ?? 0;
+  const needs = { monitoring: 1, usage: 1, review: 1, documents: 1, "data-protection": 1, users: 2, "local-ai": 0, training: 2, models: 1, ehr: 2 }[view] ?? 0;
   return rank >= needs;
 }
 
@@ -3625,6 +3633,115 @@ function wireEhr() {
   });
 }
 
+// ---------- Monitoring ----------
+const RULE_NOW = { firing: "Firing", ok: "OK", off: "Off" };
+
+function sinceText(iso) {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} h ago`;
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+function updateAlertBadge(firing) {
+  const badge = $("nav-alert-count");
+  if (!firing || !firing.length) { badge.hidden = true; return; }
+  badge.hidden = false;
+  badge.textContent = String(firing.length);
+  badge.classList.toggle("warning", !firing.some((a) => a.severity === "critical"));
+  badge.setAttribute("aria-label", `${firing.length} alert${firing.length === 1 ? "" : "s"} firing`);
+}
+
+async function loadMonitoring(check = false) {
+  let data;
+  try {
+    data = check ? await api("/api/monitoring/evaluate", { method: "POST" }) : await api("/api/monitoring");
+  } catch (err) { showMessage("monitoring-message", err.message, true); return; }
+  $("monitoring-message").hidden = true;
+  renderMonitoring(data);
+  if (check) {
+    const c = data.changes || {};
+    const parts = [];
+    if (c.fired?.length) parts.push(`${c.fired.length} started firing`);
+    if (c.resolved?.length) parts.push(`${c.resolved.length} resolved`);
+    if (c.errors?.length) parts.push(`${c.errors.length} check${c.errors.length === 1 ? "" : "s"} couldn’t run`);
+    showMessage("monitoring-message", `Checked. ${parts.length ? parts.join(", ") + "." : "No changes."}`, !!c.errors?.length);
+  }
+}
+
+function renderMonitoring(data) {
+  updateAlertBadge(data.firing);
+  const critical = data.firing.filter((a) => a.severity === "critical").length;
+  const status = $("monitor-status");
+  status.className = `monitor-status${critical ? " critical" : data.firing.length ? " warning" : ""}`;
+  status.textContent = "";
+  status.append(el("span", "pulse"), el("strong", "", data.firing.length
+    ? `${data.firing.length} alert${data.firing.length === 1 ? "" : "s"} firing${critical ? `, ${critical} critical` : ""}`
+    : "All checks are clear"), el("span", "when", `Checked every ${Math.round(data.interval_seconds / 60) || 1} min`));
+
+  const n = data.now;
+  const stats = $("monitor-stats");
+  stats.textContent = "";
+  const refusal = n.refusal_rate === null ? "–" : `${Math.round(n.refusal_rate * 100)}%`;
+  const baseline = n.baseline_refusal_rate === null ? "" : `Usually ${Math.round(n.baseline_refusal_rate * 100)}%, over the last week`;
+  stats.append(
+    statTile(`Questions, last ${n.window_minutes} min`, n.questions.toLocaleString()),
+    statTile(`Refused, last ${n.window_minutes} min`, refusal, baseline, { attention: data.firing.some((a) => a.rule === "refusal_rate") }),
+    statTile("95th percentile response", formatMs(n.p95_ms), null, { attention: data.firing.some((a) => a.rule === "latency") }),
+    statTile("Server errors, 15 min", n.server_error_rate_15m === null ? "–" : `${(n.server_error_rate_15m * 100).toFixed(1)}%`,
+      `${n.requests_15m.toLocaleString()} requests on this instance`, { attention: data.firing.some((a) => a.rule === "server_errors") }),
+  );
+
+  const list = $("alert-list");
+  list.textContent = "";
+  $("alert-empty").hidden = data.firing.length > 0;
+  data.firing.forEach((a) => {
+    const li = el("li", `alert-item ${a.severity}`);
+    const body = document.createElement("div");
+    const h = el("h3");
+    h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? "Critical" : "Warning"), a.title);
+    body.append(h, el("p", "", a.detail), el("p", "alert-meta",
+      `Firing since ${sinceText(a.first_seen)}, last checked ${sinceText(a.last_seen)}.${a.acknowledged_by ? ` Acknowledged by ${a.acknowledged_by} ${sinceText(a.acknowledged_at)}.` : ""}`));
+    const actions = el("div", "alert-actions");
+    if (!a.acknowledged_at) {
+      actions.appendChild(button("Acknowledge", "btn-ghost", false, async (e) => {
+        e.target.disabled = true;
+        try { await api(`/api/alerts/${a.id}/acknowledge`, { method: "POST" }); loadMonitoring(); }
+        catch (err) { showMessage("monitoring-message", err.message, true); e.target.disabled = false; }
+      }));
+    }
+    li.append(body, actions);
+    list.appendChild(li);
+  });
+
+  const rows = $("rules-rows");
+  rows.textContent = "";
+  const firingRules = new Set(data.firing.map((a) => a.rule));
+  data.rules.forEach((r) => {
+    const tr = document.createElement("tr");
+    const state = data.disabled.includes(r.rule) ? "off" : firingRules.has(r.rule) ? "firing" : "ok";
+    const pill = el("span", `status-pill rule-state ${state === "firing" ? "status-rejected" : state === "ok" ? "status-approved" : "status-retired"}`, RULE_NOW[state]);
+    const cell = document.createElement("td"); cell.appendChild(pill);
+    tr.append(el("td", "", r.name), el("td", "", r.limit), cell);
+    rows.appendChild(tr);
+  });
+  $("monitor-notify").textContent = data.webhook
+    ? "Alerts are also posted to the configured webhook when they fire and resolve."
+    : "Set ALERT_WEBHOOK_URL to post alerts to Slack, Teams or a paging service.";
+
+  const resolved = $("resolved-list");
+  resolved.textContent = "";
+  $("resolved-empty").hidden = data.resolved.length > 0;
+  data.resolved.slice(0, 8).forEach((a) => {
+    const li = el("li", "alert-item");
+    const h = el("h3"); h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? "Critical" : "Warning"), a.title);
+    li.append(h, el("p", "alert-meta", `Fired ${new Date(a.first_seen).toLocaleString()}, resolved ${sinceText(a.resolved_at)}.`));
+    resolved.appendChild(li);
+  });
+}
+
 // ---------- CT and MRI ----------
 // A list of imported series, and a viewer for one (#/imaging/12): slices with
 // windowing and the model's regions, the analysis, and the clinician's report.
@@ -4313,6 +4430,7 @@ const VIEWS = {
   ehr: { load: () => loadEhrPage() },
   models: { load: () => loadModels() },
   imaging: { load: () => loadImaging() },
+  monitoring: { load: () => loadMonitoring() },
 };
 
 function currentView() {
@@ -4361,6 +4479,7 @@ function wireNavigation() {
   });
   wireTraining();
   wireImaging();
+  $("monitoring-check").addEventListener("click", async (e) => { e.target.disabled = true; await loadMonitoring(true); e.target.disabled = false; });
   $("mi-modality").addEventListener("change", (e) => fillImagingWindows(e.target.value));
   $("model-imaging-form").addEventListener("submit", (e) => { e.preventDefault(); saveModelImaging(false); });
   $("mi-remove").addEventListener("click", () => saveModelImaging(true));

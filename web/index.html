@@ -27,6 +27,7 @@
     <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
     <symbol id="i-folder-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></symbol>
     <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><ellipse cx="12" cy="12" rx="5" ry="6"/><path d="M12 6v12"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
     <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
@@ -419,6 +420,11 @@
         </div>
         <div class="nav-group" id="nav-admin">
           <p class="nav-label">Administration</p>
+          <a class="nav-link" href="#/monitoring" data-view="monitoring">
+            <svg class="nav-icon" aria-hidden="true"><use href="#i-bell"/></svg>
+            <span>Monitoring</span>
+            <span class="nav-count nav-alert" id="nav-alert-count" hidden></span>
+          </a>
           <a class="nav-link" href="#/local-ai" data-view="local-ai">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-cpu"/></svg>
             <span>Local AI</span>
@@ -1192,6 +1198,44 @@
             </div>
             <p class="auth-hint" id="runs-empty" hidden>No training runs yet.</p>
           </section>
+        </section>
+
+        <!-- Monitoring -->
+        <section class="view" id="view-monitoring" data-title="Monitoring" aria-labelledby="monitoring-title" hidden>
+          <header class="page-head">
+            <div>
+              <h1 class="page-title" id="monitoring-title">Monitoring</h1>
+              <p class="page-sub">Alerts from live use: refusals, response times, drift from the documents, overdue reviews, expiring documents and the audit trail. Prometheus can scrape <code>/metrics</code>.</p>
+            </div>
+            <div class="page-actions">
+              <button type="button" class="btn btn-sm btn-primary" id="monitoring-check">Check now</button>
+            </div>
+          </header>
+          <p class="modal-message" id="monitoring-message" role="status" hidden></p>
+          <div class="monitor-status" id="monitor-status" role="status"></div>
+          <div class="stat-grid monitor-stats" id="monitor-stats"></div>
+          <section class="panel" aria-labelledby="alerts-title">
+            <h2 class="panel-heading" id="alerts-title">Firing</h2>
+            <ul class="alert-list" id="alert-list"></ul>
+            <p class="auth-hint" id="alert-empty" hidden>Nothing is firing.</p>
+          </section>
+          <div class="usage-grid">
+            <section class="panel" aria-labelledby="rules-title">
+              <h2 class="panel-heading" id="rules-title">Checks</h2>
+              <div class="users-table-wrap">
+                <table class="users-table rules-table">
+                  <thead><tr><th scope="col">Check</th><th scope="col">Alerts when</th><th scope="col">Now</th></tr></thead>
+                  <tbody id="rules-rows"></tbody>
+                </table>
+              </div>
+              <p class="field-hint" id="monitor-notify"></p>
+            </section>
+            <section class="panel" aria-labelledby="resolved-title">
+              <h2 class="panel-heading" id="resolved-title">Recently resolved</h2>
+              <ul class="alert-list resolved" id="resolved-list"></ul>
+              <p class="auth-hint" id="resolved-empty" hidden>No resolved alerts yet.</p>
+            </section>
+          </div>
         </section>
 
         <!-- CT and MRI -->

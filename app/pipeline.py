@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 
-from . import audit, config, governance, guards_input, guards_output, llm, patient_checks, retrieval
+from . import audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, retrieval
 from .schemas import AskResponse, Claim, PatientContext, PatientFinding, Settings, Source, TraceStep
 
 # The full ordered set of stage names, used to render skipped stages after an
@@ -97,6 +97,10 @@ def _finish(
     if not extras.get("review", True):
         saved["test_run"] = True  # kept in the audit trail, left out of usage reports
     audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"))
+    if not saved.get("test_run"):
+        kind = (extras.get("provider") or {}).get("kind") if llm_used else None
+        monitoring.observe_answer(decision, response.total_ms,
+                                  "local" if kind == "local" else "cloud" if llm_used else "extractive")
     if decision == "refuse" and extras.get("review", True) and audit.store.backend() == "database":
         governance.record_refusal(audit_id, str(extras.get("redacted_query", "")), refused_reason or "")
     return response

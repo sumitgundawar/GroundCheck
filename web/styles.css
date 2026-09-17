@@ -1306,6 +1306,45 @@ body { background: var(--canvas); color: var(--text); }
 .cds-card.info .finding-tag { color: var(--info); border-color: var(--info-border); }
 @media (max-width: 640px) { .ehr-load { grid-template-columns: minmax(0, 1fr); } }
 
+/* ---------- Monitoring ---------- */
+.nav-alert { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.nav-alert.warning { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn); }
+.monitor-status { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4);
+  border-radius: var(--radius); border: 1px solid var(--ok-border); background: var(--ok-bg); font-size: 14px; }
+.monitor-status:empty { display: none; }
+.monitor-status strong { font-size: 15px; color: var(--ink); }
+.monitor-status .pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); flex: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 22%, transparent); }
+.monitor-status.warning { border-color: var(--warn-border); background: var(--warn-bg); }
+.monitor-status.warning .pulse { background: var(--warn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 22%, transparent); }
+.monitor-status.critical { border-color: var(--danger-border); background: var(--danger-bg); }
+.monitor-status.critical .pulse { background: var(--danger); box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 22%, transparent); }
+.monitor-status .when { margin-left: auto; font-size: 12.5px; color: var(--text-quiet); }
+.monitor-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.alert-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.alert-list:empty { display: none; }
+.alert-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-4); padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); box-shadow: inset 4px 0 0 var(--warn); }
+.alert-item.critical { box-shadow: inset 4px 0 0 var(--danger); }
+.alert-item h3 { margin: 0 0 2px; font-size: 15px; color: var(--ink); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.alert-item p { margin: 0; font-size: 13.5px; }
+.alert-item .alert-meta { margin-top: 6px; font-size: 12.5px; color: var(--text-quiet); }
+.alert-item .alert-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: start; justify-content: flex-end; }
+.sev { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 0 7px; border-radius: 999px; border: 1px solid; line-height: 18px; }
+.sev.critical { color: var(--danger); background: var(--danger-bg); border-color: var(--danger-border); }
+.sev.warning { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-border); }
+.alert-list.resolved .alert-item { box-shadow: none; grid-template-columns: minmax(0, 1fr); }
+.alert-list.resolved h3 { font-size: 14px; font-weight: 600; }
+.rules-table td { white-space: normal; vertical-align: top; }
+.rules-table td:first-child { font-weight: 500; white-space: nowrap; }
+.rule-state { white-space: nowrap; }
+@media (max-width: 860px) { .monitor-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .alert-item { grid-template-columns: minmax(0, 1fr); }
+  .alert-item .alert-actions { justify-content: flex-start; }
+  .monitor-status { flex-wrap: wrap; }
+  .monitor-status .when { margin-left: 22px; }
+}
+
 /* ---------- CT and MRI ---------- */
 /* The viewer is a reading room: dark in both themes, as radiology displays
    are, so grey levels read the same whatever the dashboard's theme. */

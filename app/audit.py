@@ -29,6 +29,16 @@ from .schemas import AskResponse
 log = logging.getLogger("groundcheck.audit")
 
 
+def _top_score(extras: dict[str, Any]) -> float | None:
+    scores = []
+    for item in extras.get("retrieved") or []:
+        try:
+            scores.append(float(item.get("score")))
+        except (TypeError, ValueError):
+            continue
+    return max(scores) if scores else None
+
+
 class AuditStore:
     def __init__(self, capacity: int, log_path: Path | None = None, persist: bool = True):
         self.capacity = capacity
@@ -104,6 +114,8 @@ class AuditStore:
                         total_ms=response.total_ms,
                         llm_used=response.llm_used,
                         record=record,
+                        test_run=bool(extras.get("test_run")),
+                        top_score=_top_score(extras),
                     ))
             except Exception as exc:  # noqa: BLE001 - never fail a question over the audit
                 log.error("Couldn't write audit record %s to the database: %s", audit_id, exc)

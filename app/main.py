@@ -3,7 +3,10 @@ The embedding model and search index are loaded once at startup."""
 
 from __future__ import annotations
 
+import asyncio
+import hmac
 import html
+import time
 import ipaddress
 import logging
 import json
@@ -19,7 +22,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from . import (
-    audit, auth, config, db, encryption, governance, integrity, llm, local_ai, pipeline, retention, retrieval, sso,
+    audit, auth, config, db, encryption, governance, integrity, llm, local_ai, monitoring, pipeline, retention, retrieval,
+    sso,
 )
 from .schemas import AskRequest, AskResponse, Settings
 
@@ -35,10 +39,13 @@ async def lifespan(_: FastAPI):
     # Warm the model and load the prebuilt index before serving traffic. On a
     # new server whose index lives on an empty data volume, build it first.
     retrieval.get_model()
+    checks = None
     if db.ready():
         from .imaging import store as imaging_store
 
         imaging_store.recover_interrupted()
+        if config.ALERT_INTERVAL_SECONDS > 0:
+            checks = asyncio.create_task(_alert_loop())
     try:
         retrieval.load_index()
     except FileNotFoundError:
@@ -46,10 +53,25 @@ async def lifespan(_: FastAPI):
 
         logging.getLogger("groundcheck").warning("No search index found in %s; building it now.", config.INDEX_DIR)
         knowledge.rebuild_index()
-    yield
+    try:
+        yield
+    finally:
+        if checks is not None:
+            checks.cancel()
 
 
-app = FastAPI(title="GroundCheck", version="1.0.0", lifespan=lifespan,
+async def _alert_loop() -> None:
+    """Evaluate alert rules in the background, starting a minute after startup."""
+    await asyncio.sleep(min(60, config.ALERT_INTERVAL_SECONDS))
+    while True:
+        try:
+            await run_in_threadpool(monitoring.evaluate)
+        except Exception:  # noqa: BLE001 - keep checking
+            logging.getLogger("groundcheck").exception("Alert evaluation failed")
+        await asyncio.sleep(config.ALERT_INTERVAL_SECONDS)
+
+
+app = FastAPI(title="GroundCheck", version=config.VERSION, lifespan=lifespan,
               docs_url="/docs" if config.API_DOCS else None, redoc_url="/redoc" if config.API_DOCS else None,
               openapi_url="/openapi.json" if config.API_DOCS else None)
 
@@ -1579,6 +1601,76 @@ async def imaging_pacs_retrieve(body: PacsRetrieveRequest, request: Request) -> 
         return await run_in_threadpool(store.import_series, files, "pacs", body.label, user.id if user else None)
     except Exception as exc:  # noqa: BLE001
         raise _imaging_error(exc) from exc
+
+
+# --- Monitoring -----------------------------------------------------------------
+
+@app.middleware("http")
+async def count_requests(request: Request, call_next):
+    """Request counts and latency for /metrics, labelled by route template so
+    IDs in paths don't create a metric per record."""
+    started = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        route = request.scope.get("route")
+        template = getattr(route, "path", None) or ("static" if request.method == "GET" else "unmatched")
+        monitoring.observe_request(request.method, template, status, time.perf_counter() - started)
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics(request: Request) -> Response:
+    if config.METRICS_TOKEN:
+        supplied = request.headers.get("authorization", "")
+        if not hmac.compare_digest(supplied.encode(), f"Bearer {config.METRICS_TOKEN}".encode()):
+            return Response("Unauthorized\n", status_code=401, media_type="text/plain")
+    elif not _is_local_request(request):
+        return Response("Set METRICS_TOKEN to scrape metrics from another machine.\n", status_code=403,
+                        media_type="text/plain")
+    return Response(monitoring.render(), media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
+@app.get("/healthz/live", include_in_schema=False)
+def health_live() -> dict:
+    """The process is running. For a container orchestrator's liveness probe."""
+    return {"status": "ok"}
+
+
+@app.get("/healthz/ready", include_in_schema=False)
+def health_ready() -> JSONResponse:
+    """Ready for traffic: the database answers and the search index is loaded."""
+    checks = {"database": db.ready(), "index": retrieval.is_loaded()}
+    ok = all(checks.values())
+    return JSONResponse({"status": "ok" if ok else "unavailable", "checks": checks}, status_code=200 if ok else 503)
+
+
+@app.get("/api/monitoring")
+def monitoring_overview(request: Request) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    return monitoring.overview()
+
+
+@app.post("/api/monitoring/evaluate")
+async def monitoring_evaluate(request: Request) -> dict:
+    require_manager(request, "reviewer")
+    _require_database()
+    changes = await run_in_threadpool(monitoring.evaluate)
+    return {"changes": changes, **(await run_in_threadpool(monitoring.overview))}
+
+
+@app.post("/api/alerts/{alert_id}/acknowledge")
+def alerts_acknowledge(alert_id: int, request: Request) -> dict:
+    user = require_manager(request, "reviewer")
+    _require_database()
+    try:
+        return {"alert": monitoring.acknowledge(alert_id, user.id if user else None,
+                                                (user.name or user.email) if user else "Local user")}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="No such alert.") from exc
 
 
 # The dashboard loads nothing from other sites, so the policy allows only this

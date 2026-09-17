@@ -95,18 +95,19 @@ Full instructions, including configuration and Windows, are in
 16. [EHR integration](#ehr-integration)
 17. [Training imaging models](#training-imaging-models)
 18. [CT and MRI](#ct-and-mri)
-19. [Configuration](#configuration)
-20. [Local development](#local-development)
-21. [Running the checks](#running-the-checks)
-22. [Troubleshooting](#troubleshooting)
-23. [Deployment](#deployment)
-24. [Project layout](#project-layout)
-25. [Honest limitations](#honest-limitations)
-26. [Reporting issues](#reporting-issues)
-27. [Contributing](#contributing)
-28. [Security](#security)
-29. [License](#license)
-30. [Credits](#credits)
+19. [Monitoring and alerts](#monitoring-and-alerts)
+20. [Configuration](#configuration)
+21. [Local development](#local-development)
+22. [Running the checks](#running-the-checks)
+23. [Troubleshooting](#troubleshooting)
+24. [Deployment](#deployment)
+25. [Project layout](#project-layout)
+26. [Honest limitations](#honest-limitations)
+27. [Reporting issues](#reporting-issues)
+28. [Contributing](#contributing)
+29. [Security](#security)
+30. [License](#license)
+31. [Credits](#credits)
 
 ---
 
@@ -814,6 +815,49 @@ from whole series the way they'll be analysed, and local validation.
 
 ---
 
+## Monitoring and alerts
+
+The **Monitoring** page (reviewers and admins) shows what's firing, the last
+hour's questions, refusal rate and response time, and every check with its
+threshold. Checks run every `ALERT_INTERVAL_SECONDS` (60) from the database,
+so every instance agrees, and on demand with **Check now**:
+
+| Check | Alerts when |
+| --- | --- |
+| Refusal rate | The last hour's refusal rate is `ALERT_REFUSAL_RISE` (15 points) or three standard errors above the last week's, with at least `ALERT_MIN_QUESTIONS` questions. Critical at twice that. |
+| Response time | The last hour's 95th-percentile response time is above `ALERT_LATENCY_P95_MS` (15 s). |
+| Question drift | The best search scores of the last day have shifted from the last month's: population stability index at least `ALERT_DRIFT_PSI` (0.25). People may be asking about things the documents don't cover. |
+| Overdue reviews | Any review case is past due. Critical at `ALERT_OVERDUE_CRITICAL` (10). |
+| Document expiry | An approved document expires within `ALERT_DOCUMENT_EXPIRY_DAYS` (14). Critical once expired. |
+| Audit trail | The tamper-evident audit chain doesn't verify, checked every `ALERT_CHAIN_CHECK_MINUTES` (360). |
+| Server errors | 5% of this instance's requests in 15 minutes failed. |
+| Imaging failures | An imaging analysis failed in the last day. |
+
+Test questions are left out. An alert fires once, stays firing while the
+condition holds, can be acknowledged, and resolves by itself. With
+`ALERT_WEBHOOK_URL` set, firing, escalation and resolution are posted as JSON
+with a `text` field, which Slack and Microsoft Teams incoming webhooks accept.
+Turn checks off with `ALERT_DISABLED_RULES=latency,imaging_failures`.
+
+**Prometheus.** `/metrics` serves request counts and latency by route,
+questions by decision and what drafted them, imaging analyses by outcome, open
+and overdue review cases, and firing alerts. Set `METRICS_TOKEN` and scrape
+with it as a bearer token; without a token, only requests from the same
+machine are answered.
+
+```yaml
+scrape_configs:
+  - job_name: groundcheck
+    authorization: { credentials: "<METRICS_TOKEN>" }
+    static_configs: [{ targets: ["groundcheck:8000"] }]
+```
+
+**Health probes.** `/healthz/live` answers while the process runs.
+`/healthz/ready` returns 503 until the database answers and the search index
+is loaded, for load balancers and Kubernetes readiness probes.
+
+---
+
 ## Configuration
 
 All settings are read from the environment with safe defaults (`app/config.py`).
@@ -861,6 +905,11 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `TRAINING_RUNS_DIR` | `models/runs` | Training run settings, progress and logs. |
 | `MODEL_TARGET_ACCURACY` | `0.95` | Accuracy a model must show on answered validation images when setting its confidence threshold. |
 | `MODEL_MIN_CONFIDENCE` | `0.5` | A trained model never answers below this confidence. |
+| `METRICS_TOKEN` | _empty_ | Bearer token for `/metrics`. Without it, only local requests are answered. |
+| `ALERT_WEBHOOK_URL` | _empty_ | Where alerts are posted when they fire and resolve. |
+| `ALERT_INTERVAL_SECONDS` | `60` | How often alert checks run. 0 turns background checks off. |
+| `ALERT_DISABLED_RULES` | _empty_ | Checks to turn off, comma-separated. |
+| `INSTANCE_NAME` | the host name | Named in alert notifications. |
 | `IMAGING_DIR` | `data/imaging` | Where imported CT and MRI series are stored, encrypted when `DATA_ENCRYPTION_KEYS` is set. |
 | `IMAGING_MAX_UPLOAD_MB` | `1024` | Largest imaging upload. |
 | `DICOMWEB_URL` | _empty_ | A PACS or VNA's DICOMweb root, to search, retrieve series and send signed reports. |
@@ -996,6 +1045,7 @@ groundcheck/
     audit.py           in-memory ring buffer plus JSONL persistence
     training/          training studio: datasets, worker process, model library
     imaging/           DICOM import and de-identification, analysis, reports, DICOMweb
+    monitoring.py      Prometheus metrics, alert rules and notifications
     data/              synthetic corpus and demo example queries
   scripts/
     generate_corpus.py  builds the synthetic corpus
