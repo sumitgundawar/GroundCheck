@@ -979,21 +979,21 @@ docker run -p 7860:7860 groundcheck</code></pre>
             </details>
           </li>
 
-          <li class="phase-card spotlight" data-state="planned">
+          <li class="phase-card spotlight" data-state="available">
             <div class="phase-head">
               <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#activity"/></svg></span>
-              <span class="state">Planned</span>
+              <span class="state">Available now</span>
             </div>
             <h3>Production operations</h3>
             <p class="phase-goal">Run across many sites, and catch problems before clinicians do.</p>
             <details class="phase-details">
               <summary>What’s included</summary>
               <ul>
-                <li>Multi-site tenancy, high availability and Kubernetes deployment</li>
-                <li>Monitoring of refusal rates, latency and data drift, with alerts</li>
-                <li>Versioned models and sources, staged rollout and one-step rollback</li>
-                <li>Incident reporting and post-market surveillance</li>
-                </ul>
+                <li>Several hospitals or clinics in one installation, each seeing only its own records, on Docker Compose or Kubernetes with Helm</li>
+                <li>Prometheus metrics, health probes, and alerts on refusal rates, response times, drift from the documents and overdue reviews</li>
+                <li>Every change to the documents checked against the safety tests before it goes live, with one-step rollback</li>
+                <li>Incident reporting graded by harm, with regulator deadlines for data breaches and serious harm</li>
+              </ul>
             </details>
           </li>
         </ul>
@@ -1123,7 +1123,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
           </details>
           <details>
             <summary>Can I use it with real clinical documents?</summary>
-            <p>Yes. Replace the corpus with your own records and rebuild the index. Then re-tune the thresholds and write evaluation cases for your content, because the defaults were tuned on synthetic data. Keep real patient data out of the corpus, issues and pull requests.</p>
+            <p>Yes. Import your approved guidelines, formularies and protocols as PDF, Word, HTML or Markdown; someone other than the uploader approves each one, and every change is checked against the safety tests before it goes live. Re-tune the thresholds and add test questions for your content, because the defaults were tuned on synthetic data. Keep real patient data out of issues and pull requests.</p>
           </details>
           <details>
             <summary>Which language models work?</summary>
@@ -1144,6 +1144,10 @@ docker run -p 7860:7860 groundcheck</code></pre>
           <details>
             <summary>Can I train models on my own images?</summary>
             <p>Yes. Choose a folder of images arranged by class, pick a GPU or the CPU, and watch it train. Each model is saved to a library with its accuracy per class, and it abstains when it isn’t confident or an image looks unfamiliar. To try it, <code>python scripts/fetch_scan_dataset.py organamnist</code> downloads public abdominal CT slices.</p>
+          </details>
+          <details>
+            <summary>Can a hospital group run it?</summary>
+            <p>Yes. One installation serves several hospitals or clinics: each site sees only its own questions, reviews, incidents and imaging, and group staff see all of them. It runs with Docker Compose and PostgreSQL, or on Kubernetes with the Helm chart, and exposes Prometheus metrics, health probes and alerts for your operations team.</p>
           </details>
           <details>
             <summary>Does it analyse CT or MRI scans yet?</summary>

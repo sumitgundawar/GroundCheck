@@ -1,0 +1,30 @@
+{{- if .Values.metrics.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "groundcheck.fullname" . }}
+  labels:
+    {{- include "groundcheck.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: groundcheck
+      rules:
+        - alert: GroundCheckCriticalAlertFiring
+          expr: max(groundcheck_alerts_firing{severity="critical", job="{{ include "groundcheck.fullname" . }}"}) > 0
+          for: 2m
+          labels: { severity: critical }
+          annotations:
+            summary: "GroundCheck has a critical alert. See its Monitoring page."
+        - alert: GroundCheckDown
+          expr: absent(up{job="{{ include "groundcheck.fullname" . }}"} == 1)
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "No GroundCheck instance is being scraped."
+        - alert: GroundCheckSlowAnswers
+          expr: histogram_quantile(0.95, sum(rate(groundcheck_question_duration_seconds_bucket{job="{{ include "groundcheck.fullname" . }}"}[15m])) by (le)) > 15
+          for: 15m
+          labels: { severity: warning }
+          annotations:
+            summary: "95% of GroundCheck answers take more than 15 s."
+{{- end }}

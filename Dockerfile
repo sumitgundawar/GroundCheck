@@ -11,13 +11,22 @@ ENV HOME=/home/user \
 
 WORKDIR /app
 COPY --chown=user requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
+# PyTorch for the CPU by default, which keeps the image a few GB smaller. For
+# training on NVIDIA GPUs build with
+#   --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir --index-url "$TORCH_INDEX_URL" torch torchvision \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir "psycopg[binary]==3.*" "pymysql==1.*"
 
 COPY --chown=user . .
 
 # Ensure the cache directories are writable by the non-root user.
-RUN mkdir -p /home/user/.cache/huggingface /home/user/.cache/sentence-transformers \
-    && chown -R user /home/user/.cache /app
+# /data is where deployments mount their volume (deploy/docker-compose.yml). A
+# new named volume copies this folder's ownership, so the app can write to it.
+RUN mkdir -p /home/user/.cache/huggingface /home/user/.cache/sentence-transformers /data \
+    && chown -R user /home/user/.cache /app /data
 
 USER user
 
@@ -29,4 +38,4 @@ RUN python scripts/build_index.py && python scripts/run_eval.py
 # (Hugging Face Spaces). Shell form so the variable expands at runtime.
 ENV PORT=7860
 EXPOSE 7860
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}"]

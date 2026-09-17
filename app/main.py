@@ -40,6 +40,13 @@ async def lifespan(_: FastAPI):
     # new server whose index lives on an empty data volume, build it first.
     retrieval.get_model()
     checks = None
+    try:
+        retrieval.load_index()
+    except FileNotFoundError:
+        from . import knowledge
+
+        logging.getLogger("groundcheck").warning("No search index found in %s; building it now.", config.INDEX_DIR)
+        knowledge.rebuild_index("First index on this server")
     if db.ready():
         from .imaging import store as imaging_store
 
@@ -50,13 +57,6 @@ async def lifespan(_: FastAPI):
             logging.getLogger("groundcheck").exception("Couldn't record the baseline release")
         if config.ALERT_INTERVAL_SECONDS > 0:
             checks = asyncio.create_task(_alert_loop())
-    try:
-        retrieval.load_index()
-    except FileNotFoundError:
-        from . import knowledge
-
-        logging.getLogger("groundcheck").warning("No search index found in %s; building it now.", config.INDEX_DIR)
-        knowledge.rebuild_index()
     try:
         yield
     finally:

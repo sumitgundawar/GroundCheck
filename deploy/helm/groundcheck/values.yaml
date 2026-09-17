@@ -1,0 +1,101 @@
+# GroundCheck on Kubernetes. See deploy/helm/README.md.
+
+image:
+  repository: groundcheck
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# One replica with a ReadWriteOnce volume. Several replicas need PostgreSQL
+# (database.url) and a ReadWriteMany volume for the index, models, imaging
+# files and release snapshots.
+replicaCount: 1
+
+database:
+  # Name of an existing Secret holding DATABASE_URL, e.g.
+  # postgresql+psycopg://groundcheck:password@postgres:5432/groundcheck
+  existingSecret: ""
+  secretKey: DATABASE_URL
+
+# An existing Secret with the rest of the sensitive settings, as keys named like
+# the environment variables: DATA_ENCRYPTION_KEYS, AUDIT_SIGNING_KEYS,
+# OIDC_CLIENT_SECRET, SMART_CLIENT_SECRET, METRICS_TOKEN, DICOMWEB_AUTHORIZATION,
+# ALERT_WEBHOOK_URL, GROQ_API_KEY. Every key present is passed to the app.
+existingSecret: ""
+
+# Plain settings (see the README's Configuration table).
+env:
+  AUTH_REQUIRED: "true"
+  SESSION_COOKIE_SECURE: "true"
+  ADMIN_ACCESS: "none"
+  API_DOCS: "false"
+  INCLUDE_DEMO_CORPUS: "false"
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 20Gi
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: groundcheck.example.org
+  tls:
+    enabled: true
+    secretName: groundcheck-tls
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    memory: 6Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+# Restrict traffic: ingress only from the ingress controller's namespace and
+# Prometheus; egress only to DNS, the database and the listed destinations.
+networkPolicy:
+  enabled: false
+  ingressNamespace: ingress-nginx
+  prometheusNamespace: monitoring
+  # Extra egress rules, e.g. to an EHR, a PACS or an identity provider.
+  extraEgress: []
+
+metrics:
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+  # PrometheusRule alerts on GroundCheck's own alerts, answers slowing, and pods down.
+  prometheusRule:
+    enabled: false
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}

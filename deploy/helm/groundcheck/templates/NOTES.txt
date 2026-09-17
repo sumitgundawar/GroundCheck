@@ -1,0 +1,8 @@
+GroundCheck is starting. On a new volume it builds the search index first, which can take a few minutes; the pod is ready when /healthz/ready answers.
+
+{{- if .Values.ingress.enabled }}
+Open https://{{ .Values.ingress.host }} and create the first administrator.
+{{- else }}
+kubectl port-forward svc/{{ include "groundcheck.fullname" . }} 8000:{{ .Values.service.port }}
+then open http://localhost:8000 and create the first administrator. Sessions need HTTPS unless SESSION_COOKIE_SECURE is "false".
+{{- end }}

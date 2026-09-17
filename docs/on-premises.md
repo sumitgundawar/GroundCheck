@@ -147,6 +147,21 @@ and copy the data volume back. Run `python -m app.cli verify-audit` afterwards.
 To roll back, restore the backup taken in step 2 and check out the previous
 release.
 
+A data volume created by a version before 1.0 may be owned by root, which
+stops the app from writing to it. Fix it once:
+
+```bash
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env run --rm --user root --entrypoint chown app -R 1000:1000 /data
+```
+
+## Kubernetes
+
+A Helm chart is in `deploy/helm/groundcheck`, with the same hardening: a
+non-root, read-only container, readiness and liveness probes, and a volume
+uninstalling never deletes. It needs an existing PostgreSQL database and
+Secrets for the database URL and keys. See `deploy/helm/README.md`. The
+chart passes `helm lint` and Kubernetes 1.30 schema validation.
+
 ## Rotating keys
 
 - **Encryption:** put the new key first in `DATA_ENCRYPTION_KEYS` and the old
@@ -159,8 +174,15 @@ release.
 
 ## Monitoring
 
-- `GET /api/health` returns 200 when the app is serving, with the size of the
-  search index. The compose file uses it as the container health check.
+- `GET /healthz/ready` returns 200 when the database answers and the search
+  index is loaded, and 503 otherwise; the compose file uses it as the
+  container health check. `GET /healthz/live` answers while the process runs.
+- `GET /metrics` serves Prometheus metrics to requests with
+  `Authorization: Bearer <METRICS_TOKEN>`.
+- The **Monitoring** page shows alerts on refusal rates, response times,
+  drift from the documents, overdue reviews, expiring documents, the audit
+  trail and failed releases. Set `ALERT_WEBHOOK_URL` to post them to Slack,
+  Teams or a paging service.
 - Caddy writes JSON access logs to standard output, and the app writes its logs
   there too: collect them with your log platform.
 - The **Usage** page shows questions, refusals and response times; **Review**

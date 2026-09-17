@@ -14,3 +14,7 @@ data/datasets/
 site/
 .tracker/
 deploy/.env
+data/imaging/
+data/imaging-samples/
+deploy/helm/
+node_modules/

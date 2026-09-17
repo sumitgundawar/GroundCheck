@@ -1,0 +1,24 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+{{- if not .Values.existingSecret }}
+{{- fail "The ServiceMonitor needs METRICS_TOKEN in existingSecret." }}
+{{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "groundcheck.fullname" . }}
+  labels:
+    {{- include "groundcheck.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "groundcheck.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ .Values.existingSecret }}
+          key: METRICS_TOKEN
+{{- end }}
