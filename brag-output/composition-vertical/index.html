@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>GroundCheck — it refuses to guess</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Atkinson Hyperlegible Next";
+        src: url("assets/fonts/atkinson-hyperlegible-next-latin.woff2") format("woff2");
+        font-weight: 200 800;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Atkinson Hyperlegible Mono";
+        src: url("assets/fonts/atkinson-hyperlegible-mono-latin.woff2") format("woff2");
+        font-weight: 200 800;
+        font-style: normal;
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #f5f7f6;
+      }
+
+      /* Colour means status only: green is pass, red is refuse, grey is not
+         reached. Nothing else in this film is coloured. */
+      :root {
+        --ground: #f5f7f6;
+        --surface: #ffffff;
+        --ink: #0f2622;
+        --text: #1c2b28;
+        --muted: #4f5f5b;
+        --line: #d6dedb;
+        --line-strong: #b9c5c1;
+        --pass: #17784a;
+        --pass-bg: #e3f3ea;
+        --fail: #b8241c;
+        --fail-bg: #fbe9e7;
+        --skip: #8d9894;
+        --skip-text: #66726e;
+        --sans: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
+        --mono: "Atkinson Hyperlegible Mono", ui-monospace, monospace;
+      }
+
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: var(--ground);
+        color: var(--text);
+        font-family: var(--sans);
+        overflow: hidden;
+      }
+
+      .clip {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0 72px;
+      }
+
+      /* ---------- Scene 1: the question, and the answer that isn't one ---------- */
+
+      #s1 { gap: 56px; }
+      #s1-eyebrow {
+        font-family: var(--mono);
+        font-size: 22px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      #s1-question {
+        font-family: var(--mono);
+        font-size: 52px;
+        line-height: 1.5;
+        color: var(--ink);
+        max-width: 940px;
+      }
+      #s1-question .ch { opacity: 0; }
+      #s1-caret {
+        display: inline-block;
+        width: 3px;
+        height: 46px;
+        background: var(--ink);
+        vertical-align: -6px;
+        margin-left: 6px;
+        opacity: 0;
+      }
+      #s1-refused {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        opacity: 0;
+      }
+      #s1-mark {
+        width: 34px;
+        height: 34px;
+        background: var(--fail);
+        transform: rotate(45deg);
+        border-radius: 4px;
+      }
+      #s1-word {
+        font-size: 104px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--fail);
+        line-height: 1;
+      }
+
+      /* ---------- The audit record panel, recreated from the product ---------- */
+
+      .panel {
+        width: 936px;
+        margin: 0 auto;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .panel-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 26px 34px;
+        border-bottom: 1px solid var(--line);
+        font-family: var(--mono);
+        font-size: 24px;
+        color: var(--muted);
+      }
+      .panel-head .total { color: var(--muted); }
+      .panel-question {
+        padding: 30px 34px;
+        border-bottom: 1px solid var(--line);
+        font-family: var(--mono);
+        font-size: 27px;
+        line-height: 1.4;
+        color: var(--ink);
+      }
+      .rows { padding: 12px 0; }
+      /* Portrait has no room for four columns, so the detail sits under the
+         name and the millisecond column stays where the eye expects it. */
+      .row {
+        display: grid;
+        grid-template-columns: 54px 1fr 86px;
+        grid-template-rows: auto auto;
+        align-items: center;
+        gap: 2px 16px;
+        padding: 16px 30px;
+        opacity: 0;
+      }
+      .row .mark { grid-row: 1 / 3; }
+      .row .name { grid-column: 2; grid-row: 1; }
+      .row .detail { grid-column: 2; grid-row: 2; }
+      .row .ms { grid-column: 3; grid-row: 1 / 3; }
+      .row + .row { border-top: 1px solid var(--line); }
+      .row .name { font-size: 31px; font-weight: 700; color: var(--ink); }
+      .row .detail { font-size: 27px; color: var(--muted); }
+      .row .ms {
+        font-family: var(--mono);
+        font-size: 25px;
+        text-align: right;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .mark {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--pass);
+      }
+      .row.fail { background: var(--fail-bg); }
+      .row.fail .name, .row.fail .detail { color: var(--fail); font-weight: 700; }
+      .row.fail .ms { color: var(--fail); }
+      .row.fail .mark { background: var(--fail); border-radius: 3px; transform: rotate(45deg); }
+      .row.skip .name, .row.skip .detail { color: var(--skip-text); font-weight: 400; }
+      .row.skip .ms { color: var(--skip-text); }
+      .row.skip .mark { background: transparent; border: 2px solid var(--skip); }
+
+      .verdict {
+        display: flex;
+        align-items: baseline;
+        gap: 22px;
+        padding: 28px 34px;
+        border-top: 1px solid var(--line);
+        opacity: 0;
+      }
+      .verdict .word { font-size: 40px; font-weight: 700; color: var(--fail); }
+      .verdict .said { font-size: 27px; color: var(--text); }
+
+      /* ---------- Scene 3: answered, and cited ---------- */
+
+      .answer {
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+        align-items: flex-start;
+        padding: 30px 34px 34px;
+        border-top: 1px solid var(--line);
+        opacity: 0;
+      }
+      .answer-text {
+        font-size: 33px;
+        line-height: 1.5;
+        color: var(--ink);
+        max-width: 850px;
+      }
+      .cite {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 24px;
+        color: var(--pass);
+        background: var(--pass-bg);
+        border: 1px solid var(--pass);
+        border-radius: 6px;
+        padding: 2px 10px;
+        margin-left: 10px;
+        opacity: 0;
+      }
+      .source-card {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 20px 22px;
+        opacity: 0;
+      }
+      .source-card .sid {
+        font-family: var(--mono);
+        font-size: 22px;
+        color: var(--muted);
+      }
+      .source-card .stitle {
+        margin-top: 8px;
+        font-size: 24px;
+        color: var(--text);
+        line-height: 1.35;
+      }
+      .verdict.ok .word { color: var(--pass); }
+
+      /* ---------- Scene 4: the number, then the name ---------- */
+
+      #s4 { gap: 34px; }
+      #s4-number {
+        font-family: var(--mono);
+        font-size: 132px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      #s4-label { font-size: 38px; color: var(--muted); opacity: 0; }
+      #s4-zero-line {
+        display: flex;
+        align-items: baseline;
+        gap: 28px;
+        margin-top: 26px;
+        opacity: 0;
+      }
+      #s4-zero {
+        font-family: var(--mono);
+        font-size: 120px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--pass);
+      }
+      #s4-zero-label { font-size: 38px; color: var(--muted); }
+
+      #s5 { gap: 26px; }
+      #s5-name {
+        font-size: 104px;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        color: var(--ink);
+        line-height: 1;
+        opacity: 0;
+      }
+      #s5-line { font-size: 46px; color: var(--text); opacity: 0; }
+      #s5-domain {
+        font-family: var(--mono);
+        font-size: 30px;
+        color: var(--muted);
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="23"
+      data-width="1080"
+      data-height="1920"
+    >
+      <!-- Scene 1 — the question, and the answer that isn't one -->
+      <section id="s1" class="clip" data-start="0" data-duration="5.4" data-track-index="0">
+        <p id="s1-eyebrow">A clinician asks</p>
+        <p id="s1-question"><span id="s1-typed"></span><span id="s1-caret"></span></p>
+        <div id="s1-refused">
+          <span id="s1-mark"></span>
+          <span id="s1-word">REFUSED</span>
+        </div>
+      </section>
+
+      <!-- Scene 2 — eleven checks, and the four that never ran -->
+      <section id="s2" class="clip" data-start="5.4" data-duration="8.9" data-track-index="0">
+        <div class="panel" id="s2-panel">
+          <div class="panel-head">
+            <span>Audit record <span id="s2-id">82f38f41</span></span>
+            <span class="total">6 ms</span>
+          </div>
+          <p class="panel-question">“What is the recommended dose of Zalortin for a patient with Veltris syndrome?”</p>
+          <div class="rows">
+            <div class="row" id="r1"><span class="mark"></span><span class="name">PII redaction</span><span class="detail">no personal data found</span><span class="ms">&lt;1</span></div>
+            <div class="row" id="r2"><span class="mark"></span><span class="name">Scope check</span><span class="detail">no injection patterns</span><span class="ms">&lt;1</span></div>
+            <div class="row" id="r3"><span class="mark"></span><span class="name">Rate limit</span><span class="detail">within limit</span><span class="ms">&lt;1</span></div>
+            <div class="row" id="r4"><span class="mark"></span><span class="name">Retrieve</span><span class="detail">top 4 passages, best score 0.71</span><span class="ms">5</span></div>
+            <div class="row" id="r5"><span class="mark"></span><span class="name">Retrieval gate</span><span class="detail">0.71 clears the 0.30 threshold</span><span class="ms">&lt;1</span></div>
+            <div class="row fail" id="r6"><span class="mark"></span><span class="name">Source coverage</span><span class="detail">“zalortin” is in no trusted source</span><span class="ms">1</span></div>
+            <div class="row skip" id="r7"><span class="mark"></span><span class="name">Generate</span><span class="detail">not reached</span><span class="ms">–</span></div>
+            <div class="row skip" id="r8"><span class="mark"></span><span class="name">Schema validation</span><span class="detail">not reached</span><span class="ms">–</span></div>
+            <div class="row skip" id="r9"><span class="mark"></span><span class="name">Grounding check</span><span class="detail">not reached</span><span class="ms">–</span></div>
+            <div class="row skip" id="r10"><span class="mark"></span><span class="name">Dosage guard</span><span class="detail">not reached</span><span class="ms">–</span></div>
+          </div>
+          <div class="verdict" id="s2-verdict">
+            <span class="word">Refused</span>
+            <span class="said">Routed for review. No model was called.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scene 3 — the other side: answered, and cited -->
+      <section id="s3" class="clip" data-start="14.3" data-duration="3.7" data-track-index="0">
+        <div class="panel" id="s3-panel">
+          <div class="panel-head">
+            <span>Audit record <span id="s3-id">72adc72d</span></span>
+            <span class="total">57 ms</span>
+          </div>
+          <p class="panel-question">“What is the first-line medication for Veltris syndrome?”</p>
+          <div class="rows" id="s3-rows">
+            <div class="row" id="q1"><span class="mark"></span><span class="name">Source coverage</span><span class="detail">every key term is in a source</span><span class="ms">1</span></div>
+            <div class="row" id="q2"><span class="mark"></span><span class="name">Generate</span><span class="detail">4 claims drafted from sources</span><span class="ms">&lt;1</span></div>
+            <div class="row" id="q3"><span class="mark"></span><span class="name">Grounding check</span><span class="detail">all 4 claims grounded</span><span class="ms">51</span></div>
+            <div class="row" id="q4"><span class="mark"></span><span class="name">Dosage guard</span><span class="detail">15 mg verified against the source</span><span class="ms">&lt;1</span></div>
+          </div>
+          <div class="answer" id="s3-answer">
+            <p class="answer-text">When pharmacological treatment is indicated, the first-line agent is Caloradine.<span class="cite" id="s3-cite">[VELT-002]</span></p>
+            <div class="source-card" id="s3-source">
+              <p class="sid">VELT-002</p>
+              <p class="stitle">Veltris syndrome: first-line medication</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scene 4 — the number -->
+      <section id="s4" class="clip" data-start="18" data-duration="2.4" data-track-index="0">
+        <p id="s4-number">0</p>
+        <p id="s4-label">questions that had to be refused</p>
+        <div id="s4-zero-line">
+          <span id="s4-zero">0</span>
+          <span id="s4-zero-label">answered</span>
+        </div>
+      </section>
+
+      <!-- Scene 5 — the name -->
+      <section id="s5" class="clip" data-start="20.4" data-duration="2.6" data-track-index="0">
+        <p id="s5-name">GroundCheck</p>
+        <p id="s5-line">It refuses to guess.</p>
+        <p id="s5-domain">groundcheckhealth.com</p>
+      </section>
+
+      <!-- Audio: a low bed, a tick per check, one dull impact on the refusal. -->
+      <audio id="bgm" src="assets/music/happy-beats-business-moves-vol-9-by-ende-dot-app.mp3" data-start="0" data-duration="23" data-track-index="10" data-volume="1"></audio>
+
+      <audio id="key1" src="assets/sfx/click_002.ogg" data-start="0.45" data-duration="0.01" data-track-index="11" data-volume="0.16"></audio>
+      <audio id="key2" src="assets/sfx/click_002.ogg" data-start="0.95" data-duration="0.01" data-track-index="11" data-volume="0.13"></audio>
+      <audio id="key3" src="assets/sfx/click_002.ogg" data-start="1.45" data-duration="0.01" data-track-index="11" data-volume="0.15"></audio>
+      <audio id="key4" src="assets/sfx/click_002.ogg" data-start="1.95" data-duration="0.01" data-track-index="11" data-volume="0.12"></audio>
+      <audio id="refuse-hit" src="assets/sfx/impactSoft_medium_001.ogg" data-start="3.7" data-duration="0.18" data-track-index="11" data-volume="0.5"></audio>
+
+      <audio id="tick1" src="assets/sfx/click_003.ogg" data-start="6.34" data-duration="0.01" data-track-index="12" data-volume="0.3"></audio>
+      <audio id="tick2" src="assets/sfx/click_003.ogg" data-start="7.4" data-duration="0.01" data-track-index="12" data-volume="0.3"></audio>
+      <audio id="tick3" src="assets/sfx/click_003.ogg" data-start="8.44" data-duration="0.01" data-track-index="12" data-volume="0.3"></audio>
+      <audio id="tick4" src="assets/sfx/click_003.ogg" data-start="9.5" data-duration="0.01" data-track-index="12" data-volume="0.3"></audio>
+      <audio id="tick5" src="assets/sfx/click_003.ogg" data-start="10.54" data-duration="0.01" data-track-index="12" data-volume="0.3"></audio>
+      <audio id="fail-hit" src="assets/sfx/impactSoft_medium_001.ogg" data-start="11.6" data-duration="0.18" data-track-index="12" data-volume="0.45"></audio>
+      <audio id="settle" src="assets/sfx/bong_001.ogg" data-start="15.81" data-duration="0.12" data-track-index="12" data-volume="0.22"></audio>
+    </div>
+
+    <script>
+      // The question is typed character by character. Each character is its own
+      // span so the reveal is a seekable tween, not a render-time clock.
+      const QUESTION = "“What is the recommended dose of Zalortin for a patient with Veltris syndrome?”";
+      const typed = document.getElementById("s1-typed");
+      for (const character of QUESTION) {
+        const span = document.createElement("span");
+        span.className = "ch";
+        span.textContent = character;
+        typed.appendChild(span);
+      }
+
+      const tl = gsap.timeline({ paused: true });
+
+      // --- Scene 1 -------------------------------------------------------
+      tl.fromTo("#s1-eyebrow", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.15);
+      tl.to("#s1-caret", { opacity: 1, duration: 0.01 }, 0.4);
+      tl.to("#s1-typed .ch", { opacity: 1, duration: 0.01, stagger: 0.025 }, 0.4);
+      tl.to("#s1-caret", { opacity: 0, duration: 0.2 }, 2.6);
+      // beat-locked: 3.70s — the refusal lands on the beat, once.
+      tl.fromTo("#s1-refused", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 3.7);
+      tl.fromTo("#s1-mark", { scale: 0.4 }, { scale: 1, duration: 0.3, ease: "power3.out" }, 3.7);
+      tl.to("#s1", { opacity: 0, duration: 0.3, ease: "power1.in" }, 5.1);
+
+      // --- Scene 2 -------------------------------------------------------
+      tl.fromTo("#s2-panel", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 5.5);
+      // beat-grid: rows on every other beat so each label and value can be read.
+      const rowTimes = [6.34, 7.4, 8.44, 9.5, 10.54];
+      rowTimes.forEach((time, i) => {
+        tl.fromTo(`#r${i + 1}`, { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.3, ease: "power2.out" }, time);
+      });
+      // beat-locked: 11.60s — the one check that fails.
+      tl.fromTo("#r6", { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.3, ease: "power3.out" }, 11.6);
+      // The four that never ran arrive together, quietly.
+      tl.fromTo("#r7, #r8, #r9, #r10", { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.06, ease: "none" }, 12.65);
+      tl.fromTo("#s2-verdict", { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.out" }, 13.18);
+      tl.to("#s2", { opacity: 0, duration: 0.3, ease: "power1.in" }, 14.0);
+
+      // --- Scene 3 -------------------------------------------------------
+      tl.fromTo("#s3-panel", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 14.4);
+      tl.fromTo("#s3-rows .row", { opacity: 0 }, { opacity: 1, duration: 0.25, stagger: 0.09, ease: "none" }, 14.76);
+      tl.fromTo("#s3-answer", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 15.28);
+      // beat-locked: 15.81s — the citation lands, and its source card marks itself.
+      tl.fromTo("#s3-cite", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.3, ease: "power3.out" }, 15.81);
+      tl.fromTo("#s3-source", { opacity: 0, x: 12 }, { opacity: 1, x: 0, duration: 0.35, ease: "power2.out" }, 15.95);
+      tl.to("#s3-source", { borderLeftColor: "#17784a", duration: 0.3, ease: "none" }, 16.34);
+      tl.to("#s3", { opacity: 0, duration: 0.3, ease: "power1.in" }, 17.7);
+
+      // --- Scene 4 -------------------------------------------------------
+      const counter = { value: 0 };
+      const numberEl = document.getElementById("s4-number");
+      tl.to(counter, {
+        value: 221313,
+        duration: 1.0,
+        ease: "power2.out",
+        onUpdate: () => { numberEl.textContent = Math.round(counter.value).toLocaleString("en-GB"); },
+      }, 18.2);
+      tl.fromTo("#s4-number", { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "none" }, 18.2);
+      tl.fromTo("#s4-label", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "none" }, 18.5);
+      tl.fromTo("#s4-zero-line", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 19.48);
+      tl.to("#s4", { opacity: 0, duration: 0.3, ease: "power1.in" }, 20.1);
+
+      // --- Scene 5 -------------------------------------------------------
+      tl.fromTo("#s5-name", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 20.54);
+      tl.fromTo("#s5-line", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "none" }, 21.06);
+      tl.fromTo("#s5-domain", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "none" }, 21.5);
+
+      // --- Audio ---------------------------------------------------------
+      // The tween carries the level, so the element's gain stays at 1 and a seek
+      // to any point in the film lands on the level the timeline says.
+      tl.set("#bgm", { volume: 0 }, 0);
+      tl.to("#bgm", { volume: 0.18, duration: 0.8, ease: "none" }, 0);
+      tl.to("#bgm", { volume: 0, duration: 1.4, ease: "none" }, 21.2);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+# Third-party music, sound effects and font binaries live with their own
+# licences; see README.md for where to copy them from before re-rendering.
+composition*/assets/
+composition*/snapshots/
+composition*/node_modules/
+composition*/CLAUDE.md
+composition*/AGENTS.md
+brag-plan.md
+composition-brief.md

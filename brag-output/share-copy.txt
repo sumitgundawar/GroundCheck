@@ -1,0 +1,1 @@
+Most AI demos show you what the model answered. GroundCheck shows you what it refused: the question, the eleven checks, the one that failed, and the four that never ran because no model was called. Across 252,825 test questions, all 221,313 that had to be refused were refused.
