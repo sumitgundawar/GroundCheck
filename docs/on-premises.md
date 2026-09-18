@@ -102,6 +102,43 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec app \
 Keep this account as the emergency account, even when everyone else signs in
 through single sign-on.
 
+### A single container, without Compose
+
+Compose is the supported install, because it brings PostgreSQL and HTTPS with
+it. For a small site that is happy with SQLite behind an existing reverse
+proxy, the image runs on its own — as long as every path that holds state is
+pointed at the mounted volume. The plain `docker run` in the README writes
+inside the container, so `docker rm` takes the data with it.
+
+```bash
+docker volume create groundcheck-data
+docker run -d --name groundcheck -p 7860:7860 \
+  -v groundcheck-data:/data \
+  -e AUTH_REQUIRED=true -e ADMIN_ACCESS=none \
+  -e DATABASE_URL=sqlite:////data/groundcheck.db \
+  -e AUDIT_LOG_PATH=/data/audit/audit_log.jsonl \
+  -e LOCAL_AI_STATE_PATH=/data/local_ai.json \
+  -e INDEX_DIR=/data/index \
+  -e MODEL_LIBRARY_DIR=/data/models/library \
+  -e TRAINING_RUNS_DIR=/data/models/runs \
+  -e IMAGING_DIR=/data/imaging \
+  -e DATA_ENCRYPTION_KEYS=... -e AUDIT_SIGNING_KEYS=... \
+  groundcheck:1.0.0
+docker exec -it groundcheck python -m app.cli create-user \
+  --email admin@your-trust.nhs.uk --role admin
+```
+
+The first start builds the search index into the empty volume, which takes a
+couple of minutes on a CPU; the port stays closed until it finishes, so give
+health checks a start period of five minutes. Later starts are ready in about
+twenty seconds. Terminate TLS in front of it and set
+`SESSION_COOKIE_SECURE=true`.
+
+Metrics are refused from other machines unless `METRICS_TOKEN` is set; from the
+host itself, `docker exec groundcheck python -c "import urllib.request;
+print(urllib.request.urlopen('http://127.0.0.1:7860/metrics').read().decode())"`
+works without one.
+
 ## Sign-in
 
 Register GroundCheck with your identity provider (Entra ID, Okta, Keycloak,

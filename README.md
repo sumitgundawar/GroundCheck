@@ -68,7 +68,10 @@ docker run -p 7860:7860 groundcheck
 ```
 
 Open http://localhost:7860. The image builds the index and runs the evaluation
-while it builds, so it starts instantly.
+while it builds, so it starts instantly. This run keeps nothing: it is for
+trying GroundCheck out. To keep data, see
+[A single container, without Compose](docs/on-premises.md#a-single-container-without-compose),
+or use Docker Compose, below.
 
 Full instructions, including configuration and Windows, are in
 [Local development](#local-development).
