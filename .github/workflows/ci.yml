@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
   schedule:
     - cron: "0 3 * * 1"   # Monday, for the full safety evaluation and fresh advisories
 
@@ -84,6 +85,21 @@ jobs:
           path: |
             sbom.json
             third-party-licences.csv
+
+  container:
+    name: Container image
+    # The image build runs the index build and the full evaluation inside it,
+    # so this is weekly and on demand rather than on every push.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t groundcheck:test .
+
+      - name: Run it the way a site would, and check what it kept
+        run: scripts/container_smoke.sh groundcheck:test
 
   site:
     name: Website checks

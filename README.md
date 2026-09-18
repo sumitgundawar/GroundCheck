@@ -1125,14 +1125,26 @@ A local `.env` file (git-ignored) is also read on startup, so you can put
 
 ```bash
 python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383 patient scenarios
-pytest -q                                   # 360 tests, including property-based fuzzing
+pytest -q                                   # 381 tests, including property-based fuzzing
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
 python scripts/stress_eval.py               # all 252,825 cases (about an hour on 7 cores)
+scripts/container_smoke.sh groundcheck:test # the built image, the way a site runs it
 ```
 
 Everything runs in extractive mode, so it's deterministic and offline. CI
 (`.github/workflows/ci.yml`) builds the index, runs the evaluation, the test
-suite and a stress sample on every push and pull request.
+suite and a stress sample on every push and pull request. The image build and
+its smoke test run weekly, and on demand from the Actions tab.
+
+### The container smoke test
+
+`scripts/container_smoke.sh` starts the image on a fresh volume with accounts
+required, the way `docs/on-premises.md` describes a single-container install.
+It waits for the index to be built, signs in, checks that a medicine in no
+source is refused and that a real question is answered with grounded, cited
+claims, asks the same question again to see the cache, reads the monitoring
+page and the metrics, then restarts the container and checks the account, the
+audit records and the hash chain all came back.
 
 ### The large evaluation
 
