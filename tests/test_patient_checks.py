@@ -270,3 +270,22 @@ def test_sex_is_required_when_the_kidney_figure_comes_from_creatinine():
     with_sex = codes("What dose of Caloradine?", [claim("Caloradine is given at 15 mg once daily.")],
                      age_years=70, weight_kg=60, creatinine_umol_l=150, sex="female")
     assert "missing_data" not in with_sex
+
+
+def test_a_moderate_interaction_is_noted_without_stopping_the_answer():
+    """Three severities, three outcomes: contraindicated stops an answer, major
+    warns, moderate is worth knowing but changes nothing. No medicine in the
+    demo formulary carries a moderate rule, so this builds one."""
+    idx = formulary.index()
+    watched = formulary.Medicine(
+        name="Plaxetin", classes=["anticoagulants"],
+        interactions=[formulary.InteractionRule(id="PLX-INT-1", with_medicine="Caloradine",
+                                                severity="moderate", note="Watch for drowsiness.")])
+    idx.by_name["plaxetin"] = watched
+    try:
+        found = codes("What dose of Caloradine?", [claim("Caloradine is given at 15 mg once daily.")],
+                      **{**ADULT, "medicines": ["Plaxetin"]})
+        assert found["interaction_moderate"] == "info"
+        assert "interaction_contraindicated" not in found and "interaction_major" not in found
+    finally:
+        del idx.by_name["plaxetin"]

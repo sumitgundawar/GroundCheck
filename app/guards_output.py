@@ -67,6 +67,11 @@ _STOPWORDS = {
     # the wrong reason. Deliberately EXCLUDES entity/qualifier words.
     "next", "step", "steps", "follow", "following", "fail", "fails", "failed",
     "failing", "failure", "together", "maximum", "minimum", "max", "min",
+    # The other ways of asking for a limit. Without these, "the lowest dose"
+    # refused because "lowest" was treated as a clinical term nothing covers,
+    # instead of with the reason that is actually true: no source states one.
+    "highest", "lowest", "smallest", "largest", "upper", "limit", "least",
+    "amount", "amounts",
     "needs", "needed", "take", "takes", "taking", "get", "getting", "make",
     "makes", "made", "work", "works", "working", "help", "helps", "start",
     "starts", "starting", "begin", "begins", "stop", "stops", "increase",
@@ -279,12 +284,15 @@ def _with_article(phrase: str) -> str:
 # Questions that ask for a dose limit. A source only answers them if it states
 # a limit; a starting dose is not a maximum.
 _LIMIT_QUESTION = re.compile(
-    r"\b(?:(max(?:imum)?|highest|upper limit|most)|(min(?:imum)?|lowest|least))\b[^?.]*\b(?:dose|dosage|amount)\b"
-    r"|\b(?:dose|dosage)\b[^?.]*\b(?:(max(?:imum)?|highest|upper limit)|(min(?:imum)?|lowest))\b",
+    r"\b(?:(max(?:imum)?|highest|largest|upper limit|most)|(min(?:imum)?|lowest|smallest|least))\b"
+    r"[^?.]*\b(?:dose|dosage|amount)\b"
+    r"|\b(?:dose|dosage|amount)\b[^?.]*\b(?:(max(?:imum)?|highest|largest|upper limit)"
+    r"|(min(?:imum)?|lowest|smallest))\b",
     re.IGNORECASE,
 )
-_MAX_WORDS = ("maximum", "max", "highest", "exceed", "not more than", "no more than", "up to", "upper limit")
-_MIN_WORDS = ("minimum", "lowest", "at least", "no less than")
+_MAX_WORDS = ("maximum", "max", "highest", "largest", "exceed", "not more than", "no more than",
+              "up to", "upper limit")
+_MIN_WORDS = ("minimum", "lowest", "smallest", "at least", "no less than")
 
 # Questions that ask for a dose to use in combination: "combine X with Y at
 # what dose", "the dose of X when taken together with Y".

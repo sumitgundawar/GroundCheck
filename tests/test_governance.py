@@ -305,7 +305,9 @@ def test_usage_dashboard(queue):
     assert len(u["daily"]) == 7 and u["daily"][-1] == {"date": u["to"], "answered": 1, "refused": 2}
     t = u["totals"]
     assert (t["questions"], t["answered"], t["refused"], t["deidentified"]) == (3, 1, 2, 1)
-    assert t["median_ms"] is not None and t["open_reviews"] == 2
+    # A median of three real runs: a number, in milliseconds, not a placeholder.
+    assert isinstance(t["median_ms"], (int, float)) and 0 <= t["median_ms"] < 60000
+    assert t["open_reviews"] == 2
     assert u["drafted_by"] == {"Extractive": 3, "Local model": 0, "Cloud model": 0}
     assert u["refusal_reasons"] == {"term not in sources": 2}
     assert u["top_sources"] and u["top_sources"][0]["citations"] >= 1

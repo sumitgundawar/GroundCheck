@@ -247,3 +247,16 @@ def test_a_form_word_is_checked_against_sources_about_the_medicine_named():
         "What is the dose of topical Caloradine?", _sources("CALO-001", "VELT-002", "INTR-001"))
     assert "topical" in report["checked_terms"]
     assert report["unsupported_forms"] == ["topical"]
+
+
+def test_a_minimum_dose_the_sources_never_state_is_refused():
+    """The mirror of the maximum-dose rule. A starting dose is not a floor, so
+    a question asking for the lowest dose is refused unless a source gives one."""
+    for query in ["What is the minimum dose of Caloradine?", "What is the lowest dose of Caloradine?"]:
+        ok, detail = guards_output.coverage_check(query, _sources("CALO-001", "VELT-002"))
+        assert not ok, f"{query} was answered"
+        assert detail == "no trusted source states a minimum dose", detail
+
+    ok, detail = guards_output.coverage_check(
+        "What is the smallest amount of Caloradine I can give?", _sources("CALO-001", "VELT-002"))
+    assert not ok and "minimum" in detail

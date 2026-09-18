@@ -197,3 +197,20 @@ def test_switching_back_to_no_local_model(client):
     assert r.status_code == 200
     assert r.json()["selected"] is None
     assert local_ai.selected_model() is None
+
+
+def test_a_local_model_that_returns_nonsense_is_treated_as_no_answer(monkeypatch):
+    """Small local models are the ones most likely to return something that
+    isn't the schema. Every shape of that has to end as no answer, not as a
+    half-parsed one, and never as an exception reaching the person asking."""
+    monkeypatch.setattr(llm, "active_provider", lambda: {"kind": "local", "model": "llama3.2:3b"})
+    for reply in [None,                                    # the model gave nothing
+                  "I'm afraid I can't help with that.",    # prose instead of JSON
+                  "{",                                     # truncated
+                  '{"claims": "not a list"}',              # right key, wrong type
+                  '{"insufficient_context": false}',       # no claims at all
+                  '{"claims": [{"text": "x"}]}']:          # a claim citing nothing
+        monkeypatch.setattr(local_ai, "chat_json",
+                            lambda *a, reply=reply, **k: reply)
+        answer = llm.generate_llm("What is the standard dose of Caloradine?", [])
+        assert answer is None or not answer.claims or all(not c.source_ids for c in answer.claims), reply

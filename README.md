@@ -1124,7 +1124,7 @@ A local `.env` file (git-ignored) is also read on startup, so you can put
 
 ```bash
 python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383 patient scenarios
-pytest -q                                   # 401 tests, including property-based fuzzing
+pytest -q                                   # 405 tests, including property-based fuzzing
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
 python scripts/stress_eval.py               # all 253,722 cases (about an hour on 7 cores)
 scripts/container_smoke.sh groundcheck:test # the built image, the way a site runs it

@@ -445,3 +445,23 @@ def test_live_smart_launch_against_the_smart_health_it_sandbox(database, monkeyp
         saved = client.post("/api/ehr/notes", json={"audit_id": asked["audit_id"], "comment": "Automated sandbox test."})
     assert saved.status_code == 200, saved.text
     assert saved.json()["reference"].startswith("DocumentReference/")
+
+
+def test_lab_units_are_converted_not_taken_at_face_value():
+    """A creatinine of 1.2 mg/dL is 106 umol/L, and the kidney calculation
+    works in umol/L. Reading the number without its unit would put this
+    patient two dose tiers away from where they belong."""
+    def obs(value, unit):
+        return {"valueQuantity": {"value": value, "unit": unit}}
+
+    assert fhir._quantity("creatinine", obs(1.2, "mg/dL")) == 106.1
+    assert fhir._quantity("creatinine", obs(106.1, "umol/L")) == 106.1
+    assert fhir._quantity("creatinine", obs(106.1, "µmol/L")) == 106.1
+    assert fhir._quantity("creatinine", obs(0.106, "mmol/L")) == 106.0
+    # A unit nothing can be made of is left out rather than guessed at.
+    assert fhir._quantity("creatinine", obs(1.2, "mg/L")) is None
+
+    assert fhir._quantity("weight", obs(70, "kg")) == 70.0
+    assert fhir._quantity("weight", obs(154, "[lb_av]")) == 69.9
+    assert fhir._quantity("weight", obs(70000, "g")) == 70.0
+    assert fhir._quantity("weight", obs(70, "stone")) is None

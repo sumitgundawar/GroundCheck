@@ -1,12 +1,14 @@
 # Changelog
 
-Dates are when the work landed on this branch. Versions follow the app's
+Dates are when the work landed on `main`. Versions follow the app's
 `config.VERSION`.
 
-## 1.0.0 — unreleased
+## 1.0.0 — 2026-09-18
 
 The release that turns the reference pipeline into a platform a clinic or
-hospital can run. Everything below is in this branch and not yet merged.
+hospital can run. It has not been used on real patients, and it is not a
+cleared medical device: see "Honest limitations" in the README for what still
+needs people rather than code.
 
 ### Answers and safety
 
