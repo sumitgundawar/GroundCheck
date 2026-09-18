@@ -64,6 +64,22 @@ hospital can run. Everything below is in this branch and not yet merged.
 - **Deployment:** hardened Docker Compose with PostgreSQL and Caddy, and a
   Helm chart for Kubernetes.
 
+### Speed
+
+- Extractive answers take 61 ms instead of 665: the sentences of every
+  retrieved passage are embedded in one call, not one call each.
+- Building the index and analysing a scan run on an NVIDIA or Apple GPU when
+  there is one: 2,000 passages embed in 2.2 s instead of 38.5, and a
+  181-slice CT is analysed in 3.4 s instead of 31. A question's own embedding
+  stays on the CPU, where many requests can run at once.
+- Question and sentence embeddings are kept, and an identical question keeps
+  its answer for `ANSWER_CACHE_SECONDS`. Never across a change of documents,
+  settings or patient, and every request is still audited.
+- Batch sizes, caches and the recommended worker count come from the real
+  cores, memory and accelerator, including a container's cgroup limits.
+- Measured: 100,000 requests through PostgreSQL at 30 a second with 40
+  concurrent users, no errors, and every audit record present and verified.
+
 ### Testing
 
 - 2,008-case evaluation, 383 patient scenarios and 16 adversarial probes gate
