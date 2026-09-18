@@ -908,19 +908,21 @@ details[open] > .j-summary::before { content: "▾"; }
 }
 @media (max-width: 640px) {
   .hazard-form { grid-template-columns: minmax(0, 1fr); }
-  .review-table thead, .hazard-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .review-table tr, .hazard-table tr { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--space-3);
+  .review-table thead, .hazard-table thead, .medicines-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .review-table tr, .hazard-table tr, .medicines-table tbody tr { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--space-3);
     padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
-  .review-table td, .hazard-table td { display: contents; border: 0; padding: 0; }
-  .review-table td[data-label]::before, .hazard-table td[data-label]::before { content: attr(data-label); font-size: 12px; color: var(--text-muted); align-self: center; }
-  .review-table td:not([data-label]) > *, .hazard-table td:not([data-label]) > * { grid-column: 1 / -1; }
-  .review-table td[data-label] > *, .hazard-table td[data-label] > * { justify-self: start; }
+  .review-table td, .hazard-table td, .medicines-table td { display: contents; border: 0; padding: 0; }
+  .review-table td[data-label]::before, .hazard-table td[data-label]::before, .medicines-table td[data-label]::before { content: attr(data-label); font-size: 12px; color: var(--text-muted); align-self: center; }
+  .review-table td:not([data-label]) > *, .hazard-table td:not([data-label]) > *, .medicines-table td:not([data-label]) > * { grid-column: 1 / -1; }
+  .review-table td[data-label] > *, .hazard-table td[data-label] > *, .medicines-table td[data-label] > * { justify-self: start; }
   .review-table tr.overdue td:first-child { box-shadow: none; }
   .review-table tr.overdue { box-shadow: inset 3px 0 0 var(--danger); padding-left: var(--space-3); }
   .document-actions { justify-content: flex-start; }
   .review-question { max-width: none; }
   .reason-row { grid-template-columns: 1fr 3ch; }
   .reason-row .reason-track { grid-column: 1 / -1; grid-row: 2; }
+  /* Stacked rows are as wide as the screen, so the wrapper has nothing to scroll. */
+  .users-table-wrap:has(.medicines-table) { overflow-x: visible; }
 }
 .pill-group { display: flex; flex-wrap: wrap; gap: 4px; }
 
@@ -986,6 +988,12 @@ body { background: var(--canvas); color: var(--text); }
 .page-stat { font-family: var(--font-mono); font-size: 12.5px; color: var(--text); white-space: nowrap; }
 .page-stat:empty { display: none; }
 .page-stat::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); margin: 0 6px 1px 2px; vertical-align: middle; }
+@media (max-width: 640px) {
+  /* On a phone the line is wider than the screen — a long formulary name pushed
+     the whole page sideways — so it becomes its own line instead. */
+  .page-stat { display: block; margin-top: var(--space-2); white-space: normal; }
+  .page-stat::before { margin-left: 0; }
+}
 .page-actions { display: flex; align-items: center; gap: var(--space-2); }
 .select { font: inherit; font-size: 14px; padding: 6px 10px; min-height: 36px; border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm); background: var(--bg); color: var(--text); }
