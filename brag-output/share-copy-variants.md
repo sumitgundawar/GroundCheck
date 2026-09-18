@@ -92,7 +92,7 @@ thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
 > unrelated medicine's page happened to contain that number.
 >
 > Self-hosted, offline-capable (there's an extractive mode with no model at
-> all), Apache-2.0. The demo corpus is synthetic on purpose.
+> all), MIT licensed. The demo corpus is synthetic on purpose.
 
 ---
 
