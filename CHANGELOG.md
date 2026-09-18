@@ -63,6 +63,9 @@ hospital can run. Everything below is in this branch and not yet merged.
   documents, the audit trail and failed releases.
 - **Deployment:** hardened Docker Compose with PostgreSQL and Caddy, and a
   Helm chart for Kubernetes.
+- **One container on its own,** for a small site behind an existing reverse
+  proxy: `docs/on-premises.md` lists the settings that keep the database,
+  index and audit trail on the mounted volume.
 
 ### Speed
 
@@ -89,6 +92,11 @@ hospital can run. Everything below is in this branch and not yet merged.
 - **Property-based fuzzing** of the guards' invariants.
 - **Security:** `pip-audit`, `bandit` and OWASP ZAP baseline and active scans;
   a CycloneDX bill of materials and licence list from CI.
+- **Soak test:** 100,000 requests on PostgreSQL with 40 users, no errors and
+  every audit record present and chained.
+- **The release image, verified as shipped:** signing in, refusing, answering,
+  the cache, metrics, the hardware panel and the audit chain all checked
+  inside the container, and the data checked again after a restart.
 
 ### Fixed
 
