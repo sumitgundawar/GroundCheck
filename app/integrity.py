@@ -54,8 +54,16 @@ def _primary_signing_key() -> tuple[str, bytes] | None:
     return next(iter(keys.items()), None)
 
 
+# Tells `canonical` to leave a field out entirely, rather than write it as null.
+_LEGACY = object()
+
+
 def canonical(seq: int, audit_id: str, created_at, user_id, decision: str, query: str,
-              total_ms: int, llm_used: bool, record: dict) -> bytes:
+              total_ms: int, llm_used: bool, record: dict, site_id: int | None = _LEGACY) -> bytes:
+    """The bytes a record's hash covers. `site_id` decides which site's people
+    can see a record, so moving one between sites has to break the chain; it
+    joined the hashed content after the first release, and passing nothing
+    reproduces the earlier format so records written then still verify."""
     fields = {
         "seq": seq,
         "audit_id": audit_id,
@@ -67,6 +75,8 @@ def canonical(seq: int, audit_id: str, created_at, user_id, decision: str, query
         "llm_used": bool(llm_used),
         "record": record,
     }
+    if site_id is not _LEGACY:
+        fields["site_id"] = site_id
     return json.dumps(fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
                       allow_nan=False).encode("utf-8")
 
@@ -89,6 +99,12 @@ def compute(prev_hash: str, content: bytes, alg: str | None = None) -> tuple[str
 
 
 def _row_content(row: AuditRecord) -> bytes:
+    return canonical(row.seq, row.audit_id, row.created_at, row.user_id, row.decision, row.query,
+                     row.total_ms, row.llm_used, row.record, row.site_id)
+
+
+def _legacy_row_content(row: AuditRecord) -> bytes:
+    """The content format used before `site_id` was covered."""
     return canonical(row.seq, row.audit_id, row.created_at, row.user_id, row.decision, row.query,
                      row.total_ms, row.llm_used, row.record)
 
@@ -132,6 +148,7 @@ def verify(max_problems: int = 20) -> dict:
 
     checked = 0
     unverifiable = 0
+    earlier_format = 0
     error = None
     first_seq = last_seq = None
     with db.session() as s:
@@ -158,7 +175,14 @@ def verify(max_problems: int = 20) -> dict:
                 try:
                     _, expected = compute(row.prev_hash, _row_content(row), row.chain_alg)
                     if not hmac.compare_digest(expected, row.entry_hash or ""):
-                        problem(row.seq, row.audit_id, "Its content has changed since it was written.")
+                        # Records written before `site_id` was covered still
+                        # verify under the earlier format. They are counted so
+                        # an operator can see how many predate the change.
+                        _, legacy = compute(row.prev_hash, _legacy_row_content(row), row.chain_alg)
+                        if hmac.compare_digest(legacy, row.entry_hash or ""):
+                            earlier_format += 1
+                        else:
+                            problem(row.seq, row.audit_id, "Its content has changed since it was written.")
                 except KeyError:
                     unverifiable += 1
                     problem(row.seq, row.audit_id,
@@ -179,6 +203,7 @@ def verify(max_problems: int = 20) -> dict:
         "anchor_seq": chain.anchor_seq,
         "unchained": unchained,
         "unverifiable": unverifiable,
+        "earlier_format": earlier_format,
         "signed": _primary_signing_key() is not None,
         "problem_count": problem_count,
         "problems": problems,

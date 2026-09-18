@@ -126,8 +126,27 @@ class Formulary(BaseModel):
                 seen.add(key)
         return self
 
+    @model_validator(mode="after")
+    def rules_can_be_reached(self):
+        """A rule that depends on a measurement the medicine never asks for can
+        never fire. Liver rules are the exception: an unknown Child-Pugh class
+        is warned about rather than demanded, so those rules are still reached.
+        Add "child_pugh" to a medicine's `requires` to make it mandatory."""
+        for m in self.medicines:
+            if m.renal and "egfr" not in m.requires:
+                raise ValueError(f"{m.name} has kidney rules but doesn't require egfr in `requires`")
+        return self
+
 
 def normalise(text: str) -> str:
+    """Lower case, with anything that isn't a letter or digit as a space.
+
+    A strength written straight onto the name is separated too: electronic
+    records hold "Tessorin10mg" as often as "Tessorin 10 mg", and without the
+    split the name has no word boundary after it, so the medicine was not
+    recognised at all and every rule about it was silently skipped.
+    """
+    text = re.sub(r"(?<=[a-zA-Z])(?=[0-9])|(?<=[0-9])(?=[a-zA-Z])", " ", text)
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 

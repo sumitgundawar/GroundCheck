@@ -347,3 +347,52 @@ def test_api_permissions(database, monkeypatch):
         assert status["retention"]["audit_retention_days"] == 0
         assert client.post("/api/retention/run").json()["run"]["audit_deleted"] == 0
         assert client.delete(f"/api/users/{clin.id}").json()["user"]["deleted"] is True
+
+
+def test_moving_a_record_to_another_site_breaks_the_chain(database):
+    """Which site an answer belongs to decides who can see it, so a change of
+    site has to be as visible as a change of the answer itself."""
+    from app import sites
+
+    one = sites.create("site-one", "Site One")
+    two = sites.create("site-two", "Site Two")
+    _write(3)
+    with db.engine().begin() as conn:
+        conn.execute(text("UPDATE audit_records SET site_id = :s"), {"s": one["id"]})
+    # Re-chain the records now that they carry a site, then confirm a move is caught.
+    with db.session() as s:
+        rows = s.scalars(select(db.AuditRecord).order_by(db.AuditRecord.seq)).all()
+        prev = integrity.GENESIS
+        for row in rows:
+            row.prev_hash = prev
+            row.chain_alg, row.entry_hash = integrity.compute(prev, integrity._row_content(row))
+            prev = row.entry_hash
+        s.execute(update(db.AuditChain).where(db.AuditChain.id == 1).values(last_hash=prev))
+    assert integrity.verify()["ok"]
+
+    with db.engine().begin() as conn:
+        conn.execute(text("UPDATE audit_records SET site_id = :s WHERE seq = 2"), {"s": two["id"]})
+    result = integrity.verify()
+    assert not result["ok"]
+    assert result["problems"][0]["problem"] == "Its content has changed since it was written."
+
+    with db.engine().begin() as conn:
+        conn.execute(text("UPDATE audit_records SET site_id = :s WHERE seq = 2"), {"s": one["id"]})
+    assert integrity.verify()["ok"]
+
+
+def test_records_written_before_the_site_was_covered_still_verify(database):
+    """The hashed content gained a field after the first release. Records
+    written before that still verify, and are counted so an operator can see
+    how many predate the change."""
+    _write(2)
+    with db.session() as s:
+        rows = s.scalars(select(db.AuditRecord).order_by(db.AuditRecord.seq)).all()
+        prev = integrity.GENESIS
+        for row in rows:
+            row.prev_hash = prev
+            row.chain_alg, row.entry_hash = integrity.compute(prev, integrity._legacy_row_content(row))
+            prev = row.entry_hash
+        s.execute(update(db.AuditChain).where(db.AuditChain.id == 1).values(last_hash=prev))
+    result = integrity.verify()
+    assert result["ok"] and result["earlier_format"] == 2

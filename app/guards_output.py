@@ -104,8 +104,26 @@ _CONTRACTION = re.compile(r"(?:'s|'re|'ve|'ll|'d|'m|n't)$")
 
 
 # Short words that still change the question: another species, a route or a unit.
+# Two-letter forms such as XR live in _FORM_TERMS below, which reads them only
+# in capitals, so "Mr" and a hesitant "er" are still noise.
 _SHORT_SALIENT = {"cat", "cats", "dog", "dogs", "pet", "pets", "cow", "pig", "rat", "rats", "horse", "iv", "im",
                   "gram", "kg", "mcg", "ml"}
+
+# A form or a route changes the dose: 15 mg of a plain tablet is not 15 mg of a
+# modified-release one, and an intravenous dose is rarely the oral dose. These
+# words must be supported by a source about the medicine the question names,
+# not by any passage that happens to mention them. "Solution" is deliberately
+# absent: it is part of a medicine's name in the demo formulary.
+_FORM_TERMS = {
+    "xr", "sr", "er", "xl", "cr", "mr", "la", "iv", "im", "sc", "sl", "po", "pr",
+    "topical", "topically", "oral", "orally", "intravenous", "intravenously",
+    "intramuscular", "intramuscularly", "subcutaneous", "subcutaneously",
+    "sublingual", "transdermal", "rectal", "rectally", "inhaled", "nebulised",
+    "nebulized", "injection", "injectable", "infusion", "patch", "patches",
+    "depot", "suppository", "suppositories", "syrup", "elixir", "lozenge",
+    "tablet", "tablets", "capsule", "capsules", "cream", "ointment", "drops",
+    "modified", "extended", "immediate", "prolonged", "sustained", "release",
+}
 
 
 def _salient_terms(query: str) -> list[str]:
@@ -113,8 +131,18 @@ def _salient_terms(query: str) -> list[str]:
 
     query = PLACEHOLDER.sub(" ", query)  # [NAME], [DATE]: removed identifiers, not topics
     terms = []
-    for match in _WORD.finditer(query.lower().replace("’", "'")):
-        word = _CONTRACTION.sub("", match.group(0))
+    for match in _WORD.finditer(query.replace("’", "'")):
+        raw = _CONTRACTION.sub("", match.group(0))
+        word = raw.lower()
+        if word in _FORM_TERMS and (len(word) > 2 or raw.isupper()):
+            # A form or a route is never noise, whatever the stopword list
+            # says: "topical" and "oral" were both being dropped here, so a
+            # question about a form the sources never mention was answered
+            # with the plain product's dose. A two-letter abbreviation counts
+            # only when written the way clinicians write it — "XR", "IV" — so
+            # the honorific in "Mr Smith" is not read as modified release.
+            terms.append(word)
+            continue
         if (len(word) < 4 and word not in _SHORT_SALIENT) or word in _STOPWORDS or word in _CONVERSATIONAL:
             continue
         terms.append(word)
@@ -335,12 +363,20 @@ def coverage_report(query: str, sources: list[dict]) -> dict:
     covered = [t for t in terms if _covered(t, vocab)]
     uncovered = _prioritise([t for t in terms if not _covered(t, vocab)], query)
 
+    # A form or route the question names has to be described by a source about
+    # the medicine it names. Without this, "Caloradine XR" was answered with
+    # the plain product's dose, because "xr" was too short to check and
+    # "topical" appeared in some other medicine's passage.
+    about = _sources_about(query, covered, sources)
+    about_vocab = _source_vocab(about)
+    unsupported_forms = [t for t in terms if t in _FORM_TERMS and not _covered(t, about_vocab)]
+
     # A dose the question states must come from a source about what the
     # question names, not from another medicine's passage that happened to be
     # retrieved alongside it ("50 mcg of Rulpuraprex" is not supported by
     # "Lembitulex is given as 50 mcg").
     source_values: set[str] = set()
-    for record in _sources_about(query, covered, sources):
+    for record in about:
         source_values |= _canonical_pairs(record.get("text", ""))
     question_values = sorted(_canonical_pairs(query))
     unsupported_values = [v for v in question_values if v not in source_values]
@@ -368,6 +404,7 @@ def coverage_report(query: str, sources: list[dict]) -> dict:
         "uncovered": uncovered,
         "question_values": question_values,
         "unsupported_values": unsupported_values,
+        "unsupported_forms": unsupported_forms,
         "age": age_report,
         "unanswerable_request": _unanswerable_request(query, sources),
     }
@@ -382,6 +419,10 @@ def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:
     if report["unsupported_values"]:
         value = report["unsupported_values"][0]
         return False, f"the value '{value}' in the question does not appear in any trusted source"
+    if report["unsupported_forms"]:
+        form = report["unsupported_forms"][0]
+        return False, (f"no trusted source about this describes a '{form}' form or route, "
+                       f"and the dose of one form is not the dose of another")
     age = report["age"]
     if age and not age["covered"]:
         return False, (f"the question is about {_with_article(age['phrase'])}, and no "

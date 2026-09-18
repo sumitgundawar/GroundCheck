@@ -146,7 +146,8 @@
      "note": "Avoid when potassium is above 5.5 mmol/L."
     }
    ],
-   "pregnancy": "no_data"
+   "pregnancy": "no_data",
+   "requires": []
   },
   {
    "name": "Vorantil",
@@ -154,7 +155,9 @@
     "anticoagulants"
    ],
    "high_alert": true,
-   "source_ids": [],
+   "source_ids": [
+    "Demo formulary (synthetic)"
+   ],
    "weight_dose": {
     "per_kg": 1,
     "unit": "mg",

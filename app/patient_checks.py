@@ -153,12 +153,23 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                 result.add("info", "already_taking", med, f"The patient already takes {med.name}.")
                 continue
             other_classes = " | ".join([_singular(c) for c in (other.classes if other else [])] + [_singular(text)])
-            for rule in med.interactions:
-                hit = (rule.with_medicine and other is not None and formulary.normalise(rule.with_medicine)
-                       in {formulary.normalise(n) for n in [other.name, *other.aliases]}) or \
-                      (rule.with_class and re.search(rf"\b{re.escape(_singular(rule.with_class))}\b", other_classes))
-                if not hit:
+            med_names = {formulary.normalise(n) for n in [med.name, *med.aliases]}
+            med_classes = " | ".join(_singular(c) for c in med.classes)
+            # Two medicines interact whichever one you ask about, so a rule
+            # written on the other medicine's entry counts too. Only one of the
+            # pair carried the rule in the demo formulary, and asking about the
+            # other one said nothing at all.
+            pairs = [(rule, other_classes) for rule in med.interactions]
+            pairs += [(rule, med_classes) for rule in (other.interactions if other is not None else [])]
+            seen_rules: set[str] = set()
+            for rule, against_classes in pairs:
+                targets = med_names if against_classes is med_classes else \
+                    {formulary.normalise(n) for n in [other.name, *other.aliases]} if other is not None else set()
+                hit = (rule.with_medicine and formulary.normalise(rule.with_medicine) in targets) or \
+                      (rule.with_class and re.search(rf"\b{re.escape(_singular(rule.with_class))}\b", against_classes))
+                if not hit or rule.id in seen_rules:
                     continue
+                seen_rules.add(rule.id)
                 label = other.name if other else text
                 severity = {"contraindicated": stop, "major": "warn", "moderate": "info"}[rule.severity]
                 result.add(severity, f"interaction_{rule.severity}", med,
@@ -219,6 +230,11 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             missing.append("weight")
         if "egfr" in needed and kidney is None:
             missing.append("kidney function (eGFR, or serum creatinine with age and weight)")
+        elif "egfr" in needed and patient.egfr is None and patient.sex is None:
+            # Cockcroft-Gault multiplies by 0.85 for a woman. Without the sex
+            # recorded it would quietly assume a man, and the same creatinine
+            # can fall either side of a dose rule depending on that guess.
+            missing.append("sex (the creatinine calculation differs, and no eGFR was given)")
         if "child_pugh" in needed and patient.child_pugh is None:
             missing.append("liver function (Child-Pugh class)")
         if missing:
@@ -284,11 +300,19 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             dose = med.weight_dose
             amount = dose.per_kg * patient.weight_kg
             capped = min(amount, dose.max_single) if dose.max_single else amount
-            result.add("info", "weight_dose", med,
-                       f"By weight, {_fmt(dose.per_kg)} {dose.unit}/kg × {_fmt(patient.weight_kg)} kg gives "
-                       f"{_fmt(round(capped, 2))} {dose.unit} {dose.frequency}"
-                       f"{f' (capped at {_fmt(dose.max_single)} {dose.unit})' if capped < amount else ''}.",
-                       source="Formulary")
+            calculated = (f"By weight, {_fmt(dose.per_kg)} {dose.unit}/kg × {_fmt(patient.weight_kg)} kg gives "
+                          f"{_fmt(round(capped, 2))} {dose.unit} {dose.frequency}"
+                          f"{f' (capped at {_fmt(dose.max_single)} {dose.unit})' if capped < amount else ''}.")
+            # A dose stated for an adult has to clear the weight-based maximum
+            # too. Without this, the calculation was shown but never enforced,
+            # so a stated overdose of a weight-dosed medicine passed as a note.
+            too_high = _exceeds(amounts, capped, dose.unit)
+            if too_high is not None:
+                result.add("block", "dose_above_maximum", med,
+                           f"The {subject}'s {_fmt(too_high)} {dose.unit} is above this patient's maximum for "
+                           f"{med.name}. {calculated}", source="Formulary")
+            else:
+                result.add("info", "weight_dose", med, calculated, source="Formulary")
         elif limit and limit.max_daily:
             daily_factor = 2 if limit.frequency in ("twice daily", "every 12 hours") else 1
             too_high = _exceeds(amounts, limit.max_daily / daily_factor, limit.unit)

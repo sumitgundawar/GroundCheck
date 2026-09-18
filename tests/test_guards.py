@@ -216,3 +216,34 @@ def test_asking_whether_drugs_combine_is_not_a_combined_dose_request():
 ])
 def test_contractions_and_conversational_words_are_not_salient(query, expected):
     assert guards_output._salient_terms(query) == expected
+
+
+def test_a_form_or_route_the_sources_never_mention_is_refused():
+    """A modified-release product is not the plain one, and an intravenous
+    dose is rarely the oral dose, so a form the sources don't describe can't
+    borrow the plain product's dose."""
+    for query, word in [("What is the standard dose of Caloradine XR?", "xr"),
+                        ("What is the dose of Caloradine SR?", "sr"),
+                        ("What is the dose of topical Caloradine?", "topical"),
+                        ("What is the dose of Caloradine IV?", "iv"),
+                        ("How many tablets of Caloradine are taken?", "tablets")]:
+        ok, detail = guards_output.coverage_check(query, _sources("CALO-001", "VELT-002"))
+        assert not ok, f"{query} was answered"
+        assert word in detail, detail
+
+
+def test_a_form_the_sources_do_describe_is_still_answered():
+    """The Caloradine passage calls it an oral agent, so asking about the oral
+    form is asking about what the source describes."""
+    ok, _ = guards_output.coverage_check(
+        "What is the dose of oral Caloradine?", _sources("CALO-001", "VELT-002"))
+    assert ok
+
+
+def test_a_form_word_is_checked_against_sources_about_the_medicine_named():
+    """"Topical" appearing in some other medicine's passage does not make it
+    true of this one: the support has to come from a source about the subject."""
+    report = guards_output.coverage_report(
+        "What is the dose of topical Caloradine?", _sources("CALO-001", "VELT-002", "INTR-001"))
+    assert "topical" in report["checked_terms"]
+    assert report["unsupported_forms"] == ["topical"]
