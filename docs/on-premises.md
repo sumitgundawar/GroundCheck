@@ -51,6 +51,15 @@ for how you use it.
 PostgreSQL grows with the audit trail: roughly 20 KB per question, so
 100,000 questions a year need about 2 GB.
 
+**Measured capacity.** On an 8-core laptop with four workers and PostgreSQL,
+extractive mode sustained **30 questions a second** over 100,000 requests with
+no errors: median 0.7 s, 95th percentile 1.9 s, and the audit trail complete
+and verified afterwards (100,002 records, no gaps). That was a deliberately
+saturating test with 40 users asking without pause; a ward of 40 clinicians
+asks far less often. Size for your peak minute, add workers for more
+throughput (`WEB_WORKERS`), and remember that a language model, local or
+cloud, is much slower than the extractive path.
+
 ## Install
 
 On a Linux host with Docker Engine 24 or later and Docker Compose v2:
