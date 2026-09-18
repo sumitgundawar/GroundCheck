@@ -115,6 +115,21 @@ hospital can run. Everything below is in this branch and not yet merged.
   volume, builds its index before recording a release, and stops cleanly on
   signals.
 - Training checkpoints load tensors and plain data only, never code.
+- **From an independent audit of the repository,** five ways an unsafe answer
+  could get through: a dose stated above a weight-based maximum was recorded as
+  a note rather than blocked; a current medicine written as "Tessorin10mg"
+  matched nothing, so every rule about it was skipped; an interaction written on
+  one medicine's entry was invisible from the other side; an unrecorded sex
+  silently meant male in the creatinine calculation, moving a patient across a
+  dose rule; and a modified-release or intravenous form borrowed the plain
+  product's dose.
+- Two-factor codes could be guessed without limit; they now count against the
+  same lockout as passwords.
+- The audit chain did not cover which site a record belonged to, so a record
+  could be moved between sites without breaking it.
+- A release that failed part-way could leave the search index and the database
+  disagreeing about what was live; startup now restores from the release's own
+  snapshot.
 - With a child's details loaded, an answer about a medicine's place in
   treatment now says the formulary covers adults only. The dose questions were
   already refused; the informational ones passed with nothing said.
