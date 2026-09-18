@@ -54,6 +54,8 @@
   --code-key: #6b3fa0;  --code-string: #17784a;  --code-number: #1d5fa8;  --code-bool: #a4471a;
   /* Categorical, not status: see the note at the top of this file. */
   --kind-condition: #7d8c87;  --kind-drug: #2f7fb8;  --kind-reference: #a06b00;  --kind-marker: #0e8a7c;  --kind-procedure: #7a4fb5;
+  /* Not reached: a stage the pipeline never got to. Shared with the website. */
+  --skip: #8d9894;  --skip-text: #66726e;
   --map-hit: #0f2622;  --map-halo: rgba(255, 255, 255, 0.92);
   --thumb: #ffffff;
   /* type */
@@ -75,6 +77,7 @@
     color-scheme: dark;
     --canvas: #0c1513; --bg: #121e1b; --bg-subtle: #15221f; --bg-inset: #1a2824; --bg-hover: #1c2b27;
     --border: #25332f; --border-strong: #3a4c47;
+    --skip: #66746f; --skip-text: #8f9d98;
     --text: #d3ddda; --text-secondary: #d3ddda; --text-muted: #c1ccc8; --text-faint: #a3b1ad; --text-quiet: #93a39e;
     --ink: #e8f0ed; --ink-press: #c9d6d2; --on-ink: #0c1513; --ring: rgba(232, 240, 237, 0.28); --backdrop: rgba(0, 0, 0, 0.6);
     --ok: #56c28a; --ok-bg: #123224; --ok-border: #245c40;
@@ -561,13 +564,13 @@ details[open] > .j-summary::before { content: "▾"; }
 .trace-glyph.warn { background: var(--warn); }
 .trace-glyph.fail { background: var(--danger); }
 .trace-glyph.info { background: var(--info); }
-.trace-glyph.skip { background: var(--border-strong); }
+.trace-glyph.skip { background: transparent; border: 1.5px solid var(--skip); }
 .trace-main { min-width: 0; }
 .trace-name { font-family: var(--font-sans); font-size: 14px; font-weight: 600; color: var(--text); transition: color 0.12s ease; }
-.trace-item.skip .trace-name { color: var(--text-faint); }
+.trace-item.skip .trace-name { color: var(--skip-text); }
 .trace-item.fail .trace-name { color: var(--danger); }
 .trace-detail { font-size: 12px; color: var(--text-muted); }
-.trace-item.skip .trace-detail { color: var(--text-faint); }
+.trace-item.skip .trace-detail { color: var(--skip-text); }
 .trace-right { display: flex; align-items: center; gap: var(--space-2); }
 .trace-ms { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); white-space: nowrap; }
 .trace-caret { color: var(--text-faint); font-size: 11px; transition: transform 0.15s ease; }
@@ -1356,7 +1359,7 @@ body { background: var(--canvas); color: var(--text); }
 .release-check { margin-top: 6px; font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
 .release-check::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); transform: translateY(-1px); }
 .release-check.bad::before { background: var(--danger); }
-.release-check.skip::before { background: var(--border-strong); }
+.release-check.skip::before { background: transparent; border: 1.5px solid var(--skip); }
 .release-details { margin-top: 4px; font-size: 12.5px; }
 .release-details summary { cursor: pointer; color: var(--text-muted); }
 .release-details ul { margin: 4px 0 0; padding-left: 18px; }

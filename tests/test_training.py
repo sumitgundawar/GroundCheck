@@ -19,6 +19,11 @@ os.environ["GROQ_API_KEY"] = ""
 os.environ["FORCE_EXTRACTIVE"] = "true"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Real training runs on whatever hardware the tests happen to have. Four
+# minutes is comfortable on a laptop; a loaded CI runner can need longer, and a
+# slow machine failing here is a flake rather than a defect.
+TRAINING_TIMEOUT = float(os.environ.get("TRAINING_TEST_TIMEOUT", "600"))
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import config  # noqa: E402
@@ -185,7 +190,7 @@ def test_a_real_training_run_saves_a_usable_model(studio, monkeypatch):
                       "image_size": 28, "batch_size": 16})
     with pytest.raises(runs.TrainingError, match="already training"):
         runs.start({"name": "Second", "dataset": str(folder), "device": "cpu", "epochs": 1, "image_size": 28})
-    deadline = time.time() + 240
+    deadline = time.time() + TRAINING_TIMEOUT
     while runs.get(run["id"])["progress"].get("state") in runs.ACTIVE and time.time() < deadline:
         time.sleep(1)
     progress = runs.get(run["id"])["progress"]
@@ -234,7 +239,7 @@ def test_a_stopped_run_resumes_where_it_left_off(studio, monkeypatch):
     folder = _make_dataset(studio, per_class=60)
     run = runs.start({"name": "Resumable", "dataset": str(folder), "device": "cpu", "epochs": 40,
                       "image_size": 64, "batch_size": 4, "learning_rate": 0.0005})
-    deadline = time.time() + 240
+    deadline = time.time() + TRAINING_TIMEOUT
     while not runs.get(run["id"])["progress"].get("history") and time.time() < deadline:
         time.sleep(0.1)
     runs.cancel(run["id"])

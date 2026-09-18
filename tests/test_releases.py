@@ -144,3 +144,24 @@ def test_baseline_and_pruning(setup, monkeypatch):
         knowledge.rebuild_index(f"{hours} hours")
     names = [r["name"] for r in releases.list_releases()["releases"] if r["snapshot"]]
     assert names == ["R5", "R4"]
+
+
+def test_an_index_that_does_not_match_the_live_release_is_put_back(setup):
+    """Going live writes the index, then marks the row. A crash in between
+    leaves this instance serving passages the database doesn't call live, so
+    startup compares the two and the release's own snapshot wins."""
+    _approve(HTML)
+    knowledge.rebuild_index("A release to come back to")
+    live = next(r for r in releases.list_releases()["releases"] if r["status"] == "live")
+
+    # Serve something else, as a half-finished promotion would have left behind.
+    state = retrieval._state()
+    records, vectors = list(state.metadata), state.store.vectors()
+    retrieval.write_index(records[:-1], vectors[:-1])
+    retrieval.load_index()
+    assert len(retrieval._state().metadata) != live["passages"]
+
+    result = releases.reconcile()
+    assert result == {"release": int(live["name"][1:]), "restored": True}
+    assert len(retrieval._state().metadata) == live["passages"]
+    assert releases.reconcile() is None     # nothing left to put right

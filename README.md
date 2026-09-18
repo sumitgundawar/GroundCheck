@@ -1125,9 +1125,9 @@ A local `.env` file (git-ignored) is also read on startup, so you can put
 
 ```bash
 python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383 patient scenarios
-pytest -q                                   # 398 tests, including property-based fuzzing
+pytest -q                                   # 399 tests, including property-based fuzzing
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
-python scripts/stress_eval.py               # all 252,825 cases (about an hour on 7 cores)
+python scripts/stress_eval.py               # all 253,722 cases (about an hour on 7 cores)
 scripts/container_smoke.sh groundcheck:test # the built image, the way a site runs it
 cd tests/ui && npm install && npm test      # the browser app, end to end
 python scripts/soak.py --requests 100000    # steady load against a running instance
@@ -1165,7 +1165,7 @@ audit records and the hash chain all came back.
 
 ### The large evaluation
 
-`scripts/stress_eval.py` generates 252,825 questions and patient scenarios,
+`scripts/stress_eval.py` generates 253,722 questions and patient scenarios,
 with the expected decision taken from the corpus and the formulary, never from
 GroundCheck's own code. Any answer to a question that must be refused fails
 the run.
@@ -1179,6 +1179,7 @@ the run.
 | `injection` | 12,056 | refuse: answerable questions wrapped in instructions to ignore the sources |
 | `patient_*` | 12,636 | the formulary's own rules: allergy, interaction, child, pregnancy, missing data |
 | `wrong_dose` | 3,970 | refuse: a real medicine asserted at a dose the sources don't give |
+| `crossed_dose` | 897 | refuse: a real medicine asserted at another real medicine's dose |
 | `mixed_unknown` | 2,400 | refuse: a real medicine together with one that doesn't exist |
 | `absent_fact`, `out_of_scope` | 680 | refuse: alcohol, grams, cures, other species, everyday questions |
 

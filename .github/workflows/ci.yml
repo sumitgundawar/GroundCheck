@@ -101,6 +101,39 @@ jobs:
       - name: Run it the way a site would, and check what it kept
         run: scripts/container_smoke.sh groundcheck:test
 
+  integrations:
+    name: Live EHR and PACS
+    # These talk to public sandboxes, so they can't gate a merge: a sandbox
+    # being down isn't a regression. Weekly is soon enough to notice a real
+    # break in the FHIR, SMART, CDS Hooks or DICOMweb paths.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build the search index
+        run: python scripts/build_index.py
+
+      # The public HAPI FHIR server, the SMART launcher, and the public
+      # Orthanc demo. The local-Orthanc round trip stays a manual test: it
+      # needs a PACS with a CT study already loaded.
+      - name: Talk to a real FHIR server and a real PACS
+        run: pytest tests/test_ehr.py tests/test_imaging.py -q
+        env:
+          RUN_LIVE_EHR: "1"
+          RUN_LIVE_PACS: "1" 
+
   browser:
     name: Browser journey
     runs-on: ubuntu-latest

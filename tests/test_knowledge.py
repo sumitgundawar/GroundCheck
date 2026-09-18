@@ -281,7 +281,7 @@ def test_api_upload_review_and_rebuild(client):
     auth.create_user("clin@example.org", PASSWORD, role="clinician")
     auth.create_user("rev@example.org", PASSWORD, role="reviewer")
     auth.create_user("admin1@example.org", PASSWORD, role="admin")
-    auth.create_user("admin2@example.org", PASSWORD, role="admin")
+    second_admin = auth.create_user("admin2@example.org", PASSWORD, role="admin")
 
     _login(client, "clin@example.org")
     files = {"file": (PDF.name, PDF.read_bytes(), "application/pdf")}
@@ -306,5 +306,9 @@ def test_api_upload_review_and_rebuild(client):
     knowledge._index_lock.acquire()  # wait for the background rebuild to finish
     knowledge._index_lock.release()
     detail = client.get(f"/api/sources/{source_id}").json()["source"]
-    assert detail["reviewed_by"] is not None and len(detail["sections"]) == 4
+    # The approver has to be the second admin, not the person who uploaded it:
+    # that separation is the whole point of the rule being tested.
+    assert detail["reviewed_by"] == second_admin.id
+    assert detail["uploaded_by"] != detail["reviewed_by"]
+    assert len(detail["sections"]) == 4
     assert client.post("/api/sources/999/nonsense", json={}).status_code == 404

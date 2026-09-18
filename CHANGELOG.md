@@ -87,7 +87,7 @@ hospital can run. Everything below is in this branch and not yet merged.
 
 - 2,008-case evaluation, 383 patient scenarios and 16 adversarial probes gate
   the build, as before.
-- **252,825 generated questions and patient scenarios** (`scripts/stress_eval.py`),
+- **253,722 generated questions and patient scenarios** (`scripts/stress_eval.py`),
   with expectations from the corpus and the formulary.
 - **Property-based fuzzing** of the guards' invariants.
 - **Security:** `pip-audit`, `bandit`, and OWASP ZAP baseline and active scans

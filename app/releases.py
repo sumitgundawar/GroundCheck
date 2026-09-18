@@ -297,6 +297,38 @@ def rollback(user_id: int | None, name: str) -> dict:
     return promote(previous_id, user_id, name)
 
 
+def reconcile() -> dict | None:
+    """Make the index on disk match the release the database calls live.
+
+    Going live writes the index and then marks the row, so a crash in between
+    leaves this instance serving passages the database doesn't think are live —
+    and a rollback would then measure itself against the wrong starting point.
+    At startup the two are compared, and the snapshot wins.
+    """
+    from . import retrieval
+
+    with db.session() as s:
+        live = _live(s)
+        if live is None:
+            return None
+        number, expected = live.number, live.content_sha256
+    try:
+        serving = _fingerprint(list(retrieval._state().metadata))
+    except Exception:  # noqa: BLE001 - no index loaded yet is not a mismatch
+        return None
+    if serving == expected:
+        return None
+    try:
+        records, vectors = _read_snapshot(number)
+    except ReleaseError as exc:
+        log.error("The index doesn't match live release R%s and its snapshot is missing: %s", number, exc)
+        return {"release": number, "restored": False, "reason": str(exc)}
+    retrieval.write_index(records, vectors)
+    retrieval.load_index()
+    log.warning("The index didn't match live release R%s; restored it from that release's snapshot.", number)
+    return {"release": number, "restored": True}
+
+
 def baseline() -> dict | None:
     """At startup, record the index already in use as the first live release,
     so there's always something to roll back to."""
@@ -304,7 +336,7 @@ def baseline() -> dict | None:
 
     with db.session() as s:
         if s.scalar(select(func.count(Release.id))):
-            return None
+            return reconcile()
     state = retrieval._state()
     records, vectors = list(state.metadata), state.store.vectors()
     from sqlalchemy.exc import IntegrityError
