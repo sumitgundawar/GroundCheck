@@ -152,7 +152,9 @@ body {
 .brand { display: flex; align-items: center; gap: var(--space-2); text-decoration: none; color: var(--text); }
 .brand-mark { display: inline-flex; color: var(--ink); }
 .brand-mark svg { display: block; }
-.brand-word { font-family: var(--font-mono); font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+/* The wordmark reads the same here as on the website and in print: the sans
+   face, bold, mixed case. The mono face stays reserved for real data. */
+.brand-word { font-family: var(--font-sans); font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--ink); }
 .header-right { display: flex; align-items: center; gap: var(--space-2); }
 
 .pill {
@@ -1002,7 +1004,7 @@ body { background: var(--canvas); color: var(--text); }
 .section-sub { margin: 0 0 var(--space-4); color: var(--text-quiet); font-size: 13.5px; max-width: 80ch; }
 .content .panel { margin-bottom: var(--space-4); }
 .content .footer { padding-top: var(--space-8); font-size: 11.5px; color: var(--text-quiet); }
-.auth-brand { margin: 0 0 var(--space-4); font-family: var(--font-mono); font-weight: 600; font-size: 14px; }
+.auth-brand { margin: 0 0 var(--space-4); font-family: var(--font-sans); font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--ink); }
 
 /* Stat tiles */
 .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
