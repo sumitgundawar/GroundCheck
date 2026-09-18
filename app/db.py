@@ -620,6 +620,11 @@ def _make_engine(url: str) -> Engine:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA journal_mode=WAL")
+            # Wait for a writer rather than failing at once. Two workers
+            # starting together both migrate; without this the second gets
+            # "database is locked" immediately and carries on with no
+            # persistence at all.
+            cursor.execute(f"PRAGMA busy_timeout={config.SQLITE_BUSY_TIMEOUT_MS}")
             cursor.close()
     return engine
 

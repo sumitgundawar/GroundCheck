@@ -340,14 +340,33 @@ def confirm_mfa_setup(user_id: int, code: str) -> None:
 
 
 def verify_mfa(token: str, code: str) -> Principal:
-    """Complete sign-in for a session waiting on a two-factor code."""
+    """Complete sign-in for a session waiting on a two-factor code.
+
+    Wrong codes count against the same limit as wrong passwords. A six-digit
+    code is guessable in a few hundred thousand tries, so a second factor with
+    no limit on attempts is not a second factor.
+    """
+    now = utcnow()
     with db.session() as s:
         record = s.scalar(select(AuthSession).where(AuthSession.token_hash == _hash_token(token)))
-        if record is None or record.expires_at <= utcnow() or not record.mfa_pending:
+        if record is None or record.expires_at <= now or not record.mfa_pending:
             raise AuthError("Sign in again.")
         user = record.user
+        if user.locked_until and user.locked_until > now:
+            raise AuthError("Too many failed attempts. Try again later.")
         if not _code_ok(user.mfa_secret, code):
+            user.failed_logins += 1
+            if user.failed_logins >= config.LOGIN_MAX_FAILURES:
+                user.locked_until = now + timedelta(minutes=config.LOGIN_LOCKOUT_MINUTES)
+                user.failed_logins = 0
+                # The pending session is spent: whoever holds it has to sign in
+                # again from the beginning.
+                s.delete(record)
+                s.commit()
+                raise AuthError("Too many failed attempts. Try again later.")
+            s.commit()
             raise AuthError("That code didn't match. Try the latest code from your app.")
+        user.failed_logins = 0
         record.mfa_pending = False
         return _principal(user)
 

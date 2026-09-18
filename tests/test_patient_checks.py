@@ -208,3 +208,65 @@ def test_an_informational_answer_says_when_it_is_only_about_adults():
     # Asking for the dose is asking to give it, so that is still refused.
     dose = pipeline.run("What is the dose of Caloradine?", patient=child, review=False)
     assert dose.decision == "refuse"
+
+
+def test_a_twice_daily_maximum_is_a_daily_maximum():
+    """Tessorin is 10 mg twice daily, at most 20 mg a day. A single 20 mg dose
+    is the whole day's allowance at once, so it is refused — 70 of the demo
+    formulary's medicines are dosed this way."""
+    assert codes("What dose of Tessorin?", [claim("Tessorin is given at 20 mg twice daily.")],
+                 **ADULT) == {"dose_above_maximum": "block"}
+    assert codes("What dose of Tessorin?", [claim("Tessorin is given at 10 mg twice daily.")], **ADULT) == {}
+
+
+def test_interaction_severity_decides_whether_an_answer_stops():
+    """Contraindicated blocks; major warns and the answer still stands; the
+    severity comes from the formulary, not from the wording of the note."""
+    caloradine = [claim("Caloradine is given at 15 mg once daily.")]
+    blocked = codes("What dose of Caloradine?", caloradine, **{**ADULT, "medicines": ["Tessorin 10 mg"]})
+    assert blocked["interaction_contraindicated"] == "block"
+
+    warned = codes("What dose of Caloradine?", caloradine, **{**ADULT, "medicines": ["Mendel solution 5 mL"]})
+    assert warned["interaction_major"] == "warn"
+    assert "interaction_contraindicated" not in warned
+
+
+def test_an_interaction_counts_from_either_medicine():
+    """The formulary writes the Caloradine and Mendel solution interaction on
+    one entry only. Asking about either one has to find it."""
+    from_caloradine = codes("What dose of Caloradine?", [claim("Caloradine is given at 15 mg once daily.")],
+                            **{**ADULT, "medicines": ["Mendel solution 5 mL once daily"]})
+    from_mendel = codes("What dose of Mendel solution?", [claim("Mendel solution is 5 mL once daily.")],
+                        **{**ADULT, "medicines": ["Caloradine 15 mg once daily"]})
+    assert from_caloradine.get("interaction_major") == "warn"
+    assert from_mendel.get("interaction_major") == "warn"
+
+
+def test_a_strength_written_onto_the_name_is_still_the_medicine():
+    """Electronic records hold "Tessorin10mg" as readily as "Tessorin 10 mg",
+    and the rules have to apply either way."""
+    for written in ["Tessorin 10 mg", "Tessorin-10mg", "Tessorin10mg", "TESSORIN10MG"]:
+        found = codes("What dose of Caloradine?", [claim("Caloradine is given at 15 mg once daily.")],
+                      **{**ADULT, "medicines": [written]})
+        assert found.get("interaction_contraindicated") == "block", written
+
+
+def test_a_dose_above_the_weight_based_maximum_is_blocked():
+    """Vorantil is dosed by weight, at most 100 mg a dose. For a 70 kg adult
+    that is 70 mg, and a stated 200 mg has to stop the answer rather than sit
+    beside it as a note."""
+    heavy = codes("Is 200 mg of Vorantil right?", [claim("Give 200 mg of Vorantil every 12 hours.")], **ADULT)
+    assert heavy.get("dose_above_maximum") == "block"
+    right = codes("Is 70 mg of Vorantil right?", [claim("Give 70 mg of Vorantil every 12 hours.")], **ADULT)
+    assert right.get("dose_above_maximum") is None and right.get("weight_dose") == "info"
+
+
+def test_sex_is_required_when_the_kidney_figure_comes_from_creatinine():
+    """Cockcroft-Gault multiplies by 0.85 for a woman: the same creatinine puts
+    this patient either side of a dose rule, so the sex cannot be assumed."""
+    without = codes("What dose of Caloradine?", [claim("Caloradine is given at 15 mg once daily.")],
+                    age_years=70, weight_kg=60, creatinine_umol_l=150)
+    assert without == {"missing_data": "block"}
+    with_sex = codes("What dose of Caloradine?", [claim("Caloradine is given at 15 mg once daily.")],
+                     age_years=70, weight_kg=60, creatinine_umol_l=150, sex="female")
+    assert "missing_data" not in with_sex

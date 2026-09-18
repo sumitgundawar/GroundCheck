@@ -342,3 +342,39 @@ def test_security_headers_and_no_third_party_resources():
         assert c.get("/", headers={"X-Forwarded-Proto": "https"}).headers["strict-transport-security"].startswith("max-age=")
         assert c.get("/api/health").headers["cache-control"] == "no-store"
         assert c.get("/fonts/atkinson-hyperlegible-next-latin.woff2").status_code == 200
+
+
+def test_guessing_two_factor_codes_locks_the_account(database):
+    """A six-digit code falls to a few hundred thousand guesses, so wrong codes
+    count against the same limit as wrong passwords, and the pending session is
+    thrown away when the limit is reached."""
+    user = auth.create_user("ada@example.org", PASSWORD)
+    secret = auth.begin_mfa_setup(user.id)["secret"]
+    auth.confirm_mfa_setup(user.id, pyotp.TOTP(secret).now())
+    result = auth.sign_in("ada@example.org", PASSWORD)
+
+    for _ in range(config.LOGIN_MAX_FAILURES - 1):
+        with pytest.raises(auth.AuthError, match="didn't match"):
+            auth.verify_mfa(result.token, "000000")
+    with pytest.raises(auth.AuthError, match="Too many failed attempts"):
+        auth.verify_mfa(result.token, "000000")
+
+    # The right code no longer helps: the session is gone and the account locked.
+    with pytest.raises(auth.AuthError):
+        auth.verify_mfa(result.token, pyotp.TOTP(secret).now())
+    with pytest.raises(auth.AuthError, match="Too many failed attempts"):
+        auth.sign_in("ada@example.org", PASSWORD)
+
+
+def test_a_correct_code_clears_earlier_failures(database):
+    """Someone who mistypes a code once and then gets it right is not left one
+    slip away from a lockout for the rest of the day."""
+    user = auth.create_user("ada@example.org", PASSWORD)
+    secret = auth.begin_mfa_setup(user.id)["secret"]
+    auth.confirm_mfa_setup(user.id, pyotp.TOTP(secret).now())
+    result = auth.sign_in("ada@example.org", PASSWORD)
+    with pytest.raises(auth.AuthError):
+        auth.verify_mfa(result.token, "000000")
+    auth.verify_mfa(result.token, pyotp.TOTP(secret).now())
+    with db.session() as s:
+        assert s.get(db.User, user.id).failed_logins == 0

@@ -1125,11 +1125,13 @@ A local `.env` file (git-ignored) is also read on startup, so you can put
 
 ```bash
 python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383 patient scenarios
-pytest -q                                   # 381 tests, including property-based fuzzing
+pytest -q                                   # 398 tests, including property-based fuzzing
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
 python scripts/stress_eval.py               # all 252,825 cases (about an hour on 7 cores)
 scripts/container_smoke.sh groundcheck:test # the built image, the way a site runs it
 cd tests/ui && npm install && npm test      # the browser app, end to end
+python scripts/soak.py --requests 100000    # steady load against a running instance
+scripts/security_scan.sh                    # OWASP ZAP, against a running instance
 ```
 
 Everything runs in extractive mode, so it's deterministic and offline. CI
@@ -1175,7 +1177,7 @@ the run.
 | `near_miss` | 41,300 | refuse: one-letter misspellings of real names |
 | `answerable` | 27,768 | answer: corpus questions in many phrasings, casings and spacings |
 | `injection` | 12,056 | refuse: answerable questions wrapped in instructions to ignore the sources |
-| `patient_*` | 12,765 | the formulary's own rules: allergy, interaction, child, pregnancy, missing data |
+| `patient_*` | 12,636 | the formulary's own rules: allergy, interaction, child, pregnancy, missing data |
 | `wrong_dose` | 3,970 | refuse: a real medicine asserted at a dose the sources don't give |
 | `mixed_unknown` | 2,400 | refuse: a real medicine together with one that doesn't exist |
 | `absent_fact`, `out_of_scope` | 680 | refuse: alcohol, grams, cures, other species, everyday questions |
@@ -1195,10 +1197,22 @@ family at a time.
 | --- | --- | --- |
 | Dependency vulnerabilities | `pip-audit -r requirements.txt` | 0 known advisories |
 | Static analysis | `bandit -r app` | no medium or high findings |
-| Web vulnerabilities | OWASP ZAP baseline and active API scan | 0 failures over 305 endpoint variants |
+| Web vulnerabilities | `scripts/security_scan.sh` (OWASP ZAP baseline and active API scan) | one medium alert, explained below |
+| Sustained load | `python scripts/soak.py --requests 100000 --users 40` | no errors, no unsafe answers, audit trail complete |
 
-Re-run them before a release, and after upgrading dependencies. CI also
-produces a CycloneDX bill of materials and a licence list for every build; see
+The medium alert is *Cross-Domain Misconfiguration* on the CDS Hooks endpoints,
+which answer `Access-Control-Allow-Origin: *`. That is what the CDS Hooks
+specification requires — an EHR calls them from whatever origin it runs on —
+and those endpoints authenticate with a signed JWT from a trusted issuer rather
+than with a cookie. `Access-Control-Allow-Credentials` is never set, so a
+browser will not attach a session to a cross-origin call. Everything else the
+scans report is informational or low, and the two cross-origin headers the
+baseline scan first asked for were added.
+
+Re-run all of these before a release, and after upgrading dependencies. The
+first two run in CI on every push; the scans and the soak test need a running
+instance, so run them against a test deployment. CI also produces a CycloneDX
+bill of materials and a licence list for every build; see
 [docs/third-party.md](docs/third-party.md).
 
 ---

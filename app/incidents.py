@@ -123,7 +123,10 @@ def _when(value, name: str) -> datetime | None:
     return parsed
 
 
-def _check_links(s, data: dict) -> dict:
+def _check_links(s, data: dict, site_id: int | None = None) -> dict:
+    """Resolve the records an incident points at. A link has to be something
+    the reporter's own site can see: without that check, one site could name
+    another site's review case and learn that it exists."""
     links = {}
     for key, model, label in (("review_case_id", ReviewCase, "review case"), ("alert_id", Alert, "alert"),
                               ("imaging_series_id", ImagingSeries, "imaging series"), ("hazard_id", Hazard, "hazard")):
@@ -131,7 +134,8 @@ def _check_links(s, data: dict) -> dict:
         if value in (None, ""):
             links[key] = None
             continue
-        if s.get(model, int(value)) is None:
+        row = s.get(model, int(value))
+        if row is None or (site_id is not None and getattr(row, "site_id", None) not in (None, site_id)):
             raise IncidentError(f"There's no {label} {value}.")
         links[key] = int(value)
     audit = str(data.get("audit_id") or "").strip()
@@ -156,7 +160,7 @@ def report(data: dict, user_id: int | None, user_name: str, site_id: int | None 
     occurred_at = _when(data.get("occurred_at"), "time it happened")
     now = _now()
     with db.session() as s:
-        links = _check_links(s, data)
+        links = _check_links(s, data, site_id)
         incident = Incident(title=title, category=category, harm=harm, status="open", description=description,
                             occurred_at=occurred_at, reported_at=now, aware_at=now, reported_by=user_id,
                             reporter_name=user_name[:200], updated_at=now, site_id=site_id, **links)
@@ -240,7 +244,7 @@ def update(incident_id: int, changes: dict, user_id: int | None, user_name: str,
                     setattr(incident, field, value)
                     notes.append(f"{label} updated.")
         if "hazard_id" in changes:
-            hazard = _check_links(s, {"hazard_id": changes["hazard_id"]})["hazard_id"]
+            hazard = _check_links(s, {"hazard_id": changes["hazard_id"]}, incident.site_id)["hazard_id"]
             if hazard != incident.hazard_id:
                 incident.hazard_id = hazard
                 notes.append(f"Linked to hazard {hazard}." if hazard else "Hazard link removed.")

@@ -196,3 +196,54 @@ def test_true_statements_and_word_endings_still_answer(query):
 ])
 def test_word_forms_are_matched_carefully(query, expect):
     assert pipeline.run(query, check_only=True).decision == expect
+
+
+# --- The judge corroborates; it never decides -------------------------------
+
+def test_a_judge_that_says_yes_cannot_turn_a_refusal_into_an_answer(monkeypatch):
+    """The deterministic grounding score decides. A model asked to corroborate
+    can agree with a claim the score rejects, and the answer is still refused:
+    this is the whole reason the judge is called corroboration."""
+    from app import llm
+
+    monkeypatch.setattr(llm, "judge_claim",
+                        lambda text, source, use_judge=None: {"supported": True, "reason": "looks right to me"})
+    # The deterministic check says no to every claim.
+    monkeypatch.setattr(guards_output, "check_claim_grounded", lambda text, source_ids, minimum: (False, 0.11))
+    response = pipeline.run("What is the standard dose of Caloradine?",
+                            settings=Settings(use_llm_judge=True), review=False)
+    assert response.decision == "refuse"
+    assert all(not c.grounded for c in response.claims)
+    step = next(s for s in response.trace if s.name == "grounding check")
+    assert step.status == "fail"
+
+
+def test_a_judge_that_says_no_cannot_turn_an_answer_into_a_refusal(monkeypatch):
+    """The mirror: a model that disagrees with a well-grounded claim is
+    recorded in the trace and changes nothing."""
+    from app import llm
+
+    monkeypatch.setattr(llm, "judge_claim",
+                        lambda text, source, use_judge=None: {"supported": False, "reason": "I disagree"})
+    response = pipeline.run("What is the standard dose of Caloradine?",
+                            settings=Settings(use_llm_judge=True), review=False)
+    assert response.decision == "answer"
+    assert all(c.grounded for c in response.claims)
+    step = next(s for s in response.trace if s.name == "grounding check")
+    assert step.status == "pass"
+
+
+def test_the_judges_verdict_is_recorded_in_the_trace(monkeypatch):
+    """Whatever the judge said is written down, so a reviewer can see where it
+    disagreed with the score."""
+    from app import llm
+
+    monkeypatch.setattr(llm, "judge_claim",
+                        lambda text, source, use_judge=None: {"supported": False, "reason": "I disagree"})
+    response = pipeline.run("What is the standard dose of Caloradine?",
+                            settings=Settings(use_llm_judge=True), review=False)
+    step = next(s for s in response.trace if s.name == "grounding check")
+    rows = step.data["claims"]
+    assert rows and all(row["judge"] == {"supported": False, "reason": "I disagree"} for row in rows)
+    assert step.data["method"].startswith("deterministic embedding similarity, authoritative")
+    assert step.data["judge_summary"].endswith("supported")

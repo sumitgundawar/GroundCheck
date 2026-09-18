@@ -111,6 +111,9 @@ FORCE_EXTRACTIVE = _get("FORCE_EXTRACTIVE", "false").lower() in ("1", "true", "y
 # Users, sign-in sessions and audit records. SQLite by default; PostgreSQL and
 # MySQL are supported through their SQLAlchemy URLs (see app/db.py).
 DATABASE_URL = _get("DATABASE_URL", "sqlite:///data/groundcheck.db")
+# How long a SQLite connection waits for another writer before giving up.
+# Long enough to cover a migration on a busy single-node install.
+SQLITE_BUSY_TIMEOUT_MS = _get_int("SQLITE_BUSY_TIMEOUT_MS", 30000)
 DB_AUTO_MIGRATE = _get("DB_AUTO_MIGRATE", "true").lower() in ("1", "true", "yes")
 
 # --- Accounts ----------------------------------------------------------------

@@ -90,10 +90,13 @@ hospital can run. Everything below is in this branch and not yet merged.
 - **252,825 generated questions and patient scenarios** (`scripts/stress_eval.py`),
   with expectations from the corpus and the formulary.
 - **Property-based fuzzing** of the guards' invariants.
-- **Security:** `pip-audit`, `bandit` and OWASP ZAP baseline and active scans;
-  a CycloneDX bill of materials and licence list from CI.
-- **Soak test:** 100,000 requests on PostgreSQL with 40 users, no errors and
-  every audit record present and chained.
+- **Security:** `pip-audit`, `bandit`, and OWASP ZAP baseline and active scans
+  (`scripts/security_scan.sh`); a CycloneDX bill of materials and licence list
+  from CI. The scans' one medium alert is the cross-origin policy the CDS Hooks
+  specification requires, and the README says why it stands.
+- **Soak test** (`scripts/soak.py`): 100,000 requests on PostgreSQL with 40
+  users, no errors, no unsafe answers, and every audit record present and
+  chained.
 - **A browser journey** through the app (`tests/ui/`), run in CI: questions and
   their citations, the trace and audit record, a patient loaded, every page,
   themes, the keyboard and a phone-sized screen.
