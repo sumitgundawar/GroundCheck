@@ -94,6 +94,9 @@ hospital can run. Everything below is in this branch and not yet merged.
   a CycloneDX bill of materials and licence list from CI.
 - **Soak test:** 100,000 requests on PostgreSQL with 40 users, no errors and
   every audit record present and chained.
+- **A browser journey** through the app (`tests/ui/`), run in CI: questions and
+  their citations, the trace and audit record, a patient loaded, every page,
+  themes, the keyboard and a phone-sized screen.
 - **The release image, verified as shipped:** signing in, refusing, answering,
   the cache, metrics, the hardware panel and the audit chain all checked
   inside the container, and the data checked again after a restart.
@@ -109,6 +112,10 @@ hospital can run. Everything below is in this branch and not yet merged.
   volume, builds its index before recording a release, and stops cleanly on
   signals.
 - Training checkpoints load tensors and plain data only, never code.
+- With a child's details loaded, an answer about a medicine's place in
+  treatment now says the formulary covers adults only. The dose questions were
+  already refused; the informational ones passed with nothing said.
+- The Medicines page no longer runs off the side of a phone screen.
 - 31 dependency advisories closed by upgrading FastAPI, Starlette,
   cryptography, transformers, sentence-transformers and pytest.
 

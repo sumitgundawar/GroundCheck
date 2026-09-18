@@ -196,6 +196,16 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                            rule.id, rule.source)
 
         if not dose_question and not prescribing:
+            # Asking what a medicine is isn't asking to give it, so nothing here
+            # blocks an answer. Say when the formulary wouldn't cover this
+            # patient all the same, rather than leaving an adult answer looking
+            # like it applies to the child or young person in front of them.
+            if patient.age_years is not None and patient.age_years < med.adult_min_age and (
+                    med.paediatric_dose is None or (med.paediatric_min_age is not None
+                                                    and patient.age_years < med.paediatric_min_age)):
+                result.add("warn", "paediatric_not_covered", med,
+                           f"The formulary has no dosing for {med.name} in a patient aged "
+                           f"{_fmt(patient.age_years)}: this answer is about adults.")
             continue
 
         # Missing data needed before a dose can be given

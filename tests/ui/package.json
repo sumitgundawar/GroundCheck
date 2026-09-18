@@ -1,0 +1,13 @@
+{
+  "name": "groundcheck-ui-tests",
+  "private": true,
+  "type": "module",
+  "description": "Browser journey through the GroundCheck app",
+  "scripts": {
+    "test": "node journey.mjs",
+    "postinstall": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}

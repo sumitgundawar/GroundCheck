@@ -1129,12 +1129,27 @@ pytest -q                                   # 381 tests, including property-base
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
 python scripts/stress_eval.py               # all 252,825 cases (about an hour on 7 cores)
 scripts/container_smoke.sh groundcheck:test # the built image, the way a site runs it
+cd tests/ui && npm install && npm test      # the browser app, end to end
 ```
 
 Everything runs in extractive mode, so it's deterministic and offline. CI
 (`.github/workflows/ci.yml`) builds the index, runs the evaluation, the test
 suite and a stress sample on every push and pull request. The image build and
 its smoke test run weekly, and on demand from the Actions tab.
+
+### The browser journey
+
+`tests/ui/journey.mjs` drives a real browser through the app against a running
+GroundCheck: it asks a question the sources answer and checks the citations
+line up with the source cards, asks about a medicine that is in no source and
+checks the refusal names it, opens the trace and the audit record, loads a
+five-year-old patient and checks the dose is refused while an informational
+answer says it is about adults, opens every page in the sidebar, verifies the
+audit chain from the Data protection page, switches theme and reloads, asks a
+question from the keyboard alone, and checks no page scrolls sideways on a
+390px screen. It found two things the Python tests couldn't see: the Medicines
+page overflowed a phone, and an informational answer for a child carried no
+warning at all.
 
 ### The container smoke test
 

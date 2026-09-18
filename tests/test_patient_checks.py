@@ -185,3 +185,26 @@ def test_the_api_accepts_and_validates_a_patient():
         assert blocked.json()["decision"] == "refuse"
         assert blocked.json()["patient_findings"][0]["code"] == "pregnancy"
         assert client.post("/api/ask", json={"query": "x", "patient": {"name": "Jane"}}).status_code == 422
+
+
+def test_an_informational_answer_says_when_it_is_only_about_adults():
+    """Asking what the first-line medicine is isn't asking to give it, so it's
+    still answered — but with a child loaded, the answer says it's for adults."""
+    child = PatientContext(age_years=5, weight_kg=18, egfr=100)
+    response = pipeline.run("What is the first-line medication for Veltris syndrome?",
+                            patient=child, review=False)
+    assert response.decision == "answer"
+    codes = {f.code for f in response.patient_findings}
+    assert "paediatric_not_covered" in codes
+    warning = next(f for f in response.patient_findings if f.code == "paediatric_not_covered")
+    assert warning.severity == "warn" and "adults" in warning.message
+
+    # An adult gets the same answer with nothing to qualify it.
+    grown = pipeline.run("What is the first-line medication for Veltris syndrome?",
+                         patient=PatientContext(**ADULT), review=False)
+    assert grown.decision == "answer"
+    assert "paediatric_not_covered" not in {f.code for f in grown.patient_findings}
+
+    # Asking for the dose is asking to give it, so that is still refused.
+    dose = pipeline.run("What is the dose of Caloradine?", patient=child, review=False)
+    assert dose.decision == "refuse"
