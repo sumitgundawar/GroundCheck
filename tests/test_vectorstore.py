@@ -108,3 +108,25 @@ def test_metadata_and_store_must_agree(tmp_path, monkeypatch):
         retrieval.load_index()
     monkeypatch.undo()
     retrieval.load_index()
+
+
+def test_a_qdrant_server_rebuild_stages_before_it_swaps(tmp_path, monkeypatch):
+    """Against a server the new collection is filled first and the name is
+    moved with an alias, so a rebuild that dies half way leaves the old index
+    answering rather than emptying it."""
+    store = vectorstore.QdrantStore(path=str(tmp_path / "q"), collection="gc_test")
+    store.build(np.eye(3, dtype="float32"), [{"id": f"A{i}"} for i in range(3)])
+    monkeypatch.setattr(store, "_server", True)          # act like a server
+
+    swapped: list[tuple[str, str]] = []
+    monkeypatch.setattr(store.client, "update_collection_aliases",
+                        lambda change_aliases_operations: swapped.append(
+                            (change_aliases_operations[0].create_alias.collection_name,
+                             change_aliases_operations[0].create_alias.alias_name)))
+    monkeypatch.setattr(store, "_served_collection", lambda: None)
+    store.build(np.eye(3, dtype="float32") * 2, [{"id": f"B{i}"} for i in range(3)])
+
+    # The live collection was never emptied, and the name moved only at the end.
+    assert swapped == [("gc_test__building", "gc_test")]
+    assert store.client.collection_exists("gc_test")
+    assert len(store.client.scroll("gc_test", limit=10)[0]) == 3

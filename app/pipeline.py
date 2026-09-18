@@ -215,7 +215,7 @@ def _cached_answer(key: str) -> tuple[AskResponse, dict] | None:
             del _answers[key]
             return None
         _answers.move_to_end(key)
-        return response, extras
+        return response, {**extras, "cached_seconds": round(now - stored_at, 1)}
 
 
 def _remember_answer(key: str, response: AskResponse, extras: dict) -> None:
@@ -261,6 +261,15 @@ def run(raw_query: str, settings: "Settings | None" = None,
     return _run(raw_query, settings, client_id, user_id, review, patient, False, remember=key)
 
 
+def _cache_age(extras: dict) -> str:
+    """How long ago the remembered answer was produced, in plain words."""
+    seconds = int(extras.get("cached_seconds") or 0)
+    if seconds < 60:
+        return f"{seconds} second{'s' if seconds != 1 else ''} ago"
+    minutes = seconds // 60
+    return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+
+
 def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool) -> AskResponse:
     """Serve a remembered answer: the same decision, claims and trace, with its
     own audit record, so the trail still has one entry per question asked and
@@ -271,6 +280,17 @@ def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool)
     response = cached.model_copy(deep=True)
     response.audit_id = audit.store.new_id()
     response.total_ms = timer.total_ms()
+    # The trace is the earlier run's. Say so, rather than leaving an audit
+    # record that reads as though every check ran again for this question:
+    # the stage timings below belong to the run named here.
+    response.trace = [TraceStep(name="remembered answer", status="info",
+                                detail=f"the same question was answered {_cache_age(extras)}, "
+                                       f"and the checks below are that run's",
+                                ms=0, explain="An identical question, with no patient details, asked again "
+                                              "while the earlier answer was still current and the sources "
+                                              "had not changed. The earlier run's checks are shown "
+                                              "unchanged, and this request has its own audit record.",
+                                data={"of_audit_id": cached.audit_id})] + response.trace
     site_id = sites.of_user(user_id)
     audit.store.save(response.audit_id, response, {**extras, "from_cache": True}, user_id=user_id, site_id=site_id)
     monitoring.observe_answer(response.decision, response.total_ms, "cache")

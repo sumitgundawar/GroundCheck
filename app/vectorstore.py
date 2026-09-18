@@ -103,26 +103,57 @@ class QdrantStore:
         url = url if url is not None else config.QDRANT_URL
         path = path if path is not None else config.QDRANT_PATH
         self.collection = collection or config.QDRANT_COLLECTION
+        self._server = bool(url)
         if url:
             self.client = QdrantClient(url=url, api_key=api_key or config.QDRANT_API_KEY or None)
         else:
             self.client = QdrantClient(path=path or str(config.INDEX_DIR / "qdrant"))
 
     def build(self, vectors: np.ndarray, payloads: list[dict]) -> None:
+        """Replace the collection's contents.
+
+        Against a Qdrant server the new collection is filled first and the name
+        is moved to it with an alias, so a rebuild that dies half way leaves
+        the old index still answering — the same guarantee the local store gets
+        from writing a temporary file and renaming it. The embedded client
+        resolves searches by collection name only, so there the collection is
+        replaced in place; it is a single-process store on local disk, and a
+        deployment that needs the stronger guarantee runs a server.
+        """
         from qdrant_client import models
 
-        if self.client.collection_exists(self.collection):
-            self.client.delete_collection(self.collection)
+        target = f"{self.collection}__building" if self._server else self.collection
+        if self.client.collection_exists(target):
+            self.client.delete_collection(target)
         self.client.create_collection(
-            self.collection,
+            target,
             vectors_config=models.VectorParams(size=int(vectors.shape[1]), distance=models.Distance.COSINE),
         )
         for start in range(0, len(vectors), self._BATCH):
             end = min(start + self._BATCH, len(vectors))
-            self.client.upsert(self.collection, points=[
+            self.client.upsert(target, points=[
                 models.PointStruct(id=i, vector=vectors[i].tolist(), payload=payloads[i])
                 for i in range(start, end)
             ], wait=True)
+        if target == self.collection:
+            return
+
+        # Everything is in: move the name, then drop what it used to mean.
+        previous = self._served_collection()
+        self.client.update_collection_aliases(change_aliases_operations=[
+            models.CreateAliasOperation(create_alias=models.CreateAlias(
+                collection_name=target, alias_name=self.collection))])
+        if previous and previous not in (target, self.collection):
+            self.client.delete_collection(previous)
+
+    def _served_collection(self) -> str | None:
+        """The real collection the configured name currently resolves to."""
+        try:
+            for alias in self.client.get_collection_aliases(self.collection).aliases:
+                return alias.collection_name
+        except Exception:  # noqa: BLE001 - no alias means the name is the collection
+            pass
+        return None
 
     def load(self) -> None:
         if not self.client.collection_exists(self.collection):

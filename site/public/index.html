@@ -103,7 +103,7 @@
           </div>
           <p class="fineprint">MIT licensed. Runs on your own machine in a few minutes — see <a href="#start">Get started</a>.</p>
           <ul class="proof" aria-label="At a glance">
-            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#shield-check"/></svg><span><strong>0 of 221,313</strong> must-refuse questions answered in testing</span></li>
+            <li><svg class="i" aria-hidden="true"><use href="/icons.svg#shield-check"/></svg><span><strong>0 of 222,210</strong> must-refuse questions answered in testing</span></li>
             <li><svg class="i" aria-hidden="true"><use href="/icons.svg#list-checks"/></svg><span><strong>11 checks</strong> on every question</span></li>
             <li><svg class="i" aria-hidden="true"><use href="/icons.svg#laptop"/></svg><span><strong>Runs on a laptop</strong>, with optional local AI and no API key</span></li>
           </ul>
@@ -414,7 +414,7 @@
           <li>
             <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#graduation-cap"/></svg></span>
             <h3>Researchers and educators</h3>
-            <p>An offline testbed with 252,825 test questions.</p>
+            <p>An offline testbed with 253,722 test questions.</p>
           </li>
           <li>
             <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#scale"/></svg></span>
@@ -594,7 +594,7 @@
     <section class="section section-rule" id="evaluation" aria-labelledby="evaluation-title">
       <div class="wrap">
         <div class="section-intro">
-          <h2 id="evaluation-title">Tested on 252,825 questions</h2>
+          <h2 id="evaluation-title">Tested on 253,722 questions</h2>
           <p>The build fails if a single question that should be refused gets answered.</p>
         </div>
 
@@ -641,7 +641,7 @@
         </div>
         <div class="eval-scale">
           <h3>And 250,000 more</h3>
-          <p>Beyond the gating set, a generated evaluation of <strong>252,825</strong> questions and patient scenarios runs against every build: medicines that don’t exist, one-letter misspellings of real ones, questions about children and pregnancy the sources don’t cover, doses the sources never state, instructions to ignore the sources, and patients the formulary says a medicine is unsafe for. Expectations come from the documents and the formulary, never from GroundCheck’s own code, and thousands of generated inputs test each safety check’s invariants. In the latest run, all <strong>221,313</strong> questions that had to be refused were refused, and 0.5% of the answerable ones were refused when they needn’t have been.</p>
+          <p>Beyond the gating set, a generated evaluation of <strong>253,722</strong> questions and patient scenarios runs against every build: medicines that don’t exist, one-letter misspellings of real ones, questions about children and pregnancy the sources don’t cover, doses the sources never state, instructions to ignore the sources, and patients the formulary says a medicine is unsafe for. Expectations come from the documents and the formulary, never from GroundCheck’s own code, and thousands of generated inputs test each safety check’s invariants. In the latest run, all <strong>222,210</strong> questions that had to be refused were refused, and 0.5% of the answerable ones were refused when they needn’t have been.</p>
         </div>
         <p class="note">Runs offline in extractive mode, so these results measure the checks, not a language model.</p>
       </div>
@@ -819,7 +819,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
               <ul>
                 <li>Eleven-stage pipeline with deterministic guards</li>
                 <li>Citations, trace and audit record for every request</li>
-                <li>2,008-case evaluation that gates the build, and 252,825 generated cases behind it</li>
+                <li>2,008-case evaluation that gates the build, and 253,722 generated cases behind it</li>
                 <li>Tuning dashboard and JSON API</li>
                 </ul>
             </details>

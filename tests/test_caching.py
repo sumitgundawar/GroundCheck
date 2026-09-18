@@ -109,3 +109,25 @@ def test_an_operator_can_override_any_size(monkeypatch, name, value):
     chosen = {"EMBED_BATCH_SIZE": resources.embed_batch_size, "IMAGING_BATCH_SIZE": lambda: resources.patch_batch_size(64),
               "WEB_WORKERS": resources.recommended_workers, "IMAGING_CACHE_SERIES": resources.volume_cache_size}[name]
     assert chosen() == int(value)
+
+
+def test_a_remembered_answer_says_so_in_its_own_trace(database):
+    """The stages in a remembered answer's trace are the earlier run's. The
+    audit record has to say that, or it reads as though every check ran again
+    for this question — and the timings would be someone else's."""
+    first = pipeline.run(ANSWERED)
+    second = pipeline.run(ANSWERED)
+
+    assert second.trace[0].name == "remembered answer"
+    assert second.trace[0].status == "info"
+    assert "checks below are that run's" in second.trace[0].detail
+    assert second.trace[0].data == {"of_audit_id": first.audit_id}
+    # The earlier run's stages follow, unchanged.
+    assert [s.name for s in second.trace[1:]] == [s.name for s in first.trace]
+
+    from app import audit
+
+    record = audit.store.get(second.audit_id)
+    assert record["response"]["trace"][0]["name"] == "remembered answer"
+    assert record["from_cache"] is True
+    assert first.trace[0].name != "remembered answer"     # the first run says nothing of the sort
