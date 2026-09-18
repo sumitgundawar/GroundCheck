@@ -103,7 +103,14 @@ async function api(path, options = {}) {
     showAuthScreen("login", "Your session ended. Sign in again.");
   }
   if (!res.ok) {
-    const detail = data && typeof data.detail === "string" ? data.detail : `Request failed (${res.status}).`;
+    // The server's own message is usually specific and actionable. When there
+    // isn't one, say what to do rather than only what went wrong: a dead end
+    // in clinical tooling turns into a phone call to IT.
+    const fallback = res.status >= 500
+      ? "GroundCheck couldn't complete that. Try again — if it keeps happening, tell your administrator, "
+        + `and quote the time and error ${res.status}.`
+      : `That request wasn't accepted (error ${res.status}). Check what you entered and try again.`;
+    const detail = data && typeof data.detail === "string" ? data.detail : fallback;
     throw new Error(detail);
   }
   return data;
@@ -454,7 +461,7 @@ async function loadUsers() {
 
     const last = document.createElement("td");
     last.className = "mono";
-    last.textContent = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "Never";
+    last.textContent = u.last_login_at ? dateTime(u.last_login_at) : "Never";
 
     const status = document.createElement("td");
     const toggle = document.createElement("button");
@@ -1743,7 +1750,11 @@ const STATUS_LABELS = { pending: "Pending review", approved: "Approved", rejecte
 let indexPoll = null;
 
 function isoDateToIso(value) { return value ? `${value}T00:00:00` : ""; }
-function shortDate(iso) { return iso ? new Date(iso).toLocaleDateString() : ""; }
+// A date on its own, spelled so it cannot be read the wrong way round:
+// "18 Sep 2026", never 9/18/2026 or 18/09/2026.
+function shortDate(iso) {
+  return iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
+}
 
 async function loadDocuments() {
   let data;
@@ -1812,7 +1823,7 @@ function renderIndexStatus(index) {
   const text = $("index-status-text");
   if (index.state === "running") text.textContent = "Rebuilding the index…";
   else if (index.state === "failed") text.textContent = `Index rebuild failed: ${index.error}`;
-  else if (index.finished_at) text.textContent = `Index rebuilt ${new Date(index.finished_at).toLocaleString()}: ${index.documents.toLocaleString()} passages (${index.embedded} newly embedded).`;
+  else if (index.finished_at) text.textContent = `Index rebuilt ${dateTime(index.finished_at)}: ${index.documents.toLocaleString()} passages (${index.embedded} newly embedded).`;
   else text.textContent = "The index was built when the app started.";
   $("index-status").classList.toggle("failed", index.state === "failed");
   $("index-rebuild").disabled = index.state === "running";
@@ -1898,7 +1909,7 @@ async function openDocument(id) {
   evalSection.hidden = !d.evaluation;
   if (d.evaluation) {
     const e = d.evaluation;
-    $("document-eval-summary").textContent = `${e.passed} of ${e.total} behaved as intended, ${e.unsafe_answers} unsafe answers, run ${new Date(e.ran_at).toLocaleString()}.`;
+    $("document-eval-summary").textContent = `${e.passed} of ${e.total} behaved as intended, ${e.unsafe_answers} unsafe answers, run ${dateTime(e.ran_at)}.`;
     const cases = $("document-eval-cases");
     cases.textContent = "";
     e.cases.forEach((c) => {
@@ -2046,7 +2057,7 @@ async function loadReviews() {
 
     const asked = document.createElement("td");
     asked.textContent = k.occurrences === 1 ? "once" : `${k.occurrences} times`;
-    asked.title = `First ${new Date(k.created_at).toLocaleString()}, last ${new Date(k.last_seen_at).toLocaleString()}`;
+    asked.title = `First ${dateTime(k.created_at)}, last ${dateTime(k.last_seen_at)}`;
 
     const due = document.createElement("td");
     if (k.status === "open") {
@@ -2087,7 +2098,7 @@ function renderCase(k) {
   $("case-query").textContent = k.query;
   const meta = [
     k.kind === "flagged" ? `Flagged${k.flagged_by_name ? ` by ${k.flagged_by_name}` : ""}: ${k.reason}` : `Refused: ${k.reason}`,
-    `Asked ${k.occurrences === 1 ? "once" : `${k.occurrences} times`}, first ${new Date(k.created_at).toLocaleString()}`,
+    `Asked ${k.occurrences === 1 ? "once" : `${k.occurrences} times`}, first ${dateTime(k.created_at)}`,
     k.status === "open" ? `Due ${relativeTime(k.due_at)}${k.escalated ? ", escalated" : ""}` : "",
     `Audit record ${k.last_audit_id}`,
   ].filter(Boolean).map((part) => part.replace(/[.\s]+$/, ""));
@@ -2122,7 +2133,7 @@ function renderCase(k) {
     $("case-note").value = "";
     $("case-comment").value = "";
   } else {
-    $("case-outcome-text").textContent = `Resolved${k.resolved_by_name ? ` by ${k.resolved_by_name}` : ""} ${new Date(k.resolved_at).toLocaleString()}: ${k.outcome_label}.${k.outcome_note ? ` ${k.outcome_note}` : ""}`;
+    $("case-outcome-text").textContent = `Resolved${k.resolved_by_name ? ` by ${k.resolved_by_name}` : ""} ${dateTime(k.resolved_at)}: ${k.outcome_label}.${k.outcome_note ? ` ${k.outcome_note}` : ""}`;
     $("case-reopen-note").value = "";
   }
 
@@ -2136,7 +2147,7 @@ function renderCase(k) {
     action.textContent = capitalize(e.action);
     const when = document.createElement("span");
     when.className = "muted";
-    when.textContent = `${e.user ? `${e.user}, ` : ""}${new Date(e.at).toLocaleString()}`;
+    when.textContent = `${e.user ? `${e.user}, ` : ""}${dateTime(e.at)}`;
     head.append(action, when);
     li.appendChild(head);
     if (e.note) {
@@ -2395,7 +2406,7 @@ function renderRetention(ret) {
     ret.review_retention_days ? `resolved reviews for ${plural(ret.review_retention_days, "day")}` : "resolved reviews for ever",
   ];
   const due = ret.audit_records_to_delete + ret.review_cases_to_delete;
-  const last = ret.last_run ? ` Last run ${new Date(ret.last_run.ran_at).toLocaleString()}: ${plural(ret.last_run.audit_deleted, "audit record")} and ${plural(ret.last_run.reviews_deleted, "review")} deleted.` : "";
+  const last = ret.last_run ? ` Last run ${dateTime(ret.last_run.ran_at)}: ${plural(ret.last_run.audit_deleted, "audit record")} and ${plural(ret.last_run.reviews_deleted, "review")} deleted.` : "";
   $("retention-summary").textContent = `Keeping ${periods.join(" and ")}. `
     + (due ? `${plural(ret.audit_records_to_delete, "audit record")} and ${plural(ret.review_cases_to_delete, "resolved review")} are past their period.` : "Nothing is past its retention period.")
     + last;
@@ -2690,7 +2701,7 @@ async function loadEmbeddings() {
   const stats = $("embed-stats");
   stats.textContent = "";
   const idx = data.index || {};
-  const rebuilt = idx.finished_at ? `rebuilt ${new Date(idx.finished_at).toLocaleString()}` : "built when the app started";
+  const rebuilt = idx.finished_at ? `rebuilt ${dateTime(idx.finished_at)}` : "built when the app started";
   stats.append(
     statTile("Passages indexed", data.passages.toLocaleString(), `${data.from_your_documents.toLocaleString()} from your documents`),
     statTile("Embedding model", data.model.replace(/^sentence-transformers\//, ""), data.model.startsWith("sentence-transformers/") ? "sentence-transformers" : "", { small: true }),
@@ -3056,7 +3067,7 @@ async function loadRuns() {
     status.appendChild(pill);
     if (p.state === "running") status.append(` ${Math.round(p.percent || 0)}%`);
     const hwCell = document.createElement("td"); hwCell.textContent = run.device_name;
-    const started = document.createElement("td"); started.textContent = new Date(run.created_at).toLocaleString();
+    const started = document.createElement("td"); started.textContent = dateTime(run.created_at);
     const result = document.createElement("td");
     if (p.state === "completed" && p.summary) result.textContent = `${pct(p.summary.test_accuracy, 1)} accurate`;
     else if (p.state === "failed") result.textContent = p.message;
@@ -3244,7 +3255,7 @@ async function openModel(id) {
     ["Architecture", `${m.architecture === "resnet18" ? "ResNet-18" : "Small CNN"}${m.pretrained ? ", from ImageNet weights" : ", trained from scratch"}. Input ${m.input.image_size} × ${m.input.image_size} px, ${m.input.channels === 1 ? "grayscale" : "colour"}.`],
     ["Training", `${m.history.length} of ${tr.epochs} epochs (best: ${m.best_epoch}), batch ${tr.batch_size}, learning rate ${tr.learning_rate}, on ${m.hardware.device_name} in ${formatDuration(m.training_seconds)}.`],
     ["Unfamiliar images", m.novelty ? `Abstains on images far from anything it was trained on (1% of validation images would be flagged${m.test && m.test.novelty_flagged !== undefined ? `; ${pct(m.test.novelty_flagged, 1)} of test images were` : ""}).` : "No check recorded for this model."],
-    ["Created", `${new Date(m.created_at).toLocaleString()}${m.created_by ? ` by ${m.created_by}` : ""}. ID ${m.id}.`],
+    ["Created", `${dateTime(m.created_at)}${m.created_by ? ` by ${m.created_by}` : ""}. ID ${m.id}.`],
   ];
   const dl = $("model-training");
   dl.textContent = "";
@@ -3599,7 +3610,8 @@ async function loadEhrPage() {
   };
   $("smart-status").textContent = c.smart_enabled
     ? "Set up. Register these addresses with your EHR."
-    : "Not set up. Set SMART_CLIENT_ID and SMART_ALLOWED_ISSUERS, then register these addresses with your EHR.";
+    : "Not set up yet. Whoever runs this server has to add the EHR's client ID and the EHRs it may be launched "
+      + "from (SMART_CLIENT_ID and SMART_ALLOWED_ISSUERS), and then these addresses get registered with the EHR.";
   list("smart-settings", [
     ["Launch URL", c.smart_launch_url], ["Redirect URL", c.smart_redirect_url],
     ["Client ID", c.smart_client_id || "Not set"], ["Allowed EHRs", c.smart_allowed_issuers.join(", ") || "None"],
@@ -3608,7 +3620,9 @@ async function loadEhrPage() {
   ]);
   $("cds-status").textContent = c.cds_trusted.length
     ? "Accepting signed calls from the EHRs below."
-    : c.cds_unsigned ? "Accepting unsigned calls: for testing only." : "No EHR is trusted yet. Set CDS_HOOKS_TRUSTED.";
+    : c.cds_unsigned ? "Accepting unsigned calls: for testing only."
+      : "No EHR is trusted yet. Whoever runs this server has to list each EHR that may call in, with the address its "
+        + "signing keys are published at (CDS_HOOKS_TRUSTED).";
   list("cds-settings", [
     ["Discovery URL", c.cds_discovery_url], ["Hooks", "order-select, order-sign"],
     ["Trusted EHRs", c.cds_trusted.join(", ") || "None"], ["Unsigned calls", c.cds_unsigned ? "Allowed (testing)" : "Refused"],
@@ -4150,7 +4164,7 @@ function renderMonitoring(data) {
   data.resolved.slice(0, 8).forEach((a) => {
     const li = el("li", "alert-item");
     const h = el("h3"); h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? "Critical" : "Warning"), a.title);
-    li.append(h, el("p", "alert-meta", `Fired ${new Date(a.first_seen).toLocaleString()}, resolved ${sinceText(a.resolved_at)}.`));
+    li.append(h, el("p", "alert-meta", `Fired ${dateTime(a.first_seen)}, resolved ${sinceText(a.resolved_at)}.`));
     resolved.appendChild(li);
   });
 }

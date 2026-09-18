@@ -1,7 +1,11 @@
 /* GroundCheck platform design system, shared with groundcheckhealth.com.
 
    - Colour means status: pass is green, refuse is red, warning is amber. The
-     one resting colour is ink, a deep green-black (pale in dark mode).
+     one resting colour is ink, a deep green-black (pale in dark mode). One
+     exception, and only one: the corpus map and the syntax-highlighted audit
+     record use hue to tell categories apart (--kind-* and --code-* below),
+     where hue is the data rather than decoration. Both name every category in
+     a legend as well, so neither relies on colour alone.
    - One typeface family, Atkinson Hyperlegible, designed for low-vision
      readers. The Mono cut is reserved for real data: IDs, timings, figures.
    - Hairline structure on a soft ground. Light and dark themes follow the
@@ -48,6 +52,7 @@
   --series-2: #2f7fb8;
   --series-muted: #b3c1bc;
   --code-key: #6b3fa0;  --code-string: #17784a;  --code-number: #1d5fa8;  --code-bool: #a4471a;
+  /* Categorical, not status: see the note at the top of this file. */
   --kind-condition: #7d8c87;  --kind-drug: #2f7fb8;  --kind-reference: #a06b00;  --kind-marker: #0e8a7c;  --kind-procedure: #7a4fb5;
   --map-hit: #0f2622;  --map-halo: rgba(255, 255, 255, 0.92);
   --thumb: #ffffff;
@@ -122,13 +127,12 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* The sans cut, not the mono one: the mono face is reserved for real data. */
 .eyebrow {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 12px;
-  color: var(--text-faint);
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 /* ---------- Header ---------- */
@@ -271,9 +275,9 @@ body {
 
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .chip {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border-strong);
   border-radius: 999px;
@@ -559,7 +563,7 @@ details[open] > .j-summary::before { content: "▾"; }
 .trace-glyph.info { background: var(--info); }
 .trace-glyph.skip { background: var(--border-strong); }
 .trace-main { min-width: 0; }
-.trace-name { font-family: var(--font-mono); font-size: 13px; color: var(--text); transition: color 0.12s ease; }
+.trace-name { font-family: var(--font-sans); font-size: 14px; font-weight: 600; color: var(--text); transition: color 0.12s ease; }
 .trace-item.skip .trace-name { color: var(--text-faint); }
 .trace-item.fail .trace-name { color: var(--danger); }
 .trace-detail { font-size: 12px; color: var(--text-muted); }
@@ -1230,12 +1234,9 @@ body { background: var(--canvas); color: var(--text); }
 .page-title, .auth-title { font-family: var(--font-sans); font-weight: 700; letter-spacing: -0.015em; color: var(--ink); }
 .panel-heading, .step-title, .model-card h2, .case-query, .modal-head h2 { color: var(--ink); }
 .btn-orb { display: block; }
-.eyebrow { font-family: var(--font-sans); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 700; color: var(--ink); }
 
 /* ---------- Polish ---------- */
 .btn { text-decoration: none; }
-.chip { font-family: var(--font-sans); font-size: 13px; color: var(--text); background: var(--bg); }
-.chip:hover { border-color: var(--ink); background: var(--bg-hover); }
 .tile-label::first-letter, .legend-item span:last-child::first-letter { text-transform: uppercase; }
 .system-status { display: grid; gap: 6px; margin: 0; padding: var(--space-2) var(--space-2) 0; font-size: 12.5px; }
 .system-status > div { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); min-width: 0; }
@@ -1257,7 +1258,6 @@ body { background: var(--canvas); color: var(--text); }
 #refuse-detail { display: none; }
 .refuse-callout { background: color-mix(in srgb, var(--danger-bg) 70%, var(--bg)); }
 .refuse-callout .eyebrow { color: var(--danger); }
-.trace-name { font-family: var(--font-sans); font-size: 14px; font-weight: 600; }
 .trace-name::first-letter { text-transform: uppercase; }
 .decision-reason::first-letter { text-transform: uppercase; }
 

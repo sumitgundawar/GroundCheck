@@ -588,7 +588,7 @@ code, .mono{ font-family: var(--font-mono); font-size: 0.9em; }
   object-fit: contain;
   border-radius: 6px;
   box-shadow: 0 1px 0 var(--line), 0 14px 32px -20px rgb(15 38 34 / 0.35);
-  background: #fff;
+  background: var(--surface);
 }
 
 /* The link wraps the image without changing its size, so the height cap on
@@ -1010,7 +1010,7 @@ code, .mono{ font-family: var(--font-mono); font-size: 0.9em; }
 }
 
 
-.demo-stage { position: relative; background: #fff; }
+.demo-stage { position: relative; background: var(--surface); }
 .demo-video { display: block; width: 100%; height: auto; cursor: pointer; }
 
 .demo-loading {
@@ -1373,7 +1373,7 @@ code, .mono{ font-family: var(--font-mono); font-size: 0.9em; }
 .bar-value { font-variant-numeric: tabular-nums; color: var(--text); }
 
 .shot { margin: 0; }
-.shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); background: #fff; }
+.shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
 .shot figcaption { margin-top: 0.6rem; font-size: 0.93rem; color: var(--muted); }
 
 .corpus-grid { align-items: center; }
