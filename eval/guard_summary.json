@@ -1,45 +1,36 @@
 {
-  "cases": 1215,
-  "accepted_wrong_claims": 6,
+  "cases": 600,
+  "accepted_wrong_claims": 4,
   "accepted_wrong_doses": 0,
-  "misattributed_generic_sentences": 6,
+  "misattributed_generic_sentences": 4,
   "families": {
-    "unchanged": {
-      "cases": 153,
-      "passed": 153
-    },
     "number": {
-      "cases": 459,
-      "passed": 459
+      "cases": 231,
+      "passed": 231
     },
     "unit": {
-      "cases": 153,
-      "passed": 153
+      "cases": 84,
+      "passed": 84
+    },
+    "unchanged": {
+      "cases": 68,
+      "passed": 68
     },
     "crossed": {
-      "cases": 147,
-      "passed": 147
+      "cases": 78,
+      "passed": 78
     },
     "substituted": {
-      "cases": 150,
-      "passed": 144,
-      "accepted": 6
+      "cases": 67,
+      "passed": 63,
+      "accepted": 4
     },
     "fabricated": {
-      "cases": 153,
-      "passed": 153
+      "cases": 72,
+      "passed": 72
     }
   },
   "escapes": [
-    {
-      "family": "substituted",
-      "claim": "If brindyl stays high beyond eight weeks, the first-line agent Tamdamravil suspension is started.",
-      "sources": [
-        "DOST-D0142"
-      ],
-      "grounding_score": 0.461,
-      "dosage": "no dosage values to verify"
-    },
     {
       "family": "substituted",
       "claim": "Once vexin settles, the dose is tapered with a specialist.",
@@ -51,11 +42,11 @@
     },
     {
       "family": "substituted",
-      "claim": "Once hossel settles, the dose is tapered with a specialist.",
+      "claim": "If brindyl stays high beyond eight weeks, the first-line agent Tamdamravil suspension is started.",
       "sources": [
-        "BIMG-D0362"
+        "DOST-D0142"
       ],
-      "grounding_score": 0.5,
+      "grounding_score": 0.461,
       "dosage": "no dosage values to verify"
     },
     {
@@ -74,15 +65,6 @@
         "RETM-D0782"
       ],
       "grounding_score": 0.462,
-      "dosage": "no dosage values to verify"
-    },
-    {
-      "family": "substituted",
-      "claim": "Once wendal settles, the dose is tapered with a specialist.",
-      "sources": [
-        "LASL-D1172"
-      ],
-      "grounding_score": 0.5,
       "dosage": "no dosage values to verify"
     }
   ]
