@@ -61,6 +61,7 @@ def _finish(
     *,
     decision: str,
     answer_text: str,
+    outcome: str | None = None,
     refused_reason: str | None,
     claims: list[Claim],
     sources: list[Source],
@@ -87,6 +88,7 @@ def _finish(
             step.explain = STAGE_EXPLAIN.get(step.name, "")
     response = AskResponse(
         decision=decision,
+        outcome=outcome or ("answered" if decision == "answer" else "refused"),
         answer_text=answer_text,
         refused_reason=refused_reason,
         claims=claims,
@@ -304,6 +306,18 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
          review: bool, patient: PatientContext | None, check_only: bool, remember: str | None = None) -> AskResponse:
     # Effective settings: an explicit object, or the configured defaults.
     cfg = settings or Settings()
+    # Turning a guard off is a demonstration, not a request option. Unless the
+    # deployment has explicitly allowed it, every guard runs whatever the
+    # caller sent — otherwise one JSON field from any client produces an
+    # ungoverned answer that still says `decision: answer`.
+    if not config.ALLOW_GUARD_OVERRIDES:
+        cfg = cfg.model_copy(update={
+            "enable_pii_redaction": True, "enable_injection_guard": True,
+            "enable_coverage_guard": True, "enable_grounding_guard": True,
+            "enable_dosage_guard": True,
+            "retrieval_min_score": max(cfg.retrieval_min_score, config.RETRIEVAL_MIN_SCORE),
+            "grounding_min": max(cfg.grounding_min, config.GROUNDING_MIN),
+        })
     timer = _Timer()
     trace: list[TraceStep] = []
     extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump(), "user_id": user_id,
@@ -348,7 +362,7 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
     ))
     if not rate.ok:
         _skip_after(trace, "rate limit")
-        return _finish(decision="refuse",
+        return _finish(decision="refuse", outcome="not_evaluated",
                        answer_text=REFUSAL_PREFIX + rate.reason,
                        refused_reason=rate.reason, claims=[], sources=[],
                        trace=trace, llm_used=False, timer=timer, extras=extras)
@@ -556,7 +570,7 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                                      "verified": [], "enabled": False}))
     else:
         dose_ok, dose_detail, dose_checked = guards_output.dosage_guard(
-            answer_body, source_records)
+            answer_body, source_records, redacted)
         trace.append(TraceStep(name="dosage guard",
                                status="pass" if dose_ok else "fail",
                                detail=dose_detail, ms=timer.lap_ms(),

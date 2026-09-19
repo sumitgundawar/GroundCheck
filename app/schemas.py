@@ -11,6 +11,13 @@ from . import config
 
 Status = Literal["pass", "warn", "fail", "skip", "info"]
 Decision = Literal["answer", "refuse"]
+# What actually happened, which `decision` alone cannot say: a question that was
+# evaluated and declined on safety grounds is not the same event as one that was
+# never looked at because the caller was rate limited or the service was not
+# ready. Both are `decision: refuse`, and an integrator keying on that alone
+# would read "we checked and it isn't safe" where the truth is "we never
+# checked". Key on this field.
+Outcome = Literal["answered", "refused", "not_evaluated"]
 
 
 class Settings(BaseModel):
@@ -130,6 +137,10 @@ class TraceStep(BaseModel):
 
 class AskResponse(BaseModel):
     decision: Decision
+    # `decision` collapses "refused after checking" and "never checked" into
+    # "refuse", for callers written against the original two values. `outcome`
+    # separates them and is the field to key on.
+    outcome: Outcome = "refused"
     answer_text: str
     refused_reason: str | None = None
     claims: list[Claim] = []

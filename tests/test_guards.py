@@ -260,3 +260,29 @@ def test_a_minimum_dose_the_sources_never_state_is_refused():
     ok, detail = guards_output.coverage_check(
         "What is the smallest amount of Caloradine I can give?", _sources("CALO-001", "VELT-002"))
     assert not ok and "minimum" in detail
+
+
+def test_a_dose_must_come_from_a_source_about_the_medicine_it_names():
+    """Ask about two medicines and both passages are retrieved. A dose that
+    belongs to one of them must not verify a claim about the other: the number
+    has to come from a source about the medicine in that sentence."""
+    both = _sources("CALO-001", "MEND-001")
+    question = "What is the dose of Caloradine and Mendel solution?"
+
+    ok, detail, _ = guards_output.dosage_guard(
+        "The standard adult dose of Caloradine is 5 mL once daily.", both, question)
+    assert not ok, "a dose belonging to Mendel solution verified a claim about Caloradine"
+    assert "about this medicine" in detail
+
+    # Each medicine's own dose still verifies.
+    assert guards_output.dosage_guard("Caloradine is given at 15 mg once daily.", both, question)[0]
+    assert guards_output.dosage_guard("Mendel solution is 5 mL once daily.", both, question)[0]
+
+
+def test_a_dose_still_verifies_when_only_the_question_names_the_medicine():
+    """An answer that says "it" rather than repeating the name is still checked
+    against the right sources."""
+    ok, _, _ = guards_output.dosage_guard(
+        "It is given at 15 mg once daily.", _sources("CALO-001", "VELT-002"),
+        "What is the dose of Caloradine?")
+    assert ok

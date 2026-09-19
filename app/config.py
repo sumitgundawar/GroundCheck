@@ -121,6 +121,14 @@ DB_AUTO_MIGRATE = _get("DB_AUTO_MIGRATE", "true").lower() in ("1", "true", "yes"
 # for any deployment with real users: every API call except health and sign-in
 # then needs a signed-in session, and actions are limited by role.
 AUTH_REQUIRED = _get("AUTH_REQUIRED", "false").lower() in ("1", "true", "yes")
+
+# The tuning panel can switch individual guards off, which is how the demo
+# shows what an ungoverned system would have said. That is a demonstration
+# feature, and any HTTP client could use it, so it is only honoured when this
+# is on — and it is off wherever accounts are required, which is every
+# deployment that serves real people.
+ALLOW_GUARD_OVERRIDES = _get(
+    "ALLOW_GUARD_OVERRIDES", "false" if AUTH_REQUIRED else "true").lower() in ("1", "true", "yes")
 SESSION_HOURS = _get_float("SESSION_HOURS", 12.0)
 # Mark the session cookie Secure (HTTPS only). Leave on in production.
 SESSION_COOKIE_SECURE = _get("SESSION_COOKIE_SECURE", "true").lower() in ("1", "true", "yes")

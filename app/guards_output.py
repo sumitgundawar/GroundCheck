@@ -599,27 +599,51 @@ def extract_values(text: str) -> list[str]:
     return [re.sub(r"\s+", " ", m.group(0)).strip() for m in _VALUE_RE.finditer(text)]
 
 
-def dosage_guard(answer_text: str, sources: list[dict]) -> tuple[bool, str, list[str]]:
+def dosage_guard(answer_text: str, sources: list[dict],
+                 query: str = "") -> tuple[bool, str, list[str]]:
     """Return (ok, detail, checked_values).
-    ok is False if any value-with-unit in the answer has no canonical match in a
-    source. Canonicalisation means written-out numbers and unit spellings are
-    matched against symbol forms in the sources."""
+
+    ok is False if any value-with-unit in the answer has no canonical match in
+    a source **about the medicine the answer names**. Canonicalisation means
+    written-out numbers and unit spellings are matched against symbol forms.
+
+    Pooling numbers across every retrieved passage was the hole here: ask about
+    two medicines, and a dose belonging to one of them verified a claim about
+    the other. The coverage check already scopes this way (`_sources_about`);
+    so does this, now, against the answer as well as the question — the answer
+    is what states the dose.
+    """
     answer_pairs = _canonical_pairs(answer_text)
-    surface = extract_values(answer_text)
     if not answer_pairs:
         return True, "no dosage values to verify", []
 
-    source_pairs: set[str] = set()
-    for r in sources:
-        source_pairs |= _canonical_pairs(r.get("text", ""))
+    vocab = _source_vocab(sources)
 
+    def supporting(text: str) -> set[str]:
+        """The values stated by the sources about whatever `text` names."""
+        covered = [t for t in _salient_terms(text) if _covered(t, vocab)]
+        pairs: set[str] = set()
+        for record in _sources_about(text, covered, sources):
+            pairs |= _canonical_pairs(record.get("text", ""))
+        return pairs
+
+    # A dose belongs to the medicine named beside it, so each sentence is
+    # checked against the sources about that sentence's own subject. Checking
+    # the answer as a whole was the hole: ask about two medicines and one's
+    # dose verified a claim about the other.
     checked = sorted(answer_pairs)
-    for pair in checked:
-        if pair not in source_pairs:
-            return (
-                False,
-                f"the value '{pair}' is not supported by any source",
-                checked,
-            )
+    for sentence in re.split(r"(?<=[.!?])\s+", answer_text):
+        stated = _canonical_pairs(sentence)
+        if not stated:
+            continue
+        # The question names the subject when a sentence only says "it".
+        allowed = supporting(sentence) or supporting(f"{query} {sentence}")
+        for pair in sorted(stated):
+            if pair not in allowed:
+                return (
+                    False,
+                    f"the value '{pair}' is not supported by a source about this medicine",
+                    checked,
+                )
     cited = ", ".join(checked)
     return True, f"{cited} verified against sources", checked

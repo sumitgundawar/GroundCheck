@@ -247,3 +247,46 @@ def test_the_judges_verdict_is_recorded_in_the_trace(monkeypatch):
     assert rows and all(row["judge"] == {"supported": False, "reason": "I disagree"} for row in rows)
     assert step.data["method"].startswith("deterministic embedding similarity, authoritative")
     assert step.data["judge_summary"].endswith("supported")
+
+
+# --- What happened, not just what was decided -------------------------------
+
+def test_a_rate_limited_question_is_not_reported_as_a_refusal(monkeypatch):
+    """"We checked and declined" and "we never looked" are different events.
+    Both are decision=refuse for callers written against the original two
+    values, so `outcome` is what an integrator keys on."""
+    from app import guards_input
+
+    monkeypatch.setattr(guards_input, "_limiter", guards_input.RateLimiter(1))
+    first = pipeline.run("What is the standard dose of Caloradine?", client_id="limited", review=False)
+    assert (first.decision, first.outcome) == ("answer", "answered")
+
+    second = pipeline.run("What is the standard dose of Caloradine?", client_id="limited", review=False)
+    assert second.decision == "refuse"
+    assert second.outcome == "not_evaluated"
+    assert "rate limited" in (second.refused_reason or "")
+
+    safety = pipeline.run("What is the dose of Zalortin?", client_id="other", review=False)
+    assert (safety.decision, safety.outcome) == ("refuse", "refused")
+
+
+def test_guards_cannot_be_switched_off_by_a_request_where_it_matters(monkeypatch):
+    """The tuning panel exists to show what an ungoverned system would say.
+    That is a demonstration, and one JSON field from any client must not buy an
+    ungoverned answer in a deployment that serves real people."""
+    from app import config
+
+    ungoverned = Settings(enable_coverage_guard=False, enable_grounding_guard=False,
+                          enable_dosage_guard=False, retrieval_min_score=0.0)
+
+    monkeypatch.setattr(config, "ALLOW_GUARD_OVERRIDES", False)
+    locked = pipeline.run("What is the dose of Zalortin for Veltris syndrome?",
+                          settings=ungoverned, review=False)
+    assert locked.decision == "refuse"
+    assert "zalortin" in (locked.refused_reason or "").lower()
+
+    # The demo keeps its teeth-baring mode, explicitly enabled.
+    monkeypatch.setattr(config, "ALLOW_GUARD_OVERRIDES", True)
+    demo = pipeline.run("What is the dose of Zalortin for Veltris syndrome?",
+                        settings=ungoverned, review=False)
+    assert demo.decision == "answer"

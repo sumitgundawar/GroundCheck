@@ -145,6 +145,23 @@ def cards_for(request: dict) -> dict:
         name = fhir.concept_text(order.get("medicationCodeableConcept"))
         medicine = idx.find(name) or next(iter(idx.mentioned(name)), None)
         if medicine is None:
+            # Never say nothing. In an ordering screen an empty response reads
+            # as "checked, no concerns", so a medicine this formulary has never
+            # heard of has to say so out loud — it is the one case where
+            # silence is read as clearance.
+            cards.append({
+                "uuid": str(uuid.uuid4()),
+                "summary": f"Not checked: {name or 'this medicine'} is not in the formulary",
+                "indicator": "warning",
+                "detail": (f"**{name or 'This medicine'}** was not checked. It is not in the formulary "
+                           f"GroundCheck is running ({formulary.load().name}), so no allergy, interaction, "
+                           f"kidney, liver, pregnancy or dose rule has been applied to this order.\n\n"
+                           f"This is not a statement that the order is safe."),
+                "source": {"label": "GroundCheck formulary",
+                           "topic": {"code": "not_in_formulary",
+                                     "system": "https://groundcheckhealth.com/cds/finding"}},
+                "overrideReasons": [],
+            })
             continue
         sentence, _, _ = _order_dose(order)
         claims = [Claim(text=f"{medicine.name} {sentence}.", source_ids=["ORDER"], grounded=True, grounding_score=1.0)]

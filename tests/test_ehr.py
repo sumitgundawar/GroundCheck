@@ -351,7 +351,7 @@ def test_calls_must_be_signed_by_a_trusted_ehr(cds, monkeypatch):
     expired = token(AUD, exp=int(time.time()) - 120, iat=int(time.time()) - 400)
     assert client.post(SERVICE, json=order_request(), headers={"Authorization": f"Bearer {expired}"}).status_code == 401
     ok = client.post(SERVICE, json=order_request(), headers={"Authorization": f"Bearer {token(AUD)}"})
-    assert ok.status_code == 200 and ok.json() == {"cards": []}
+    assert ok.status_code == 200 and ok.json()["cards"] == []
     monkeypatch.setattr(config, "CDS_HOOKS_ALLOW_UNSIGNED", True)
     assert client.post(SERVICE, json=order_request()).status_code == 200
 
@@ -370,8 +370,15 @@ def test_cards_for_unsafe_orders(cds, monkeypatch):
     missing = client.post(SERVICE, json=order_request(egfr=None), headers=headers()).json()["cards"]
     assert missing[0]["source"]["topic"]["code"] == "missing_data"
 
+    # A medicine the formulary has never heard of must say so. Returning no
+    # cards would read, in an ordering screen, as "checked, no concerns".
     unknown = client.post(SERVICE, json=order_request(medicine="Paracetamol"), headers=headers()).json()
-    assert unknown == {"cards": []}
+    assert len(unknown["cards"]) == 1
+    card = unknown["cards"][0]
+    assert card["source"]["topic"]["code"] == "not_in_formulary"
+    assert card["indicator"] == "warning"
+    assert "Paracetamol" in card["summary"] and "not in the formulary" in card["summary"]
+    assert "not a statement that the order is safe" in card["detail"]
 
     select = "/cds-services/groundcheck-medication-safety-order-select"
     body = order_request(egfr=40, hook="order-select", selections=["MedicationRequest/other"])
