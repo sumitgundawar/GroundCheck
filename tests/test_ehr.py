@@ -472,3 +472,27 @@ def test_lab_units_are_converted_not_taken_at_face_value():
     assert fhir._quantity("weight", obs(154, "[lb_av]")) == 69.9
     assert fhir._quantity("weight", obs(70000, "g")) == 70.0
     assert fhir._quantity("weight", obs(70, "stone")) is None
+
+
+def test_the_ehr_is_told_the_formulary_is_invented():
+    """An EHR decides whether to install a service from its description. One
+    that advertises allergy and interaction checking, without saying its
+    formulary knows no real medicine, is how this ends up in an ordering
+    screen."""
+    service = cds_hooks.discovery()["services"][0]
+    assert "demonstration" in service["title"].lower()
+    assert service["description"].startswith("DEMONSTRATION ONLY")
+    assert "synthetic" in service["usageRequirements"].lower()
+    assert "not checked" in service["description"]
+
+    import app.formulary as formulary_module
+
+    real = formulary_module.load().model_copy(update={"synthetic": False})
+    original = formulary_module.load
+    formulary_module.load = lambda: real
+    try:
+        live = cds_hooks.discovery()["services"][0]
+    finally:
+        formulary_module.load = original
+    assert "DEMONSTRATION ONLY" not in live["description"]
+    assert "demonstration" not in live["title"].lower()

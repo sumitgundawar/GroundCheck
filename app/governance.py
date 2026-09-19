@@ -687,11 +687,33 @@ def safety_case_markdown(days: int = 30, site_id: int | None = None) -> str:
     review_tests = run_eval_cases() if db.ready() else None
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
+    # A document shaped like a deliverable gets filed like one. If the evidence
+    # underneath it is invented, that has to be the first thing on the page and
+    # it has to be impossible to read past — not a line near the bottom.
+    from . import formulary
+
+    synthetic = formulary.load().synthetic
     lines = [
         f"# GroundCheck clinical safety case summary",
         "",
         f"Version {__version__}. Generated {now}. Period: last {days} days.",
         "",
+    ]
+    if synthetic:
+        lines += [
+            "> ## THIS IS NOT A SAFETY CASE",
+            ">",
+            "> Every figure below was produced against a **synthetic demonstration corpus and",
+            "> formulary**: the medicines, conditions and doses in it are invented and do not",
+            "> describe any real medicine. Nothing here is evidence about the safety of this",
+            "> software on real clinical content, and no part of it should be quoted, filed or",
+            "> signed as though it were.",
+            ">",
+            "> To produce a document that means anything, point FORMULARY_PATH at your own",
+            "> licensed formulary, load your own approved documents, and re-run it.",
+            "",
+        ]
+    lines += [
         "This summary supports, and does not replace, a clinical safety case signed off by a",
         "qualified clinical safety officer. GroundCheck is not a certified medical device.",
         "",
@@ -738,11 +760,9 @@ def safety_case_markdown(days: int = 30, site_id: int | None = None) -> str:
             lines.append("| " + " | ".join(c.replace("|", "/") for c in cells) + " |")
     else:
         lines.append("No hazards recorded.")
-    lines += [
-        "",
-        "## Sign-off",
-        "",
-        "Clinical safety officer: ____________________  Date: __________",
-        "",
-    ]
+    lines += ["", "## Sign-off", ""]
+    lines += (["There is nothing here to sign. Produce this document against your own",
+               "formulary and your own approved documents first.", ""]
+              if synthetic else
+              ["Clinical safety officer: ____________________  Date: __________", ""])
     return "\n".join(lines)

@@ -228,7 +228,26 @@ def test_report_and_safety_case(queue):
     text = governance.safety_case_markdown(30)
     assert "# GroundCheck clinical safety case summary" in text
     assert "| H1 | Wrong dose cited | 15 (high)" in text
-    assert "Clinical safety officer" in text
+    # The demo formulary is invented, so the document says so before anything
+    # else and offers nothing to sign. A document shaped like a deliverable
+    # gets filed like one, whatever a disclaimer near the bottom says.
+    assert text.splitlines()[4].startswith("> ## THIS IS NOT A SAFETY CASE")
+    assert "synthetic demonstration corpus" in text
+    assert "Clinical safety officer: ____" not in text
+    assert "There is nothing here to sign" in text
+
+    # Against a real formulary it is a normal document, with a signature line.
+    import app.formulary as formulary_module
+
+    real = formulary_module.load().model_copy(update={"synthetic": False})
+    original = formulary_module.load
+    formulary_module.load = lambda: real
+    try:
+        signed = governance.safety_case_markdown(30)
+    finally:
+        formulary_module.load = original
+    assert "THIS IS NOT A SAFETY CASE" not in signed
+    assert "Clinical safety officer: ____" in signed
 
 
 # --- API ---------------------------------------------------------------------------------

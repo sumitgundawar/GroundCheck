@@ -47,11 +47,28 @@ class CdsError(Exception):
 
 
 def discovery() -> dict:
+    """What this service tells an EHR it does.
+
+    An EHR decides whether to install a service from this description, so it
+    has to say which formulary the checks come from. Advertising allergy and
+    interaction checking without saying that the demonstration formulary is
+    invented is how a service that knows no real medicine gets installed in a
+    real ordering screen.
+    """
+    loaded = formulary.load()
     description = ("Checks a medication order against the patient's allergies, other medicines, age, weight, kidney "
-                   "and liver function, pregnancy and lab results, using GroundCheck's formulary.")
+                   f"and liver function, pregnancy and lab results, using the {loaded.name} formulary. "
+                   "A medicine that formulary does not contain is reported as not checked.")
+    requirements = "Patient-context medication ordering."
+    if loaded.synthetic:
+        description = ("DEMONSTRATION ONLY — the formulary behind this service is synthetic: every medicine, "
+                       "dose and rule in it is invented, and no real medicine is known to it. It must not be "
+                       "installed where it can influence prescribing. " + description)
+        requirements = "Demonstration only. Not for clinical use: the formulary is synthetic."
     return {"services": [
-        {"hook": hook, "id": f"{SERVICE_ID}-{hook}", "title": "GroundCheck medication safety",
-         "description": description, "prefetch": PREFETCH, "usageRequirements": "Patient-context medication ordering."}
+        {"hook": hook, "id": f"{SERVICE_ID}-{hook}", "title": "GroundCheck medication safety"
+         + (" (demonstration, synthetic formulary)" if loaded.synthetic else ""),
+         "description": description, "prefetch": PREFETCH, "usageRequirements": requirements}
         for hook in ("order-select", "order-sign")
     ]}
 

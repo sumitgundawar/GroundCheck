@@ -692,6 +692,26 @@ naming its formulary rule. Calls must carry a JWT from a trusted EHR:
 `CDS_HOOKS_TRUSTED=https://ehr.example.org=https://ehr.example.org/jwks.json`.
 `CDS_HOOKS_ALLOW_UNSIGNED=true` is for sandbox testing only.
 
+**Read this before installing it anywhere.** Software that receives a draft
+medication order and returns severity-graded cards into a prescriber's workflow
+is clinical decision support, and in the UK and EU that is a regulated medical
+device whatever this README says about it. GroundCheck has no such clearance.
+DCB0129 and DCB0160 obligations fall on the manufacturer and the deploying
+organisation, and nothing here discharges them.
+
+Two specific properties matter more than the disclaimer:
+
+- **A medicine the formulary does not contain is reported as not checked**, with
+  a card saying so. Returning no cards would read, in an ordering screen, as
+  "checked, no concerns" — and against the synthetic demonstration formulary,
+  every real medicine is one this service has never heard of.
+- **While the formulary is synthetic, the discovery document says so** — in the
+  service title, the description and the usage requirements — so an EHR
+  administrator sees it before installing rather than after.
+
+Point `FORMULARY_PATH` at a licensed formulary before this is worth installing,
+and treat the regulatory work as the precondition it is.
+
 ### Testing against public sandboxes
 
 `RUN_LIVE_EHR=1 pytest tests/test_ehr.py` loads patients from the public HAPI
@@ -1124,7 +1144,7 @@ A local `.env` file (git-ignored) is also read on startup, so you can put
 
 ```bash
 python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383 patient scenarios
-pytest -q                                   # 405 tests, including property-based fuzzing
+pytest -q                                   # 414 tests, including property-based fuzzing
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
 python scripts/stress_eval.py               # all 265,778 cases (about an hour on 7 cores)
 python scripts/guard_eval.py                # the grounding and dosage guards, against wrong claims
