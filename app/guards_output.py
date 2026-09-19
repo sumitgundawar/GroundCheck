@@ -644,7 +644,12 @@ def _named_sources(text: str, sources: list[dict]) -> list[dict]:
     """
     words = {w for w in re.findall(r"[a-z][a-z'-]{2,}", text.lower())}
     subjects = [_subject_words(r) for r in sources]
-    shared = {w for i, a in enumerate(subjects) for j, b in enumerate(subjects) if i != j for w in a & b}
+    # A word is generic only when it is shared by sources about *different*
+    # subjects — "solution", "complex". Several passages about one medicine
+    # share its name, and stripping that left nothing to recognise it by, so a
+    # dose quoted from one passage was rejected against another of its own.
+    shared = {w for i, a in enumerate(subjects) for j, b in enumerate(subjects)
+              if i != j and a != b for w in a & b}
     named = []
     for record, subject in zip(sources, subjects):
         distinctive = subject - shared

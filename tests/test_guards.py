@@ -343,3 +343,19 @@ def test_an_age_is_checked_once_by_the_check_that_understands_ages():
     assert not ok and "5-year-old" in detail
     ok, detail = guards_output.coverage_check("What is the dose of Caloradine in an 80 year old?", sources)
     assert not ok and "80-year-old" in detail
+
+
+def test_several_passages_about_one_medicine_are_all_about_it():
+    """A medicine has an indications passage, a dosage passage, an interactions
+    passage. They share its name, and treating that shared name as a generic
+    word left nothing to recognise any of them by — so a dose quoted from one
+    was rejected against another of its own."""
+    sources = _sources("CALO-001", "VELT-002")
+    calo = next(r for r in sources if r["id"] == "CALO-001")
+    named = guards_output._named_sources("What is the dose of Caloradine?", sources)
+    assert [r["id"] for r in named] == ["CALO-001"]
+
+    # A second passage about the same medicine: both are named by it.
+    twin = dict(calo); twin["id"] = "CALO-002"; twin["title"] = "Caloradine: interactions"
+    named = guards_output._named_sources("What is the dose of Caloradine?", [calo, twin])
+    assert {r["id"] for r in named} == {"CALO-001", "CALO-002"}
