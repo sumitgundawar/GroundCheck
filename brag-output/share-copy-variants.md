@@ -17,11 +17,11 @@ thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
 >
 > GroundCheck shows you what it refused — and why.
 >
-> 252,825 test questions. All 221,313 that had to be refused, were.
+> 265,778 test questions. All 222,210 that had to be refused, were.
 
 **Alternative opener, if you want the number first:**
 
-> 221,313 questions that had no grounded answer.
+> 222,210 questions that had no grounded answer.
 >
 > GroundCheck answered none of them.
 >
@@ -29,7 +29,7 @@ thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
 
 **Thread continuation (optional, 4 posts):**
 
-1. Most AI demos show you what the model answered. GroundCheck shows you what it refused — and why. 252,825 test questions. All 221,313 that had to be refused, were.
+1. Most AI demos show you what the model answered. GroundCheck shows you what it refused — and why. 265,778 test questions. All 222,210 that had to be refused, were.
 2. Every question runs eleven checks before a model is allowed to write a word: PII redaction, injection scope, retrieval, source coverage, then schema, grounding and a dosage guard on the way out. A question about a medicine that's in no source stops at check six, in 6 ms, with the reason recorded.
 3. Answers are the same machine running to the end: every claim carries a citation back to the passage it came from, and a claim that isn't grounded doesn't ship. With a patient loaded it also checks allergies, interactions, kidney and liver function, weight, age and pregnancy against the formulary.
 4. Self-hosted, open source, Docker Compose or Helm, encrypted at rest, and a hash-chained audit record for every question — including the ones it refused. github.com/sumitgundawar/GroundCheck
@@ -50,9 +50,9 @@ thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
 > documents do cover and every claim in the answer carries a citation back to
 > the passage it came from.
 >
-> It was tested on 252,825 generated questions and patient scenarios, with the
+> It was tested on 265,778 generated questions and patient scenarios, with the
 > expected outcome taken from the source documents and the formulary rather
-> than from its own code. Of those, 221,313 had to be refused. It refused all
+> than from its own code. Of those, 222,210 had to be refused. It refused all
 > of them.
 >
 > It runs on your own servers — Docker Compose or Kubernetes — with encryption
@@ -79,9 +79,9 @@ thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
 > the reason, the retrieval scores and the stage timings in a hash-chained
 > audit record.
 >
-> The evaluation is the part I'd most like torn apart: 252,825 generated
+> The evaluation is the part I'd most like torn apart: 265,778 generated
 > questions and patient scenarios, expectations derived from the corpus and the
-> formulary rather than from the code, 221,313 of which must be refused
+> formulary rather than from the code, 222,210 of which must be refused
 > (medicines that don't exist, one-letter misspellings of ones that do,
 > children and pregnancy where the sources only cover adults, doses the sources
 > never state, prompt injections, and patients the formulary rules out). It
@@ -100,7 +100,7 @@ thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
 
 > Built a clinical Q&A system whose party trick is saying no. 11 checks per
 > question, refuses in 6 ms when a medicine isn't in any source, and every
-> answer cites the passage it came from. 252,825 test questions, 221,313 of
+> answer cites the passage it came from. 265,778 test questions, 222,210 of
 > them had to be refused, it refused all of them. 🎥 below
 
 ---
@@ -114,7 +114,7 @@ thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
 > stages read "not reached". The verdict says "Refused. Routed for review. No
 > model was called." A second record shows the same pipeline answering a
 > question it can support, with the citation [VELT-002] beside its source. The
-> film ends on 221,313 questions that had to be refused, 0 answered, and the
+> film ends on 222,210 questions that had to be refused, 0 answered, and the
 > line "It refuses to guess."
 
 ---
@@ -124,7 +124,7 @@ thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
 - The video is 23 seconds, 1920×1080, with a quiet music bed. Most feeds
   autoplay muted, and it reads fine silent.
 - Every figure shown is reproducible: `python scripts/run_eval.py` for the
-  2,008-case gate, `python scripts/stress_eval.py` for the 252,825.
+  2,008-case gate, `python scripts/stress_eval.py` for the 265,778.
 - Say the corpus is synthetic if the post might reach clinicians. The medicines
   in the film — Zalortin, Caloradine, Veltris syndrome — do not exist, which is
   the point of the demo, but it should never read as real dosing advice.

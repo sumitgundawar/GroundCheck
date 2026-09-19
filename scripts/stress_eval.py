@@ -141,6 +141,29 @@ def corpus_cases(rng: random.Random) -> list[dict]:
                 for surface in SURFACE:
                     add("answerable", surface(base), "answer")
 
+    # The same answerable questions, asked the way a person asks them. The
+    # templates above are the shapes this project already had in mind, so they
+    # flatter it: the number that matters to a clinician is how often it
+    # refuses an answerable question put in their own words.
+    for topic in topics:
+        for section, forms in ANSWER_TEMPLATES.items():
+            if section not in sections[topic]:
+                continue
+            name = title(topic)
+            plain = forms[0].format(n=name)
+            lower = plain[0].lower() + plain[1:]
+            for natural in (
+                f"Remind me — {lower}",
+                f"Quick question, {lower}",
+                f"A colleague asked {lower}",
+                f"Can you tell me {lower.rstrip('?')}?",
+                f"{plain.rstrip('?')} please?",
+                plain.replace("What is the", "Whats the").replace("?", ""),
+                f"{plain.rstrip('?')} for a 40 year old?",
+                f"{plain.rstrip('?')} in an adult?",
+            ):
+                add("natural", natural, "answer")
+
     # Unknown entities.
     names = set()
     for a in FAKE_P1:

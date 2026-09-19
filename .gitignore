@@ -4,7 +4,6 @@ __pycache__/
 *.pyc
 .env
 .pytest_cache/
-eval/eval_summary.json
 audit/
 .DS_Store
 local_ai.json
@@ -14,4 +13,6 @@ data/datasets/
 deploy/.env
 data/imaging-samples/
 data/imaging/
-eval/stress_summary.json
+
+# Evaluation results are committed: a number on the website that nobody
+# outside this machine can check is not evidence.

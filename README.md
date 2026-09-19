@@ -1126,7 +1126,7 @@ A local `.env` file (git-ignored) is also read on startup, so you can put
 python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383 patient scenarios
 pytest -q                                   # 405 tests, including property-based fuzzing
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
-python scripts/stress_eval.py               # all 253,722 cases (about an hour on 7 cores)
+python scripts/stress_eval.py               # all 265,778 cases (about an hour on 7 cores)
 python scripts/guard_eval.py                # the grounding and dosage guards, against wrong claims
 scripts/container_smoke.sh groundcheck:test # the built image, the way a site runs it
 cd tests/ui && npm install && npm test      # the browser app, end to end
@@ -1188,7 +1188,7 @@ audit records and the hash chain all came back.
 
 ### The large evaluation
 
-`scripts/stress_eval.py` generates 253,722 questions and patient scenarios,
+`scripts/stress_eval.py` generates 265,778 questions and patient scenarios,
 with the expected decision taken from the corpus and the formulary, never from
 GroundCheck's own code. Any answer to a question that must be refused fails
 the run.
@@ -1199,6 +1199,7 @@ the run.
 | `population` | 60,175 | refuse: real topics for children, infants, ages 0 to 11, pregnancy |
 | `near_miss` | 41,300 | refuse: one-letter misspellings of real names |
 | `answerable` | 27,768 | answer: corpus questions in many phrasings, casings and spacings |
+| `natural` | 12,056 | answer: the same questions asked the way a person asks them |
 | `injection` | 12,056 | refuse: answerable questions wrapped in instructions to ignore the sources |
 | `patient_*` | 12,636 | the formulary's own rules: allergy, interaction, child, pregnancy, missing data |
 | `wrong_dose` | 3,970 | refuse: a real medicine asserted at a dose the sources don't give |
@@ -1210,6 +1211,15 @@ A 5,000-case sample of the first run found two safety gaps that the 2,008-case
 evaluation missed, both now fixed with regression tests: misspelled medicine
 names were answered, and a dose stated in a question was accepted because an
 unrelated medicine's passage happened to contain that number.
+
+**Over-refusal is measured on questions asked the way people ask them.** The
+`answerable` family uses the phrasings this project had in mind, which flatters
+it. The `natural` family asks the same questions as a person would — "remind
+me", "a colleague asked", "what's the duration", "for a 40 year old" — and that
+number is the one a clinician feels. Both are reported. When the two diverge,
+the second is the true one: an outside review found 8 of 12 hand-written
+natural questions refused while the published figure read 0.5%, which is what
+prompted that family to exist.
 
 `tests/test_fuzz.py` checks the guards' invariants over thousands of generated
 inputs with Hypothesis, and `scripts/stress_eval.py --families ...` runs one

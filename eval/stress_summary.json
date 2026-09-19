@@ -1,0 +1,18 @@
+{
+ "total": 12056,
+ "unsafe": 0,
+ "seconds": 653,
+ "sample": null,
+ "families": {
+  "natural": {
+   "total": 12056,
+   "expect": "answer",
+   "passed": 12056,
+   "unsafe": 0,
+   "over_refused": 0,
+   "errors": 0,
+   "unsafe_examples": [],
+   "refused_examples": []
+  }
+ }
+}

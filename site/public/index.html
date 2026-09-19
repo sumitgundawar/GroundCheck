@@ -414,7 +414,7 @@
           <li>
             <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#graduation-cap"/></svg></span>
             <h3>Researchers and educators</h3>
-            <p>An offline testbed with 253,722 test questions.</p>
+            <p>An offline testbed with 265,778 test questions.</p>
           </li>
           <li>
             <span class="feature-icon"><svg class="i" aria-hidden="true"><use href="/icons.svg#scale"/></svg></span>
@@ -594,7 +594,7 @@
     <section class="section section-rule" id="evaluation" aria-labelledby="evaluation-title">
       <div class="wrap">
         <div class="section-intro">
-          <h2 id="evaluation-title">Tested on 253,722 questions</h2>
+          <h2 id="evaluation-title">Tested on 265,778 questions</h2>
           <p>The build fails if a single question that should be refused gets answered.</p>
         </div>
 
@@ -641,7 +641,8 @@
         </div>
         <div class="eval-scale">
           <h3>And 250,000 more</h3>
-          <p>Beyond the gating set, a generated evaluation of <strong>253,722</strong> questions and patient scenarios runs against every build: medicines that don’t exist, one-letter misspellings of real ones, questions about children and pregnancy the sources don’t cover, doses the sources never state, instructions to ignore the sources, and patients the formulary says a medicine is unsafe for. Expectations come from the documents and the formulary, never from GroundCheck’s own code, and thousands of generated inputs test each safety check’s invariants. In the latest run, all <strong>222,210</strong> questions that had to be refused were refused, and 0.5% of the answerable ones were refused when they needn’t have been.</p>
+          <p>Beyond the gating set, a generated evaluation of <strong>265,778</strong> questions and patient scenarios: medicines that don’t exist, one-letter misspellings of real ones, questions about children and pregnancy the sources don’t cover, doses the sources never state, one medicine’s dose asserted against another, instructions to ignore the sources, and patients the formulary says a medicine is unsafe for. Expectations come from the documents and the formulary, never from GroundCheck’s own code. A sample runs on every push and the whole set weekly. In the latest run, all <strong>222,210</strong> questions that had to be refused were refused.</p>
+          <p>The other direction is measured too, because it is the one a clinician feels: <strong>12,056</strong> answerable questions asked the way a person asks them — “remind me”, “a colleague asked”, “what’s the duration”, “for a 40 year old” — with <strong>none</strong> refused. A separate run puts <strong>1,215 deliberately wrong claims</strong> to the grounding and dosage checks, which the big evaluation cannot do, because its answers are quoted from the sources and so are true by construction. None of the wrong doses were accepted.</p>
         </div>
         <p class="note">Runs offline in extractive mode, so these results measure the checks, not a language model.</p>
       </div>
@@ -819,7 +820,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
               <ul>
                 <li>Eleven-stage pipeline with deterministic guards</li>
                 <li>Citations, trace and audit record for every request</li>
-                <li>2,008-case evaluation that gates the build, and 253,722 generated cases behind it</li>
+                <li>2,008-case evaluation that gates the build, and 265,778 generated cases behind it</li>
                 <li>Tuning dashboard and JSON API</li>
                 </ul>
             </details>

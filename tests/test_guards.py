@@ -311,3 +311,35 @@ def test_a_shared_word_in_two_titles_does_not_put_both_in_scope():
     calo, mend = _sources("CALO-001", "MEND-001")
     named = guards_output._named_sources("What is the dose of Mendel solution?", [calo, mend])
     assert [r["id"] for r in named] == ["MEND-001"]
+
+
+def test_ordinary_phrasing_is_not_read_as_an_unknown_entity():
+    """A clinician asks in their own words. "Remind me", "a colleague asked",
+    "what's the duration" — none of these names anything clinical, and each of
+    them refused an answerable question by claiming the word appears in no
+    trusted source, which was both unhelpful and untrue."""
+    sources = _sources("CALO-001", "VELT-002")
+    for query in ["Remind me of the Caloradine dose",
+                  "A colleague asked about Caloradine dosing",
+                  "Quick question — what is the dose of Caloradine?",
+                  "Whats the dose of Caloradine",
+                  "Can you tell me the dose of Caloradine please?",
+                  "What is the duration of Caloradine therapy?",
+                  "How long do patients stay on Caloradine?"]:
+        ok, detail = guards_output.coverage_check(query, sources)
+        assert ok, f"{query!r} was refused: {detail}"
+
+
+def test_an_age_is_checked_once_by_the_check_that_understands_ages():
+    """"For a 19 year old" refused because the word "year" is in no passage,
+    while the age check had already decided this was an adult the sources
+    cover. The age phrase belongs to that check alone."""
+    sources = _sources("CALO-001", "VELT-002")
+    assert guards_output.coverage_check("What is the dose of Caloradine for a 19 year old?", sources)[0]
+    assert guards_output.coverage_check("What is the dose of Caloradine for a 45-year-old?", sources)[0]
+
+    # The ages the sources do not cover are still refused, by that check.
+    ok, detail = guards_output.coverage_check("What is the dose of Caloradine for a 5 year old?", sources)
+    assert not ok and "5-year-old" in detail
+    ok, detail = guards_output.coverage_check("What is the dose of Caloradine in an 80 year old?", sources)
+    assert not ok and "80-year-old" in detail

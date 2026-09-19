@@ -101,6 +101,14 @@ _CONVERSATIONAL = {
     "someone", "anyone", "somebody", "anything", "something", "whether",
     "correct", "true", "wrong", "confirm", "clarify", "understand",
     "according", "says", "said", "mention", "mentions",
+    # How people actually open a question to a colleague or a tool. None of
+    # these names anything clinical, and each of them was refusing an
+    # answerable question with "the term does not appear in any trusted
+    # source", which is both unhelpful and untrue.
+    "remind", "reminds", "reminder", "colleague", "colleagues", "asked", "asks",
+    "asking", "tell", "tells", "telling", "whats", "hows", "stay", "stays",
+    "staying", "please", "help", "need", "needing", "looking", "look", "查",
+    "again", "just", "quickly", "anybody", "everyone", "team", "ward", "clinic",
 }
 
 # Contractions attach to words the check would otherwise treat as unknown
@@ -135,6 +143,11 @@ def _salient_terms(query: str) -> list[str]:
     from .deid import PLACEHOLDER
 
     query = PLACEHOLDER.sub(" ", query)  # [NAME], [DATE]: removed identifiers, not topics
+    # An age has its own check, which knows whether the sources cover that age
+    # group. Leaving the phrase in here as well meant "for a 19 year old" was
+    # refused because the word "year" is in no passage — while the age check
+    # had already decided this was an adult the sources do cover.
+    query = _AGE_RE.sub(" ", query)
     terms = []
     for match in _WORD.finditer(query.replace("’", "'")):
         raw = _CONTRACTION.sub("", match.group(0))
@@ -216,6 +229,16 @@ _SYNONYM_GROUPS = [
     {"symptom", "symptoms", "signs", "presentation", "presents", "features"},
     {"cause", "causes", "caused", "aetiology", "etiology", "why"},
     {"manage", "managed", "management", "treatment", "treated", "therapy", "care"},
+    # The same clinical idea, worded the way a clinician words it rather than
+    # the way the source happens to. "What is the duration of therapy?" was
+    # refused as an unknown term while the source said "for an initial course
+    # of 14 days".
+    {"duration", "course", "length", "long", "period"},
+    {"renal", "kidney", "kidneys", "egfr", "creatinine", "clearance"},
+    {"hepatic", "liver", "child-pugh"},
+    {"elderly", "older", "old", "age", "aged", "years", "year"},
+    {"paediatric", "pediatric", "child", "children", "infant", "infants", "baby"},
+    {"pregnancy", "pregnant", "gestation", "expecting"},
 ]
 _SYNONYMS = {word: group for group in _SYNONYM_GROUPS for word in group}
 
@@ -426,7 +449,12 @@ def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:
     report = coverage_report(query, sources)
     if report["unsupported_values"]:
         value = report["unsupported_values"][0]
-        return False, f"the value '{value}' in the question does not appear in any trusted source"
+        # Scoped to sources about the subject, so the wording says so: the
+        # number may well appear elsewhere in the corpus, attached to another
+        # medicine, and saying otherwise put a false statement into an audit
+        # record a safety officer is meant to rely on.
+        return False, (f"the value '{value}' in the question is not stated by any "
+                       f"source about what it asks about")
     if report["unsupported_forms"]:
         form = report["unsupported_forms"][0]
         return False, (f"no trusted source about this describes a '{form}' form or route, "
