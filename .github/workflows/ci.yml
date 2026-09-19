@@ -35,6 +35,9 @@ jobs:
       - name: Run the test suite (no network)
         run: pytest -q
 
+      - name: Guards, against claims that are wrong
+        run: python scripts/guard_eval.py
+
       - name: Large safety evaluation (a sample on every push, all of it weekly)
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then

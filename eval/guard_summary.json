@@ -1,0 +1,89 @@
+{
+  "cases": 1215,
+  "accepted_wrong_claims": 6,
+  "accepted_wrong_doses": 0,
+  "misattributed_generic_sentences": 6,
+  "families": {
+    "unchanged": {
+      "cases": 153,
+      "passed": 153
+    },
+    "number": {
+      "cases": 459,
+      "passed": 459
+    },
+    "unit": {
+      "cases": 153,
+      "passed": 153
+    },
+    "crossed": {
+      "cases": 147,
+      "passed": 147
+    },
+    "substituted": {
+      "cases": 150,
+      "passed": 144,
+      "accepted": 6
+    },
+    "fabricated": {
+      "cases": 153,
+      "passed": 153
+    }
+  },
+  "escapes": [
+    {
+      "family": "substituted",
+      "claim": "If brindyl stays high beyond eight weeks, the first-line agent Tamdamravil suspension is started.",
+      "sources": [
+        "DOST-D0142"
+      ],
+      "grounding_score": 0.461,
+      "dosage": "no dosage values to verify"
+    },
+    {
+      "family": "substituted",
+      "claim": "Once vexin settles, the dose is tapered with a specialist.",
+      "sources": [
+        "KUNP-D0312"
+      ],
+      "grounding_score": 0.5,
+      "dosage": "no dosage values to verify"
+    },
+    {
+      "family": "substituted",
+      "claim": "Once hossel settles, the dose is tapered with a specialist.",
+      "sources": [
+        "BIMG-D0362"
+      ],
+      "grounding_score": 0.5,
+      "dosage": "no dosage values to verify"
+    },
+    {
+      "family": "substituted",
+      "claim": "Once jadrin settles, the dose is tapered with a specialist.",
+      "sources": [
+        "ROTM-D0602"
+      ],
+      "grounding_score": 0.625,
+      "dosage": "no dosage values to verify"
+    },
+    {
+      "family": "substituted",
+      "claim": "The dose is not increased without specialist input.",
+      "sources": [
+        "RETM-D0782"
+      ],
+      "grounding_score": 0.462,
+      "dosage": "no dosage values to verify"
+    },
+    {
+      "family": "substituted",
+      "claim": "Once wendal settles, the dose is tapered with a specialist.",
+      "sources": [
+        "LASL-D1172"
+      ],
+      "grounding_score": 0.5,
+      "dosage": "no dosage values to verify"
+    }
+  ]
+}

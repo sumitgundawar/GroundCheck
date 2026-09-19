@@ -1127,6 +1127,7 @@ python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383
 pytest -q                                   # 405 tests, including property-based fuzzing
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
 python scripts/stress_eval.py               # all 253,722 cases (about an hour on 7 cores)
+python scripts/guard_eval.py                # the grounding and dosage guards, against wrong claims
 scripts/container_smoke.sh groundcheck:test # the built image, the way a site runs it
 cd tests/ui && npm install && npm test      # the browser app, end to end
 python scripts/soak.py --requests 100000    # steady load against a running instance
@@ -1151,6 +1152,29 @@ question from the keyboard alone, and checks no page scrolls sideways on a
 390px screen. It found two things the Python tests couldn't see: the Medicines
 page overflowed a phone, and an informational answer for a child carried no
 warning at all.
+
+### What the large evaluation cannot tell you
+
+Every case in `run_eval.py` and `stress_eval.py` runs in extractive mode, where
+the generator copies sentences out of the sources word for word. A copied
+sentence overlaps its source completely and states only numbers the source
+states, so **the grounding check and the dosage guard cannot fail there**, however
+many questions are asked. Those two guards were, in effect, unmeasured, and the
+large numbers say nothing about them.
+
+`scripts/guard_eval.py` asks them the question the other evaluation cannot. It
+mutates real corpus sentences — multiplies a dose, reads mg as mcg, swaps in
+another medicine's dose with both passages retrieved, substitutes a sentence
+from an unrelated passage, invents one outright — and requires the guards to
+reject every one. The expected answer comes from the corpus, not from the
+guards' own code. It runs on every push and fails the build on any wrong dose
+accepted.
+
+The last run: **1,215 mutated claims, 0 wrong doses accepted.** Six generic
+sentences ("the dose is not increased without specialist input") were
+attributed to the wrong passage. That is the noise floor of a similarity check
+rather than a dosing error, and it is reported rather than gated on, because
+tuning until that number reads zero would be tuning the measurement.
 
 ### The container smoke test
 

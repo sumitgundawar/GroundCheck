@@ -599,6 +599,32 @@ def extract_values(text: str) -> list[str]:
     return [re.sub(r"\s+", " ", m.group(0)).strip() for m in _VALUE_RE.finditer(text)]
 
 
+def _subject_words(record: dict) -> set[str]:
+    """What a source is about: the part of its title before the colon —
+    "Caloradine: standard regimen" — as words."""
+    subject = (record.get("title") or "").split(":")[0]
+    return {w for w in re.findall(r"[a-z][a-z'-]{2,}", subject.lower()) if w not in _STOPWORDS}
+
+
+def _named_sources(text: str, sources: list[dict]) -> list[dict]:
+    """The sources whose subject `text` actually names.
+
+    Only the distinctive part of a title counts. Several medicines are a
+    "solution" or a "complex", and matching on those words put two passages in
+    scope at once, which is how one medicine's dose went on verifying a claim
+    about another.
+    """
+    words = {w for w in re.findall(r"[a-z][a-z'-]{2,}", text.lower())}
+    subjects = [_subject_words(r) for r in sources]
+    shared = {w for i, a in enumerate(subjects) for j, b in enumerate(subjects) if i != j for w in a & b}
+    named = []
+    for record, subject in zip(sources, subjects):
+        distinctive = subject - shared
+        if distinctive and any(_stems(w) & _stems(word) for w in distinctive for word in words):
+            named.append(record)
+    return named
+
+
 def dosage_guard(answer_text: str, sources: list[dict],
                  query: str = "") -> tuple[bool, str, list[str]]:
     """Return (ok, detail, checked_values).
@@ -619,13 +645,20 @@ def dosage_guard(answer_text: str, sources: list[dict],
 
     vocab = _source_vocab(sources)
 
-    def supporting(text: str) -> set[str]:
-        """The values stated by the sources about whatever `text` names."""
-        covered = [t for t in _salient_terms(text) if _covered(t, vocab)]
-        pairs: set[str] = set()
-        for record in _sources_about(text, covered, sources):
-            pairs |= _canonical_pairs(record.get("text", ""))
-        return pairs
+    def supporting(text: str) -> set[str] | None:
+        """The values stated by the sources whose own subject `text` names, or
+        None when it names none of them.
+
+        Scoping by the rarest word in the claim is not enough: a sentence that
+        says only "the standard adult regimen is 20 mL" names no medicine at
+        all, and the rarest word in it was "ml", which pointed at whichever
+        passage happened to use millilitres — one that did state 20 mL. A dose
+        is attributed by naming the thing being dosed, or not at all.
+        """
+        about = _named_sources(text, sources)
+        if not about:
+            return None
+        return {pair for record in about for pair in _canonical_pairs(record.get("text", ""))}
 
     # A dose belongs to the medicine named beside it, so each sentence is
     # checked against the sources about that sentence's own subject. Checking
@@ -636,8 +669,17 @@ def dosage_guard(answer_text: str, sources: list[dict],
         stated = _canonical_pairs(sentence)
         if not stated:
             continue
-        # The question names the subject when a sentence only says "it".
-        allowed = supporting(sentence) or supporting(f"{query} {sentence}")
+        # Attribute the dose as precisely as the words allow: what this
+        # sentence names, else what the question named, else — when nothing
+        # names a subject the sources know — every source about the question,
+        # which is where this started.
+        allowed = supporting(sentence)
+        if allowed is None:
+            allowed = supporting(f"{query} {sentence}")
+        if allowed is None:
+            covered = [t for t in _salient_terms(f"{query} {sentence}") if _covered(t, vocab)]
+            allowed = {pair for record in _sources_about(f"{query} {sentence}", covered, sources)
+                       for pair in _canonical_pairs(record.get("text", ""))}
         for pair in sorted(stated):
             if pair not in allowed:
                 return (

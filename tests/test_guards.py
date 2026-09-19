@@ -286,3 +286,28 @@ def test_a_dose_still_verifies_when_only_the_question_names_the_medicine():
         "It is given at 15 mg once daily.", _sources("CALO-001", "VELT-002"),
         "What is the dose of Caloradine?")
     assert ok
+
+
+def test_a_dose_with_no_medicine_named_is_attributed_by_the_question():
+    """A sentence that says only "the standard adult regimen is 20 mL" names
+    nothing. Attributing it by the rarest word in it picked whichever passage
+    happened to use millilitres, and that passage did state 20 mL."""
+    both = _sources("CALO-001", "MEND-001")
+    ok, detail, _ = guards_output.dosage_guard(
+        "The standard adult regimen is 5 mL once daily, taken in the morning with food.",
+        both, "What is the dose of Caloradine?")
+    assert not ok, "a dose was attributed to a medicine the question did not ask about"
+
+    ok, _, _ = guards_output.dosage_guard(
+        "The standard adult regimen is 15 mg once daily, taken in the morning with food.",
+        both, "What is the dose of Caloradine?")
+    assert ok
+
+
+def test_a_shared_word_in_two_titles_does_not_put_both_in_scope():
+    """Several medicines are a "solution" or a "complex". Matching a title on
+    those words put two passages in scope at once, and one medicine's dose
+    went on verifying a claim about the other."""
+    calo, mend = _sources("CALO-001", "MEND-001")
+    named = guards_output._named_sources("What is the dose of Mendel solution?", [calo, mend])
+    assert [r["id"] for r in named] == ["MEND-001"]
