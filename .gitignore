@@ -16,3 +16,6 @@ data/imaging/
 
 # Evaluation results are committed: a number on the website that nobody
 # outside this machine can check is not evidence.
+
+# A sampled run writes here, so it can never be mistaken for the full-run evidence.
+eval/*.sample.json

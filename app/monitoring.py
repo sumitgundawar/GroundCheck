@@ -34,7 +34,7 @@ import math
 import threading
 import time
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import httpx
 from sqlalchemy import func, select

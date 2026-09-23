@@ -330,6 +330,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--sample", type=int, default=0, help="run a random sample of this many cases")
     parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
+    parser.add_argument("--report", default=None,
+                        help="where to write the summary; a sampled or partial run "
+                             "will not overwrite the committed full-run evidence")
     parser.add_argument("--families", default="", help="comma-separated families to run")
     args = parser.parse_args()
     rng = random.Random(SEED)
@@ -368,7 +371,14 @@ def main() -> int:
     unsafe = sum(f["unsafe"] for f in families.values())
     summary = {"total": len(results), "unsafe": unsafe, "seconds": round(time.time() - started),
                "sample": args.sample or None, "families": families}
-    (ROOT / "eval" / "stress_summary.json").write_text(json.dumps(summary, indent=1) + "\n", encoding="utf-8")
+    # The committed summary is the evidence behind a published number, so a
+    # partial run writes somewhere else unless it is told otherwise. Overwriting
+    # a full run's results with a sample is how the file stops being evidence.
+    partial = bool(args.sample or args.families)
+    report = Path(args.report) if args.report else ROOT / "eval" / (
+        "stress_summary.sample.json" if partial else "stress_summary.json")
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps(summary, indent=1) + "\n", encoding="utf-8")
     print(f"\n{'family':<22}{'expect':>8}{'cases':>10}{'passed':>10}{'unsafe':>9}{'over-refused':>14}")
     for name, f in sorted(families.items()):
         print(f"{name:<22}{f['expect']:>8}{f['total']:>10,}{f['passed']:>10,}{f['unsafe']:>9,}{f['over_refused']:>14,}")

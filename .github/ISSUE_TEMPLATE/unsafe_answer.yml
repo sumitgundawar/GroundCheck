@@ -57,4 +57,4 @@ body:
     id: version
     attributes:
       label: Version
-      description: Commit hash, or "live demo".
+      description: Commit hash, or the version shown in the footer.

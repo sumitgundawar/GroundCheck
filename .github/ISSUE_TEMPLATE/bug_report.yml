@@ -39,7 +39,6 @@ body:
         - Docker
         - Hugging Face Spaces
         - Render
-        - Live demo
         - Other
     validations:
       required: true

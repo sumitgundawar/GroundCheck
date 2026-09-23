@@ -111,8 +111,6 @@ def _echoed(record: dict, sentence: str) -> bool:
 def _states(record: dict, claim: str) -> bool:
     """True if the record already states every value the claim states, in which
     case the mutation produced something true and is not a test case."""
-    from app import guards_output
-
     return _canonical(claim) <= _canonical(record.get("text", ""))
 
 
@@ -124,7 +122,6 @@ def _canonical(text: str) -> set[str]:
 
 def run(cases: list[dict], records: list[dict]) -> dict:
     from app import config, guards_output
-    from app.schemas import Claim
 
     by_id = {r["id"]: r for r in records}
     families: dict[str, Counter] = {}
@@ -194,13 +191,18 @@ def main() -> int:
     for escape in result["escapes"][:5]:
         print(f"  ACCEPTED [{escape['family']}] {escape['claim'][:110]}")
 
-    Path(args.report).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.report).write_text(json.dumps(
+    # A sample is not the evidence behind the published number, so it writes
+    # somewhere else unless told otherwise.
+    report = Path(args.report)
+    if args.sample and args.report == parser.get_default("report"):
+        report = report.with_suffix(".sample.json")
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps(
         {"cases": total, "accepted_wrong_claims": accepted, "accepted_wrong_doses": unsafe,
          "misattributed_generic_sentences": boilerplate,
          "families": {k: dict(v) for k, v in result["families"].items()},
          "escapes": result["escapes"]}, indent=2) + "\n")
-    print(f"written to {args.report}")
+    print(f"written to {report}")
     return 1 if unsafe else 0
 
 

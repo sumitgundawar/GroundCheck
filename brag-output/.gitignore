@@ -3,7 +3,6 @@
 composition*/assets/
 composition*/snapshots/
 composition*/node_modules/
-composition*/CLAUDE.md
-composition*/AGENTS.md
+composition*/*.md
 brag-plan.md
 composition-brief.md

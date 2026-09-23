@@ -12,7 +12,6 @@ import logging
 import json
 from urllib.parse import quote
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
