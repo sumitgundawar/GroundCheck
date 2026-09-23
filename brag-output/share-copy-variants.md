@@ -4,8 +4,8 @@ The canonical caption is `share-copy.txt`. These are the same claim cut for
 different rooms. Every number below is from a real run and can be reproduced
 with `python scripts/stress_eval.py`.
 
-Attach `brag.mp4`; use `brag.jpg` wherever a platform lets you upload a
-thumbnail (Instagram, TikTok, YouTube, Facebook, the LinkedIn post editor).
+Attach a recording of the product if you have one; LinkedIn and X both favour
+native video over a link preview.
 
 ---
 
