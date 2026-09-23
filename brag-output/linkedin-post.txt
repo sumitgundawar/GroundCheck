@@ -1,0 +1,22 @@
+Most AI demos show you what the model answered. I've spent the last while building one that shows you what it refused.
+
+GroundCheck answers clinical questions using only documents you trust. Every sentence it writes carries a citation back to the exact passage it came from. When it can't back something up, it says so, explains why, and sends the question to a person instead.
+
+The refusal is the point.
+
+Ask it about a medicine that isn't in its sources and it stops before any model writes a word. Eleven checks run, one fails, the rest never happen — and all of it is written into an audit record you can verify later. A system that confidently invents a dose is worse than one that says "I don't know." In medicine, "I don't know" is often the useful answer.
+
+I tested it the way I'd want a hospital to test it:
+
+→ 265,778 generated questions and patient scenarios. 222,210 of them had to be refused. All 222,210 were.
+→ 12,056 of those questions asked the way people actually talk — "remind me…", "a colleague asked…", "what's the duration?" — with none wrongly refused.
+→ 1,215 deliberately wrong claims put to the safety checks. Not one wrong dose accepted.
+
+I also had the whole thing pulled apart by an independent review, and fixed what it found. The one that stuck with me: a medicine the system didn't recognise returned nothing at all — and in a prescribing screen, nothing reads as "all clear." Silence is the most dangerous answer software can give. It now says, plainly, that it didn't check.
+
+Being straight about what it isn't: the demo data is synthetic on purpose — every medicine and dose in it is invented — and this is not a medical device and has not been clinically validated. It's MIT licensed and runs on your own machine.
+
+Website: https://groundcheckhealth.com
+Code: https://github.com/sumitgundawar/GroundCheck
+
+If you work on safety in clinical software, I'd genuinely like to hear from you — especially if you want to try to break it.
