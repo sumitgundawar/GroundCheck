@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>GroundCheck: clinical answers that cite their sources or refuse</title>
-  <meta name="description" content="GroundCheck is an open-source retrieval pipeline for clinical questions. It answers only from sources you trust, cites every claim, and refuses with a reason when it cannot back up what it would say.">
+  <title>GroundCheckHealth: clinical answers that cite their sources or refuse</title>
+  <meta name="description" content="GroundCheckHealth is an open-source retrieval pipeline for clinical questions. It answers only from sources you trust, cites every claim, and refuses with a reason when it cannot back up what it would say.">
   <link rel="canonical" href="https://groundcheckhealth.com/">
   <meta name="theme-color" content="#f5f7f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0c1513" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
 
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="GroundCheck">
-  <meta property="og:title" content="GroundCheck: grounded answers, or none at all">
+  <meta property="og:site_name" content="GroundCheckHealth">
+  <meta property="og:title" content="GroundCheckHealth: grounded answers, or none at all">
   <meta property="og:description" content="Open-source clinical retrieval that cites every claim and refuses when it cannot ground an answer.">
   <meta property="og:url" content="https://groundcheckhealth.com/">
   <meta property="og:image" content="https://groundcheckhealth.com/og.png">
@@ -29,7 +29,7 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareSourceCode",
-    "name": "GroundCheck",
+    "name": "GroundCheckHealth",
     "description": "Open-source retrieval pipeline for clinical questions that cites every claim and refuses when it cannot ground an answer.",
     "url": "https://groundcheckhealth.com/",
     "codeRepository": "https://github.com/sumitgundawar/GroundCheck",
@@ -46,13 +46,13 @@
 
   <header class="site-header">
     <div class="wrap header-inner">
-      <a class="brand" href="/" aria-label="GroundCheck home">
+      <a class="brand" href="/" aria-label="GroundCheckHealth home">
         <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <rect x="3" y="3" width="18" height="18" rx="5" />
           <path d="M7.5 12.25l2.25 2.25L13 11" />
           <path d="M7 17.5h10" />
         </svg>
-        <span class="brand-word">GroundCheck</span>
+        <span class="brand-word">GroundCheckHealth</span>
       </a>
       <nav class="site-nav" aria-label="Sections" data-nav>
         <a href="#demo">Demo</a>
@@ -288,7 +288,7 @@
             <div class="tour-panel" role="tabpanel" id="tour-panel-ask" aria-labelledby="tour-tab-ask">
               <figure class="tour-figure">
               <div class="lightbox">
-                <a class="lightbox-link" href="/screenshots/ask.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/ask-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/ask.webp" width="1440" height="900" fetchpriority="low" decoding="async" alt="The GroundCheck app: a sidebar of pages, and the Ask page with a question box and example questions that answer and refuse."></picture></a>
+                <a class="lightbox-link" href="/screenshots/ask.webp" aria-label="Open full-size screenshot"><picture><source srcset="/screenshots/ask-dark.webp" media="(prefers-color-scheme: dark)"><img src="/screenshots/ask.webp" width="1440" height="900" fetchpriority="low" decoding="async" alt="The GroundCheckHealth app: a sidebar of pages, and the Ask page with a question box and example questions that answer and refuse."></picture></a>
               </div>
               <figcaption><strong>Ask a question.</strong> Type your own, or start from examples that answer and refuse.</figcaption>
             </figure>
@@ -422,7 +422,7 @@
             <p>Trace any decision to its check and its source.</p>
           </li>
         </ul>
-        <p class="callout-line"><strong>Not for patient care.</strong> GroundCheck isn’t clinically validated or cleared by any regulator.</p>
+        <p class="callout-line"><strong>Not for patient care.</strong> GroundCheckHealth isn’t clinically validated or cleared by any regulator.</p>
       </div>
     </section>
 
@@ -562,7 +562,7 @@
             </ul>
           </li>
         </ul>
-        <p class="note">If a model fails or times out, GroundCheck falls back to the extractive answer.</p>
+        <p class="note">If a model fails or times out, GroundCheckHealth falls back to the extractive answer.</p>
       </div>
     </section>
 
@@ -641,7 +641,7 @@
         </div>
         <div class="eval-scale">
           <h3>And 250,000 more</h3>
-          <p>Beyond the gating set, a generated evaluation of <strong>265,778</strong> questions and patient scenarios: medicines that don’t exist, one-letter misspellings of real ones, questions about children and pregnancy the sources don’t cover, doses the sources never state, one medicine’s dose asserted against another, instructions to ignore the sources, and patients the formulary says a medicine is unsafe for. Expectations come from the documents and the formulary, never from GroundCheck’s own code. A sample runs on every push and the whole set weekly. In the latest run, all <strong>222,210</strong> questions that had to be refused were refused.</p>
+          <p>Beyond the gating set, a generated evaluation of <strong>265,778</strong> questions and patient scenarios: medicines that don’t exist, one-letter misspellings of real ones, questions about children and pregnancy the sources don’t cover, doses the sources never state, one medicine’s dose asserted against another, instructions to ignore the sources, and patients the formulary says a medicine is unsafe for. Expectations come from the documents and the formulary, never from GroundCheckHealth’s own code. A sample runs on every push and the whole set weekly. In the latest run, all <strong>222,210</strong> questions that had to be refused were refused.</p>
           <p>The other direction is measured too, because it is the one a clinician feels: <strong>12,056</strong> answerable questions asked the way a person asks them — “remind me”, “a colleague asked”, “what’s the duration”, “for a 40 year old” — with <strong>none</strong> refused. A separate run puts <strong>1,215 deliberately wrong claims</strong> to the grounding and dosage checks, which the big evaluation cannot do, because its answers are quoted from the sources and so are true by construction. None of the wrong doses were accepted.</p>
         </div>
         <p class="note">Runs offline in extractive mode, so these results measure the checks, not a language model.</p>
@@ -803,7 +803,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
     <section class="section section-rule" id="roadmap" aria-labelledby="roadmap-title">
       <div class="wrap">
         <div class="section-intro">
-          <h2 id="roadmap-title">Where GroundCheck is headed</h2>
+          <h2 id="roadmap-title">Where GroundCheckHealth is headed</h2>
           <p>From a reference pipeline to a platform hospitals can run safely. Planned work is built in the open.</p>
         </div>
 
@@ -1010,7 +1010,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
         <div class="compliance">
           <div>
             <h3>Designed toward regulated use</h3>
-            <p>GroundCheck holds <strong>no certifications or clearances today</strong>. These are the standards it is being designed toward.</p>
+            <p>GroundCheckHealth holds <strong>no certifications or clearances today</strong>. These are the standards it is being designed toward.</p>
           </div>
           <dl class="standards">
             <div><dt>Privacy</dt><dd>HIPAA, GDPR, UK GDPR</dd></div>
@@ -1089,7 +1089,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
             <div class="code-block">
               <div class="code-toolbar"><span>Terminal</span><button class="copy" type="button" data-copy hidden>Copy</button></div>
               <pre class="code" tabindex="0"><code>git clone https://github.com/sumitgundawar/GroundCheck.git
-cd GroundCheck
+cd GroundCheckHealth
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -1103,7 +1103,7 @@ uvicorn app.main:app --port 8000</code></pre>
             <div class="code-block">
               <div class="code-toolbar"><span>Terminal</span><button class="copy" type="button" data-copy hidden>Copy</button></div>
               <pre class="code" tabindex="0"><code>git clone https://github.com/sumitgundawar/GroundCheck.git
-cd GroundCheck
+cd GroundCheckHealth
 docker build -t groundcheck .
 docker run -p 7860:7860 groundcheck</code></pre>
             </div>
@@ -1123,7 +1123,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
         </div>
         <div class="faq">
           <details>
-            <summary>Is GroundCheck a medical device?</summary>
+            <summary>Is GroundCheckHealth a medical device?</summary>
             <p>No. It’s research and engineering software. It hasn’t been clinically validated or cleared by the FDA, a notified body or any other regulator, and it must not be used to make decisions about real patients.</p>
           </details>
           <details>
@@ -1140,7 +1140,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
           </details>
           <details>
             <summary>Can I use AI without sending data to the cloud?</summary>
-            <p>Yes. Install Ollama, then open the Local AI panel in the dashboard. GroundCheck recommends open-source models that fit your machine, downloads the one you choose, and runs it locally. Extractive mode is also fully local, without AI-written drafts.</p>
+            <p>Yes. Install Ollama, then open the Local AI panel in the dashboard. GroundCheckHealth recommends open-source models that fit your machine, downloads the one you choose, and runs it locally. Extractive mode is also fully local, without AI-written drafts.</p>
           </details>
           <details>
             <summary>Do I need a GPU?</summary>
@@ -1192,13 +1192,13 @@ docker run -p 7860:7860 groundcheck</code></pre>
     <div class="wrap">
       <div class="footer-top">
         <div class="footer-brand">
-          <a class="brand" href="/" aria-label="GroundCheck home">
+          <a class="brand" href="/" aria-label="GroundCheckHealth home">
             <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <rect x="3" y="3" width="18" height="18" rx="5" />
           <path d="M7.5 12.25l2.25 2.25L13 11" />
           <path d="M7 17.5h10" />
         </svg>
-            <span class="brand-word">GroundCheck</span>
+            <span class="brand-word">GroundCheckHealth</span>
           </a>
           <p>Grounded answers, or none at all. Open-source clinical AI that cites every claim or refuses.</p>
         </div>
@@ -1235,7 +1235,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
 
       <p class="disclaimer">
         <strong>Not a medical device and not medical advice.</strong>
-        GroundCheck is research and engineering software. It has not been clinically
+        GroundCheckHealth is research and engineering software. It has not been clinically
         validated or cleared by any regulator. Every condition, drug and dose in the demo is fictional.
       </p>
 
@@ -1243,7 +1243,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
         <span>© 2026 Sumit Gundawar. MIT License.</span>
       </div>
     </div>
-    <p class="footer-wordmark" aria-hidden="true">GroundCheck</p>
+    <p class="footer-wordmark" aria-hidden="true">GroundCheckHealth</p>
   </footer>
 </body>
 </html>

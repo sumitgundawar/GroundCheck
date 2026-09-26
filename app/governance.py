@@ -589,13 +589,13 @@ def surveillance_markdown(days: int = 90, site_id: int | None = None) -> str:
             alert_counts[a.rule] = alert_counts.get(a.rule, 0) + 1
     q, rv = r["questions"], r["reviews"]
     lines = [
-        "# GroundCheck post-market surveillance report",
+        "# GroundCheckHealth post-market surveillance report",
         "",
         f"Version {__version__}. Generated {now:%Y-%m-%d %H:%M} UTC. Period: {since:%Y-%m-%d} to {now:%Y-%m-%d} "
         f"({days} days).",
         "",
         "This report gathers what the software did in use. It supports, and does not replace, the surveillance",
-        "your quality system requires. GroundCheck is not a certified medical device.",
+        "your quality system requires. GroundCheckHealth is not a certified medical device.",
         "",
         "## Use",
         "",
@@ -694,7 +694,7 @@ def safety_case_markdown(days: int = 30, site_id: int | None = None) -> str:
 
     synthetic = formulary.load().synthetic
     lines = [
-        f"# GroundCheck clinical safety case summary",
+        f"# GroundCheckHealth clinical safety case summary",
         "",
         f"Version {__version__}. Generated {now}. Period: last {days} days.",
         "",
@@ -715,7 +715,7 @@ def safety_case_markdown(days: int = 30, site_id: int | None = None) -> str:
         ]
     lines += [
         "This summary supports, and does not replace, a clinical safety case signed off by a",
-        "qualified clinical safety officer. GroundCheck is not a certified medical device.",
+        "qualified clinical safety officer. GroundCheckHealth is not a certified medical device.",
         "",
         "## Evaluation",
         "",

@@ -118,7 +118,7 @@ class FhirClient:
         except httpx.HTTPError as exc:
             raise FhirError("Couldn't reach the FHIR server.") from exc
         if response.status_code in (401, 403):
-            raise FhirError("The FHIR server refused access. Launch GroundCheck from the EHR again.")
+            raise FhirError("The FHIR server refused access. Launch GroundCheckHealth from the EHR again.")
         if response.status_code == 404:
             raise FhirError("The FHIR server has no such record.")
         if response.status_code >= 400:
@@ -253,7 +253,7 @@ def map_patient(patient: dict, observations: list[dict], allergies: list[dict], 
         else:
             value = _quantity(kind, obs)
             if value is None:
-                warnings.append(f"A {kind} result used units GroundCheck can't convert, so it was left out.")
+                warnings.append(f"A {kind} result used units GroundCheckHealth can't convert, so it was left out.")
                 continue
             low, high = PLAUSIBLE[kind]
             if not low <= value <= high:

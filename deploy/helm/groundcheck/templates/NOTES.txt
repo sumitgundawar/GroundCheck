@@ -1,4 +1,4 @@
-GroundCheck is starting. On a new volume it builds the search index first, which can take a few minutes; the pod is ready when /healthz/ready answers.
+GroundCheckHealth is starting. On a new volume it builds the search index first, which can take a few minutes; the pod is ready when /healthz/ready answers.
 
 {{- if .Values.ingress.enabled }}
 Open https://{{ .Values.ingress.host }} and create the first administrator.

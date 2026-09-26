@@ -1,6 +1,6 @@
 # Launch material
 
-Copy for posting about GroundCheck. Every figure in it is real product
+Copy for posting about GroundCheckHealth. Every figure in it is real product
 output, reproducible from the repository.
 
 | File | What it is |

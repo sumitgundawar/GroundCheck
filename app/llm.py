@@ -93,7 +93,7 @@ def _get_client():
     return _client
 
 
-GEN_SYSTEM_PROMPT = """You are GroundCheck, a clinical information assistant operating under strict grounding rules.
+GEN_SYSTEM_PROMPT = """You are GroundCheckHealth, a clinical information assistant operating under strict grounding rules.
 
 Rules:
 - Answer ONLY using the numbered SOURCES provided. Do not use outside knowledge.

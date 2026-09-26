@@ -1,7 +1,7 @@
 {
   "name": "groundcheckhealth",
   "private": true,
-  "description": "The GroundCheck website, served from Cloudflare Workers static assets.",
+  "description": "The GroundCheckHealth website, served from Cloudflare Workers static assets.",
   "license": "MIT",
   "type": "module",
   "engines": {

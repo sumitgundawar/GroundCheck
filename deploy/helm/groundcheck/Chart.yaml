@@ -1,6 +1,6 @@
 apiVersion: v2
 name: groundcheck
-description: GroundCheck, a clinical assistant that answers from approved sources or refuses.
+description: GroundCheckHealth, a clinical assistant that answers from approved sources or refuses.
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

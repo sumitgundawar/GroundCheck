@@ -1,4 +1,4 @@
-// GroundCheck site. Progressive enhancement only: every section is complete
+// GroundCheckHealth site. Progressive enhancement only: every section is complete
 // without this script.
 
 (() => {

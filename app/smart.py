@@ -1,7 +1,7 @@
-"""SMART on FHIR: launching GroundCheck from an EHR, and loading its patient.
+"""SMART on FHIR: launching GroundCheckHealth from an EHR, and loading its patient.
 
 EHR launch: the EHR opens /api/ehr/launch?iss=<its FHIR base>&launch=<token>.
-Standalone launch: /api/ehr/launch?iss=<FHIR base>. Either way GroundCheck
+Standalone launch: /api/ehr/launch?iss=<FHIR base>. Either way GroundCheckHealth
 discovers the authorisation server from the issuer's
 .well-known/smart-configuration, sends the browser to it with PKCE, and on
 return exchanges the code for an access token and the patient in context.
@@ -9,7 +9,7 @@ return exchanges the code for an access token and the patient in context.
 The patient is read once (app/fhir.py) and kept, encrypted, for
 EHR_CONTEXT_MINUTES for this browser. The access token isn't stored.
 
-Only issuers in SMART_ALLOWED_ISSUERS can launch GroundCheck, so a crafted
+Only issuers in SMART_ALLOWED_ISSUERS can launch GroundCheckHealth, so a crafted
 launch link can't make the server fetch from anywhere else. For development,
 servers in FHIR_OPEN_SERVERS can be read without SMART."""
 
@@ -76,7 +76,7 @@ def start(issuer: str, launch: str | None, base_url: str) -> tuple[str, str]:
     try:
         issuer = fhir.validate_base_url(issuer, config.SMART_ALLOWED_ISSUERS)
     except fhir.FhirError as exc:
-        raise SmartError("This EHR isn't allowed to launch GroundCheck.") from exc
+        raise SmartError("This EHR isn't allowed to launch GroundCheckHealth.") from exc
     document = discover(issuer)
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(64)
@@ -99,12 +99,12 @@ def start(issuer: str, launch: str | None, base_url: str) -> tuple[str, str]:
 
 def finish(code: str, state: str, cookie_state: str | None, base_url: str) -> str:
     if not state or not cookie_state or not secrets.compare_digest(state, cookie_state):
-        raise SmartError("The launch didn't start in this browser, or took too long. Launch GroundCheck again.")
+        raise SmartError("The launch didn't start in this browser, or took too long. Launch GroundCheckHealth again.")
     now = utcnow()
     with db.session() as s:
         pending = s.scalar(select(EhrLaunch).where(EhrLaunch.state_hash == _hash(state)))
         if pending is None or pending.expires_at < now:
-            raise SmartError("The launch didn't start in this browser, or took too long. Launch GroundCheck again.")
+            raise SmartError("The launch didn't start in this browser, or took too long. Launch GroundCheckHealth again.")
         issuer, verifier, token_endpoint = pending.issuer, pending.code_verifier, pending.token_endpoint
         s.delete(pending)
     form = {"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_url(base_url),
@@ -117,10 +117,10 @@ def finish(code: str, state: str, cookie_state: str | None, base_url: str) -> st
     except (httpx.HTTPError, ValueError) as exc:
         raise SmartError("Couldn't complete the launch with the EHR.") from exc
     if response.status_code != 200 or not tokens.get("access_token"):
-        raise SmartError("The EHR didn't accept the launch. Launch GroundCheck again.")
+        raise SmartError("The EHR didn't accept the launch. Launch GroundCheckHealth again.")
     patient_id = tokens.get("patient")
     if not patient_id:
-        raise SmartError("The EHR didn't say which patient to open. Launch GroundCheck from a patient's record.")
+        raise SmartError("The EHR didn't say which patient to open. Launch GroundCheckHealth from a patient's record.")
     try:
         with fhir.FhirClient(issuer, tokens["access_token"], transport=transport) as client:
             loaded = fhir.load_patient(client, patient_id, {"system": "SMART on FHIR", "server": issuer})
@@ -214,8 +214,8 @@ def note_text(record: dict, reviewer: str, comment: str) -> str:
                   *[f"- [{f['severity']}] {f['medicine']}: {f['message']}" for f in findings], ""]
     if comment.strip():
         lines += [f"Clinician comment: {comment.strip()}", ""]
-    lines += [f"Drafted by GroundCheck from approved sources and reviewed by {reviewer} before saving. "
-              f"GroundCheck is not a medical device. Audit record {record.get('audit_id', '')}."]
+    lines += [f"Drafted by GroundCheckHealth from approved sources and reviewed by {reviewer} before saving. "
+              f"GroundCheckHealth is not a medical device. Audit record {record.get('audit_id', '')}."]
     return "\n".join(lines)
 
 
@@ -226,7 +226,7 @@ def write_note(context_token: str | None, record: dict, reviewer: str, comment: 
         raise SmartError("Saving to the record needs a SMART launch from the EHR with permission to write notes.")
     access = data["access"]
     if datetime.fromisoformat(access["expires_at"]) <= utcnow():
-        raise SmartError("The EHR's permission has expired. Launch GroundCheck from the record again.")
+        raise SmartError("The EHR's permission has expired. Launch GroundCheckHealth from the record again.")
     if not record.get("patient"):
         raise SmartError("Only an answer asked for this patient can be saved to their record.")
     loaded_at = datetime.fromisoformat(data["loaded_at"])
@@ -237,14 +237,14 @@ def write_note(context_token: str | None, record: dict, reviewer: str, comment: 
     text = note_text(record, reviewer, comment)
     document = {
         "resourceType": "DocumentReference", "status": "current", "docStatus": "preliminary",
-        "type": {"coding": [NOTE_TYPE], "text": "GroundCheck answer"},
+        "type": {"coding": [NOTE_TYPE], "text": "GroundCheckHealth answer"},
         "category": [{"coding": [{"system": "http://hl7.org/fhir/us/core/CodeSystem/us-core-documentreference-category",
                                   "code": "clinical-note", "display": "Clinical Note"}]}],
         "subject": {"reference": data["source"]["patient"]},
         "date": now.isoformat(),
         "author": [{"display": reviewer}],
-        "description": f"GroundCheck: {str(record.get('redacted_query', ''))[:120]}",
-        "content": [{"attachment": {"contentType": "text/plain; charset=utf-8", "title": "GroundCheck answer",
+        "description": f"GroundCheckHealth: {str(record.get('redacted_query', ''))[:120]}",
+        "content": [{"attachment": {"contentType": "text/plain; charset=utf-8", "title": "GroundCheckHealth answer",
                                     "creation": now.isoformat(),
                                     "data": base64.b64encode(text.encode("utf-8")).decode("ascii")}}],
         "context": {"related": [{"identifier": {"system": "https://groundcheckhealth.com/audit",
@@ -259,7 +259,7 @@ def write_note(context_token: str | None, record: dict, reviewer: str, comment: 
     except httpx.HTTPError as exc:
         raise SmartError("Couldn't reach the EHR to save the note.") from exc
     if response.status_code in (401, 403):
-        raise SmartError("The EHR refused to save the note. Check GroundCheck's write permission with the EHR team.")
+        raise SmartError("The EHR refused to save the note. Check GroundCheckHealth's write permission with the EHR team.")
     if response.status_code not in (200, 201):
         raise SmartError(f"The EHR couldn't save the note ({response.status_code}).")
     location = response.headers.get("location", "")

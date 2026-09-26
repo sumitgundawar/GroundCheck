@@ -2,7 +2,7 @@
 
 Besides accuracy, a clinical model is judged by sensitivity and specificity
 for each class, how well its confidence is calibrated, and when it should
-not answer. GroundCheck picks each model's confidence threshold on the
+not answer. GroundCheckHealth picks each model's confidence threshold on the
 validation images: the lowest confidence at which the images it answers are
 at least MODEL_TARGET_ACCURACY correct, judged by the lower end of a 95%
 confidence interval (Wilson), so a small validation set can't flatter it. Below the threshold, the model

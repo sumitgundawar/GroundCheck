@@ -1,4 +1,4 @@
-# GroundCheck on Kubernetes. See deploy/helm/README.md.
+# GroundCheckHealth on Kubernetes. See deploy/helm/README.md.
 
 image:
   repository: groundcheck
@@ -87,7 +87,7 @@ metrics:
   serviceMonitor:
     enabled: false
     interval: 30s
-  # PrometheusRule alerts on GroundCheck's own alerts, answers slowing, and pods down.
+  # PrometheusRule alerts on GroundCheckHealth's own alerts, answers slowing, and pods down.
   prometheusRule:
     enabled: false
 

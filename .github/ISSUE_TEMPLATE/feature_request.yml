@@ -19,7 +19,7 @@ body:
     id: safety
     attributes:
       label: Effect on refusals
-      description: Could this change make GroundCheck answer something it currently refuses? How would we test that?
+      description: Could this change make GroundCheckHealth answer something it currently refuses? How would we test that?
   - type: textarea
     id: alternatives
     attributes:

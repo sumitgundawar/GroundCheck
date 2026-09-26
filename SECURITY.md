@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-GroundCheck is developed on the `main` branch. Security fixes are made on
+GroundCheckHealth is developed on the `main` branch. Security fixes are made on
 `main`; there are no separately maintained release branches.
 
 ## Reporting a vulnerability
@@ -53,6 +53,6 @@ gives us reasonable time to fix a problem before it is disclosed.
 
 ## Not a medical device
 
-GroundCheck is research and engineering software. It is not a medical device,
+GroundCheckHealth is research and engineering software. It is not a medical device,
 has not been clinically validated, and must not be used to make clinical
 decisions.

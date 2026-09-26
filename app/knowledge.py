@@ -261,7 +261,7 @@ def _text_key(text: str) -> str:
     return "t" + hashlib.sha256(f"{config.EMBED_MODEL}\n{text}".encode("utf-8")).hexdigest()[:40]
 
 
-def rebuild_index(reason: str = "Index rebuilt", user_id: int | None = None, user_name: str = "GroundCheck") -> dict:
+def rebuild_index(reason: str = "Index rebuilt", user_id: int | None = None, user_name: str = "GroundCheckHealth") -> dict:
     """Rebuild the search index from the demo corpus and approved documents.
     With a database, the result is a release that is checked before it goes
     live (app/releases.py); without one, it's swapped in directly. Only one
@@ -309,7 +309,7 @@ def rebuild_index(reason: str = "Index rebuilt", user_id: int | None = None, use
 
 
 def rebuild_index_in_background(reason: str = "Index rebuilt", user_id: int | None = None,
-                                user_name: str = "GroundCheck") -> None:
+                                user_name: str = "GroundCheckHealth") -> None:
     def run():
         try:
             rebuild_index(reason, user_id, user_name)

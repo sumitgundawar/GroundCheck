@@ -6,7 +6,7 @@
 - A prostate MRI (20 slices, 3 MB) from Prostate-Diagnosis
 
 Both are from The Cancer Imaging Archive under CC BY 3.0 and are already
-de-identified by TCIA; GroundCheck de-identifies again when importing. They
+de-identified by TCIA; GroundCheckHealth de-identifies again when importing. They
 are written to data/imaging-samples/, with a DATASET.md giving the sources,
 licence and citations. For research and evaluation only."""
 

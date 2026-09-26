@@ -1,10 +1,10 @@
-# Running GroundCheck on your own servers
+# Running GroundCheckHealth on your own servers
 
-This guide is for IT teams installing GroundCheck inside a hospital or clinic
+This guide is for IT teams installing GroundCheckHealth inside a hospital or clinic
 network. It covers the architecture, installation, sign-in, keys, backups,
 upgrades, monitoring and a hardening checklist.
 
-GroundCheck is not a certified medical device. Your organisation is
+GroundCheckHealth is not a certified medical device. Your organisation is
 responsible for clinical safety sign-off (for example DCB0129 and DCB0160 in
 England), a data protection impact assessment, and any regulatory approval
 for how you use it.
@@ -20,7 +20,7 @@ for how you use it.
           │ internal network, no internet access
   ┌───────▼────────┐      ┌──────────────┐
   │   app          │──────▶  PostgreSQL  │  users, audit trail, reviews, documents
-  │  (GroundCheck) │      └──────────────┘
+  │  (GroundCheckHealth) │      └──────────────┘
   │                │──────▶ Ollama (optional)  local language model
   │                │──────▶ Qdrant (optional)  vector database for large collections
   └────────────────┘
@@ -66,7 +66,7 @@ On a Linux host with Docker Engine 24 or later and Docker Compose v2:
 
 ```bash
 git clone https://github.com/sumitgundawar/GroundCheck.git
-cd GroundCheck
+cd GroundCheckHealth
 cp deploy/.env.example deploy/.env
 ```
 
@@ -141,7 +141,7 @@ works without one.
 
 ## Sign-in
 
-Register GroundCheck with your identity provider (Entra ID, Okta, Keycloak,
+Register GroundCheckHealth with your identity provider (Entra ID, Okta, Keycloak,
 ADFS or any OpenID Connect provider) as a web application with the redirect
 address `https://<GROUNDCHECK_HOSTNAME>/api/auth/sso/callback`. Create app
 roles or groups for admins and reviewers, and set the `OIDC_*` values in

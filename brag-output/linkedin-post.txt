@@ -1,6 +1,6 @@
 Most AI demos show you what the model answered. I built one that shows you what it refused.
 
-GroundCheck answers clinical questions using only documents you trust, and puts a citation on every sentence. When it can't back something up, it says so and sends the question to a person instead.
+GroundCheckHealth answers clinical questions using only documents you trust, and puts a citation on every sentence. When it can't back something up, it says so and sends the question to a person instead.
 
 The refusal is the point. Ask about a medicine that isn't in its sources and it stops before any model writes a word — eleven checks run, one fails, the rest never happen — and all of it goes into an audit record you can verify.
 

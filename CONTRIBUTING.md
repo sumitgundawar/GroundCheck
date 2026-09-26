@@ -1,6 +1,6 @@
-# Contributing to GroundCheck
+# Contributing to GroundCheckHealth
 
-Thanks for helping. GroundCheck exists to show that a clinical AI system can
+Thanks for helping. GroundCheckHealth exists to show that a clinical AI system can
 refuse when it isn't sure, so the most valuable contributions are the ones that
 make its refusals more correct: a question it answered but shouldn't have, a
 check that can be fooled, or an evaluation case that exposes either.
@@ -56,7 +56,7 @@ the embedding model and dependencies. Docker is optional.
 
 ```bash
 git clone https://github.com/sumitgundawar/GroundCheck.git
-cd GroundCheck
+cd GroundCheckHealth
 
 python3.12 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
@@ -134,5 +134,5 @@ static HTML, CSS and JavaScript with no build step. See
 
 ## Licensing
 
-GroundCheck is released under the [MIT License](LICENSE). By submitting a
+GroundCheckHealth is released under the [MIT License](LICENSE). By submitting a
 contribution, you agree that it is licensed under the same terms.

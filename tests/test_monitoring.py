@@ -87,7 +87,7 @@ def test_refusal_spike_fires_notifies_and_resolves(mon, monkeypatch):
     assert changes["fired"] == ["refusal_rate"] and not changes["errors"]
     [alert] = mon.get("/api/monitoring").json()["firing"]
     assert alert["severity"] == "critical" and "60% of 40 questions" in alert["detail"] and alert["notified"]
-    assert posted[0]["alert"]["event"] == "fired" and posted[0]["text"].startswith("GroundCheck Critical:")
+    assert posted[0]["alert"]["event"] == "fired" and posted[0]["text"].startswith("GroundCheckHealth Critical:")
 
     # Still firing: no second notification, and acknowledging records who.
     assert monitoring.evaluate()["fired"] == [] and len(posted) == 1

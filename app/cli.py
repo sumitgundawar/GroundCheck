@@ -33,7 +33,7 @@ def _prompt_password() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m app.cli", description="GroundCheck administration")
+    parser = argparse.ArgumentParser(prog="python -m app.cli", description="GroundCheckHealth administration")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("migrate", help="Upgrade the database to the latest schema")
     create = sub.add_parser("create-user", help="Create a user (prompts for the password)")

@@ -332,7 +332,7 @@ def recover_interrupted() -> int:
     with db.session() as s:
         rows = s.scalars(select(ImagingAnalysis).where(ImagingAnalysis.status.in_(("queued", "running")))).all()
         for row in rows:
-            row.status, row.error, row.finished_at = "failed", "Stopped when GroundCheck restarted. Run it again.", _now()
+            row.status, row.error, row.finished_at = "failed", "Stopped when GroundCheckHealth restarted. Run it again.", _now()
         return len(rows)
 
 

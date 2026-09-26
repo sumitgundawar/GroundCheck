@@ -166,7 +166,7 @@ jobs:
         working-directory: tests/ui
         run: npm install
 
-      - name: Start GroundCheck
+      - name: Start GroundCheckHealth
         run: |
           uvicorn app.main:app --port 8000 &
           for _ in $(seq 1 60); do

@@ -7,7 +7,7 @@ Two layouts are understood:
       kidney/ c.png ...              val/    liver/ ...  kidney/ ...
                                      test/   liver/ ...  kidney/ ...
 
-In the first, GroundCheck splits the images into training, validation and
+In the first, GroundCheckHealth splits the images into training, validation and
 test sets itself, keeping each class's share the same in every set. In the
 second, the folders' own split is used (val and test are optional).
 

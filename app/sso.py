@@ -214,7 +214,7 @@ def _site_from_claims(s, claims: dict) -> int | None:
         return None
     site = sites.by_key(s, value) if value else None
     if site is None:
-        raise SsoError("Your account isn't assigned to a GroundCheck site. Ask your administrator for access.")
+        raise SsoError("Your account isn't assigned to a GroundCheckHealth site. Ask your administrator for access.")
     return site.id
 
 
@@ -253,7 +253,7 @@ def finish(code: str, state: str, cookie_state: str | None, base_url: str, ip: s
     if config.OIDC_REQUIRE_MFA:
         methods = claims.get("amr") or []
         if not (set(methods) & _MFA_METHODS or claims.get("acr") in ("mfa", "http://schemas.openid.net/pape/policies/2007/06/multi-factor")):
-            raise SsoError("Sign in with multi-factor authentication to use GroundCheck.")
+            raise SsoError("Sign in with multi-factor authentication to use GroundCheckHealth.")
     email = str(claims.get("email") or claims.get("preferred_username") or claims.get("upn") or "").strip().lower()
     if "@" not in email:
         raise SsoError("Your account didn't share an email address. Ask your administrator to allow the email scope.")
@@ -277,23 +277,23 @@ def finish(code: str, state: str, cookie_state: str | None, base_url: str, ip: s
             elif config.OIDC_AUTO_CREATE:
                 role = mapped_role or (config.OIDC_DEFAULT_ROLE if config.OIDC_DEFAULT_ROLE != "none" else None)
                 if role is None:
-                    raise SsoError("Your account doesn't have a GroundCheck role. Ask your administrator for access.")
+                    raise SsoError("Your account doesn't have a GroundCheckHealth role. Ask your administrator for access.")
                 user = User(email=email, name=str(claims.get("name") or "")[:200], password_hash="!",
                             role=auth.check_role(role), sso_issuer=issuer, sso_subject=subject)
                 s.add(user)
                 s.flush()
             else:
-                raise SsoError("You don't have a GroundCheck account yet. Ask your administrator for access.")
+                raise SsoError("You don't have a GroundCheckHealth account yet. Ask your administrator for access.")
         if _mapping_configured():
             if mapped_role is None and config.OIDC_DEFAULT_ROLE == "none":
-                raise SsoError("Your account no longer has a GroundCheck role. Ask your administrator for access.")
+                raise SsoError("Your account no longer has a GroundCheckHealth role. Ask your administrator for access.")
             new_role = mapped_role or config.OIDC_DEFAULT_ROLE
             if new_role != user.role:
                 user.role = auth.check_role(new_role)
         if config.OIDC_SITE_CLAIM:
             user.site_id = _site_from_claims(s, claims)
         if not user.is_active:
-            raise SsoError("Your GroundCheck account is deactivated.")
+            raise SsoError("Your GroundCheckHealth account is deactivated.")
         if claims.get("name") and not user.name:
             user.name = str(claims["name"])[:200]
         user.last_login_at = now

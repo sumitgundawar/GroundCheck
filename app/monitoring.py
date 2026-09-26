@@ -147,7 +147,7 @@ def render() -> str:
                 lines.append(f'{name}{{severity="{label}"}} {v}')
         else:
             lines.append(f"{name} {value}")
-    lines += ["# HELP groundcheck_build_info GroundCheck version.", "# TYPE groundcheck_build_info gauge",
+    lines += ["# HELP groundcheck_build_info GroundCheckHealth version.", "# TYPE groundcheck_build_info gauge",
               f'groundcheck_build_info{{version="{config.VERSION}"}} 1',
               "# HELP groundcheck_process_start_time_seconds When this instance started.",
               "# TYPE groundcheck_process_start_time_seconds gauge",
@@ -368,7 +368,7 @@ def _notify(alert, event: str) -> bool:
     if not config.ALERT_WEBHOOK_URL:
         return False
     word = "Resolved" if event == "resolved" else alert.severity.capitalize()
-    text = f"GroundCheck {word}: {alert.title}. {alert.detail if event != 'resolved' else ''}".strip()
+    text = f"GroundCheckHealth {word}: {alert.title}. {alert.detail if event != 'resolved' else ''}".strip()
     payload = {"text": text, "alert": {"id": alert.id, "rule": alert.rule, "severity": alert.severity,
                                        "status": alert.status, "title": alert.title, "detail": alert.detail,
                                        "first_seen": alert.first_seen.isoformat(),

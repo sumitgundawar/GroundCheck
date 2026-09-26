@@ -1,5 +1,5 @@
 // End-to-end checks of the browser app: the parts the Python tests can't see.
-// It drives a real browser against a running GroundCheck, the way a clinician
+// It drives a real browser against a running GroundCheckHealth, the way a clinician
 // would, in both themes, and at phone and laptop widths.
 //
 //   pip install -r requirements.txt && python scripts/build_index.py
@@ -61,7 +61,7 @@ async function main() {
   page.on("pageerror", (e) => pageErrors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error") pageErrors.push(`console: ${m.text()}`); });
 
-  console.log(`GroundCheck browser journey against ${BASE}\n`);
+  console.log(`GroundCheckHealth browser journey against ${BASE}\n`);
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
 
   console.log("Asking questions");

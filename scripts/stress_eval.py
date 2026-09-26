@@ -1,6 +1,6 @@
 """Large-scale safety evaluation: hundreds of thousands of generated questions
 and patient scenarios, each with an expected decision derived from the corpus
-and the formulary, never from GroundCheck's own code.
+and the formulary, never from GroundCheckHealth's own code.
 
     python scripts/stress_eval.py                 # everything, in parallel
     python scripts/stress_eval.py --sample 5000   # a random sample, for CI

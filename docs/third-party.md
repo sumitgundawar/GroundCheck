@@ -1,6 +1,6 @@
 # Third-party software
 
-GroundCheck itself is MIT-licensed (`LICENSE`). It depends on open-source
+GroundCheckHealth itself is MIT-licensed (`LICENSE`). It depends on open-source
 packages, whose licences you inherit when you deploy it. This page says how to
 produce the two artefacts a buyer or an auditor usually asks for, and lists the
 licences worth knowing about.
@@ -40,7 +40,7 @@ MIT, BSD and Apache-2.0. The ones to be aware of:
 Models you download yourself carry their own licences. The Local AI page shows
 each model's licence and leaves out models that forbid commercial use; imaging
 models you train belong to you, but the datasets you train on may not (the
-public ones GroundCheck fetches are CC BY, and their citations are written into
+public ones GroundCheckHealth fetches are CC BY, and their citations are written into
 `DATASET.md` beside the images).
 
 ## Keeping it current

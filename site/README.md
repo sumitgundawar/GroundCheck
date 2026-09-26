@@ -1,4 +1,4 @@
-# GroundCheck website
+# GroundCheckHealth website
 
 The source for [groundcheckhealth.com](https://groundcheckhealth.com): static
 HTML, CSS and JavaScript with no framework and no build step, served by

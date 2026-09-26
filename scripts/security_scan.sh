@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scan a running GroundCheck with OWASP ZAP: the passive baseline first, then
+# Scan a running GroundCheckHealth with OWASP ZAP: the passive baseline first, then
 # the active API scan driven by the OpenAPI description the app publishes.
 #
 #   uvicorn app.main:app --port 8000

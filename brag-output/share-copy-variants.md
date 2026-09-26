@@ -1,4 +1,4 @@
-# GroundCheck — launch copy
+# GroundCheckHealth — launch copy
 
 The canonical caption is `share-copy.txt`. These are the same claim cut for
 different rooms. Every number below is from a real run and can be reproduced
@@ -15,7 +15,7 @@ native video over a link preview.
 
 > Most AI demos show you what the model answered.
 >
-> GroundCheck shows you what it refused — and why.
+> GroundCheckHealth shows you what it refused — and why.
 >
 > 265,778 test questions. All 222,210 that had to be refused, were.
 
@@ -23,13 +23,13 @@ native video over a link preview.
 
 > 222,210 questions that had no grounded answer.
 >
-> GroundCheck answered none of them.
+> GroundCheckHealth answered none of them.
 >
 > Open source, runs on a laptop, refuses out loud.
 
 **Thread continuation (optional, 4 posts):**
 
-1. Most AI demos show you what the model answered. GroundCheck shows you what it refused — and why. 265,778 test questions. All 222,210 that had to be refused, were.
+1. Most AI demos show you what the model answered. GroundCheckHealth shows you what it refused — and why. 265,778 test questions. All 222,210 that had to be refused, were.
 2. Every question runs eleven checks before a model is allowed to write a word: PII redaction, injection scope, retrieval, source coverage, then schema, grounding and a dosage guard on the way out. A question about a medicine that's in no source stops at check six, in 6 ms, with the reason recorded.
 3. Answers are the same machine running to the end: every claim carries a citation back to the passage it came from, and a claim that isn't grounded doesn't ship. With a patient loaded it also checks allergies, interactions, kidney and liver function, weight, age and pregnancy against the formulary.
 4. Self-hosted, open source, Docker Compose or Helm, encrypted at rest, and a hash-chained audit record for every question — including the ones it refused. github.com/sumitgundawar/GroundCheck
@@ -38,7 +38,7 @@ native video over a link preview.
 
 ## LinkedIn
 
-> **GroundCheck refuses to guess.**
+> **GroundCheckHealth refuses to guess.**
 >
 > Clinical software that answers from documents has one failure mode that
 > matters: answering when it shouldn't. So I built the refusal first.
@@ -69,12 +69,12 @@ native video over a link preview.
 
 ## Hacker News / Reddit (r/MachineLearning, r/healthIT)
 
-**Title:** GroundCheck – a clinical RAG system built around refusing to answer
+**Title:** GroundCheckHealth – a clinical RAG system built around refusing to answer
 
 **Body:**
 
 > The interesting part of retrieval-augmented generation in medicine isn't the
-> generation, it's the refusal. GroundCheck runs eleven checks per question and
+> generation, it's the refusal. GroundCheckHealth runs eleven checks per question and
 > stops at the first one that fails — before any model is called — then records
 > the reason, the retrieval scores and the stage timings in a hash-chained
 > audit record.
@@ -107,7 +107,7 @@ native video over a link preview.
 
 ## Video alt text (use it — this project is about legibility)
 
-> Screen recording of GroundCheck. A clinician's question — "What is the
+> Screen recording of GroundCheckHealth. A clinician's question — "What is the
 > recommended dose of Zalortin for a patient with Veltris syndrome?" — is
 > refused. An audit record fills in stage by stage: five checks pass, "Source
 > coverage" fails because "zalortin" is in no trusted source, and four later

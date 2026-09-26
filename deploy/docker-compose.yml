@@ -1,4 +1,4 @@
-# GroundCheck on your own servers: the app, PostgreSQL, and Caddy for HTTPS.
+# GroundCheckHealth on your own servers: the app, PostgreSQL, and Caddy for HTTPS.
 #
 #   cp deploy/.env.example deploy/.env    # then fill it in
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
@@ -116,7 +116,7 @@ services:
     restart: unless-stopped
     environment:
       DICOM_WEB_PLUGIN_ENABLED: "true"
-      ORTHANC__NAME: GroundCheck test PACS
+      ORTHANC__NAME: GroundCheckHealth test PACS
       ORTHANC__AUTHENTICATION_ENABLED: "true"
       ORTHANC__REGISTERED_USERS: '{"groundcheck": "${PACS_PASSWORD:-change-me}"}'
     volumes:

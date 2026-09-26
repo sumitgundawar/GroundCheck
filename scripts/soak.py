@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hold a running GroundCheck under steady load and check what it kept.
+"""Hold a running GroundCheckHealth under steady load and check what it kept.
 
     uvicorn app.main:app --port 8000
     python scripts/soak.py --requests 100000 --users 40

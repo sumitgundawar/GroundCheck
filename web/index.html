@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GroundCheck</title>
+  <title>GroundCheckHealth</title>
   <meta name="description" content="A clinical retrieval demo that refuses to guess. Synthetic data only. Not medical advice." />
   <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
   <script src="/theme.js"></script>
@@ -40,7 +40,7 @@
   <!-- Sign-in: shown instead of the dashboard when accounts are required -->
   <section class="auth-screen" id="auth-screen" hidden aria-labelledby="auth-title">
     <div class="auth-card">
-      <p class="auth-brand">GroundCheck</p>
+      <p class="auth-brand">GroundCheckHealth</p>
       <h1 class="auth-title" id="auth-title">Sign in</h1>
       <p class="auth-lede" id="auth-lede">Sign in to ask questions and review answers.</p>
 
@@ -360,7 +360,7 @@
       <h2 id="model-imaging-title">Use on CT and MRI</h2>
       <button type="button" class="modal-close" data-close aria-label="Close">×</button>
     </div>
-    <p class="modal-status" id="model-imaging-meta">Tell GroundCheck how this model’s training images were made, so it can cut matching regions from a whole series.</p>
+    <p class="modal-status" id="model-imaging-meta">Tell GroundCheckHealth how this model’s training images were made, so it can cut matching regions from a whole series.</p>
     <form class="report-form" id="model-imaging-form" novalidate>
       <div class="field">
         <label for="mi-modality">Trained on</label>
@@ -433,11 +433,11 @@
 
   <div class="app" id="dashboard">
     <!-- Navigation: a sidebar on wide screens, a drawer on narrow ones -->
-    <aside class="sidebar" id="sidebar" aria-label="GroundCheck">
+    <aside class="sidebar" id="sidebar" aria-label="GroundCheckHealth">
       <div class="sidebar-head">
-        <a class="brand" href="#/ask" aria-label="GroundCheck, ask a question">
+        <a class="brand" href="#/ask" aria-label="GroundCheckHealth, ask a question">
           <span class="brand-mark" id="brand-mark"></span>
-          <span class="brand-word">GroundCheck</span>
+          <span class="brand-word">GroundCheckHealth</span>
         </a>
         <button type="button" class="icon-button nav-close" id="nav-close" aria-label="Close menu">
           <svg aria-hidden="true"><use href="#i-x"/></svg>
@@ -576,7 +576,7 @@
         <header class="page-head">
           <div>
             <h1 class="page-title"><span id="ask-title">Grounded answers, or none at all</span></h1>
-            <p class="page-sub">Answers come only from approved sources, with a citation for every statement. When a question can’t be grounded, GroundCheck refuses and sends it for review.</p>
+            <p class="page-sub">Answers come only from approved sources, with a citation for every statement. When a question can’t be grounded, GroundCheckHealth refuses and sends it for review.</p>
           </div>
         </header>
       <section class="panel ask-panel">
@@ -1574,7 +1574,7 @@
         <header class="page-head">
           <div>
             <h1 class="page-title" id="ehr-title">EHR integration</h1>
-            <p class="page-sub">Launch GroundCheck from a patient’s record with SMART on FHIR, and check medication orders inside the EHR with CDS Hooks.</p>
+            <p class="page-sub">Launch GroundCheckHealth from a patient’s record with SMART on FHIR, and check medication orders inside the EHR with CDS Hooks.</p>
           </div>
         </header>
           <div class="usage-grid">
@@ -1692,7 +1692,7 @@
         </section>
 
         <footer class="footer">
-          GroundCheck. Built to refuse rather than guess. Synthetic corpus structured after MedQuAD and FDA DailyMed labelling.
+          GroundCheckHealth. Built to refuse rather than guess. Synthetic corpus structured after MedQuAD and FDA DailyMed labelling.
         </footer>
       </main>
     </div>

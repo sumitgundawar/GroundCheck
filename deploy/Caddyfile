@@ -1,4 +1,4 @@
-# HTTPS in front of GroundCheck. TLS_SETTING is "internal" (a certificate
+# HTTPS in front of GroundCheckHealth. TLS_SETTING is "internal" (a certificate
 # from Caddy's own authority, for internal networks; install its root on
 # client machines), an email address (a public certificate from Let's
 # Encrypt, for a host reachable from the internet), or paths to your

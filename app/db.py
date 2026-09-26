@@ -1,6 +1,6 @@
 """Database: engine, sessions, schema and migrations.
 
-GroundCheck stores users, sign-in sessions and audit records in a relational
+GroundCheckHealth stores users, sign-in sessions and audit records in a relational
 database through SQLAlchemy, so the same code runs on:
 
 - SQLite, the default: a single file, nothing to install

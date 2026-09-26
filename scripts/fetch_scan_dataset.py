@@ -58,7 +58,7 @@ SIZES = (28, 64, 128, 224)
 
 
 def download(url: str) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "GroundCheck dataset fetcher"})
+    request = urllib.request.Request(url, headers={"User-Agent": "GroundCheckHealth dataset fetcher"})
     with urllib.request.urlopen(request, timeout=60) as response:
         total = int(response.headers.get("Content-Length") or 0)
         chunks, done = [], 0

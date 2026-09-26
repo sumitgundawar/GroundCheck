@@ -107,7 +107,7 @@ async function api(path, options = {}) {
     // isn't one, say what to do rather than only what went wrong: a dead end
     // in clinical tooling turns into a phone call to IT.
     const fallback = res.status >= 500
-      ? "GroundCheck couldn't complete that. Try again — if it keeps happening, tell your administrator, "
+      ? "GroundCheckHealth couldn't complete that. Try again — if it keeps happening, tell your administrator, "
         + `and quote the time and error ${res.status}.`
       : `That request wasn't accepted (error ${res.status}). Check what you entered and try again.`;
     const detail = data && typeof data.detail === "string" ? data.detail : fallback;
@@ -1607,7 +1607,7 @@ function renderLocalAI() {
       ", start it, then reopen this panel.");
   } else if (!s.can_manage) {
     msg.hidden = false;
-    msg.textContent = "Models can only be downloaded or switched from the machine running GroundCheck.";
+    msg.textContent = "Models can only be downloaded or switched from the machine running GroundCheckHealth.";
   }
 
   s.models.forEach((m) => list.appendChild(renderModelRow(m, s)));
@@ -2714,7 +2714,7 @@ async function loadEmbeddings() {
     ["Ranking", data.hybrid.enabled ? `Hybrid: ${Math.round(data.hybrid.embedding_weight * 100)}% embedding similarity, ${Math.round(data.hybrid.keyword_weight * 100)}% keyword (BM25)` : "Embedding similarity only"],
     ["Similarity", "Cosine, on normalised vectors"],
     ["Passages retrieved", `${data.top_k} per question`],
-    ["Relevance threshold", `${data.min_score} cosine. Below this, GroundCheck refuses before drafting anything.`],
+    ["Relevance threshold", `${data.min_score} cosine. Below this, GroundCheckHealth refuses before drafting anything.`],
     ["Sources", data.include_demo_corpus ? `Your approved documents and the synthetic demo corpus (${data.from_demo_corpus.toLocaleString()} passages)` : "Your approved documents only"],
   ];
   const list = $("embed-settings");
@@ -3780,7 +3780,7 @@ async function loadReleases() {
     const [label, cls] = RELEASE_STATUS[r.status] || [r.status, ""];
     const h = el("h3");
     h.append(r.reason || "Index rebuilt", el("span", `status-pill ${cls}`, label));
-    body.append(h, el("p", "release-meta", `Built ${dateTime(r.created_at)} by ${r.created_by || "GroundCheck"}. ${r.passages.toLocaleString()} passages, ${r.documents.length} document${r.documents.length === 1 ? "" : "s"}.${r.snapshot ? "" : " Snapshot removed."}`));
+    body.append(h, el("p", "release-meta", `Built ${dateTime(r.created_at)} by ${r.created_by || "GroundCheckHealth"}. ${r.passages.toLocaleString()} passages, ${r.documents.length} document${r.documents.length === 1 ? "" : "s"}.${r.snapshot ? "" : " Snapshot removed."}`));
     const changes = changeText(r);
     if (changes) body.appendChild(el("p", "", changes));
     const [text, state] = checkText(r.check);
@@ -4216,7 +4216,7 @@ function seriesTitle(s) {
 
 function renderImagingList() {
   const { series, pacs } = imaging.home;
-  document.title = "CT and MRI · GroundCheck";
+  document.title = "CT and MRI · GroundCheckHealth";
   $("imaging-summary").textContent = series.length ? plural(series.length, "series").replace(/seriess$/, "series") : "";
   $("pacs-off").hidden = pacs;
   $("pacs-search").hidden = !pacs;
@@ -4434,7 +4434,7 @@ async function openSeries(id, keepPlace = false) {
   const title = seriesTitle(s);
   $("viewer-title").textContent = title;
   $("topbar-title").textContent = title;
-  document.title = `${title} · GroundCheck`;
+  document.title = `${title} · GroundCheckHealth`;
   $("viewer-sub").textContent = [s.modality, s.plane !== "unknown" ? s.plane : "", plural(s.slices, "image"), s.label && s.description ? s.description : ""].filter(Boolean).join(", ");
   $("viewer-delete").hidden = !canDeleteSeries();
 
@@ -4876,7 +4876,7 @@ function route() {
   });
   const title = $(`view-${name}`).dataset.title;
   $("topbar-title").textContent = title;
-  document.title = name === "ask" ? "GroundCheck" : `${title} · GroundCheck`;
+  document.title = name === "ask" ? "GroundCheckHealth" : `${title} · GroundCheckHealth`;
   setNavOpen(false);
   VIEWS[name].load();
 }

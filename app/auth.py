@@ -40,7 +40,7 @@ _hasher = PasswordHasher()
 _DUMMY_HASH = _hasher.hash(secrets.token_urlsafe(16))
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-MFA_ISSUER = "GroundCheck"
+MFA_ISSUER = "GroundCheckHealth"
 
 
 class AuthError(Exception):

@@ -101,15 +101,15 @@ def build(*, series, report, analysis, previous, identified: bool) -> Dataset:
         evidence=evidence, content=root,
         series_instance_uid=generate_uid(entropy_srcs=[series.uid, "groundcheck report series"]),
         series_number=990, sop_instance_uid=report.sr_uid, instance_number=report.id,
-        manufacturer="GroundCheck", is_complete=True, is_final=True, is_verified=True,
+        manufacturer="GroundCheckHealth", is_complete=True, is_final=True, is_verified=True,
         verifying_observer_name=_person_name(report.author_name),
-        verifying_organization=config.ORGANISATION_NAME or "GroundCheck",
+        verifying_organization=config.ORGANISATION_NAME or "GroundCheckHealth",
     )
-    ds.SeriesDescription = "GroundCheck report"
+    ds.SeriesDescription = "GroundCheckHealth report"
     if report.signed_at:
         ds.ContentDate = report.signed_at.strftime("%Y%m%d")
         ds.ContentTime = report.signed_at.strftime("%H%M%S")
     if not identified:
         ds.PatientIdentityRemoved = "YES"
-        ds.DeidentificationMethod = "GroundCheck de-identified series"
+        ds.DeidentificationMethod = "GroundCheckHealth de-identified series"
     return ds

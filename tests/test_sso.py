@@ -210,7 +210,7 @@ def test_domains_roles_and_mfa_rules(client, provider, monkeypatch):
     monkeypatch.setattr(config, "OIDC_ALLOWED_DOMAINS", {"hospital.example"})
 
     monkeypatch.setattr(config, "OIDC_DEFAULT_ROLE", "none")
-    assert "doesn't have a GroundCheck role" in error_of(sign_in(client, provider, roles=["unrelated"]))
+    assert "doesn't have a GroundCheckHealth role" in error_of(sign_in(client, provider, roles=["unrelated"]))
 
     monkeypatch.setattr(config, "OIDC_REQUIRE_MFA", True)
     assert "multi-factor" in error_of(sign_in(client, provider, roles=["gc-reviewers"], amr=["pwd"]))
@@ -218,7 +218,7 @@ def test_domains_roles_and_mfa_rules(client, provider, monkeypatch):
 
     # Losing the role at the provider removes access at the next sign-in.
     client.post("/api/auth/logout")
-    assert "no longer has a GroundCheck role" in error_of(sign_in(client, provider, amr=["mfa"]))
+    assert "no longer has a GroundCheckHealth role" in error_of(sign_in(client, provider, amr=["mfa"]))
 
 
 def test_existing_accounts_link_only_by_verified_email(client, provider):

@@ -122,7 +122,7 @@ BASE = [
 
 def main() -> int:
     records = json.loads((ROOT / "app" / "data" / "corpus.json").read_text(encoding="utf-8"))
-    formulary = {"name": "GroundCheck demo formulary", "version": "2026.09", "synthetic": True,
+    formulary = {"name": "GroundCheckHealth demo formulary", "version": "2026.09", "synthetic": True,
                  "medicines": BASE + from_corpus(records)}
     Formulary.model_validate(formulary)  # fail loudly on any invalid rule
     out = ROOT / "app" / "data" / "formulary.json"

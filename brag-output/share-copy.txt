@@ -1,1 +1,1 @@
-Most AI demos show you what the model answered. GroundCheck shows you what it refused: the question, the eleven checks, the one that failed, and the four that never ran because no model was called. Across 265,778 test questions, all 222,210 that had to be refused were refused.
+Most AI demos show you what the model answered. GroundCheckHealth shows you what it refused: the question, the eleven checks, the one that failed, and the four that never ran because no model was called. Across 265,778 test questions, all 222,210 that had to be refused were refused.

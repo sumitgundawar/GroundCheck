@@ -200,7 +200,7 @@ def read(uploads: list[tuple[str, bytes]]) -> list[Series]:
         try:
             volume = np.stack([pixels(ds) for ds, _ in usable])
         except Exception as exc:  # noqa: BLE001 - unsupported compression, most often
-            raise DicomError("These images use a compression GroundCheck can't read. Export them uncompressed.") from exc
+            raise DicomError("These images use a compression GroundCheckHealth can't read. Export them uncompressed.") from exc
         report = {k: sum(rep[k] for _, rep in usable) for k in usable[0][1] if k != "_original"}
         first_original = usable[0][1]["_original"]
         modality = "CT" if str(first.SOPClassUID) in CT else "MR"

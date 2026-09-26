@@ -150,7 +150,7 @@ const main = async () => {
   });
 
   server.listen(port, "127.0.0.1", () => {
-    console.log(`GroundCheck site: http://localhost:${port}`);
+    console.log(`GroundCheckHealth site: http://localhost:${port}`);
   });
 };
 

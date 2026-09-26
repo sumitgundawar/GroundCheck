@@ -9,22 +9,22 @@ spec:
   groups:
     - name: groundcheck
       rules:
-        - alert: GroundCheckCriticalAlertFiring
+        - alert: GroundCheckHealthCriticalAlertFiring
           expr: max(groundcheck_alerts_firing{severity="critical", job="{{ include "groundcheck.fullname" . }}"}) > 0
           for: 2m
           labels: { severity: critical }
           annotations:
-            summary: "GroundCheck has a critical alert. See its Monitoring page."
-        - alert: GroundCheckDown
+            summary: "GroundCheckHealth has a critical alert. See its Monitoring page."
+        - alert: GroundCheckHealthDown
           expr: absent(up{job="{{ include "groundcheck.fullname" . }}"} == 1)
           for: 5m
           labels: { severity: critical }
           annotations:
-            summary: "No GroundCheck instance is being scraped."
-        - alert: GroundCheckSlowAnswers
+            summary: "No GroundCheckHealth instance is being scraped."
+        - alert: GroundCheckHealthSlowAnswers
           expr: histogram_quantile(0.95, sum(rate(groundcheck_question_duration_seconds_bucket{job="{{ include "groundcheck.fullname" . }}"}[15m])) by (le)) > 15
           for: 15m
           labels: { severity: warning }
           annotations:
-            summary: "95% of GroundCheck answers take more than 15 s."
+            summary: "95% of GroundCheckHealth answers take more than 15 s."
 {{- end }}

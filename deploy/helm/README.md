@@ -1,6 +1,6 @@
-# GroundCheck Helm chart
+# GroundCheckHealth Helm chart
 
-Runs GroundCheck on Kubernetes with the same hardening as the Docker Compose
+Runs GroundCheckHealth on Kubernetes with the same hardening as the Docker Compose
 deployment: a non-root, read-only container with no capabilities, probes on
 `/healthz/live` and `/healthz/ready`, and data on a persistent volume that
 uninstalling the chart never deletes.
@@ -54,7 +54,7 @@ example `--set env.OIDC_ISSUER=https://login.example.org`.
 | `persistence.size` | `20Gi` | The index, trained models, imaging series and release snapshots. |
 | `networkPolicy.enabled` | `false` | Allow traffic only from the ingress controller and Prometheus, and out only to DNS, the database and `networkPolicy.extraEgress`. |
 | `metrics.serviceMonitor.enabled` | `false` | Scrape `/metrics` with the Prometheus Operator, using `METRICS_TOKEN`. |
-| `metrics.prometheusRule.enabled` | `false` | Page on GroundCheck's critical alerts, slow answers, and no instance up. |
+| `metrics.prometheusRule.enabled` | `false` | Page on GroundCheckHealth's critical alerts, slow answers, and no instance up. |
 | `podDisruptionBudget.enabled` | `false` | Keep an instance up during node maintenance, with several replicas. |
 
 The chart refuses to render without a database Secret, and with several

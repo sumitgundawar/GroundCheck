@@ -2,7 +2,7 @@
   "name": "groundcheck-ui-tests",
   "private": true,
   "type": "module",
-  "description": "Browser journey through the GroundCheck app",
+  "description": "Browser journey through the GroundCheckHealth app",
   "scripts": {
     "test": "node journey.mjs",
     "postinstall": "playwright install --with-deps chromium"

@@ -36,7 +36,7 @@ from . import config
 #
 # Download sizes come from the Ollama registry manifests (sum of layer sizes)
 # and licences from the licence file each model ships with. Models whose
-# licence forbids commercial use are left out, since GroundCheck targets
+# licence forbids commercial use are left out, since GroundCheckHealth targets
 # clinical organisations. "quality" orders recommendations: higher is better
 # for grounded, JSON-structured answers.
 # --------------------------------------------------------------------------
@@ -158,7 +158,7 @@ def model_memory_budget(memory_gb: float, apple_silicon: bool, gpus: tuple[Gpu, 
     Apple silicon shares memory between CPU and GPU, and macOS lets the GPU use
     roughly two thirds of it. On NVIDIA the model must fit the largest GPU's
     own memory. Without a GPU, a model runs on the CPU in half of system memory,
-    leaving the rest for the operating system and GroundCheck."""
+    leaving the rest for the operating system and GroundCheckHealth."""
     if apple_silicon:
         return "apple-silicon", round(memory_gb * 0.65, 1)
     if gpus:
@@ -312,7 +312,7 @@ def pull(name: str) -> Iterator[dict]:
     {"status": str, "completed": int, "total": int} and finally {"status": "success"}.
     Raises OllamaError if the server is unreachable or reports an error."""
     if name not in _BY_NAME:
-        raise OllamaError(f"{name} is not in the GroundCheck model catalogue")
+        raise OllamaError(f"{name} is not in the GroundCheckHealth model catalogue")
     try:
         with _client(None) as c, c.stream("POST", "/api/pull", json={"model": name, "stream": True}) as r:
             if r.status_code != 200:

@@ -62,7 +62,7 @@ def _json(response: httpx.Response) -> list[dict]:
     if response.status_code == 204:
         return []
     if response.status_code in (401, 403):
-        raise PacsError("The PACS refused GroundCheck's credentials. Check DICOMWEB_AUTHORIZATION.")
+        raise PacsError("The PACS refused GroundCheckHealth's credentials. Check DICOMWEB_AUTHORIZATION.")
     if response.status_code >= 400:
         raise PacsError(f"The PACS returned an error ({response.status_code}).")
     try:
@@ -128,7 +128,7 @@ def retrieve_series(study_uid: str, series_uid: str) -> list[tuple[str, bytes]]:
         with _client(timeout=300.0) as client, client.stream(
                 "GET", path, headers={"Accept": 'multipart/related; type="application/dicom"; transfer-syntax=*'}) as r:
             if r.status_code in (401, 403):
-                raise PacsError("The PACS refused GroundCheck's credentials. Check DICOMWEB_AUTHORIZATION.")
+                raise PacsError("The PACS refused GroundCheckHealth's credentials. Check DICOMWEB_AUTHORIZATION.")
             if r.status_code == 404:
                 raise PacsError("The PACS has no such series.")
             if r.status_code >= 400:
@@ -159,7 +159,7 @@ def store(instances: list[bytes], study_uid: str | None = None) -> dict:
     except httpx.HTTPError as exc:
         raise PacsError("The PACS couldn't be reached.") from exc
     if response.status_code in (401, 403):
-        raise PacsError("The PACS refused GroundCheck's credentials. Check DICOMWEB_AUTHORIZATION.")
+        raise PacsError("The PACS refused GroundCheckHealth's credentials. Check DICOMWEB_AUTHORIZATION.")
     if response.status_code == 409 or response.status_code >= 400:
         raise PacsError(f"The PACS didn't store the report ({response.status_code}).")
     try:

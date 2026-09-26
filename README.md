@@ -1,5 +1,5 @@
 ---
-title: GroundCheck
+title: GroundCheckHealth
 emoji: 🩺
 colorFrom: gray
 colorTo: green
@@ -8,7 +8,7 @@ app_port: 7860
 pinned: false
 ---
 
-# GroundCheck
+# GroundCheckHealth
 
 **Grounded answers, or none at all.**
 
@@ -20,7 +20,7 @@ pinned: false
 [Report an issue](https://github.com/sumitgundawar/GroundCheck/issues/new/choose) ·
 [Contributing](CONTRIBUTING.md)
 
-GroundCheck is an open-source clinical-style retrieval application that answers
+GroundCheckHealth is an open-source clinical-style retrieval application that answers
 questions only from a trusted set of source documents, and refuses when it
 cannot ground its response. It is a demonstration of trustworthy AI
 engineering: the model is the easy part, and everything around it (retrieval,
@@ -30,12 +30,12 @@ actual work.
 The single idea it makes visible: **a system that refuses to answer when it is
 not sure is safer than one that always answers.**
 
-> **Not a medical device and not medical advice.** GroundCheck is research and
+> **Not a medical device and not medical advice.** GroundCheckHealth is research and
 > engineering software. It has not been clinically validated or cleared by any
 > regulator. All demo data is synthetic: every condition, medication, lab
 > marker, dosage, and procedure is fictional.
 
-![The GroundCheck app: a sidebar of pages and the Ask page](site/public/screenshots/ask.webp)
+![The GroundCheckHealth app: a sidebar of pages and the Ask page](site/public/screenshots/ask.webp)
 
 ---
 
@@ -47,7 +47,7 @@ Requires Python 3.12 (3.11 also works) or Docker. No API key and no GPU needed.
 
 ```bash
 git clone https://github.com/sumitgundawar/GroundCheck.git
-cd GroundCheck
+cd GroundCheckHealth
 python3.12 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -61,14 +61,14 @@ Open http://localhost:8000.
 
 ```bash
 git clone https://github.com/sumitgundawar/GroundCheck.git
-cd GroundCheck
+cd GroundCheckHealth
 docker build -t groundcheck .
 docker run -p 7860:7860 groundcheck
 ```
 
 Open http://localhost:7860. The image builds the index and runs the evaluation
 while it builds, so it starts instantly. This run keeps nothing: it is for
-trying GroundCheck out. To keep data, see
+trying GroundCheckHealth out. To keep data, see
 [A single container, without Compose](docs/on-premises.md#a-single-container-without-compose),
 or use Docker Compose, below.
 
@@ -118,7 +118,7 @@ Full instructions, including configuration and Windows, are in
 
 ## What it does
 
-You ask a clinical-style question. GroundCheck retrieves the most relevant
+You ask a clinical-style question. GroundCheckHealth retrieves the most relevant
 passages from its trusted corpus, asks a language model to answer using only
 those passages, and then runs a series of deterministic checks before it shows
 anything. If every check passes, you get an answer with citations. If any check
@@ -343,7 +343,7 @@ are never changed.
 
 ## Local AI models
 
-GroundCheck can draft answers with an open-source model running on your own
+GroundCheckHealth can draft answers with an open-source model running on your own
 machine through [Ollama](https://ollama.com). No API key is needed and nothing
 is sent to the cloud. The model only drafts: the same deterministic checks
 decide what is shown, and if the model is unavailable or fails, answers fall
@@ -373,7 +373,7 @@ one without the dashboard: `ollama pull llama3.2:3b`, then
 
 Downloading and switching models changes the server for everyone. With
 sign-in required, only admins can do it. Without sign-in, it's allowed only
-from the machine running GroundCheck; set `ADMIN_ACCESS=all` to allow it from
+from the machine running GroundCheckHealth; set `ADMIN_ACCESS=all` to allow it from
 anywhere, or `none` to lock the choice.
 
 Small local models are slower and less capable than large cloud models. Expect
@@ -384,7 +384,7 @@ when a small model drafts claims the grounding check can't verify.
 
 ## Accounts and databases
 
-By default GroundCheck runs as an open demo: no sign-in, and everything is
+By default GroundCheckHealth runs as an open demo: no sign-in, and everything is
 stored in a SQLite file at `data/groundcheck.db`, created on first run.
 
 ### Requiring sign-in
@@ -399,7 +399,7 @@ itself, and each user has a role:
 | `reviewer` | Also read every audit record, work the review queue and read reports |
 | `admin` | Also manage users, documents, local AI models and the hazard log |
 
-Create the first admin from the machine running GroundCheck, either in the
+Create the first admin from the machine running GroundCheckHealth, either in the
 dashboard (it offers this while no users exist) or on the command line:
 
 ```bash
@@ -417,10 +417,10 @@ passed as arguments.
 
 ### Single sign-on
 
-GroundCheck signs people in through your identity provider with OpenID
+GroundCheckHealth signs people in through your identity provider with OpenID
 Connect: Microsoft Entra ID, Okta, Google Workspace, Auth0, Keycloak, Ping or
-ADFS. Register GroundCheck as a web application with the redirect address
-`https://<your GroundCheck>/api/auth/sso/callback`, then set:
+ADFS. Register GroundCheckHealth as a web application with the redirect address
+`https://<your GroundCheckHealth>/api/auth/sso/callback`, then set:
 
 ```bash
 AUTH_REQUIRED=true
@@ -429,8 +429,8 @@ OIDC_CLIENT_ID=<application id>
 OIDC_CLIENT_SECRET=<client secret>
 OIDC_PROVIDER_NAME="NHS Trust account"
 OIDC_ROLES_CLAIM=roles            # or groups
-OIDC_ADMIN_VALUES=GroundCheck.Admin
-OIDC_REVIEWER_VALUES=GroundCheck.Reviewer
+OIDC_ADMIN_VALUES=GroundCheckHealth.Admin
+OIDC_REVIEWER_VALUES=GroundCheckHealth.Reviewer
 OIDC_DEFAULT_ROLE=clinician       # or none, to refuse people without a mapped role
 OIDC_ALLOWED_DOMAINS=nhs.net      # optional
 OIDC_REQUIRE_MFA=true             # optional: refuse sign-ins without MFA
@@ -552,7 +552,7 @@ Import your organisation's guidelines, formularies and protocols in the
 dashboard's **Documents** panel, or through the API.
 
 1. **Upload** a PDF, Word (.docx), HTML, Markdown or text file, up to 25 MB,
-   with an owner and optional effective and expiry dates. GroundCheck splits it
+   with an owner and optional effective and expiry dates. GroundCheckHealth splits it
    into sections using the document's own headings, so every citation keeps
    its heading. Uploading a new file with the same title creates the next
    version.
@@ -560,7 +560,7 @@ dashboard's **Documents** panel, or through the API.
    required, the person who uploaded a document can't approve it. Approving a
    version retires the previous one, and the search index rebuilds in the
    background, embedding only new text.
-3. **Evaluate** it. GroundCheck generates a question for each section, which
+3. **Evaluate** it. GroundCheckHealth generates a question for each section, which
    must be answered citing the document, and the same question about an
    invented document, which must be refused.
 
@@ -568,7 +568,7 @@ An approved document is cited only between its effective and expiry dates,
 checked on every search. **Retire** a document to stop citing it. Set
 `INCLUDE_DEMO_CORPUS=false` to answer only from your own documents.
 
-Scanned PDFs need OCR first: GroundCheck reads the text layer only. Never put
+Scanned PDFs need OCR first: GroundCheckHealth reads the text layer only. Never put
 real patient data in a document.
 
 The thresholds were tuned on the synthetic corpus, so re-tune
@@ -619,7 +619,7 @@ breastfeeding, allergies, current medicines, conditions and lab results. No
 names or record numbers: the API rejects fields it doesn't know. Through the
 API, send a `patient` object with `POST /api/ask`.
 
-For every formulary medicine named in the question or the answer, GroundCheck
+For every formulary medicine named in the question or the answer, GroundCheckHealth
 checks:
 
 | Check | Refuses when | Warns when |
@@ -651,13 +651,13 @@ if any scenario that must be refused is answered.
 
 ## EHR integration
 
-GroundCheck works with electronic health records through HL7 FHIR R4, SMART
+GroundCheckHealth works with electronic health records through HL7 FHIR R4, SMART
 on FHIR and CDS Hooks. Admins see the addresses to register and a CDS console
 on the **EHR integration** page.
 
 ### Reading a patient
 
-From a patient's FHIR record GroundCheck reads age and sex, the latest eGFR,
+From a patient's FHIR record GroundCheckHealth reads age and sex, the latest eGFR,
 serum creatinine, weight, potassium, sodium, INR, platelets, ALT, QTc and
 pregnancy status (by LOINC, with units converted), active allergies,
 medicines and conditions. Names, identifiers and contact details are never
@@ -665,9 +665,9 @@ copied. Results that are old (`FHIR_LAB_MAX_AGE_DAYS`), in units it can't
 convert, or implausible are flagged or left out. The patient is kept,
 encrypted, for `EHR_CONTEXT_MINUTES` for that browser.
 
-- **SMART on FHIR launch.** Register GroundCheck with your EHR using the launch
-  URL `https://<your GroundCheck>/api/ehr/launch` and redirect URL
-  `https://<your GroundCheck>/api/ehr/callback`, then set `SMART_CLIENT_ID`
+- **SMART on FHIR launch.** Register GroundCheckHealth with your EHR using the launch
+  URL `https://<your GroundCheckHealth>/api/ehr/launch` and redirect URL
+  `https://<your GroundCheckHealth>/api/ehr/callback`, then set `SMART_CLIENT_ID`
   and `SMART_ALLOWED_ISSUERS` (your EHR's FHIR base URL). EHR launch and
   standalone launch both use PKCE, and only allowed issuers can launch.
 - **Open FHIR servers.** For development, list servers in `FHIR_OPEN_SERVERS`
@@ -684,7 +684,7 @@ server-side and never sent to the browser.
 
 ### CDS Hooks
 
-The discovery endpoint is `https://<your GroundCheck>/cds-services`. The
+The discovery endpoint is `https://<your GroundCheckHealth>/cds-services`. The
 `order-select` and `order-sign` services check each draft `MedicationRequest`
 against the prefetched patient and return a card per finding: **critical** for
 unsafe orders (with override reasons), **warning** and **info** otherwise, each
@@ -695,7 +695,7 @@ naming its formulary rule. Calls must carry a JWT from a trusted EHR:
 **Read this before installing it anywhere.** Software that receives a draft
 medication order and returns severity-graded cards into a prescriber's workflow
 is clinical decision support, and in the UK and EU that is a regulated medical
-device whatever this README says about it. GroundCheck has no such clearance.
+device whatever this README says about it. GroundCheckHealth has no such clearance.
 DCB0129 and DCB0160 obligations fall on the manufacturer and the deploying
 organisation, and nothing here discharges them.
 
@@ -739,7 +739,7 @@ images, on this machine's hardware, and saves it to the **Model library**.
    validation stops improving, and it can be cancelled. Training runs in its
    own process, so the app stays responsive.
 
-Every saved model refuses to guess, like the rest of GroundCheck:
+Every saved model refuses to guess, like the rest of GroundCheckHealth:
 
 - **Confidence threshold.** Chosen on validation images as the lowest
   confidence at which answered images are at least `MODEL_TARGET_ACCURACY`
@@ -858,7 +858,7 @@ from whole series the way they'll be analysed, and local validation.
 
 ## Speed, caching and hardware
 
-GroundCheck sizes itself to the machine it runs on, and does no work twice.
+GroundCheckHealth sizes itself to the machine it runs on, and does no work twice.
 
 **Where work runs.** A question's embedding runs on the CPU: it takes a few
 milliseconds, and it's safe to run from many requests at once. Batch work —
@@ -1008,7 +1008,7 @@ were refused, what reviewers found and how quickly, every incident with its
 harm and whether a regulator decision is needed, the operational alerts that
 fired, and which knowledge releases went live. It ends with the actions to
 work through and a line for a quality or clinical safety lead to sign.
-Regulated use expects this at regular intervals; GroundCheck gathers the
+Regulated use expects this at regular intervals; GroundCheckHealth gathers the
 evidence, and a qualified person reviews and signs it.
 
 ---
@@ -1046,9 +1046,9 @@ The only one you may want to set is `GROQ_API_KEY`.
 | `RATE_LIMIT_PER_MINUTE` | `30` | Requests per minute, per client IP. |
 | `AUDIT_PERSIST` | `true` | Persist the audit trail to disk. |
 | `FHIR_OPEN_SERVERS` | _empty_ | FHIR servers a patient can be loaded from without SMART, comma-separated. For development. |
-| `SMART_CLIENT_ID` | _empty_ | GroundCheck's client ID registered with the EHR. |
+| `SMART_CLIENT_ID` | _empty_ | GroundCheckHealth's client ID registered with the EHR. |
 | `SMART_CLIENT_SECRET` | _empty_ | The client secret, for confidential clients. |
-| `SMART_ALLOWED_ISSUERS` | _empty_ | FHIR base URLs of EHRs allowed to launch GroundCheck, comma-separated. |
+| `SMART_ALLOWED_ISSUERS` | _empty_ | FHIR base URLs of EHRs allowed to launch GroundCheckHealth, comma-separated. |
 | `SMART_WRITE_NOTES` | `false` | Ask for write permission and let clinicians save reviewed answers as notes. |
 | `EHR_CONTEXT_MINUTES` | `60` | How long a patient loaded from an EHR is kept. |
 | `FHIR_LAB_MAX_AGE_DAYS` | `90` | Lab results older than this are flagged as possibly out of date. |
@@ -1162,7 +1162,7 @@ its smoke test run weekly, and on demand from the Actions tab.
 ### The browser journey
 
 `tests/ui/journey.mjs` drives a real browser through the app against a running
-GroundCheck: it asks a question the sources answer and checks the citations
+GroundCheckHealth: it asks a question the sources answer and checks the citations
 line up with the source cards, asks about a medicine that is in no source and
 checks the refusal names it, opens the trace and the audit record, loads a
 five-year-old patient and checks the dose is refused while an informational
@@ -1210,7 +1210,7 @@ audit records and the hash chain all came back.
 
 `scripts/stress_eval.py` generates 265,778 questions and patient scenarios,
 with the expected decision taken from the corpus and the formulary, never from
-GroundCheck's own code. Any answer to a question that must be refused fails
+GroundCheckHealth's own code. Any answer to a question that must be refused fails
 the run.
 
 | Family | Cases | Must |
@@ -1286,7 +1286,7 @@ bill of materials and a licence list for every build; see
 ## Deployment
 
 **In a hospital or clinic network**, use the hardened stack in `deploy/`
-(GroundCheck, PostgreSQL and HTTPS, with no internet access at runtime) and
+(GroundCheckHealth, PostgreSQL and HTTPS, with no internet access at runtime) and
 follow [docs/on-premises.md](docs/on-premises.md): installation, single
 sign-on, keys, scheduled jobs, backups, upgrades and a hardening checklist.
 
@@ -1379,7 +1379,7 @@ In the spirit of the demo, these are real and worth knowing:
   abstain on most real scans. They show the workflow, not diagnostic
   performance.
 - The safety case summary and hazard log are tools for your own clinical
-  safety process. GroundCheck is not a certified medical device.
+  safety process. GroundCheckHealth is not a certified medical device.
 
 ---
 
@@ -1395,7 +1395,7 @@ problems it fixed.
 Use the issue forms at
 [github.com/sumitgundawar/GroundCheck/issues/new/choose](https://github.com/sumitgundawar/GroundCheck/issues/new/choose):
 
-- **Unsafe answer**: GroundCheck answered a question it should have refused.
+- **Unsafe answer**: GroundCheckHealth answered a question it should have refused.
   This is the most valuable report you can file. Include the exact question,
   the answer, and the audit ID.
 - **Bug report**: something is broken, or a question was wrongly refused.
@@ -1424,7 +1424,7 @@ Please don't report vulnerabilities in public issues. Follow
 
 ## License
 
-[MIT](LICENSE). You may use, modify, and distribute GroundCheck, including
+[MIT](LICENSE). You may use, modify, and distribute GroundCheckHealth, including
 commercially. Any clinical use, and the regulatory approvals and validation it
 requires, is your responsibility.
 
