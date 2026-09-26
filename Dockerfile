@@ -15,8 +15,15 @@ COPY --chown=user requirements.txt .
 # training on NVIDIA GPUs build with
 #   --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu124
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+# Pinned. These were installed unpinned, so two builds a month apart shipped
+# different versions of the library the imaging models run on -- and the
+# evaluation summary baked into this image was produced by whichever one the
+# build happened to get.
+ARG TORCH_VERSION=2.14.0
+ARG TORCHVISION_VERSION=0.29.0
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir --index-url "$TORCH_INDEX_URL" torch torchvision \
+    && pip install --no-cache-dir --index-url "$TORCH_INDEX_URL" \
+       "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" \
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir "psycopg[binary]==3.*" "pymysql==1.*"
 

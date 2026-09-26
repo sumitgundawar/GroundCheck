@@ -66,14 +66,27 @@ async def lifespan(_: FastAPI):
             checks.cancel()
 
 
+def _evaluate_alerts_once() -> None:
+    """One pass of the alert rules, in whichever replica gets the lock.
+
+    Every replica runs this loop, and nothing stopped two of them evaluating
+    the same rules at the same time: both insert a firing alert for the rule
+    and both post to the webhook. A replica that cannot take the lock skips
+    the round, which costs nothing -- the next pass is seconds away.
+    """
+    with db.try_advisory_lock(*db.ALERT_LOCK) as held:
+        if held:
+            monitoring.evaluate()
+
+
 async def _alert_loop() -> None:
     """Evaluate alert rules in the background, starting a minute after startup."""
     await asyncio.sleep(min(60, config.ALERT_INTERVAL_SECONDS))
     while True:
         try:
-            await run_in_threadpool(monitoring.evaluate)
+            await run_in_threadpool(_evaluate_alerts_once)
         except Exception:  # noqa: BLE001 - keep checking
-            logging.getLogger("groundcheck").exception("Alert evaluation failed")
+            logging.getLogger("groundcheckhealth").exception("Alert evaluation failed")
         await asyncio.sleep(config.ALERT_INTERVAL_SECONDS)
 
 

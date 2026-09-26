@@ -693,6 +693,51 @@ def migrate() -> None:
                 connection.execute(text("SELECT RELEASE_LOCK('groundcheck_migrate')"))
 
 
+@contextmanager
+def try_advisory_lock(name: str, key: int) -> Iterator[bool]:
+    """Take a cross-process lock if it is free, yielding whether it was taken.
+
+    Unlike the lock around migrations this one never waits: a caller that
+    cannot take it skips this round. That suits periodic background work,
+    where a second replica doing the same pass a moment later is not useful
+    and, for alerting, actively harmful -- two replicas evaluating the same
+    rules both insert a firing alert and both post to the webhook, and
+    duplicate pages are how a team learns to ignore an alerting system.
+    """
+    if not ready():
+        yield False
+        return
+    eng = engine()
+    dialect = eng.dialect.name
+    if dialect == "sqlite":
+        # A SQLite database is a file on one machine, so there is no second
+        # replica to coordinate with.
+        yield True
+        return
+    connection = eng.connect()
+    held = False
+    try:
+        if dialect == "postgresql":
+            held = bool(connection.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": key}).scalar())
+        elif dialect in ("mysql", "mariadb"):
+            held = connection.execute(text("SELECT GET_LOCK(:n, 0)"), {"n": name}).scalar() == 1
+        else:
+            held = True
+        yield held
+    finally:
+        try:
+            if held and dialect == "postgresql":
+                connection.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": key})
+            elif held and dialect in ("mysql", "mariadb"):
+                connection.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": name})
+            connection.commit()
+        finally:
+            connection.close()
+
+
+ALERT_LOCK = ("groundcheck_alerts", 724315002)
+
+
 _ready = False
 
 
