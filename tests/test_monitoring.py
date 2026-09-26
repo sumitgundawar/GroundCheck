@@ -132,7 +132,14 @@ def test_a_broken_audit_chain_is_critical(mon, monkeypatch):
     assert monitoring.evaluate()["fired"] == []
     with db.session() as s:
         s.query(AuditRecord).filter(AuditRecord.audit_id == "abcd1234").one().total_ms = 1
-    monitoring._last_chain_check["at"] = 0.0
+    # Clear the cached result, not just its timestamp. The gate re-verifies
+    # when time.monotonic() - at exceeds the check interval, and monotonic()
+    # counts from boot, so setting at=0.0 only forces a re-check on a machine
+    # that has been up longer than ALERT_CHAIN_CHECK_MINUTES (six hours by
+    # default). On a freshly booted machine -- or a CI runner -- the stale
+    # "ok" was reused and this test failed for a reason nothing to do with
+    # the audit chain.
+    monitoring._last_chain_check.update(at=0.0, result=None)
     assert "audit_chain" in monitoring.evaluate()["fired"]
     with db.session() as s:
         alert = s.query(Alert).filter(Alert.rule == "audit_chain").one()

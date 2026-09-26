@@ -91,9 +91,21 @@ class RateLimiter:
         self.limit = limit_per_minute
         self._by_client: dict[str, deque[float]] = {}
 
+    # Buckets are dropped once they fall outside the window, so the dict holds
+    # only callers seen in the last minute. It used to keep one deque per
+    # distinct client id for the lifetime of the process, which grows without
+    # bound on a public instance.
+    _SWEEP_EVERY = 256
+
     def allow(self, client_id: str = "global", now: float | None = None) -> bool:
         now = now if now is not None else time.monotonic()
         cutoff = now - 60.0
+        self._since_sweep = getattr(self, "_since_sweep", 0) + 1
+        if self._since_sweep >= self._SWEEP_EVERY:
+            self._since_sweep = 0
+            for stale in [c for c, ev in self._by_client.items() if not ev or ev[-1] < cutoff]:
+                if stale != client_id:
+                    del self._by_client[stale]
         events = self._by_client.setdefault(client_id, deque())
         while events and events[0] < cutoff:
             events.popleft()

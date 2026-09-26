@@ -81,8 +81,15 @@ class LocalStore:
         if k <= 0:
             return []
         scores = self._matrix @ np.asarray(query, dtype="float32")
-        # Stable order for equal scores: lower row first.
-        top = np.lexsort((np.arange(len(scores)), -scores))[:k]
+        # Only the k best are wanted, so partition around the kth (linear) and
+        # order those, instead of sorting every passage in the corpus to throw
+        # all but eight of them away. Stable order for equal scores: lower row
+        # first, which is why both steps carry the row index as a second key.
+        if k >= len(scores):
+            top = np.lexsort((np.arange(len(scores)), -scores))
+        else:
+            part = np.argpartition(-scores, k - 1)[:k]
+            top = part[np.lexsort((part, -scores[part]))]
         return [(int(r), float(scores[r])) for r in top]
 
     def vectors(self, rows: list[int] | None = None) -> np.ndarray:

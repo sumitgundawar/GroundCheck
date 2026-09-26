@@ -5,6 +5,7 @@ in llm.py is corroboration only; the checks here are authoritative."""
 
 from __future__ import annotations
 
+from functools import lru_cache
 import re
 
 
@@ -195,7 +196,12 @@ _ENDINGS = ("", "s", "es", "ed", "d", "ing", "ly", "ment", "ments", "al", "ally"
             "er", "ers", "ive", "ity", "ies", "y", "ic", "ical", "ness", "ance", "ence", "ant", "ent")
 
 
+@lru_cache(maxsize=100_000)
 def _stems(word: str) -> set[str]:
+    # Called for every word of every retrieved passage, twice over: once while
+    # reporting coverage and again while scoping sources. The corpus vocabulary
+    # repeats heavily, and the answer is a pure function of the word, so the
+    # work is done once per distinct word instead of once per occurrence.
     out = {word}
     for ending in _ENDINGS:
         if ending and word.endswith(ending) and len(word) - len(ending) >= 3:

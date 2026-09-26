@@ -383,7 +383,14 @@ def search(query: str, k: int | None = None,
     depth = max(_HYBRID_DEPTH, k * 25)
     nearest = dict(state.store.search(query_vec, depth))
     keyword = state.lexical.scores(query)
-    by_keyword = [int(i) for i in np.argsort(-keyword)[:depth] if keyword[i] > 0]
+    # Same reason as the vector store: take the best `depth` without ordering
+    # every score in the corpus.
+    if depth >= len(keyword):
+        order = np.argsort(-keyword)
+    else:
+        part = np.argpartition(-keyword, depth - 1)[:depth]
+        order = part[np.argsort(-keyword[part])]
+    by_keyword = [int(i) for i in order if keyword[i] > 0]
     missing = [row for row in by_keyword if row not in nearest]
     if missing:
         for row, vec in zip(missing, state.store.vectors(missing)):
@@ -541,10 +548,16 @@ def topics_mentioned(query: str) -> dict[str, str]:
 
 
 def corpus_text_for(source_id: str) -> str | None:
-    for record in _state().metadata:
-        if record["id"] == source_id:
-            return record["text"]
-    return None
+    # Called once per claim per cited source while checking grounding, and
+    # again in the judge loop. Walking the whole corpus each time made
+    # answering slower the more documents a site had approved.
+    state = _state()
+    by_id = state.cache.get("by_id")
+    if by_id is None:
+        by_id = {record["id"]: record for record in state.metadata}
+        state.cache["by_id"] = by_id
+    record = by_id.get(source_id)
+    return record["text"] if record else None
 
 
 def all_metadata() -> list[dict]:
