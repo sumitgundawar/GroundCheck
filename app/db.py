@@ -696,6 +696,7 @@ def migrate() -> None:
 _ready = False
 
 
+_last_error: str | None = None
 def ready() -> bool:
     """Migrate once, on first use. Returns False (and the app runs without
     persistence) if the database can't be reached or written."""
@@ -707,6 +708,19 @@ def ready() -> bool:
             migrate()
         _ready = True
     except Exception as exc:  # noqa: BLE001 - any failure means no database
-        log.warning("Database unavailable, continuing without persistence: %s", exc)
+        # Serving continues, but nothing is written down: no audit record, no
+        # review queue, no alerts. That is a state an operator has to be able
+        # to see, so the reason is kept for /api/health and the alert rule
+        # rather than living only in one line of stderr.
+        global _last_error
+        _last_error = f"{type(exc).__name__}: {exc}"
+        log.warning("Database unavailable, continuing without persistence: %s", exc,
+                    extra={"database": "unavailable"})
         _ready = False
     return _ready
+
+
+def state() -> dict:
+    """Whether questions are being recorded, and why not when they are not."""
+    return {"ready": bool(_ready), "configured": bool(config.DATABASE_URL),
+            "error": None if _ready else _last_error}

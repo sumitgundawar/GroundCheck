@@ -21,8 +21,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from . import (
-    audit, auth, config, db, encryption, governance, integrity, llm, local_ai, monitoring, pipeline, releases, retention,
-    retrieval, sites, sso,
+    audit, auth, config, db, encryption, governance, integrity, llm, local_ai, logging_setup, monitoring, pipeline,
+    releases, retention, retrieval, sites, sso,
 )
 from .schemas import AskRequest, AskResponse, Settings
 
@@ -31,6 +31,9 @@ WEB_DIR = config.ROOT_DIR / "web"
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Before anything else can log, so startup warnings are formatted and
+    # timestamped rather than going out through Python's handler of last resort.
+    logging_setup.configure()
     # Refuse to start with a malformed encryption or signing key, rather than
     # run without the protection that was asked for.
     encryption.keyring()
@@ -566,13 +569,21 @@ def corpus_map() -> JSONResponse:
 
 @app.get("/api/health")
 def health() -> JSONResponse:
-    corpus = retrieval.all_metadata()
     provider = llm.active_provider()
+    database = db.state()
+    backend = audit.store.backend()
+    # An instance that is answering but writing nothing down is not healthy,
+    # whatever it can still do. "ok" used to be unconditional, so the one state
+    # an operator most needs to know about looked exactly like a good one.
+    recording = backend == "database" or (backend == "file" and not database["configured"])
     return JSONResponse({
-        "status": "ok",
+        "status": "ok" if recording else "degraded",
         "llm": provider is not None,
         "provider": provider,
-        "corpus": len(corpus),
+        "corpus": retrieval.corpus_size(),
+        "database": database,
+        "audit_backend": backend,
+        "recording": recording,
     })
 
 

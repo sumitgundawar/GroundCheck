@@ -15,6 +15,17 @@ spec:
           labels: { severity: critical }
           annotations:
             summary: "GroundCheckHealth has a critical alert. See its Monitoring page."
+        - alert: GroundCheckHealthNotRecording
+          expr: min(groundcheck_recording{job="{{ include "groundcheck.fullname" . }}"}) == 0
+          for: 2m
+          labels: { severity: critical }
+          annotations:
+            summary: "GroundCheckHealth is answering but not recording."
+            description: >-
+              The instance is serving questions with no durable audit trail behind them:
+              no audit record, no review queue, no alerts stored. Check the database.
+              This cannot be raised as an in-app alert, because in-app alerts are stored
+              in the database that is unavailable.
         - alert: GroundCheckHealthDown
           expr: absent(up{job="{{ include "groundcheck.fullname" . }}"} == 1)
           for: 5m

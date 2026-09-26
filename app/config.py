@@ -258,6 +258,13 @@ RELEASE_CHECK_ANSWERABLE = _get("RELEASE_CHECK_ANSWERABLE", "false").lower() in 
 RELEASES_KEEP = _get_int("RELEASES_KEEP", 10)
 
 # --- Monitoring and alerts (see app/monitoring.py) ---
+# --- Logging ---------------------------------------------------------------
+# Without configuration Python logs WARNING and above through its handler of
+# last resort, with no timestamp and no level. LOG_FORMAT=json emits one JSON
+# object per line for a log shipper.
+LOG_LEVEL = _get("LOG_LEVEL", "INFO")
+LOG_FORMAT = _get("LOG_FORMAT", "plain")
+
 VERSION = "1.0.0"
 # A name for this instance, included in alert notifications.
 INSTANCE_NAME = _get("INSTANCE_NAME", "") or __import__("socket").gethostname()

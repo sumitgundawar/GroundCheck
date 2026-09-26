@@ -116,6 +116,7 @@ def _finish(
         kind = (extras.get("provider") or {}).get("kind") if llm_used else None
         monitoring.observe_answer(decision, response.total_ms,
                                   "local" if kind == "local" else "cloud" if llm_used else "extractive")
+        monitoring.observe_stages(decision, trace)
     if decision == "refuse" and extras.get("review", True) and audit.store.backend() == "database":
         governance.record_refusal(audit_id, str(extras.get("redacted_query", "")), refused_reason or "", site_id)
     return response

@@ -169,3 +169,46 @@ def test_the_overview_says_what_this_instance_runs_on(mon):
     assert instance["embed_batch"] >= 32 and instance["web_workers"] >= 1
     assert instance["answer_cache_seconds"] == config.ANSWER_CACHE_SECONDS
     assert "passages_cached" in instance and instance["version"] == config.VERSION
+
+
+def test_refusals_are_counted_by_the_stage_that_stopped_them(mon):
+    """Prometheus could say how often the system refused, but never which
+    check was doing the refusing -- the question an operator asks first when a
+    release changes the answer rate."""
+    from app.schemas import TraceStep
+
+    monitoring.reset()
+    trace = [TraceStep(name="pii redaction", status="pass", detail="", ms=1),
+             TraceStep(name="source coverage", status="fail", detail="not in any source", ms=2),
+             TraceStep(name="generate", status="skip", detail="not reached", ms=0),
+             TraceStep(name="decision", status="fail", detail="REFUSE", ms=0)]
+    monitoring.observe_stages("refuse", trace)
+    out = monitoring.render()
+
+    assert 'groundcheck_refusals_total{stage="source coverage"} 1' in out
+    assert 'groundcheck_pipeline_stage_seconds_count{stage="source coverage"} 1' in out
+    # A stage that was never reached reports 0 ms. Timing it would pull that
+    # stage's latency toward zero in proportion to how often the run stopped
+    # earlier, so "how long does generate take" could not be answered.
+    assert 'groundcheck_pipeline_stage_seconds_count{stage="generate"}' not in out
+    # An answered question adds no refusal.
+    monitoring.observe_stages("answer", [TraceStep(name="generate", status="pass", detail="", ms=5)])
+    assert 'groundcheck_refusals_total{stage="source coverage"} 1' in monitoring.render()
+
+
+def test_an_instance_answering_without_recording_says_so(mon, monkeypatch):
+    """Serving continues when the database is unavailable, with no audit
+    record behind any answer. Every other gauge is computed from the database,
+    so they all vanished exactly then, and the state looked like a quiet
+    instance. This one is emitted whatever the database is doing."""
+    from app import audit
+
+    assert "groundcheck_recording 1" in monitoring.render()
+    assert mon.get("/api/health").json()["status"] == "ok"
+
+    monkeypatch.setattr(db, "ready", lambda: False)
+    monkeypatch.setattr(audit.store, "backend", lambda: None)
+
+    assert "groundcheck_recording 0" in monitoring.render()
+    body = mon.get("/api/health").json()
+    assert body["status"] == "degraded" and body["recording"] is False

@@ -87,6 +87,25 @@ def observe_answer(decision: str, milliseconds: int, drafted_by: str) -> None:
     _observe("groundcheck_question_duration_seconds", (("decision", decision),), milliseconds / 1000)
 
 
+def observe_stages(decision: str, trace) -> None:
+    """Which stage stopped the run, and how long each one took.
+
+    The pipeline already works both of these out for the trace it shows the
+    user, but neither left the process, so Prometheus could say how often the
+    system refused and never which check was doing the refusing — the question
+    an operator actually asks after a release changes the answer rate.
+    """
+    for step in trace:
+        # A stage that was never reached reports 0 ms. Counting those would
+        # pull every stage's latency toward zero in proportion to how often
+        # the run stopped earlier, so only stages that actually ran are timed.
+        if step.name != "decision" and step.status != "skip":
+            _observe("groundcheck_pipeline_stage_seconds", (("stage", step.name),), (step.ms or 0) / 1000)
+    if decision != "answer":
+        stopped = next((s.name for s in trace if s.status == "fail" and s.name != "decision"), "unknown")
+        _inc("groundcheck_refusals_total", (("stage", stopped),))
+
+
 def observe_imaging(status: str) -> None:
     _inc("groundcheck_imaging_analyses_total", (("status", status),))
 
@@ -115,6 +134,8 @@ HELP = {
     "groundcheck_questions_total": ("counter", "Questions answered or refused."),
     "groundcheck_question_duration_seconds": ("histogram", "Time to answer or refuse a question."),
     "groundcheck_imaging_analyses_total": ("counter", "Imaging analyses by outcome."),
+    "groundcheck_refusals_total": ("counter", "Refusals by the stage that stopped the run."),
+    "groundcheck_pipeline_stage_seconds": ("histogram", "Time spent in each pipeline stage."),
 }
 
 
@@ -156,10 +177,21 @@ def render() -> str:
 
 
 def _gauges() -> dict:
+    from . import audit
     from .db import Alert, ReviewCase
 
+    # Emitted whatever the database is doing. Every other gauge here needs a
+    # working database to compute, so they all disappeared at exactly the
+    # moment something had gone wrong -- leaving the one state an operator
+    # most needs to alert on indistinguishable from a quiet instance.
+    backend = audit.store.backend()
+    configured = bool(config.DATABASE_URL)
+    recording = int(backend == "database" or (backend == "file" and not configured))
+    base = {"groundcheck_recording": (
+        "1 when questions are written to a durable audit trail, 0 when the instance "
+        "is answering without recording anything.", recording)}
     if not db.ready():
-        return {}
+        return base
     now = db.utcnow()
     with db.session() as s:
         open_cases = s.scalar(select(func.count(ReviewCase.id)).where(ReviewCase.status == "open")) or 0
@@ -168,6 +200,7 @@ def _gauges() -> dict:
         firing = dict(s.execute(select(Alert.severity, func.count(Alert.id))
                                 .where(Alert.status == "firing").group_by(Alert.severity)).all())
     return {
+        **base,
         "groundcheck_review_cases_open": ("Open review cases.", open_cases),
         "groundcheck_review_cases_overdue": ("Open review cases past their due date.", overdue),
         "groundcheck_alerts_firing": ("Alerts firing, by severity.",

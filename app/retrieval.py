@@ -564,6 +564,12 @@ def all_metadata() -> list[dict]:
     return list(_state().metadata)
 
 
+def corpus_size() -> int:
+    """How many passages are indexed. The health probe wants the number, not a
+    copy of every passage in the corpus, and it is polled continuously."""
+    return len(_state().metadata)
+
+
 # --------------------------------------------------------------------------
 # Corpus map: a 2D PCA projection of every document embedding, plus aggregate
 # statistics. Computed once and cached so the endpoint is instant.

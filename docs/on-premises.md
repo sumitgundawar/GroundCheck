@@ -269,6 +269,14 @@ machine and copy the Ollama data volume across.
 - [ ] `DATA_ENCRYPTION_KEYS` and `AUDIT_SIGNING_KEYS` set, with copies in a secrets manager
 - [ ] `GROQ_API_KEY` empty, unless a cloud model has been approved by information governance
 - [ ] `INCLUDE_DEMO_CORPUS=false`, so only your approved documents are cited
+- [ ] `TRUSTED_PROXIES` set to your load balancer, if one sits in front, so
+      rate limiting and audit records attribute requests to the real caller
+      rather than to the proxy
+- [ ] `LOG_FORMAT=json` if you collect logs, and an alert on
+      `groundcheck_recording == 0`, which means the instance is answering
+      questions with nothing being written to the audit trail. That cannot be
+      an in-app alert, because in-app alerts live in the database that is
+      unavailable when it fires
 - [ ] `API_DOCS=false`
 - [ ] `METRICS_TOKEN` set, and `/metrics` reachable only from your monitoring system
 - [ ] `ALERT_WEBHOOK_URL` pointing at a channel someone watches
