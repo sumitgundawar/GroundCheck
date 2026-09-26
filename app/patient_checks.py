@@ -40,8 +40,15 @@ _INFORMATIONAL = re.compile(
 )
 _DOSE_QUESTION = re.compile(
     r"\b(dose|doses|dosage|dosing|how much|how often|regimen|course|frequency|mg|mcg|ml|maximum|max)\b", re.IGNORECASE)
-_VALUE = re.compile(r"(\d+(?:\.\d+)?)\s*(mg|mcg|mL|ml|g|units)\b")
+_VALUE = re.compile(r"(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(mg|mcg|mL|ml|g|units)\b")
 _UNIT_FACTOR = {"mcg": 0.001, "mg": 1.0, "g": 1000.0}
+# How many times a day each frequency is given, so a per-dose maximum can be
+# derived from a daily one. Anything not listed is treated as once daily, which
+# is the cautious direction: it compares the stated dose against the full
+# daily maximum rather than a larger one.
+_DOSES_PER_DAY = {"twice daily": 2, "every 12 hours": 2,
+                  "three times daily": 3, "every 8 hours": 3,
+                  "four times daily": 4, "every 6 hours": 4}
 
 
 @dataclass
@@ -83,7 +90,7 @@ def _stated_amounts(claims: list[Claim], medicine: Medicine, only_medicine: bool
     found = []
     for claim in claims:
         if only_medicine or any(re.search(rf"\b{re.escape(n)}\b", formulary.normalise(claim.text)) for n in names):
-            found += [(float(v), u.replace("ml", "mL")) for v, u in _VALUE.findall(claim.text)]
+            found += [(float(v.replace(",", "")), u.replace("ml", "mL")) for v, u in _VALUE.findall(claim.text)]
     return found
 
 
@@ -239,7 +246,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             missing.append("liver function (Child-Pugh class)")
         if missing:
             result.add("block", "missing_data", med,
-                       f"To check a dose of {med.name} for this patient, GroundCheck needs their {', '.join(missing)}.")
+                       f"To check a dose of {med.name} for this patient, GroundCheckHealth needs their {', '.join(missing)}.")
             continue
 
         # Children
@@ -252,7 +259,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                 continue
             if patient.weight_kg is None:
                 result.add("block", "missing_data", med,
-                           f"To calculate a dose of {med.name} for a child, GroundCheck needs their weight.")
+                           f"To calculate a dose of {med.name} for a child, GroundCheckHealth needs their weight.")
                 continue
             dose = med.paediatric_dose
             amount = dose.per_kg * patient.weight_kg
@@ -314,7 +321,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             else:
                 result.add("info", "weight_dose", med, calculated, source="Formulary")
         elif limit and limit.max_daily:
-            daily_factor = 2 if limit.frequency in ("twice daily", "every 12 hours") else 1
+            daily_factor = _DOSES_PER_DAY.get(limit.frequency or "", 1)
             too_high = _exceeds(amounts, limit.max_daily / daily_factor, limit.unit)
             if too_high is not None and not any(f.code in ("renal_dose", "hepatic_dose") for f in result.findings
                                                 if f.medicine == med.name):

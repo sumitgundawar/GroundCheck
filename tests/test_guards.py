@@ -359,3 +359,61 @@ def test_several_passages_about_one_medicine_are_all_about_it():
     twin = dict(calo); twin["id"] = "CALO-002"; twin["title"] = "Caloradine: interactions"
     named = guards_output._named_sources("What is the dose of Caloradine?", [calo, twin])
     assert {r["id"] for r in named} == {"CALO-001", "CALO-002"}
+
+
+def test_a_thousands_separator_is_part_of_the_number():
+    """"2,500 mg" was read as "500 mg": the match began after the comma. A
+    source stating 500 mg then verified a claim stating five times that, and
+    the audit record displayed the number the answer never said."""
+    assert guards_output._canonical_pairs("Give 2,500 mg daily.") == {"2500 mg"}
+
+    source = [{"id": "S1", "title": "Alphamed: dosage",
+               "text": "Alphamed is given as 500 mg once daily."}]
+    ok, detail, checked = guards_output.dosage_guard(
+        "Alphamed is given as 2,500 mg once daily.", source, "What dose of Alphamed?")
+    assert not ok, "a five-fold overdose verified against a source stating 500 mg"
+    assert "2500 mg" in detail and checked == ["2500 mg"]
+
+    # The source's own figure still verifies.
+    assert guards_output.dosage_guard(
+        "Alphamed is given as 500 mg once daily.", source, "What dose of Alphamed?")[0]
+
+
+def test_a_percentage_is_a_dosage_value():
+    """"%" is a canonical unit, but the pattern ended in \\b, which can never
+    match after a symbol. Every strength written as a percentage was invisible,
+    so an answer could state any concentration at all."""
+    assert guards_output._canonical_pairs("Apply 5% cream twice daily") == {"5 %"}
+
+    source = [{"id": "S2", "title": "Dermacream: strength",
+               "text": "Dermacream is supplied as a 1% cream."}]
+    ok, detail, _ = guards_output.dosage_guard(
+        "Dermacream is applied as a 10% cream.", source, "What strength of Dermacream?")
+    assert not ok, "a tenfold concentration passed against a source stating 1%"
+    assert "10 %" in detail
+
+    assert guards_output.dosage_guard(
+        "Dermacream is supplied as a 1% cream.", source, "What strength of Dermacream?")[0]
+
+
+def test_a_question_naming_two_medicines_cannot_attribute_an_unnamed_dose():
+    """When the dosing sentence names no medicine, attribution falls back to
+    the question. If the question names two, both passages were pooled and one
+    medicine's dose verified a claim about the other. Real label prose puts the
+    name in the title, not the dosing sentence, so this is the common shape."""
+    both = _sources("CALO-001", "MEND-001")
+    question = "What are the doses of Caloradine and Mendel solution?"
+    answer = ("Caloradine is a fictional oral agent used in the management of Veltris syndrome. "
+              "The standard adult regimen is 5 mL once daily, taken in the morning with food.")
+
+    ok, detail, _ = guards_output.dosage_guard(answer, both, question)
+    assert not ok, "Mendel solution's 5 mL verified a claim about Caloradine"
+    assert "about this medicine" in detail
+
+    # Naming the medicine in the sentence still attributes it, and a question
+    # about one medicine is unaffected.
+    assert guards_output.dosage_guard(
+        "Caloradine is started at 15 mg once daily.", both, question)[0]
+    assert guards_output.dosage_guard(
+        "The standard adult regimen is 15 mg once daily.",
+        _sources("CALO-001"), "What is the standard dose of Caloradine?")[0]

@@ -90,7 +90,13 @@ class AuditStore:
 
     # --- API ---------------------------------------------------------------
     def new_id(self) -> str:
-        return secrets.token_hex(4)  # 8 hex characters
+        # 16 hex characters. At 8, a collision was more likely than not after
+        # about 77,000 records, and a collision is not a cosmetic problem here:
+        # the insert fails the unique constraint, the transaction rolls back,
+        # the error is swallowed so a question is never lost over its audit,
+        # and the clinician is handed an id that belongs to someone else's
+        # question. A tamper-evident trail cannot afford that.
+        return secrets.token_hex(8)
 
     def save(self, audit_id: str, response: AskResponse, extras: dict[str, Any],
              user_id: int | None = None, site_id: int | None = None) -> None:

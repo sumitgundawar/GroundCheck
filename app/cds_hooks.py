@@ -1,7 +1,7 @@
 """CDS Hooks: medication safety cards inside the EHR's ordering screen.
 
 The EHR calls this service when a clinician selects or signs a medication
-order (the order-select and order-sign hooks). GroundCheck builds the patient
+order (the order-select and order-sign hooks). GroundCheckHealth builds the patient
 from the prefetched FHIR resources (app/fhir.py), checks each draft
 MedicationRequest against the formulary (app/patient_checks.py), and returns a
 card for every finding: critical for unsafe, warning for checks, info for
@@ -66,7 +66,7 @@ def discovery() -> dict:
                        "installed where it can influence prescribing. " + description)
         requirements = "Demonstration only. Not for clinical use: the formulary is synthetic."
     return {"services": [
-        {"hook": hook, "id": f"{SERVICE_ID}-{hook}", "title": "GroundCheck medication safety"
+        {"hook": hook, "id": f"{SERVICE_ID}-{hook}", "title": "GroundCheckHealth medication safety"
          + (" (demonstration, synthetic formulary)" if loaded.synthetic else ""),
          "description": description, "prefetch": PREFETCH, "usageRequirements": requirements}
         for hook in ("order-select", "order-sign")
@@ -98,7 +98,7 @@ def verify(authorization: str | None, audience: str) -> str:
     issuer = unverified.get("iss", "")
     jwks_url = config.CDS_HOOKS_TRUSTED.get(issuer)
     if not jwks_url:
-        raise CdsError("This EHR isn't trusted to call GroundCheck.", 401)
+        raise CdsError("This EHR isn't trusted to call GroundCheckHealth.", 401)
     if header.get("alg") not in ("RS384", "ES384", "RS256", "ES256"):
         raise CdsError("The token's algorithm isn't allowed.", 401)
     keys = _jwks(jwks_url).get("keys", [])
@@ -121,6 +121,14 @@ def _bundle_resources(value, resource_type: str) -> list[dict]:
     return [e["resource"] for e in value.get("entry", []) if e.get("resource", {}).get("resourceType") == resource_type]
 
 
+def _plain(amount: float) -> str:
+    """A number as a clinician would write it. "%g" turns 1000000 into "1e+06",
+    which the dose parser then reads as 6, and rounds anything past six
+    significant figures; neither is acceptable for a dose."""
+    text = f"{amount:.4f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
 def _order_dose(order: dict) -> tuple[str, float | None, str]:
     """(sentence, amount, unit) describing an order's dose."""
     dosage = (order.get("dosageInstruction") or [{}])[0]
@@ -131,7 +139,7 @@ def _order_dose(order: dict) -> tuple[str, float | None, str]:
         return dosage.get("text", ""), None, ""
     unit = (quantity.get("unit") or quantity.get("code") or "").replace("ml", "mL")
     amount = float(quantity["value"])
-    return f"{amount:g} {unit} {frequency}".strip(), amount, unit
+    return f"{_plain(amount)} {unit} {frequency}".strip(), amount, unit
 
 
 def cards_for(request: dict) -> dict:
@@ -171,10 +179,10 @@ def cards_for(request: dict) -> dict:
                 "summary": f"Not checked: {name or 'this medicine'} is not in the formulary",
                 "indicator": "warning",
                 "detail": (f"**{name or 'This medicine'}** was not checked. It is not in the formulary "
-                           f"GroundCheck is running ({formulary.load().name}), so no allergy, interaction, "
+                           f"GroundCheckHealth is running ({formulary.load().name}), so no allergy, interaction, "
                            f"kidney, liver, pregnancy or dose rule has been applied to this order.\n\n"
                            f"This is not a statement that the order is safe."),
-                "source": {"label": "GroundCheck formulary",
+                "source": {"label": "GroundCheckHealth formulary",
                            "topic": {"code": "not_in_formulary",
                                      "system": "https://groundcheckhealth.com/cds/finding"}},
                 "overrideReasons": [],
@@ -199,7 +207,7 @@ def cards_for(request: dict) -> dict:
                 "summary": summary,
                 "indicator": INDICATOR[finding.severity],
                 "detail": detail,
-                "source": {"label": "GroundCheck formulary" + (f" ({finding.rule_id})" if finding.rule_id else ""),
+                "source": {"label": "GroundCheckHealth formulary" + (f" ({finding.rule_id})" if finding.rule_id else ""),
                            "topic": {"code": finding.code, "system": "https://groundcheckhealth.com/cds/finding"}},
                 "overrideReasons": [
                     {"code": "clinically-appropriate", "system": "https://groundcheckhealth.com/cds/override",

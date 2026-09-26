@@ -185,24 +185,37 @@ def check(records: list[dict], vectors: np.ndarray) -> dict:
                 over_refused.append(query)
 
     with retrieval.using(state):
-        if demo:
-            golden = _load_cases(GOLDEN_PATH)
-            for case in golden:
-                if case["expect"] == "refuse" or config.RELEASE_CHECK_ANSWERABLE:
-                    record("golden", case["query"], case["expect"], pipeline.run(case["query"], check_only=True).decision)
-            for case in _load_cases(PATIENT_PATH):
-                if case["expect"] != "refuse":
-                    continue
-                got = pipeline.run(case["query"], patient=PatientContext(**case["patient"]), check_only=True).decision
-                record("patient", case["query"], case["expect"], got)
+        # The must-refuse cases assert that the system refuses what it cannot
+        # ground, which holds against any corpus, so they always run. Only the
+        # answerable ones need the demo documents to be present.
+        #
+        # These used to be skipped whenever the index held no demo passages,
+        # which is exactly the configuration every deployment guide asks for
+        # (INCLUDE_DEMO_CORPUS=false). A real site therefore ran no safety
+        # checks at all, and was told the release passed.
+        for case in _load_cases(GOLDEN_PATH):
+            if case["expect"] == "refuse" or (demo and config.RELEASE_CHECK_ANSWERABLE):
+                record("golden", case["query"], case["expect"], pipeline.run(case["query"], check_only=True).decision)
+        for case in _load_cases(PATIENT_PATH):
+            if case["expect"] != "refuse":
+                continue
+            got = pipeline.run(case["query"], patient=PatientContext(**case["patient"]), check_only=True).decision
+            record("patient", case["query"], case["expect"], got)
         if db.ready():
             for case in governance.list_eval_cases():
                 record("review_tests", case["query"], case["expect"],
                        pipeline.run(case["query"], check_only=True).decision)
     total_unsafe = sum(g["unsafe"] for g in groups.values())
-    return {"passed": total_unsafe == 0, "unsafe": total_unsafe, "groups": groups, "unsafe_examples": unsafe,
-            "over_refused_examples": over_refused, "seconds": round(time.monotonic() - started, 1),
-            "checked_at": _now().isoformat()}
+    checked = sum(g["total"] for g in groups.values())
+    # Zero unsafe answers out of zero questions is not a pass. A check that
+    # could not run is a failed check, the same as one that raised.
+    result = {"passed": total_unsafe == 0 and checked > 0, "unsafe": total_unsafe, "checked": checked,
+              "groups": groups, "unsafe_examples": unsafe, "over_refused_examples": over_refused,
+              "seconds": round(time.monotonic() - started, 1), "checked_at": _now().isoformat()}
+    if not checked:
+        result["error"] = ("No safety checks could run, so nothing about this release has been "
+                           "verified. Add review test cases, or restore the golden set.")
+    return result
 
 
 # ---------------------------------------------------------------- lifecycle
@@ -220,7 +233,7 @@ def _go_live(s, row: Release, records: list[dict], vectors: np.ndarray, user_id:
 
 
 def create(records: list[dict], vectors: np.ndarray, reason: str, user_id: int | None = None,
-           name: str = "GroundCheck") -> dict:
+           name: str = "GroundCheckHealth") -> dict:
     """Make a candidate from a rebuilt index, check it, and put it live if it
     passes (and promotion is automatic)."""
     with _lock:
@@ -346,11 +359,11 @@ def baseline() -> dict | None:
             if s.scalar(select(func.count(Release.id))):
                 return None
             row = Release(number=1, status="live", reason="The index in use when releases began",
-                          created_by_name="GroundCheck", passages=len(records),
+                          created_by_name="GroundCheckHealth", passages=len(records),
                           demo_passages=sum(1 for r in records if r.get("source_id") is None),
                           documents=_documents(records), content_sha256=_fingerprint(records),
                           formulary_sha256=_formulary_fingerprint(), check={"passed": True, "skipped": True},
-                          live_at=_now(), live_by_name="GroundCheck")
+                          live_at=_now(), live_by_name="GroundCheckHealth")
             s.add(row)
             s.flush()   # another instance that got here first makes this fail
             _write_snapshot(1, records, vectors)

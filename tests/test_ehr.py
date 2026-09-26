@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import cds_hooks, config, fhir, smart  # noqa: E402
+from app import cds_hooks, config, fhir, patient_checks, smart  # noqa: E402
 
 EHR = "https://ehr.example.org/fhir"
 RECENT = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
@@ -496,3 +496,18 @@ def test_the_ehr_is_told_the_formulary_is_invented():
         formulary_module.load = original
     assert "DEMONSTRATION ONLY" not in live["description"]
     assert "demonstration" not in live["title"].lower()
+
+
+def test_a_very_large_dose_is_not_read_as_a_small_one():
+    """The order's dose was formatted with "%g", which switches to exponential
+    notation at a million: 1000000 became "1e+06", and the dose parser then
+    read that as 6. A million-milligram order produced no card at all."""
+    assert cds_hooks._plain(1000000.0) == "1000000"
+    assert cds_hooks._plain(123456.7) == "123456.7"       # and no rounding to 6 figures
+    assert cds_hooks._plain(15.0) == "15" and cds_hooks._plain(2.5) == "2.5"
+
+    text, amount, unit = cds_hooks._order_dose(
+        {"dosageInstruction": [{"doseAndRate": [{"doseQuantity": {"value": 1000000, "unit": "mg"}}],
+                                "timing": {"repeat": {"frequency": 1, "period": 1, "periodUnit": "d"}}}]})
+    assert "1e+06" not in text and text.startswith("1000000 mg")
+    assert patient_checks._VALUE.findall(text) == [("1000000", "mg")]

@@ -5,6 +5,8 @@ TEST_POSTGRES_URL is set."""
 
 from __future__ import annotations
 
+import conftest
+
 import os
 import sys
 from datetime import timedelta
@@ -226,7 +228,7 @@ def test_report_and_safety_case(queue):
         governance.report(0)
 
     text = governance.safety_case_markdown(30)
-    assert "# GroundCheck clinical safety case summary" in text
+    assert "# GroundCheckHealth clinical safety case summary" in text
     assert "| H1 | Wrong dose cited | 15 (high)" in text
     # The demo formulary is invented, so the document says so before anything
     # else and offers nothing to sign. A document shaped like a deliverable
@@ -310,9 +312,10 @@ def test_api_without_sign_in_is_local_only(queue, monkeypatch):
     from app.main import app
     with TestClient(app) as c:
         assert c.get("/api/reviews").status_code == 200
-        remote = {"X-Forwarded-For": "203.0.113.9"}
-        assert c.get("/api/reviews", headers=remote).status_code == 403
-        assert c.post("/api/hazards", json=HAZARD, headers=remote).status_code == 403
+    with TestClient(app, client=conftest.REMOTE_PEER) as c:
+        assert c.get("/api/reviews").status_code == 403
+        assert c.post("/api/hazards", json=HAZARD).status_code == 403
+        assert c.get("/api/reviews", headers=conftest.remote_headers()).status_code == 403
 
 
 def test_usage_dashboard(queue):
@@ -355,7 +358,7 @@ def test_surveillance_report_gathers_the_period(queue, monkeypatch):
                       "description": "Recalled."}, None, "Dr Rev")
     monitoring.evaluate()
     text = governance.surveillance_markdown(90)
-    assert "# GroundCheck post-market surveillance report" in text
+    assert "# GroundCheckHealth post-market surveillance report" in text
     assert "Questions: 2 (1 answered, 1 refused" in text
     assert "Moderate harm: 1" in text and "Data protection or security: 1" in text
     assert "Needing a decision on reporting to a regulator: 1" in text   # the data breach, not moderate harm
@@ -370,5 +373,5 @@ def test_surveillance_report_needs_a_reviewer(client):
     assert client.get("/api/governance/surveillance").status_code == 403
     _login(client, "rev@example.org")
     r = client.get("/api/governance/surveillance?days=30")
-    assert r.status_code == 200 and r.text.startswith("# GroundCheck post-market surveillance report")
+    assert r.status_code == 200 and r.text.startswith("# GroundCheckHealth post-market surveillance report")
     assert r.headers["content-disposition"].endswith('filename="groundcheck-surveillance.md"')

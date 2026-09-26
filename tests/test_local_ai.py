@@ -4,6 +4,8 @@ permission and validation rules."""
 
 from __future__ import annotations
 
+import conftest
+
 import os
 import sys
 from pathlib import Path
@@ -168,11 +170,15 @@ def test_status_endpoint_reports_hardware_and_catalogue(client):
     assert {"fit", "recommended", "installed", "memory_needed_gb"} <= set(body["models"][0])
 
 
-def test_managing_models_is_refused_from_another_machine(client):
-    headers = {"X-Forwarded-For": "203.0.113.9"}
-    assert client.post("/api/local-ai/select", json={"model": None}, headers=headers).status_code == 403
-    assert client.post("/api/local-ai/pull", json={"model": "gemma3:1b"}, headers=headers).status_code == 403
-    assert client.get("/api/local-ai", headers=headers).json()["can_manage"] is False
+def test_managing_models_is_refused_from_another_machine():
+    from app.main import app
+    with TestClient(app, client=conftest.REMOTE_PEER) as c:
+        assert c.post("/api/local-ai/select", json={"model": None}).status_code == 403
+        assert c.post("/api/local-ai/pull", json={"model": "gemma3:1b"}).status_code == 403
+        assert c.get("/api/local-ai").json()["can_manage"] is False
+        # A forwarded-for header must not buy management rights.
+        assert c.post("/api/local-ai/select", json={"model": None},
+                      headers=conftest.remote_headers()).status_code == 403
 
 
 def test_management_can_be_disabled(client, monkeypatch):

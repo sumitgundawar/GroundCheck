@@ -54,3 +54,14 @@ def database(request, tmp_path):
     finally:
         config.DATABASE_URL = original_url
         _forget_database()
+
+# A request from another machine. Tests used to simulate this with an
+# X-Forwarded-For header, which the app no longer believes: "this came from the
+# machine running it" is now decided by the socket the request arrived on, so a
+# test has to arrive on a different one.
+REMOTE_PEER = ("203.0.113.9", 44321)
+
+
+def remote_headers() -> dict:
+    """A header claiming to be local. It must not be believed."""
+    return {"X-Forwarded-For": "127.0.0.1"}

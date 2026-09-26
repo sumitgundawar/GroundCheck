@@ -74,7 +74,7 @@ async def _alert_loop() -> None:
         await asyncio.sleep(config.ALERT_INTERVAL_SECONDS)
 
 
-app = FastAPI(title="GroundCheck", version=config.VERSION, lifespan=lifespan,
+app = FastAPI(title="GroundCheckHealth", version=config.VERSION, lifespan=lifespan,
               docs_url="/docs" if config.API_DOCS else None, redoc_url="/redoc" if config.API_DOCS else None,
               openapi_url="/openapi.json" if config.API_DOCS else None)
 
@@ -308,7 +308,7 @@ def auth_first_admin(body: NewUserRequest, request: Request, response: Response)
     only from this machine, so a new install can't be claimed remotely."""
     _require_database()
     if not _is_local_request(request):
-        raise HTTPException(status_code=403, detail="Create the first admin from the machine running GroundCheck.")
+        raise HTTPException(status_code=403, detail="Create the first admin from the machine running GroundCheckHealth.")
     if auth.count_users() > 0:
         raise HTTPException(status_code=409, detail="An admin already exists. Sign in instead.")
     try:
@@ -478,11 +478,9 @@ def index() -> FileResponse:
 @app.post("/api/ask", response_model=AskResponse)
 def ask(body: AskRequest, request: Request,
         user: auth.Principal | None = Depends(require_role("clinician"))) -> AskResponse:
-    # Rate limiting is keyed by client IP. Behind a proxy (Hugging Face, Render),
-    # the real client is in X-Forwarded-For; fall back to the socket address.
-    fwd = request.headers.get("x-forwarded-for", "")
-    client_id = fwd.split(",")[0].strip() if fwd else (
-        request.client.host if request.client else "global")
+    # Rate limiting is keyed by client IP, taken from the socket unless a
+    # trusted proxy is configured; see _client_ip.
+    client_id = _client_ip(request) or "global"
     return pipeline.run(body.query, body.settings, client_id=client_id, patient=body.patient,
                         user_id=user.id if user else None)
 
@@ -584,13 +582,45 @@ class LocalModelRequest(BaseModel):
     model: str | None = None
 
 
+def _peer_ip(request: Request) -> str:
+    """The address the request actually arrived from. No header can change it."""
+    return request.client.host if request.client else ""
+
+
+def _from_trusted_proxy(request: Request) -> bool:
+    peer = _peer_ip(request)
+    if not peer or not config.TRUSTED_PROXIES:
+        return False
+    try:
+        addr = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    for entry in config.TRUSTED_PROXIES:
+        try:
+            if addr in ipaddress.ip_network(entry, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def _client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for", "")
-    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "")
+    """Who to record and rate limit. X-Forwarded-For is believed only when the
+    request came from a proxy named in TRUSTED_PROXIES; otherwise anyone could
+    pick their own identity, and with it a fresh rate-limit bucket."""
+    if _from_trusted_proxy(request):
+        fwd = request.headers.get("x-forwarded-for", "")
+        if fwd:
+            return fwd.split(",")[0].strip()
+    return _peer_ip(request)
 
 
 def _is_local_request(request: Request) -> bool:
-    host = _client_ip(request)
+    """Whether this came from the machine running the app. Deliberately ignores
+    X-Forwarded-For even from a trusted proxy: a proxy forwarding a request is
+    by definition not the local machine, and claiming an install or managing it
+    is exactly what a remote caller must not be able to do."""
+    host = _peer_ip(request)
     try:
         return host == "testclient" or ipaddress.ip_address(host).is_loopback
     except ValueError:
@@ -608,7 +638,7 @@ def require_manager(request: Request, role: str = "admin") -> auth.Principal | N
         return principal
     if config.ADMIN_ACCESS == "all" or (config.ADMIN_ACCESS == "local" and _is_local_request(request)):
         return None
-    raise HTTPException(status_code=403, detail="This is only allowed from the machine running GroundCheck.")
+    raise HTTPException(status_code=403, detail="This is only allowed from the machine running GroundCheckHealth.")
 
 
 def _require_local_ai_admin(request: Request) -> None:

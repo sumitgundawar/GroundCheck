@@ -5,6 +5,8 @@ permission rules."""
 
 from __future__ import annotations
 
+import conftest
+
 import io
 import os
 import sys
@@ -272,11 +274,13 @@ def test_api_rules(studio, monkeypatch):
     _make_dataset(studio, per_class=10)
     from app.main import app
 
-    with TestClient(app) as client:
-        remote = {"X-Forwarded-For": "203.0.113.9"}
+    with TestClient(app, client=conftest.REMOTE_PEER) as remote_client:
         for method, path in (("get", "/api/training/setup"), ("get", "/api/training/runs"), ("get", "/api/models"),
                              ("get", f"/api/training/browse?path={studio}")):
-            assert getattr(client, method)(path, headers=remote).status_code == 403
+            assert getattr(remote_client, method)(path).status_code == 403
+            assert getattr(remote_client, method)(
+                path, headers=conftest.remote_headers()).status_code == 403
+    with TestClient(app) as client:
         setup = client.get("/api/training/setup").json()
         assert setup["hardware"]["devices"][-1]["id"] == "cpu" and setup["active_run"] is None
         summary = client.get(f"/api/training/dataset?path={studio / 'scans'}").json()

@@ -165,3 +165,36 @@ def test_an_index_that_does_not_match_the_live_release_is_put_back(setup):
     assert result == {"release": int(live["name"][1:]), "restored": True}
     assert len(retrieval._state().metadata) == live["passages"]
     assert releases.reconcile() is None     # nothing left to put right
+
+
+def test_the_safety_check_runs_without_the_demo_corpus(setup):
+    """Every deployment guide sets INCLUDE_DEMO_CORPUS=false, and the
+    must-refuse cases used to be skipped whenever the index held no demo
+    passages. A real site therefore ran no safety checks at all, and its
+    Releases page reported that the check had passed."""
+    _approve()
+    status = knowledge.rebuild_index("Approved falls guideline")
+    check = status["release"]["check"]
+    assert check["groups"].get("golden", {}).get("total"), "the golden set did not run"
+    assert check["checked"] >= 1 and check["passed"]
+
+
+def test_a_release_that_checked_nothing_does_not_pass(setup, monkeypatch, tmp_path):
+    """Zero unsafe answers out of zero questions is not evidence of anything."""
+    # A first release that does check something, so there is a live index to
+    # fall back to when the second one is refused.
+    _approve()
+    assert knowledge.rebuild_index("Approved falls guideline")["release"]["check"]["passed"]
+
+    empty = tmp_path / "empty.json"
+    empty.write_text("[]")
+    monkeypatch.setattr(releases, "GOLDEN_PATH", empty)
+    other = b"""<html><body><h1>Pressure ulcers</h1><h2>Checks</h2>
+<p>Inspect pressure areas at every shift for adults with limited mobility.</p></body></html>"""
+    _approve(other, name="pressure.html")
+    status = knowledge.rebuild_index("Second guideline")
+    check = status["release"]["check"]
+    assert check["checked"] == 0
+    assert not check["passed"], "a release that checked nothing was reported as passing"
+    assert "No safety checks" in check.get("error", "")
+    assert status["release"]["status"] == "failed"

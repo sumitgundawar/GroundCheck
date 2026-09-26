@@ -289,3 +289,30 @@ def test_a_moderate_interaction_is_noted_without_stopping_the_answer():
         assert "interaction_contraindicated" not in found and "interaction_major" not in found
     finally:
         del idx.by_name["plaxetin"]
+
+
+def test_a_per_dose_maximum_accounts_for_how_often_it_is_given():
+    """The daily maximum was divided by two only for twice-daily. Three times
+    daily fell through to one, so a single dose equal to the whole daily
+    maximum raised nothing, even though three of them are three times it. The
+    system generates that frequency string itself in cds_hooks."""
+    assert patient_checks._DOSES_PER_DAY["three times daily"] == 3
+    assert patient_checks._DOSES_PER_DAY["every 8 hours"] == 3
+    assert patient_checks._DOSES_PER_DAY["four times daily"] == 4
+    assert patient_checks._DOSES_PER_DAY["every 6 hours"] == 4
+    assert patient_checks._DOSES_PER_DAY["twice daily"] == 2
+    # Anything unlisted stays at once daily, which compares against the full
+    # daily maximum rather than a larger one.
+    assert patient_checks._DOSES_PER_DAY.get("once daily", 1) == 1
+
+
+def test_a_thousands_separator_in_a_dose_is_not_truncated():
+    """"2,500 mg" matched as 500, five times under the stated dose, so the
+    formulary maximum could not fire on it."""
+    assert patient_checks._VALUE.findall("Alphamed is given as 2,500 mg once daily.") == [("2,500", "mg")]
+    assert patient_checks._VALUE.findall("Give 500 mg daily.") == [("500", "mg")]
+    # And the parsed number is the whole one.
+    amounts = [(float(v.replace(",", "")), u) for v, u in
+               patient_checks._VALUE.findall("Alphamed is given as 2,500 mg once daily.")]
+    assert amounts == [(2500.0, "mg")]
+    assert patient_checks._exceeds(amounts, 500.0, "mg") == 2500.0

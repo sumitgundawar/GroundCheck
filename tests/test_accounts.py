@@ -5,6 +5,8 @@ is set, for example postgresql+psycopg://user@127.0.0.1:5432/groundcheck_test.""
 
 from __future__ import annotations
 
+import conftest
+
 import os
 import sys
 import tempfile
@@ -148,7 +150,7 @@ def test_the_last_admin_cannot_be_demoted_or_deactivated(database):
 def test_two_factor_setup_requires_a_valid_code(database):
     user = auth.create_user("ada@example.org", PASSWORD)
     setup = auth.begin_mfa_setup(user.id)
-    assert setup["otpauth_uri"].startswith("otpauth://totp/GroundCheck:ada%40example.org")
+    assert setup["otpauth_uri"].startswith("otpauth://totp/GroundCheckHealth:ada%40example.org")
     with pytest.raises(auth.AuthError, match="didn't match"):
         auth.confirm_mfa_setup(user.id, "000000")
     auth.confirm_mfa_setup(user.id, pyotp.TOTP(setup["secret"]).now())
@@ -254,10 +256,16 @@ def test_first_admin_then_sign_in_and_ask(client):
     assert ask.status_code == 200 and ask.json()["decision"] == "answer"
 
 
-def test_first_admin_cannot_be_created_remotely(client):
-    r = client.post("/api/auth/first-admin", json={"email": "admin@example.org", "password": PASSWORD},
-                    headers={"X-Forwarded-For": "203.0.113.9"})
-    assert r.status_code == 403
+def test_first_admin_cannot_be_created_remotely(database, monkeypatch):
+    from app.main import app
+    monkeypatch.setattr(config, "AUTH_REQUIRED", True)
+    with TestClient(app, client=conftest.REMOTE_PEER) as c:
+        assert c.post("/api/auth/first-admin",
+                      json={"email": "admin@example.org", "password": PASSWORD}).status_code == 403
+        # The attack the old test missed: claiming to be the local machine.
+        assert c.post("/api/auth/first-admin",
+                      json={"email": "attacker@evil.example", "password": PASSWORD},
+                      headers=conftest.remote_headers()).status_code == 403
 
 
 def test_roles_limit_what_each_user_can_do(client):

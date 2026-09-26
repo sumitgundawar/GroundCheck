@@ -558,10 +558,10 @@ _NUM_WORDS = {**_ONES, **_TENS, **_FRACTIONS}
 # A quantity is either digits (15, 2.5) or one-to-two number words
 # (fifteen, twenty five, twenty-five), optionally part of a range.
 _NUMWORD_ALT = "|".join(sorted(_NUM_WORDS, key=len, reverse=True))
-_QTY = rf"(?:\d+(?:\.\d+)?|(?:{_NUMWORD_ALT})(?:[\s-]+(?:{_NUMWORD_ALT}))?)"
+_QTY = rf"(?:\d{{1,3}}(?:,\d{{3}})+(?:\.\d+)?|\d+(?:\.\d+)?|(?:{_NUMWORD_ALT})(?:[\s-]+(?:{_NUMWORD_ALT}))?)"
 _RANGE_SEP = r"(?:\s*(?:to|-|–|—|or)\s*)"
 _VALUE_RE = re.compile(
-    rf"\b({_QTY})(?:{_RANGE_SEP}({_QTY}))?\s*({_UNIT_ALT})\b",
+    rf"\b({_QTY})(?:{_RANGE_SEP}({_QTY}))?\s*({_UNIT_ALT})(?![A-Za-z])",
     re.IGNORECASE,
 )
 
@@ -583,7 +583,7 @@ def _normalise(text: str) -> str:
 
 def _word_to_number(token: str) -> float | None:
     """Parse a digit string or one-to-two number words into a number."""
-    token = token.strip().lower()
+    token = token.strip().lower().replace(",", "")
     try:
         return float(token)
     except ValueError:
@@ -657,6 +657,12 @@ def _named_sources(text: str, sources: list[dict]) -> list[dict]:
     return named
 
 
+def _named_subjects(text: str, sources: list[dict]) -> set[frozenset]:
+    """How many distinct things `text` names among the sources. Several
+    passages about one medicine count once; two medicines count twice."""
+    return {frozenset(_subject_words(r)) for r in _named_sources(text, sources)}
+
+
 def dosage_guard(answer_text: str, sources: list[dict],
                  query: str = "") -> tuple[bool, str, list[str]]:
     """Return (ok, detail, checked_values).
@@ -707,7 +713,17 @@ def dosage_guard(answer_text: str, sources: list[dict],
         # which is where this started.
         allowed = supporting(sentence)
         if allowed is None:
-            allowed = supporting(f"{query} {sentence}")
+            # Falling back to the question only attributes a dose when the
+            # question names one medicine. Ask about two and let the dosing
+            # sentence name neither — which is the shape real label prose
+            # takes, since the title carries the name — and pooling both
+            # passages let one medicine's dose verify a claim about the other.
+            # Nothing attributes that dose, so nothing supports it.
+            subjects = _named_subjects(f"{query} {sentence}", sources)
+            if len(subjects) == 1:
+                allowed = supporting(f"{query} {sentence}")
+            elif len(subjects) > 1:
+                allowed = set()
         if allowed is None:
             covered = [t for t in _salient_terms(f"{query} {sentence}") if _covered(t, vocab)]
             allowed = {pair for record in _sources_about(f"{query} {sentence}", covered, sources)

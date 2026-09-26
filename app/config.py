@@ -60,6 +60,12 @@ LOCAL_AI_TIMEOUT_SECONDS = _get_float("LOCAL_AI_TIMEOUT_SECONDS", 60.0)
 ADMIN_ACCESS = _get("ADMIN_ACCESS", _get("LOCAL_AI_ADMIN", "local")).lower()
 LOCAL_AI_STATE_PATH = ROOT_DIR / _get("LOCAL_AI_STATE_PATH", "local_ai.json")
 
+# Proxies whose X-Forwarded-For may be believed, as IPs or CIDRs. Empty by
+# default: a header is only a claim, and "this request came from the machine
+# running the app" is a security decision, so it is taken from the socket the
+# request arrived on unless a proxy in front is named here.
+TRUSTED_PROXIES = [v.strip() for v in _get("TRUSTED_PROXIES", "").split(",") if v.strip()]
+
 # --- Embeddings + retrieval ------------------------------------------------
 EMBED_MODEL = _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 # Where query embeddings run. The CPU by default: a question is embedded in a
@@ -195,10 +201,10 @@ def _list(name: str, default: str = "") -> list[str]:
     return [v.strip().rstrip("/") for v in _get(name, default).split(",") if v.strip()]
 
 
-# FHIR servers GroundCheck may read patients from without SMART authorisation:
+# FHIR servers GroundCheckHealth may read patients from without SMART authorisation:
 # public sandboxes for development, or an internal server behind your network.
 FHIR_OPEN_SERVERS = _list("FHIR_OPEN_SERVERS")
-# SMART on FHIR app launch. Issuers are the EHRs' FHIR base URLs allowed to launch GroundCheck.
+# SMART on FHIR app launch. Issuers are the EHRs' FHIR base URLs allowed to launch GroundCheckHealth.
 SMART_CLIENT_ID = _get("SMART_CLIENT_ID", "")
 SMART_CLIENT_SECRET = os.environ.get("SMART_CLIENT_SECRET", "").strip()
 SMART_ALLOWED_ISSUERS = _list("SMART_ALLOWED_ISSUERS")
