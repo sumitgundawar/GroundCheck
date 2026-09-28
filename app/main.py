@@ -588,7 +588,7 @@ def health() -> JSONResponse:
     # An instance that is answering but writing nothing down is not healthy,
     # whatever it can still do. "ok" used to be unconditional, so the one state
     # an operator most needs to know about looked exactly like a good one.
-    recording = backend == "database" or (backend == "file" and not database["configured"])
+    recording = monitoring.recording_as_configured()
     return JSONResponse({
         "status": "ok" if recording else "degraded",
         "llm": provider is not None,

@@ -505,6 +505,10 @@ def test_a_very_large_dose_is_not_read_as_a_small_one():
     assert cds_hooks._plain(1000000.0) == "1000000"
     assert cds_hooks._plain(123456.7) == "123456.7"       # and no rounding to 6 figures
     assert cds_hooks._plain(15.0) == "15" and cds_hooks._plain(2.5) == "2.5"
+    # Nor at the small end: a fixed four decimal places rounded 0.00005 to
+    # "0.0001" and 0.000001 to "0", printing a dose the order never stated.
+    assert cds_hooks._plain(0.00005) == "0.00005"
+    assert cds_hooks._plain(0.000001) == "0.000001"
 
     text, amount, unit = cds_hooks._order_dose(
         {"dosageInstruction": [{"doseAndRate": [{"doseQuantity": {"value": 1000000, "unit": "mg"}}],

@@ -197,7 +197,7 @@ _ENDINGS = ("", "s", "es", "ed", "d", "ing", "ly", "ment", "ments", "al", "ally"
 
 
 @lru_cache(maxsize=100_000)
-def _stems(word: str) -> set[str]:
+def _stems(word: str) -> frozenset[str]:
     # Called for every word of every retrieved passage, twice over: once while
     # reporting coverage and again while scoping sources. The corpus vocabulary
     # repeats heavily, and the answer is a pure function of the word, so the
@@ -215,7 +215,9 @@ def _stems(word: str) -> set[str]:
             if ending in ("ed", "ing") and len(stem) > 3 and stem[-1] == stem[-2] and stem[-1] not in "aeiou":
                 out.add(stem[:-1])
             out.add(stem + "e")             # dosed -> dose, managing -> manage
-    return out
+    # Frozen because it is cached: callers share one object, and a caller that
+    # added to it would change what every later question stems to.
+    return frozenset(out)
 
 
 # Words that ask for the same thing. A source that says "is given as 5 mL"

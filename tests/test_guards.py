@@ -417,3 +417,14 @@ def test_a_question_naming_two_medicines_cannot_attribute_an_unnamed_dose():
     assert guards_output.dosage_guard(
         "The standard adult regimen is 15 mg once daily.",
         _sources("CALO-001"), "What is the standard dose of Caloradine?")[0]
+
+
+def test_stems_are_frozen_because_they_are_cached():
+    """Callers share one cached object per word. A caller that added to it
+    would change what every later question stems to, inside the check that
+    decides whether a question is answerable at all."""
+    stems = guards_output._stems("therapies")
+    assert isinstance(stems, frozenset)
+    with pytest.raises(AttributeError):
+        stems.add("anything")
+    assert guards_output._stems("dosing") & guards_output._stems("dose")

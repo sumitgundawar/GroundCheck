@@ -15,6 +15,8 @@ Specification: https://cds-hooks.hl7.org"""
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import re
 import time
 import uuid
@@ -125,8 +127,10 @@ def _plain(amount: float) -> str:
     """A number as a clinician would write it. "%g" turns 1000000 into "1e+06",
     which the dose parser then reads as 6, and rounds anything past six
     significant figures; neither is acceptable for a dose."""
-    text = f"{amount:.4f}".rstrip("0").rstrip(".")
-    return text or "0"
+    # Decimal, not a fixed number of places: "%.4f" rounded 0.000001 to "0"
+    # and 0.00005 to "0.0001", which is a dose the order did not say.
+    text = format(Decimal(str(amount)).normalize(), "f")
+    return text if text and text != "-0" else "0"
 
 
 def _order_dose(order: dict) -> tuple[str, float | None, str]:

@@ -212,3 +212,22 @@ def test_an_instance_answering_without_recording_says_so(mon, monkeypatch):
     assert "groundcheck_recording 0" in monitoring.render()
     body = mon.get("/api/health").json()
     assert body["status"] == "degraded" and body["recording"] is False
+
+
+def test_turning_persistence_off_deliberately_is_not_a_fault(mon, monkeypatch):
+    """AUDIT_PERSIST=false is a supported setting. A gauge that pages forever
+    on it is a gauge an operator turns off, so it reports whether the instance
+    is recording as configured, not merely whether anything is stored."""
+    from app import audit
+
+    assert monitoring.recording_as_configured() is True
+
+    monkeypatch.setattr(config, "AUDIT_PERSIST", False)
+    monkeypatch.setattr(audit.store, "backend", lambda: None)
+    assert monitoring.recording_as_configured() is True
+    assert "groundcheck_recording 1" in monitoring.render()
+
+    # But a database that was configured and is not being written to is a fault.
+    monkeypatch.setattr(config, "AUDIT_PERSIST", True)
+    assert monitoring.recording_as_configured() is False
+    assert "groundcheck_recording 0" in monitoring.render()

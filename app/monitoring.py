@@ -176,20 +176,37 @@ def render() -> str:
     return "\n".join(lines) + "\n"
 
 
-def _gauges() -> dict:
+def recording_as_configured() -> bool:
+    """Whether questions are reaching the audit trail the operator asked for.
+
+    False means something is wrong -- the database was configured and is not
+    being written to -- rather than merely that nothing is being stored.
+    """
     from . import audit
+
+    if not config.AUDIT_PERSIST:
+        return True                       # asked for no persistence, and got none
+    backend = audit.store.backend()
+    if backend == "database":
+        return True
+    # A file-backed trail is the intended arrangement only when no database
+    # was configured in the first place.
+    return backend == "file" and not config.DATABASE_URL
+
+
+def _gauges() -> dict:
     from .db import Alert, ReviewCase
 
     # Emitted whatever the database is doing. Every other gauge here needs a
     # working database to compute, so they all disappeared at exactly the
     # moment something had gone wrong -- leaving the one state an operator
     # most needs to alert on indistinguishable from a quiet instance.
-    backend = audit.store.backend()
-    configured = bool(config.DATABASE_URL)
-    recording = int(backend == "database" or (backend == "file" and not configured))
     base = {"groundcheck_recording": (
-        "1 when questions are written to a durable audit trail, 0 when the instance "
-        "is answering without recording anything.", recording)}
+        "1 when questions are recorded as this instance was configured to record them, "
+        "0 when it was configured to record them and is not. Deliberately turning "
+        "persistence off with AUDIT_PERSIST=false reads as 1: it is the configuration "
+        "working, not a fault, and a gauge that pages forever on a supported setting "
+        "would be turned off.", int(recording_as_configured()))}
     if not db.ready():
         return base
     now = db.utcnow()
