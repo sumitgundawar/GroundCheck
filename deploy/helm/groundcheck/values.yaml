@@ -9,6 +9,14 @@ imagePullSecrets: []
 # One replica with a ReadWriteOnce volume. Several replicas need PostgreSQL
 # (database.url) and a ReadWriteMany volume for the index, models, imaging
 # files and release snapshots.
+# Which proxies uvicorn may believe when it rewrites the client address from
+# X-Forwarded-For. This used to be "*", which let any caller choose the address
+# the application saw, and with it who was rate limited and what went into the
+# audit record. Empty leaves uvicorn's own default, so the address is the one
+# the connection actually came from. Set it to your ingress controller if you
+# want the real client address, and set TRUSTED_PROXIES to match.
+forwardedAllowIps: ""
+
 replicaCount: 1
 
 database:

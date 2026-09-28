@@ -65,3 +65,9 @@ REMOTE_PEER = ("203.0.113.9", 44321)
 def remote_headers() -> dict:
     """A header claiming to be local. It must not be believed."""
     return {"X-Forwarded-For": "127.0.0.1"}
+
+
+# A request arriving from the loopback address, which is what a reverse proxy
+# on the same host looks like, and what uvicorn --forwarded-allow-ips makes a
+# remote request look like.
+LOOPBACK_PEER = ("127.0.0.1", 50001)

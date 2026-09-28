@@ -231,3 +231,28 @@ def test_turning_persistence_off_deliberately_is_not_a_fault(mon, monkeypatch):
     monkeypatch.setattr(config, "AUDIT_PERSIST", True)
     assert monitoring.recording_as_configured() is False
     assert "groundcheck_recording 0" in monitoring.render()
+
+
+def test_health_does_not_hand_out_the_database_error(mon, monkeypatch):
+    """/api/health is in PUBLIC_API, so it answers without a sign-in even when
+    AUTH_REQUIRED is on. The exception text names the database host, its
+    address, its port and the database user, which is reconnaissance for
+    moving further into the network, not a health signal."""
+    from app import db as dbmod
+
+    secret = ('OperationalError: (psycopg.OperationalError) connection to server at '
+              '"db.internal.trust.example" (10.20.0.5), port 5432 failed: FATAL: '
+              'password authentication failed for user "groundcheck"')
+    monkeypatch.setattr(dbmod, "_ready", False)
+    monkeypatch.setattr(dbmod, "_last_error", secret)
+    monkeypatch.setattr(dbmod, "_last_reason", "unreachable")
+
+    # The detail is still available to code that asks for it, for the log.
+    # Checked first: serving the request below re-readies the database.
+    assert dbmod.state(detail=True)["error"] == secret
+    assert "error" not in dbmod.state()
+
+    body = mon.get("/api/health").json()
+    text = json.dumps(body)
+    assert "db.internal.trust.example" not in text and "10.20.0.5" not in text
+    assert "password" not in text and "groundcheck" not in text

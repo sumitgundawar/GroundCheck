@@ -583,6 +583,10 @@ def corpus_map() -> JSONResponse:
 @app.get("/api/health")
 def health() -> JSONResponse:
     provider = llm.active_provider()
+    # /api/health is in PUBLIC_API, so this is unauthenticated even when
+    # AUTH_REQUIRED is on. It reports that the database is unreachable, never
+    # the exception text, which names the host, its address and the database
+    # user. The full text is in the log line at db.ready().
     database = db.state()
     backend = audit.store.backend()
     # An instance that is answering but writing nothing down is not healthy,
@@ -640,10 +644,28 @@ def _client_ip(request: Request) -> str:
 
 
 def _is_local_request(request: Request) -> bool:
-    """Whether this came from the machine running the app. Deliberately ignores
-    X-Forwarded-For even from a trusted proxy: a proxy forwarding a request is
-    by definition not the local machine, and claiming an install or managing it
-    is exactly what a remote caller must not be able to do."""
+    """Whether this came from the machine running the app.
+
+    A forwarded request is never local, whatever address it appears to arrive
+    from. Reading the peer address alone is not enough, because two ordinary
+    deployments make a remote caller look like a local one:
+
+      - a reverse proxy terminating TLS on the same host, which the on-premises
+        guide recommends: every remote request then reaches the app from
+        127.0.0.1;
+      - uvicorn started with --proxy-headers --forwarded-allow-ips, which
+        rewrites the socket address from X-Forwarded-For before the app sees
+        it. The Helm chart passed "*", so the attacker chose that address.
+
+    In both, believing the apparent peer hands a remote caller the rights of
+    the machine itself: claiming a fresh install as admin, approving documents
+    the system will then ground answers in, promoting releases. A caller who
+    sends the header on a direct connection only denies themselves.
+    """
+    if request.headers.get("x-forwarded-for") or request.headers.get("forwarded"):
+        return False
+    if _from_trusted_proxy(request):
+        return False
     host = _peer_ip(request)
     try:
         return host == "testclient" or ipaddress.ip_address(host).is_loopback

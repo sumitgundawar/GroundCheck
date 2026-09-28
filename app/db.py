@@ -742,6 +742,7 @@ _ready = False
 
 
 _last_error: str | None = None
+_last_reason: str | None = None
 def ready() -> bool:
     """Migrate once, on first use. Returns False (and the app runs without
     persistence) if the database can't be reached or written."""
@@ -757,15 +758,31 @@ def ready() -> bool:
         # review queue, no alerts. That is a state an operator has to be able
         # to see, so the reason is kept for /api/health and the alert rule
         # rather than living only in one line of stderr.
-        global _last_error
+        global _last_error, _last_reason
         _last_error = f"{type(exc).__name__}: {exc}"
+        # A coarse class for anyone who may see it without signing in. The
+        # exception text names the host, address, port and database user, which
+        # is reconnaissance, not a health signal.
+        name = type(exc).__name__
+        _last_reason = ("unreachable" if "Operational" in name or "Interface" in name
+                        else "misconfigured" if "Argument" in name or "NoSuchModule" in name
+                        else "migration_failed" if "Programming" in name or "Integrity" in name
+                        else "error")
         log.warning("Database unavailable, continuing without persistence: %s", exc,
                     extra={"database": "unavailable"})
         _ready = False
     return _ready
 
 
-def state() -> dict:
-    """Whether questions are being recorded, and why not when they are not."""
-    return {"ready": bool(_ready), "configured": bool(config.DATABASE_URL),
-            "error": None if _ready else _last_error}
+def state(detail: bool = False) -> dict:
+    """Whether questions are being recorded, and why not when they are not.
+
+    `detail` adds the exception text. It names the database host, address, port
+    and user, so it is for the log and for signed-in operators, never for an
+    unauthenticated caller.
+    """
+    out = {"ready": bool(_ready), "configured": bool(config.DATABASE_URL),
+           "reason": None if _ready else _last_reason}
+    if detail:
+        out["error"] = None if _ready else _last_error
+    return out

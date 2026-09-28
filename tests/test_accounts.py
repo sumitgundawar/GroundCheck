@@ -386,3 +386,33 @@ def test_a_correct_code_clears_earlier_failures(database):
     auth.verify_mfa(result.token, pyotp.TOTP(secret).now())
     with db.session() as s:
         assert s.get(db.User, user.id).failed_logins == 0
+
+
+def test_a_forwarded_request_is_never_local(database, monkeypatch):
+    """Reading the peer address alone is not enough. A reverse proxy on the
+    same host, which the on-premises guide recommends, makes every remote
+    request arrive from 127.0.0.1; and uvicorn started with
+    --forwarded-allow-ips rewrites the peer from X-Forwarded-For before the
+    app sees it, which the Helm chart used to enable for every source. In both
+    shapes a remote caller looked local and got the machine's own rights."""
+    from app.main import app
+
+    monkeypatch.setattr(config, "AUTH_REQUIRED", False)
+
+    # A proxy on the same host, forwarding a genuinely remote caller.
+    with TestClient(app, client=conftest.LOOPBACK_PEER) as c:
+        assert c.get("/api/local-ai", headers={"X-Forwarded-For": "203.0.113.9"}
+                     ).json()["can_manage"] is False
+        # And the shape where the attacker chose the address uvicorn reported.
+        assert c.get("/api/local-ai", headers={"X-Forwarded-For": "127.0.0.1"}
+                     ).json()["can_manage"] is False
+        assert c.get("/api/local-ai", headers={"Forwarded": 'for="203.0.113.9"'}
+                     ).json()["can_manage"] is False
+        # A direct connection from the machine itself still manages.
+        assert c.get("/api/local-ai").json()["can_manage"] is True
+
+    monkeypatch.setattr(config, "AUTH_REQUIRED", True)
+    with TestClient(app, client=conftest.LOOPBACK_PEER) as c:
+        assert c.post("/api/auth/first-admin",
+                      json={"email": "attacker@evil.example", "password": PASSWORD},
+                      headers={"X-Forwarded-For": "127.0.0.1"}).status_code == 403
