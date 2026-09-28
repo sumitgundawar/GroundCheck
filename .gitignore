@@ -19,3 +19,7 @@ data/imaging/
 
 # A sampled run writes here, so it can never be mistaken for the full-run evidence.
 eval/*.sample.json
+
+# Launch and social copy. Personal material about shipping this project,
+# not part of the platform anyone installs.
+brag-output/
