@@ -35,7 +35,14 @@ not sure is safer than one that always answers.**
 > regulator. All demo data is synthetic: every condition, medication, lab
 > marker, dosage, and procedure is fictional.
 
-![The GroundCheckHealth app: a sidebar of pages and the Ask page](site/public/screenshots/ask.webp)
+<video src="https://github.com/sumitgundawar/GroundCheck/raw/main/site/public/media/platform-tour.mp4"
+       poster="site/public/media/tour-poster.jpg" controls muted playsinline width="900">
+</video>
+
+*Thirty-six seconds: a grounded answer with its citations, the same pipeline refusing a
+medicine that is in no source, and a dose checked against a five-year-old. If the video does
+not play here, [watch it on the site](https://groundcheckhealth.com) or open
+[`site/public/media/platform-tour.mp4`](site/public/media/platform-tour.mp4).*
 
 ---
 
