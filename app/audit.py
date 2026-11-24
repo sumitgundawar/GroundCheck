@@ -99,11 +99,16 @@ class AuditStore:
         return secrets.token_hex(8)
 
     def save(self, audit_id: str, response: AskResponse, extras: dict[str, Any],
-             user_id: int | None = None, site_id: int | None = None) -> None:
+             user_id: int | None = None, site_id: int | None = None,
+             api_key_id: int | None = None) -> None:
+        total_ms = getattr(response, "total_ms", None)
+        if total_ms is None:
+            total_ms = getattr(response, "latency_ms", 0)
         record = {
             "audit_id": audit_id,
             "user_id": user_id,
             "site_id": site_id,
+            "api_key_id": api_key_id,
             "response": response.model_dump(),
             **{k: v for k, v in extras.items() if k != "raw_query"},
         }
@@ -118,8 +123,9 @@ class AuditStore:
                         user_id=user_id,
                         decision=response.decision,
                         query=str(extras.get("redacted_query", "")),
-                        total_ms=response.total_ms,
-                        llm_used=response.llm_used,
+                        total_ms=total_ms,
+                        llm_used=getattr(response, "llm_used", False),
+                        api_key_id=api_key_id,
                         record=record,
                         test_run=bool(extras.get("test_run")),
                         top_score=_top_score(extras),

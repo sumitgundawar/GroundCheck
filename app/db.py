@@ -157,6 +157,55 @@ class User(Base):
     sessions: Mapped[list["AuthSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
+class ApiKey(Base):
+    """A service account credential. The secret is shown once, at creation; only
+    its prefix (to find the row) and a salted SHA-256 hash are stored."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    prefix: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)
+    salt: Mapped[str] = mapped_column(String(32), nullable=False)
+    hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
+    scopes: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    rpm_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    monthly_quota: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Billable requests so far in `quota_period` (YYYY-MM, UTC), reserved with a
+    # single conditional UPDATE so concurrent requests cannot overshoot.
+    quota_period: Mapped[str] = mapped_column(String(7), nullable=False, default="")
+    quota_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (Index("ix_api_keys_site_id", "site_id"),)
+
+
+class UsageDaily(Base):
+    """One row per day, site, key, endpoint and decision. Counts only: no
+    question or answer text is ever stored here. site_id and api_key_id are 0
+    when there is none."""
+
+    __tablename__ = "usage_daily"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), nullable=False)
+    site_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    api_key_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    endpoint: Mapped[str] = mapped_column(String(64), nullable=False)
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        UniqueConstraint("day", "site_id", "api_key_id", "endpoint", "decision", name="uq_usage_daily"),
+        Index("ix_usage_daily_day", "day"),
+    )
+
+
 class AuthSession(Base):
     """A signed-in browser. Only a SHA-256 hash of the token is stored, so a
     database leak doesn't hand out working sessions."""
@@ -204,10 +253,13 @@ class AuditRecord(Base):
     test_run: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     top_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
+    # The service account that made the request, when it came through the API.
+    api_key_id: Mapped[int | None] = mapped_column(ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True)
 
     __table_args__ = (
         Index("ix_audit_records_created_at", "created_at"),
         Index("ix_audit_records_user_id", "user_id"),
+        Index("ix_audit_records_api_key_id", "api_key_id"),
     )
 
 

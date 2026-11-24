@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document xmlns="urn:hl7-org:v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <id root="5b1f6f0e-0000-4000-8000-000000000001"/>
+  <code code="34391-3" codeSystem="2.16.840.1.113883.6.1" displayName="HUMAN PRESCRIPTION DRUG LABEL"/>
+  <title>ZENTRILEX (zentrilex hydrochloride) tablet, film coated</title>
+  <effectiveTime value="20240115"/>
+  <setId root="5B1F6F0E-0000-4000-8000-0000000000AA"/>
+  <versionNumber value="3"/>
+  <author><time/><assignedEntity><representedOrganization><name>Fictional Pharma Inc.</name></representedOrganization></assignedEntity></author>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <id root="a1"/>
+          <code code="48780-1" codeSystem="2.16.840.1.113883.6.1" displayName="SPL PRODUCT DATA ELEMENTS SECTION"/>
+          <subject>
+            <manufacturedProduct>
+              <manufacturedProduct>
+                <code code="00000-1111" codeSystem="2.16.840.1.113883.6.69"/>
+                <name>Zentrilex</name>
+                <formCode code="C42998" codeSystem="2.16.840.1.113883.3.26.1.1" displayName="TABLET, FILM COATED"/>
+                <asEntityWithGeneric><genericMedicine><name>zentrilex hydrochloride</name></genericMedicine></asEntityWithGeneric>
+                <ingredient classCode="ACTIB">
+                  <quantity><numerator value="10" unit="mg"/><denominator value="1" unit="1"/></quantity>
+                  <ingredientSubstance><code code="ZZZ111" codeSystem="2.16.840.1.113883.4.9"/><name>ZENTRILEX HYDROCHLORIDE</name></ingredientSubstance>
+                </ingredient>
+                <ingredient classCode="IACT">
+                  <quantity><numerator value="50" unit="mg"/><denominator value="1" unit="1"/></quantity>
+                  <ingredientSubstance><name>LACTOSE MONOHYDRATE</name></ingredientSubstance>
+                </ingredient>
+              </manufacturedProduct>
+              <consumedIn><substanceAdministration><routeCode code="C38288" codeSystem="2.16.840.1.113883.3.26.1.1" displayName="ORAL"/></substanceAdministration></consumedIn>
+            </manufacturedProduct>
+          </subject>
+        </section>
+      </component>
+      <component>
+        <section>
+          <id root="s1"/>
+          <code code="34067-9" codeSystem="2.16.840.1.113883.6.1" displayName="INDICATIONS &amp; USAGE SECTION"/>
+          <title>1 INDICATIONS AND USAGE</title>
+          <text><paragraph>Zentrilex is indicated for the treatment of fictional quorl elevation in adults and in pediatric patients 6 years and older.</paragraph></text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <id root="s2"/>
+          <code code="34068-7" codeSystem="2.16.840.1.113883.6.1" displayName="DOSAGE &amp; ADMINISTRATION SECTION"/>
+          <title>2 DOSAGE AND ADMINISTRATION</title>
+          <text><paragraph>Take Zentrilex orally with or without food.</paragraph></text>
+          <component>
+            <section>
+              <id root="s2a"/>
+              <code code="34068-7" codeSystem="2.16.840.1.113883.6.1"/>
+              <title>2.1 Adult Dosage</title>
+              <text><paragraph>The recommended adult dose is 10 mg once daily. The maximum dose is 20 mg per day.</paragraph></text>
+            </section>
+          </component>
+          <component>
+            <section>
+              <id root="s2b"/>
+              <code code="34068-7" codeSystem="2.16.840.1.113883.6.1"/>
+              <title>2.2 Pediatric Dosage</title>
+              <text>
+                <paragraph>For pediatric patients 6 to 11 years, give 5 mg once daily.</paragraph>
+                <list listType="unordered">
+                  <item>Patients 12 years and older: 10 mg once daily</item>
+                  <item>Do not exceed 0.5 mg/kg in a single dose</item>
+                </list>
+              </text>
+            </section>
+          </component>
+        </section>
+      </component>
+      <component>
+        <section>
+          <id root="s3"/>
+          <code code="34070-3" codeSystem="2.16.840.1.113883.6.1" displayName="CONTRAINDICATIONS SECTION"/>
+          <title>4 CONTRAINDICATIONS</title>
+          <text><paragraph>Zentrilex is contraindicated in patients with known hypersensitivity to zentrilex hydrochloride &amp; related quorl modulators.</paragraph></text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <id root="s4"/>
+          <code code="34073-7" codeSystem="2.16.840.1.113883.6.1" displayName="DRUG INTERACTIONS SECTION"/>
+          <title>7 DRUG INTERACTIONS</title>
+          <text>
+            <table width="100%">
+              <thead><tr><th>Drug</th><th>Effect</th></tr></thead>
+              <tbody><tr><td>Orrin-blockers</td><td>Do not combine</td></tr></tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <id root="s5"/>
+          <code code="43684-0" codeSystem="2.16.840.1.113883.6.1" displayName="USE IN SPECIFIC POPULATIONS SECTION"/>
+          <title>8 USE IN SPECIFIC POPULATIONS</title>
+          <component>
+            <section>
+              <id root="s5a"/>
+              <code code="34081-0" codeSystem="2.16.840.1.113883.6.1" displayName="PEDIATRIC USE SECTION"/>
+              <title>8.4 Pediatric Use</title>
+              <text><paragraph>Safety and effectiveness have not been established in patients younger than 6 years.</paragraph></text>
+            </section>
+          </component>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</document>

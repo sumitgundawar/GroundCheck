@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "groundcheck-client"
+version = "0.1.0"
+description = "Python client for the GroundCheck verification API"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+classifiers = ["Typing :: Typed"]
+
+[tool.setuptools]
+packages = ["groundcheck_client"]
+
+[tool.setuptools.package-data]
+groundcheck_client = ["py.typed"]

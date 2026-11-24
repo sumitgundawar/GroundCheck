@@ -1,0 +1,59 @@
+{
+  "decision": "fail",
+  "reason_code": "dose_unsupported",
+  "claims": [
+    {
+      "text": "The standard dose of Caloradine is 500 mg twice daily.",
+      "grounded": false,
+      "source_id": "CALO-001",
+      "support": {
+        "source_id": "CALO-001",
+        "start": 0,
+        "end": 194,
+        "sentence": "Caloradine is a fictional oral agent used in the management of Veltris syndrome. The standard adult regimen is 15 mg once daily, taken in the morning with food, for an initial course of 14 days."
+      },
+      "relevance": 0.8443,
+      "issues": [
+        "the number 500 is not stated by the source",
+        "'500 mg' is not stated by the source",
+        "'twice' changes the meaning and is not in the source",
+        "the value '500 mg' is not supported by a source about this medicine"
+      ]
+    }
+  ],
+  "unsupported_claims": [
+    0
+  ],
+  "dose_issues": [
+    {
+      "claim": 0,
+      "value": "500 mg",
+      "message": "the value '500 mg' is not supported by a source about this medicine"
+    }
+  ],
+  "explanation": {
+    "summary": "A dose in the answer is not stated by a source about that medicine.",
+    "missing_terms": [],
+    "suggestions": []
+  },
+  "redaction": {
+    "kinds": {},
+    "redacted_query": "What is the standard dose of Caloradine?",
+    "redacted_answer": "The standard dose of Caloradine is 500 mg twice daily."
+  },
+  "audit_id": "rec-ver-2",
+  "latency_ms": 42,
+  "sources": [
+    {
+      "id": "CALO-001",
+      "title": "Caloradine: standard regimen",
+      "topic": "caloradine"
+    }
+  ],
+  "patient_findings": [],
+  "review": {
+    "routed": false,
+    "case_id": null,
+    "note": ""
+  }
+}

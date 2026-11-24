@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document xmlns="urn:hl7-org:v3">
+  <title>THYRONEX (levothyronex sodium) tablet</title>
+  <effectiveTime value="20210910"/>
+  <setId root="5b1f6f0e-0000-4000-8000-0000000000dd"/>
+  <author><assignedEntity><representedOrganization><name>Placeholder Biologics</name></representedOrganization></assignedEntity></author>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48780-1"/>
+          <subject>
+            <manufacturedProduct>
+              <manufacturedProduct>
+                <name>Thyronex</name>
+                <formCode displayName="TABLET"/>
+                <ingredient classCode="ACTIB">
+                  <quantity><numerator value="25" unit="ug"/><denominator value="1" unit="1"/></quantity>
+                  <ingredientSubstance><name>LEVOTHYRONEX SODIUM</name></ingredientSubstance>
+                </ingredient>
+                <ingredient classCode="ACTIB">
+                  <quantity><numerator value="1,000" unit="ug"/><denominator value="1" unit="1"/></quantity>
+                  <ingredientSubstance><name>LEVOTHYRONEX SODIUM</name></ingredientSubstance>
+                </ingredient>
+              </manufacturedProduct>
+              <consumedIn><substanceAdministration><routeCode displayName="ORAL"/></substanceAdministration></consumedIn>
+            </manufacturedProduct>
+          </subject>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="34068-7"/>
+          <title>DOSAGE AND ADMINISTRATION</title>
+          <text><paragraph>Start Thyronex at 25 mcg once daily in adults. Titrate in 25 mcg to 50 mcg steps every 6 weeks.</paragraph></text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</document>

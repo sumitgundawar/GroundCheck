@@ -197,3 +197,59 @@ def reset() -> None:
     global _index
     with _lock:
         _index = None
+
+
+# --- Adapters ----------------------------------------------------------------
+# An adapter turns an external source (a CSV export, a licensed drug database)
+# into a validated Formulary. It reports every problem with a row and column
+# rather than dropping rows silently.
+
+from dataclasses import dataclass, field  # noqa: E402
+from typing import Any, Protocol  # noqa: E402
+
+
+@dataclass(frozen=True)
+class RowError:
+    row: int                 # 1 is the header; the first data row is 2. 0 means the file as a whole.
+    column: str
+    message: str
+
+    def __str__(self) -> str:
+        where = f"row {self.row}" if self.row else "file"
+        return f"{where}, column {self.column!r}: {self.message}" if self.column else f"{where}: {self.message}"
+
+
+@dataclass
+class AdapterResult:
+    formulary: Formulary | None
+    errors: list[RowError] = field(default_factory=list)
+    rows_read: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return self.formulary is not None and not self.errors
+
+
+class FormularyAdapter(Protocol):
+    name: str
+
+    def load(self, source: Any, *, formulary_name: str, version: str, synthetic: bool = False,
+             strict: bool = True) -> AdapterResult: ...
+
+
+_adapters: dict[str, FormularyAdapter] = {}
+
+
+def register_adapter(adapter: FormularyAdapter) -> None:
+    _adapters[adapter.name] = adapter
+
+
+def get_adapter(name: str) -> FormularyAdapter:
+    if name == "csv" and "csv" not in _adapters:
+        from .formulary_adapters import csv_adapter  # registers itself
+
+        csv_adapter.register()
+    try:
+        return _adapters[name]
+    except KeyError:
+        raise KeyError(f"No formulary adapter named {name!r}. Available: {', '.join(sorted(_adapters)) or 'none'}.") from None

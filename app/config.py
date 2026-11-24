@@ -112,6 +112,16 @@ MAX_QUERY_CHARS = 400
 # public deployment from a single client draining the LLM quota.
 RATE_LIMIT_PER_MINUTE = _get_int("RATE_LIMIT_PER_MINUTE", 30)
 
+# --- Service API (/api/v1) ----------------------------------------------------
+# Requests per minute for each API key unless the key sets its own, and the
+# monthly cap on billable requests (0 means no cap).
+API_KEY_RPM = _get_int("API_KEY_RPM", 60)
+API_KEY_MONTHLY_QUOTA = _get_int("API_KEY_MONTHLY_QUOTA", 0)
+API_MAX_BODY_BYTES = _get_int("API_MAX_BODY_BYTES", 262144)
+API_MAX_ANSWER_CHARS = _get_int("API_MAX_ANSWER_CHARS", 8000)
+API_MAX_SOURCES = 20
+API_MAX_CLAIMS = 40
+
 # Force extractive mode even when an API key is present. Use this to expose a
 # public demo without spending the LLM quota; run the live model from localhost.
 FORCE_EXTRACTIVE = _get("FORCE_EXTRACTIVE", "false").lower() in ("1", "true", "yes")

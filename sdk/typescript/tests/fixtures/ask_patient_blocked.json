@@ -1,0 +1,285 @@
+{
+  "decision": "refuse",
+  "outcome": "refused",
+  "answer_text": "I cannot answer this safely. The answer's 15 mg is too high: the patient's eGFR is 45. Halve the dose when eGFR is 30 to 59. The formulary gives 7.5 mg once daily. It was not sent for review (this was a test run).",
+  "refused_reason": "the answer's 15 mg is too high: the patient's eGFR is 45. Halve the dose when eGFR is 30 to 59. The formulary gives 7.5 mg once daily",
+  "claims": [
+    {
+      "text": "The standard adult regimen is 15 mg once daily, taken in the morning with food, for an initial course of 14 days.",
+      "source_ids": [
+        "CALO-001"
+      ],
+      "grounded": true,
+      "grounding_score": 1.0,
+      "relevance": 0.6104,
+      "support": {
+        "source_id": "CALO-001",
+        "start": 81,
+        "end": 194,
+        "sentence": "The standard adult regimen is 15 mg once daily, taken in the morning with food, for an initial course of 14 days."
+      }
+    }
+  ],
+  "sources": [
+    {
+      "id": "CALO-001",
+      "title": "Caloradine: standard regimen",
+      "snippet": "Caloradine is a fictional oral agent used in the management of Veltris syndrome. The standard adult regimen is 15 mg once daily, taken in the morning with food, for an initial course of 14 days. Common side effects in this fictional model include mild drowsiness and dry mouth. Caloradine should not be combined with Orrin-blockers.",
+      "score": 0.7395,
+      "topic": "caloradine",
+      "section": "Dosage and Administration",
+      "kind": "drug",
+      "rank": 1,
+      "above_gate": true
+    },
+    {
+      "id": "VELT-002",
+      "title": "Veltris syndrome: first-line medication",
+      "snippet": "When pharmacological treatment of Veltris syndrome is indicated, the first-line agent is Caloradine. Caloradine is started at 15 mg once daily for 14 days, then reviewed. The dose is not increased without specialist input. Caloradine is contraindicated in patients with known quorl sensitivity.",
+      "score": 0.6463,
+      "topic": "veltris syndrome",
+      "section": "Treatment",
+      "kind": "condition",
+      "rank": 2,
+      "above_gate": true
+    },
+    {
+      "id": "INTR-001",
+      "title": "Interactions: Orrin-blockers",
+      "snippet": "Orrin-blockers are a fictional drug class that must not be combined with Caloradine or Mendel solution. Combining them in this fictional model increases the risk of transient dizziness and is therefore avoided.",
+      "score": 0.4284,
+      "topic": "interactions",
+      "section": "Drug Interactions",
+      "kind": "reference",
+      "rank": 3,
+      "above_gate": true
+    },
+    {
+      "id": "PIST-D0662",
+      "title": "Pistadulex solution: dosage and administration",
+      "snippet": "The standard adult regimen of Pistadulex solution is 40 mg every 12 hours, taken twice daily with water, for an initial course of 7 days. The dose is not increased without specialist input.",
+      "score": 0.557,
+      "topic": "pistadulex",
+      "section": "Dosage and Administration",
+      "kind": "drug",
+      "rank": 4,
+      "above_gate": true
+    }
+  ],
+  "trace": [
+    {
+      "name": "pii redaction",
+      "status": "pass",
+      "detail": "no identifiers found",
+      "ms": 0,
+      "explain": "Before anything is logged, embedded, or sent to a model, identifiers are replaced with placeholders such as [NAME] and [DATE]. Each detector proposes spans with a score; checksums (NHS mod-11, Luhn for cards and provider numbers, mod-97 for IBANs, social security rules) and real calendar dates confirm them, and nearby cue words ('patient', 'husband', 'DOB') raise or lower the score. Names come from titles, relation and role cues, 'SURNAME, Given', and a bundled list of given names; words the documents know, medicine names and months are never names, and a dose or an age under 90 is never removed. If spaCy or Presidio is installed it can add people and places. Ages over 89 become 90. This is a safety net, not a guarantee.",
+      "data": null
+    },
+    {
+      "name": "scope check",
+      "status": "pass",
+      "detail": "no scope or injection issues",
+      "ms": 0,
+      "explain": "Rejects empty or over-long queries and obvious prompt-injection patterns such as 'ignore previous instructions'. A blocked query refuses here and goes no further.",
+      "data": null
+    },
+    {
+      "name": "rate limit",
+      "status": "pass",
+      "detail": "within rate limit",
+      "ms": 0,
+      "explain": "A simple in-memory limiter caps requests per minute per process, so a burst of traffic cannot overwhelm the service.",
+      "data": null
+    },
+    {
+      "name": "retrieve",
+      "status": "pass",
+      "detail": "top-4 from corpus (keyword + embedding), best score 0.74",
+      "ms": 3,
+      "explain": "The query is embedded with a sentence-transformer and compared against every document vector in the vector store, alongside a keyword search. The top-k passages are returned with cosine similarity scores.",
+      "data": {
+        "results": [
+          {
+            "id": "CALO-001",
+            "title": "Caloradine: standard regimen",
+            "score": 0.7395,
+            "kind": "drug",
+            "section": "Dosage and Administration"
+          },
+          {
+            "id": "VELT-002",
+            "title": "Veltris syndrome: first-line medication",
+            "score": 0.6463,
+            "kind": "condition",
+            "section": "Treatment"
+          },
+          {
+            "id": "INTR-001",
+            "title": "Interactions: Orrin-blockers",
+            "score": 0.4284,
+            "kind": "reference",
+            "section": "Drug Interactions"
+          },
+          {
+            "id": "PIST-D0662",
+            "title": "Pistadulex solution: dosage and administration",
+            "score": 0.557,
+            "kind": "drug",
+            "section": "Dosage and Administration"
+          }
+        ]
+      }
+    },
+    {
+      "name": "retrieval gate",
+      "status": "pass",
+      "detail": "best score 0.74 clears threshold 0.30",
+      "ms": 0,
+      "explain": "If even the best passage scores below the retrieval threshold, the system refuses now, before any text is generated. The cheapest refusal happens before a model is ever called.",
+      "data": {
+        "best_score": 0.7395,
+        "threshold": 0.3,
+        "cleared": true
+      }
+    },
+    {
+      "name": "source coverage",
+      "status": "pass",
+      "detail": "all question terms are represented in the retrieved sources",
+      "ms": 0,
+      "explain": "A deterministic check that the contentful terms in the question (drug and condition names, clinical terms, qualifiers like 'children') appear in the retrieved sources; everyday words like 'email' or 'meeting' are not held against them. A term the index has but the passages lack gets one more search aimed at it, kept to the topic the question names. Catches questions about things the corpus never mentions, before generation.",
+      "data": {
+        "checked_terms": [
+          "caloradine"
+        ],
+        "covered": [
+          "caloradine"
+        ],
+        "uncovered": [],
+        "in_index": {},
+        "question_values": [],
+        "unsupported_values": [],
+        "unsupported_forms": [],
+        "age": null,
+        "unanswerable_request": null
+      }
+    },
+    {
+      "name": "generate",
+      "status": "info",
+      "detail": "extractive fallback",
+      "ms": 1,
+      "explain": "The question and the retrieved sources are sent to the LLM, which must return structured JSON: a list of claims, each citing the source ids it came from. With no API key, an extractive fallback picks up to three sentences from the passages about the topic, scored on meaning, on the question's own words and on whether the passage is the kind of section that answers it (dose, side effects, symptoms...), and gives each part of a two-part question its own sentence. Either way the output is the same shape and passes through the same guards.",
+      "data": null
+    },
+    {
+      "name": "schema validate",
+      "status": "pass",
+      "detail": "1 claim(s) conform to schema",
+      "ms": 0,
+      "explain": "The model output is parsed and validated against a strict Pydantic schema. Malformed output is retried once, then falls back to extractive. Free-text answers are never accepted.",
+      "data": null
+    },
+    {
+      "name": "grounding check",
+      "status": "pass",
+      "detail": "all 1 claim(s) grounded in cited sources",
+      "ms": 20,
+      "explain": "For every claim, a deterministic embedding similarity is computed between the claim and its cited source. The claim must cite a real source and clear the grounding threshold, and a sentence that names no medicine must belong to the passage it cites: every name and clinical term in it has to be in that passage. Each claim also records how relevant it is to the question and where in the passage it sits, for information only. When a live LLM is configured, a second, cheaper model acts as a judge and is asked, strictly, whether the source supports the claim. The deterministic result is authoritative; the judge is recorded as corroboration so the demo stays reproducible.",
+      "data": {
+        "claims": [
+          {
+            "claim": "The standard adult regimen is 15 mg once daily, taken in the morning with food, for an initial course of 14 days.",
+            "source_ids": [
+              "CALO-001"
+            ],
+            "deterministic_score": 1.0,
+            "threshold": 0.45,
+            "grounded": true,
+            "relevance": 0.6104,
+            "judge": null
+          }
+        ],
+        "method": "deterministic embedding similarity",
+        "judge_model": null,
+        "judge_summary": "judge not run"
+      }
+    },
+    {
+      "name": "dosage guard",
+      "status": "pass",
+      "detail": "15 mg verified against sources",
+      "ms": 0,
+      "explain": "The showpiece check, and deterministic: every value with a clinical unit in the answer (for example '15 mg') must be stated by a retrieved source about the medicine it is attributed to. Numbers and units are compared, so '15 mg' and 'fifteen milligrams' match and '15 mcg' does not. Otherwise the system refuses and names the offending value.",
+      "data": {
+        "detected_values": [
+          "15 mg"
+        ],
+        "verified": [
+          "15 mg"
+        ],
+        "rule": "every value-with-unit must be stated by a retrieved source about the same medicine",
+        "ok": true
+      }
+    },
+    {
+      "name": "patient checks",
+      "status": "fail",
+      "detail": "The answer's 15 mg is too high: the patient's eGFR is 45. Halve the dose when eGFR is 30 to 59. The formulary gives 7.5 mg once daily.",
+      "ms": 0,
+      "explain": "When the question is about a specific patient, the formulary's rules for every medicine named are applied to that patient: allergies, conditions, interactions with current medicines, age, weight, kidney and liver function, pregnancy, lab results and high-alert status. A problem that makes the answer unsafe refuses it; others are shown as warnings.",
+      "data": {
+        "medicines": [
+          "Caloradine"
+        ],
+        "findings": [
+          {
+            "severity": "block",
+            "code": "renal_dose",
+            "medicine": "Caloradine",
+            "message": "The answer's 15 mg is too high: the patient's eGFR is 45. Halve the dose when eGFR is 30 to 59. The formulary gives 7.5 mg once daily.",
+            "rule_id": "CALO-RENAL-2",
+            "source": "Demo formulary (synthetic)"
+          }
+        ],
+        "derived": {}
+      }
+    },
+    {
+      "name": "decision",
+      "status": "fail",
+      "detail": "REFUSE, the answer's 15 mg is too high: the patient's eGFR is 45. Halve the dose when eGFR is 30 to 59. The formulary gives 7.5 mg once daily",
+      "ms": 0,
+      "explain": "The gate. Refuse if any input guard blocked, the retrieval gate failed, coverage failed, the model had insufficient context, any claim is ungrounded, or the dosage guard failed. A refusal is put in the review queue when one is running, and the answer says whether it was; the reason is also given as a stable code. Otherwise answer, assembling the grounded claims into prose with bracketed citations.",
+      "data": null
+    }
+  ],
+  "audit_id": "rec-ask-3",
+  "total_ms": 25,
+  "llm_used": false,
+  "patient_findings": [
+    {
+      "severity": "block",
+      "code": "renal_dose",
+      "medicine": "Caloradine",
+      "message": "The answer's 15 mg is too high: the patient's eGFR is 45. Halve the dose when eGFR is 30 to 59. The formulary gives 7.5 mg once daily.",
+      "rule_id": "CALO-RENAL-2",
+      "source": "Demo formulary (synthetic)"
+    }
+  ],
+  "reason_code": "patient_unsafe",
+  "review": {
+    "routed": false,
+    "case_id": null,
+    "note": "this was a test run"
+  },
+  "explanation": {
+    "summary": "The patient's details make the answer unsafe to give.",
+    "missing_terms": [],
+    "suggestions": []
+  },
+  "redaction": {
+    "kinds": {},
+    "redacted_query": "What is the standard dose of Caloradine?"
+  }
+}

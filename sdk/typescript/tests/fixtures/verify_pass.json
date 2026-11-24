@@ -1,0 +1,46 @@
+{
+  "decision": "pass",
+  "reason_code": "verified",
+  "claims": [
+    {
+      "text": "The standard adult regimen is 15 mg once daily, taken in the morning with food, for an initial course of 14 days.",
+      "grounded": true,
+      "source_id": "CALO-001",
+      "support": {
+        "source_id": "CALO-001",
+        "start": 81,
+        "end": 194,
+        "sentence": "The standard adult regimen is 15 mg once daily, taken in the morning with food, for an initial course of 14 days."
+      },
+      "relevance": 0.559,
+      "issues": []
+    }
+  ],
+  "unsupported_claims": [],
+  "dose_issues": [],
+  "explanation": {
+    "summary": "Every claim is stated by a trusted source and every dose matches.",
+    "missing_terms": [],
+    "suggestions": []
+  },
+  "redaction": {
+    "kinds": {},
+    "redacted_query": "What is the standard dose of Caloradine?",
+    "redacted_answer": "The standard adult regimen is 15 mg once daily, taken in the morning with food, for an initial course of 14 days."
+  },
+  "audit_id": "rec-ver-1",
+  "latency_ms": 30,
+  "sources": [
+    {
+      "id": "CALO-001",
+      "title": "Caloradine: standard regimen",
+      "topic": "caloradine"
+    }
+  ],
+  "patient_findings": [],
+  "review": {
+    "routed": false,
+    "case_id": null,
+    "note": ""
+  }
+}

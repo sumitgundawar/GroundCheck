@@ -1,0 +1,464 @@
+{
+  "cases": 1635,
+  "correct_answers": 482,
+  "wrong_answers": 1153,
+  "wrong_pass": 0,
+  "false_fail": 0,
+  "false_fail_rate": 0.0,
+  "false_review": 8,
+  "missed_fail": 0,
+  "redaction_missed": 0,
+  "p50_ms": 28.2,
+  "p95_ms": 57.1,
+  "by_category": {
+    "answer_to_other_question": {
+      "total": 149,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "bare_yes": {
+      "total": 15,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "citation_nonexistent": {
+      "total": 50,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "citation_outside_sources": {
+      "total": 50,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "contradiction": {
+      "total": 74,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_bullets": {
+      "total": 25,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_closer": {
+      "total": 30,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_hedged": {
+      "total": 38,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 7,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_lowercase": {
+      "total": 22,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_no_citations": {
+      "total": 75,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_numbers_in_words": {
+      "total": 13,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_reordered": {
+      "total": 7,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_unit_spelling": {
+      "total": 13,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_verbatim": {
+      "total": 150,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_with_sources": {
+      "total": 50,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "correct_zero_width": {
+      "total": 19,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "digit_transposition": {
+      "total": 8,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "fabricated": {
+      "total": 13,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_children": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_combination": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_combination_ok": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_correct": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_cure": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_emoji_only": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_empty_claims": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_fullwidth": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_gram": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_homoglyph": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_html": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_microgram": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_overdose": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_rtl": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_sql": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_words": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_words_wrong": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "hand_wrong_drug_dose": {
+      "total": 1,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "injection_in_answer": {
+      "total": 13,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "invented_drug": {
+      "total": 88,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "invented_sentence": {
+      "total": 17,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "negation_added": {
+      "total": 117,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "negation_dropped": {
+      "total": 16,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "partly_correct": {
+      "total": 14,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "patient_safe": {
+      "total": 15,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "patient_unsafe": {
+      "total": 45,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "pii_in_answer": {
+      "total": 10,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "pii_in_question": {
+      "total": 10,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 1,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "random_word_swap": {
+      "total": 148,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "refusal": {
+      "total": 15,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "swapped_condition": {
+      "total": 43,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "swapped_drug": {
+      "total": 88,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "typo_drug": {
+      "total": 45,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "wrong_dose": {
+      "total": 27,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "wrong_dose_hedged": {
+      "total": 12,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "wrong_duration": {
+      "total": 27,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "wrong_side_effect": {
+      "total": 39,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    },
+    "wrong_unit": {
+      "total": 27,
+      "wrong_pass": 0,
+      "false_fail": 0,
+      "false_review": 0,
+      "missed_fail": 0,
+      "redaction_missed": 0
+    }
+  },
+  "targets_met": true
+}

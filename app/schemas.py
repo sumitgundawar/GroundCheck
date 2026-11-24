@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator, model_validator
 
 from . import config
 
@@ -210,3 +210,110 @@ class LLMClaim(BaseModel):
 class LLMAnswer(BaseModel):
     insufficient_context: bool
     claims: list[LLMClaim] = []
+
+
+# --- /api/v1 -----------------------------------------------------------------
+
+VerifyDecision = Literal["pass", "fail", "review"]
+VerifyReason = Literal[
+    "verified", "input_blocked", "claim_ungrounded", "dose_unsupported", "patient_unsafe", "citation_invalid",
+    "answer_off_topic", "claim_unverified", "no_checkable_claims", "no_relevant_source",
+]
+
+
+def _clean_text(value: str, what: str) -> str:
+    if any(ord(c) < 32 and c not in "\t\n\r" or ord(c) == 127 for c in value):
+        raise ValueError(f"{what} contains control characters")
+    if not value.strip():
+        raise ValueError(f"{what} is empty")
+    return value
+
+
+class V1AskRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: StrictStr
+    site: StrictStr | None = Field(default=None, max_length=64)
+    patient: PatientContext | None = None
+
+    @field_validator("question")
+    @classmethod
+    def _question(cls, value: str) -> str:
+        value = _clean_text(value, "question")
+        if len(value.strip()) > config.MAX_QUERY_CHARS:
+            raise ValueError(f"question is longer than {config.MAX_QUERY_CHARS} characters")
+        return value
+
+
+class V1VerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: StrictStr
+    answer: StrictStr
+    site: StrictStr | None = Field(default=None, max_length=64)
+    sources: list[StrictStr] | None = Field(default=None, max_length=config.API_MAX_SOURCES)
+    patient: PatientContext | None = None
+
+    @field_validator("question")
+    @classmethod
+    def _question(cls, value: str) -> str:
+        value = _clean_text(value, "question")
+        if len(value.strip()) > config.MAX_QUERY_CHARS:
+            raise ValueError(f"question is longer than {config.MAX_QUERY_CHARS} characters")
+        return value
+
+    @field_validator("answer")
+    @classmethod
+    def _answer(cls, value: str) -> str:
+        value = _clean_text(value, "answer")
+        if len(value) > config.API_MAX_ANSWER_CHARS:
+            raise ValueError(f"answer is longer than {config.API_MAX_ANSWER_CHARS} characters")
+        return value
+
+    @field_validator("sources")
+    @classmethod
+    def _sources(cls, values: list[str] | None) -> list[str] | None:
+        if values is None:
+            return None
+        cleaned = list(dict.fromkeys(v.strip() for v in values))
+        if not cleaned or any(not v or len(v) > 64 or any(ord(c) < 33 or ord(c) == 127 for c in v) for v in cleaned):
+            raise ValueError("sources must be a non-empty list of source ids")
+        return cleaned
+
+
+class VerifiedClaim(BaseModel):
+    text: str
+    grounded: bool
+    source_id: str | None = None
+    support: ClaimSupport | None = None
+    relevance: float = 0.0
+    issues: list[str] = []
+
+
+class DoseIssue(BaseModel):
+    claim: int
+    value: str
+    message: str
+
+
+class VerifyRedaction(Redaction):
+    redacted_answer: str = ""
+
+
+class VerifySource(BaseModel):
+    id: str
+    title: str
+    topic: str = ""
+
+
+class VerifyResponse(BaseModel):
+    decision: VerifyDecision
+    reason_code: VerifyReason
+    claims: list[VerifiedClaim] = []
+    unsupported_claims: list[int] = []
+    dose_issues: list[DoseIssue] = []
+    explanation: Explanation = Explanation()
+    redaction: VerifyRedaction = VerifyRedaction()
+    audit_id: str
+    latency_ms: int
+    sources: list[VerifySource] = []
+    patient_findings: list[PatientFinding] = []
+    review: Review = Review()

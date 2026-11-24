@@ -1,0 +1,11 @@
+{
+  "group_by": "day",
+  "from": "2026-11-01",
+  "to": "2026-11-24",
+  "rows": [
+    { "day": "2026-11-23", "requests": 12, "billable": 10, "decisions": { "pass": 8, "fail": 2, "refused": 2 } },
+    { "day": "2026-11-24", "requests": 5, "billable": 4, "decisions": { "pass": 4, "rate_limited": 1 } }
+  ],
+  "total": 17,
+  "billable": 14
+}

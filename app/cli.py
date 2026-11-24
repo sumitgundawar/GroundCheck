@@ -12,6 +12,10 @@
     python -m app.cli verify-audit
     python -m app.cli audit-head
     python -m app.cli retention [--apply]
+    python -m app.cli pack keygen --out publisher.key
+    python -m app.cli pack build SRC_DIR OUT.gcpack [--sign-key publisher.key]
+    python -m app.cli pack inspect FILE.gcpack
+    python -m app.cli pack import FILE.gcpack [--override --reason TEXT] [--allow-downgrade]
 
 Passwords are always prompted for, never passed as arguments, so they don't
 end up in shell history."""
@@ -20,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import sys
 
 from . import auth, db, encryption
@@ -53,8 +58,25 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("audit-head", help="Print the audit chain head, to record somewhere else")
     keep = sub.add_parser("retention", help="Show, or with --apply delete, records past their retention period")
     keep.add_argument("--apply", action="store_true", help="Delete them")
+    pack = sub.add_parser("pack", help="Build, inspect and import knowledge packs")
+    pack_sub = pack.add_subparsers(dest="pack_command", required=True)
+    keygen = pack_sub.add_parser("keygen", help="Create a signing key for a publisher")
+    keygen.add_argument("--out", required=True, help="File to write the private key to")
+    build = pack_sub.add_parser("build", help="Build a pack from a folder")
+    build.add_argument("source")
+    build.add_argument("output")
+    build.add_argument("--sign-key", help="Private key file from `pack keygen`")
+    look = pack_sub.add_parser("inspect", help="Show a pack's manifest and whether it can be trusted")
+    look.add_argument("file")
+    load = pack_sub.add_parser("import", help="Import a pack's documents as pending versions")
+    load.add_argument("file")
+    load.add_argument("--override", action="store_true", help="Import although the pack is unsigned or untrusted")
+    load.add_argument("--reason", default="", help="Why the override is justified (recorded in the audit trail)")
+    load.add_argument("--allow-downgrade", action="store_true", help="Import a version older than one already imported")
     args = parser.parse_args(argv)
 
+    if args.command == "pack" and args.pack_command in ("keygen", "build", "inspect"):
+        return _pack_offline(args)
     try:
         if args.command == "generate-key":
             print(encryption.generate_key())
@@ -121,6 +143,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "audit-head":
             head = integrity.head()
             print(f"{head['seq']} {head['hash']} {head['updated_at']}")
+        elif args.command == "pack":
+            return _pack_import(args)
         elif args.command == "retention":
             from . import retention
 
@@ -140,6 +164,77 @@ def main(argv: list[str] | None = None) -> int:
     except auth.AuthError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
+    return 0
+
+
+def _pack_offline(args) -> int:
+    """Pack commands that need neither the database nor the app's keys."""
+    from pathlib import Path
+
+    from . import packs
+
+    try:
+        if args.pack_command == "keygen":
+            out = Path(args.out)
+            if out.exists():
+                raise packs.PackError(f"{out} already exists; refusing to overwrite a key.")
+            private, public = packs.generate_keypair()
+            fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w") as fh:
+                fh.write(private + "\n")
+            print(f"Private key written to {out}. Keep it secret.")
+            print(f"Public key (for PACK_TRUSTED_KEYS as publisher={public}):\n{public}")
+        elif args.pack_command == "build":
+            key = None
+            if args.sign_key:
+                try:
+                    key = packs.decode_key(Path(args.sign_key).read_text(encoding="utf-8"))
+                except OSError as exc:
+                    raise packs.PackError(f"Couldn't read the key file: {exc.strerror}") from None
+            info = packs.build_pack(Path(args.source), Path(args.output), key)
+            print(f"Built {info['name']} {info['version']}: {info['files']} files, "
+                  f"{'signed' if info['signed'] else 'unsigned'}, sha256 {info['sha256']}")
+            print(f"Wrote {info['path']}")
+        else:
+            info = packs.inspect_pack(Path(args.file))
+            print(f"{info['name']} {info['version']} by {info['publisher']} ({info['licence']}, {info['jurisdiction']})")
+            if info["description"]:
+                print(f"  {info['description']}")
+            print(f"  effective {info['effective_from'] or 'always'}, expires {info['expires_on'] or 'never'}"
+                  f"{', synthetic' if info['synthetic'] else ''}")
+            for f in info["files"]:
+                print(f"  {f['kind']:<9} {f['path']}  {f['size']} bytes")
+            v = info["verification"]
+            for problem in v["problems"]:
+                print(f"  PROBLEM: {problem}")
+            print(f"Signature: {v['signature']}. {v['detail']}")
+            return 0 if v["trusted"] else 2
+    except packs.PackError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _pack_import(args) -> int:
+    from pathlib import Path
+
+    from . import packs
+
+    try:
+        result = packs.import_pack(Path(args.file), override=args.override, override_reason=args.reason,
+                                   allow_downgrade=args.allow_downgrade)
+    except packs.PackError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    if result["status"] == "already_imported":
+        print(f"{result['name']} {result['version']} was already imported; nothing changed.")
+        return 0
+    print(f"Imported {result['name']} {result['version']}: {len(result['documents'])} documents are pending approval"
+          f"{', ' + str(len(result['skipped'])) + ' unchanged and skipped' if result['skipped'] else ''}.")
+    if result["override_used"]:
+        print(f"Override recorded in the audit trail ({result['audit_id']}).")
+    if result["formulary_path"]:
+        print(f"Formulary staged at {result['formulary_path']} (not active; point FORMULARY_PATH at it to use it).")
     return 0
 
 

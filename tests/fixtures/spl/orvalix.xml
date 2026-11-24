@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document xmlns="urn:hl7-org:v3">
+  <id root="5b1f6f0e-0000-4000-8000-000000000002"/>
+  <title>ORVALIX (orvalix sulfate) solution</title>
+  <effectiveTime value="20230601"/>
+  <setId root="5b1f6f0e-0000-4000-8000-0000000000bb"/>
+  <author><assignedEntity><representedOrganization><name>Example Laboratories</name></representedOrganization></assignedEntity></author>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48780-1"/>
+          <subject>
+            <manufacturedProduct>
+              <manufacturedProduct>
+                <name>Orvalix</name>
+                <formCode code="C42986" displayName="SOLUTION"/>
+                <asEntityWithGeneric><genericMedicine><name>orvalix sulfate</name></genericMedicine></asEntityWithGeneric>
+                <ingredient classCode="ACTIB">
+                  <quantity><numerator value="5" unit="mg"/><denominator value="1" unit="mL"/></quantity>
+                  <ingredientSubstance><name>ORVALIX SULFATE</name></ingredientSubstance>
+                </ingredient>
+              </manufacturedProduct>
+              <consumedIn><substanceAdministration><routeCode displayName="ORAL"/></substanceAdministration></consumedIn>
+            </manufacturedProduct>
+          </subject>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="34067-9"/>
+          <title>INDICATIONS AND USAGE</title>
+          <text><paragraph>Orvalix oral solution is indicated for relief of fictional tremor episodes.</paragraph></text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="34068-7"/>
+          <title>DOSAGE AND ADMINISTRATION</title>
+          <text>
+            <paragraph>Adults: 5 to 10 mL (25 to 50 mg) every 6 hours as needed. Do not exceed 40 mL in 24 hours.</paragraph>
+            <paragraph>Children 2 to 5 years: 2.5 mL (12.5 mg) every 6 hours. Pediatric dosing may also be calculated as 0.25 mg/kg per dose.</paragraph>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="34070-3"/>
+          <title>CONTRAINDICATIONS</title>
+          <text><paragraph>None known.</paragraph></text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</document>

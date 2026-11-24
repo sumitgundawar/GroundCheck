@@ -13,6 +13,7 @@ import re
 import threading
 import time
 from collections import OrderedDict
+from dataclasses import dataclass, field
 
 from . import audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, retrieval
 from .schemas import (AskResponse, Claim, ClaimSupport, Explanation, PatientContext, PatientFinding, Redaction, Review, Settings,
@@ -111,7 +112,7 @@ def _finish(
     outcome = outcome or ("answered" if decision == "answer" else "refused")
     from . import sites
 
-    site_id = sites.of_user(extras.get("user_id"))
+    site_id = extras["site_id"] if "site_id" in extras else sites.of_user(extras.get("user_id"))
     review = Review()
     if decision == "refuse":
         review = _route(review=extras.get("review", True), check_only=bool(extras.get("check_only")),
@@ -152,13 +153,14 @@ def _finish(
     if extras.get("check_only"):
         return response
     saved = {k: v for k, v in extras.items()
-             if k not in ("user_id", "review", "check_only", "remember", "raw_query", "redaction")}
+             if k not in ("user_id", "review", "check_only", "remember", "raw_query", "redaction", "site_id", "api_key_id")}
     key = extras.get("remember")
     if key and not any(step.name == "rate limit" and step.status == "fail" for step in trace):
         _remember_answer(key, response, saved)
     if not extras.get("review", True):
         saved["test_run"] = True  # kept in the audit trail, left out of usage reports
-    audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"), site_id=site_id)
+    audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"), site_id=site_id,
+                     api_key_id=extras.get("api_key_id"))
     if not saved.get("test_run"):
         kind = (extras.get("provider") or {}).get("kind") if llm_used else None
         monitoring.observe_answer(decision, response.total_ms,
@@ -353,11 +355,14 @@ def answer_cache_stats() -> dict:
 
 def run(raw_query: str, settings: "Settings | None" = None,
         client_id: str = "global", user_id: int | None = None,
-        review: bool = True, patient: PatientContext | None = None, check_only: bool = False) -> AskResponse:
+        review: bool = True, patient: PatientContext | None = None, check_only: bool = False,
+        service: "ServiceCaller | None" = None) -> AskResponse:
     """Run a question through the pipeline. review=False keeps a refusal out of
     the review queue, for generated test questions. check_only=True is for
     checking a release before it goes live: extractive answers, no rate limit,
-    and nothing recorded."""
+    and nothing recorded. `service` is an API key calling on behalf of a site:
+    the record carries the key and the site, and the per-key limits in
+    app/apikeys.py replace the per-client limiter."""
     if check_only:
         with llm.extractive_only():
             return _run(raw_query, settings, client_id, user_id, False, patient, True)
@@ -368,13 +373,13 @@ def run(raw_query: str, settings: "Settings | None" = None,
     cacheable = (config.ANSWER_CACHE_SECONDS > 0 and review and (patient is None or patient.is_empty())
                  and not llm.llm_available())
     if not cacheable:
-        return _run(raw_query, settings, client_id, user_id, review, patient, False)
+        return _run(raw_query, settings, client_id, user_id, review, patient, False, service=service)
     retrieval.ensure_loaded()      # the key names the index, so load it first
     key = _cache_key(raw_query, settings or Settings())
     hit = _cached_answer(key)
     if hit is not None:
-        return _reuse(*hit, user_id=user_id, review=review)
-    return _run(raw_query, settings, client_id, user_id, review, patient, False, remember=key)
+        return _reuse(*hit, user_id=user_id, review=review, service=service)
+    return _run(raw_query, settings, client_id, user_id, review, patient, False, remember=key, service=service)
 
 
 def _cache_age(extras: dict) -> str:
@@ -386,7 +391,8 @@ def _cache_age(extras: dict) -> str:
     return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
 
 
-def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool) -> AskResponse:
+def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool,
+           service: "ServiceCaller | None" = None) -> AskResponse:
     """Serve a remembered answer: the same decision, claims and trace, with its
     own audit record, so the trail still has one entry per question asked and
     a repeated refusal still adds to its review case."""
@@ -396,7 +402,7 @@ def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool)
     response = cached.model_copy(deep=True)
     response.audit_id = audit.store.new_id()
     response.total_ms = timer.total_ms()
-    site_id = sites.of_user(user_id)
+    site_id = service.site_id if service else sites.of_user(user_id)
     if response.decision == "refuse":
         response.review = _route(review=review, check_only=False, outcome=response.outcome,
                                  audit_id=response.audit_id, query=str(extras.get("redacted_query", "")),
@@ -415,13 +421,193 @@ def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool)
                                               "had not changed. The earlier run's checks are shown "
                                               "unchanged, and this request has its own audit record.",
                                 data={"of_audit_id": cached.audit_id})] + response.trace
-    audit.store.save(response.audit_id, response, {**extras, "from_cache": True}, user_id=user_id, site_id=site_id)
+    audit.store.save(response.audit_id, response, {**extras, "from_cache": True}, user_id=user_id, site_id=site_id,
+                     api_key_id=service.api_key_id if service else None)
     monitoring.observe_answer(response.decision, response.total_ms, "cache")
     return response
 
 
+@dataclass(frozen=True)
+class ServiceCaller:
+    """An API key making a request: which key, and the site it speaks for."""
+    api_key_id: int
+    site_id: int | None
+
+
+@dataclass
+class Verification:
+    """The outcome of checking claims against sources. `trace` holds the
+    grounding, dosage and patient steps in the order they ran; `message` is the
+    refusal text without its prefix."""
+    decision: str                       # "answer" | "refuse"
+    reason_code: str | None
+    refused_reason: str | None
+    message: str
+    claims: list[Claim]
+    findings: list[PatientFinding]
+    trace: list[TraceStep]
+    ungrounded: list[str] = field(default_factory=list)
+    dose_ok: bool = True
+    dose_detail: str = ""
+
+
+def verify_claims(question: str, claims, sources: list[dict], patient: PatientContext | None,
+                  cfg: "Settings", timer: "_Timer | None" = None) -> Verification:
+    """Check claims that something else drafted: each must be grounded in its
+    cited source, every dose must be stated by a source about the same
+    medicine, and the patient's details must not make it unsafe. `claims` are
+    objects with `text` and `source_ids` (and optionally `relevance`, `support`);
+    `sources` are index records. Pure apart from reading the index; the same
+    stage the question pipeline runs after drafting."""
+    timer = timer or _Timer()
+    trace: list[TraceStep] = []
+    query = question
+    out_claims: list[Claim] = []
+    ungrounded: list[str] = []
+    judge_supported = 0
+    judge_total = 0
+    grounding_rows: list[dict] = []
+    for llm_claim in claims:
+        grounded, score = guards_output.check_claim_grounded(
+            llm_claim.text, llm_claim.source_ids, cfg.grounding_min
+        )
+        # Optional LLM corroboration (never authoritative).
+        judge_verdict = None
+        for sid in llm_claim.source_ids:
+            src_text = retrieval.corpus_text_for(sid)
+            if src_text:
+                verdict = llm.judge_claim(llm_claim.text, src_text, cfg.use_llm_judge)
+                if verdict is not None:
+                    judge_total += 1
+                    judge_supported += 1 if verdict["supported"] else 0
+                    judge_verdict = verdict
+                break
+        support = llm_claim.support
+        relevance = llm_claim.relevance
+        if support is None and llm_claim.source_ids:
+            found = retrieval.locate_sentence(llm_claim.text, llm_claim.source_ids[0])
+            if found:
+                support = ClaimSupport(source_id=llm_claim.source_ids[0], start=found[0], end=found[1],
+                                       sentence=found[2])
+        if not relevance:
+            relevance = float(retrieval.embed([llm_claim.text])[0] @ retrieval.embed_query(query))
+        out_claims.append(Claim(
+            text=llm_claim.text,
+            source_ids=llm_claim.source_ids,
+            grounded=grounded,
+            grounding_score=round(score, 4),
+            relevance=round(relevance, 4),
+            support=support,
+        ))
+        grounding_rows.append({
+            "claim": llm_claim.text,
+            "source_ids": llm_claim.source_ids,
+            "deterministic_score": round(score, 4),
+            "threshold": cfg.grounding_min,
+            "grounded": grounded,
+            "relevance": round(relevance, 4),
+            "judge": judge_verdict,  # {supported, reason} or null
+        })
+        if not grounded:
+            ungrounded.append(llm_claim.text)
+    claims = out_claims
+
+    judge_note = (f", judge {judge_supported}/{judge_total} supported"
+                  if judge_total else "")
+    grounding_data = {
+        "claims": grounding_rows,
+        "method": ("deterministic embedding similarity, authoritative; "
+                   "LLM judge as corroboration" if judge_total
+                   else "deterministic embedding similarity"),
+        "judge_model": config.JUDGE_MODEL if judge_total else None,
+        "judge_summary": (f"{judge_supported}/{judge_total} supported"
+                          if judge_total else "judge not run"),
+    }
+    if not cfg.enable_grounding_guard:
+        # Guard disabled: still compute scores for display, but do not let an
+        # ungrounded claim block the answer. Makes the guard's effect visible.
+        ungrounded = []
+        trace.append(TraceStep(name="grounding check", status="skip",
+                               detail="guard disabled" + judge_note,
+                               ms=timer.lap_ms(), data=grounding_data))
+    elif ungrounded:
+        trace.append(TraceStep(
+            name="grounding check", status="fail",
+            detail=f"{len(ungrounded)} claim(s) below grounding threshold "
+                   f"{cfg.grounding_min:.2f}" + judge_note,
+            ms=timer.lap_ms(), data=grounding_data,
+        ))
+    else:
+        trace.append(TraceStep(
+            name="grounding check", status="pass",
+            detail=f"all {len(claims)} claim(s) grounded in cited sources"
+                   + judge_note,
+            ms=timer.lap_ms(), data=grounding_data,
+        ))
+
+    # --- Dosage guard ------------------------------------------------------
+    answer_body = " ".join(c.text for c in claims)
+    detected_values = guards_output.extract_values(answer_body)
+    if not cfg.enable_dosage_guard:
+        dose_ok, dose_detail, dose_checked = True, "guard disabled", []
+        trace.append(TraceStep(name="dosage guard", status="skip",
+                               detail="guard disabled", ms=timer.lap_ms(),
+                               data={"detected_values": detected_values,
+                                     "verified": [], "enabled": False}))
+    else:
+        dose_ok, dose_detail, dose_checked = guards_output.dosage_guard(
+            answer_body, sources, query)
+        trace.append(TraceStep(name="dosage guard",
+                               status="pass" if dose_ok else "fail",
+                               detail=dose_detail, ms=timer.lap_ms(),
+                               data={"detected_values": detected_values,
+                                     "verified": dose_checked,
+                                     "rule": "every value-with-unit must be stated by a "
+                                             "retrieved source about the same medicine",
+                                     "ok": dose_ok}))
+
+    # --- Patient checks ----------------------------------------------------
+    findings: list[PatientFinding] = []
+    blocking = None
+    if patient is None or patient.is_empty():
+        trace.append(TraceStep(name="patient checks", status="skip",
+                               detail="no patient details given", ms=timer.lap_ms()))
+    else:
+        checked = patient_checks.review(query, claims, patient)
+        findings = checked.findings
+        blocking = checked.blocking
+        warnings = [f for f in findings if f.severity == "warn"]
+        trace.append(TraceStep(
+            name="patient checks",
+            status="fail" if blocking else "warn" if warnings else "pass" if checked.medicines else "info",
+            detail=(blocking.message if blocking
+                    else f"{len(warnings)} warning(s) for {', '.join(checked.medicines)}" if warnings
+                    else f"no problems for this patient with {', '.join(checked.medicines)}" if checked.medicines
+                    else "no formulary medicines in the question or answer"),
+            ms=timer.lap_ms(),
+            data={"medicines": checked.medicines, "findings": [f.model_dump() for f in findings],
+                  "derived": checked.derived},
+        ))
+
+    # --- Decision gate -----------------------------------------------------
+    def refuse(code: str, reason: str, message: str) -> Verification:
+        return Verification("refuse", code, reason, message, claims, findings, trace, ungrounded, dose_ok,
+                            dose_detail)
+
+    if blocking and not ungrounded and dose_ok:
+        reason = blocking.message.rstrip(".")
+        return refuse("patient_unsafe", reason[0].lower() + reason[1:], blocking.message)
+    if ungrounded:
+        return refuse("claim_ungrounded", f"a claim could not be grounded: \"{ungrounded[0]}\"",
+                      "A statement could not be grounded in the sources.")
+    if not dose_ok:
+        return refuse("dose_unsupported", dose_detail, dose_detail.capitalize() + ".")
+    return Verification("answer", None, None, "", claims, findings, trace, ungrounded, dose_ok, dose_detail)
+
+
 def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: int | None,
-         review: bool, patient: PatientContext | None, check_only: bool, remember: str | None = None) -> AskResponse:
+         review: bool, patient: PatientContext | None, check_only: bool, remember: str | None = None,
+         service: "ServiceCaller | None" = None) -> AskResponse:
     # Effective settings: an explicit object, or the configured defaults.
     cfg = settings or Settings()
     # Turning a guard off is a demonstration, not a request option. Unless the
@@ -440,6 +626,8 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
     trace: list[TraceStep] = []
     extras: dict = {"raw_query": raw_query, "settings": cfg.model_dump(), "user_id": user_id,
                     "review": review, "check_only": check_only, "remember": remember}
+    if service is not None:
+        extras["site_id"], extras["api_key_id"] = service.site_id, service.api_key_id
     if patient is not None and not patient.is_empty():
         extras["patient"] = patient.model_dump(exclude_defaults=True)
 
@@ -472,8 +660,12 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                        refused_reason=scope.reason, reason_code="input_blocked", claims=[], sources=[],
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
-    rate = guards_input.GuardResult(True, detail="not applied to release checks") if check_only \
-        else guards_input.check_rate_limit(client_id)
+    if check_only:
+        rate = guards_input.GuardResult(True, detail="not applied to release checks")
+    elif service is not None:
+        rate = guards_input.GuardResult(True, detail="limited per API key")
+    else:
+        rate = guards_input.check_rate_limit(client_id)
     trace.append(TraceStep(
         name="rate limit",
         status="pass" if rate.ok else "fail",
@@ -644,152 +836,15 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                        refused_reason=reason, reason_code="insufficient_context", claims=[], sources=sources,
                        trace=trace, llm_used=llm_used, timer=timer, extras=extras)
 
-    # --- 7. Grounding check ------------------------------------------------
-    claims: list[Claim] = []
-    ungrounded: list[str] = []
-    judge_supported = 0
-    judge_total = 0
-    grounding_rows: list[dict] = []
-    for llm_claim in llm_answer.claims:
-        grounded, score = guards_output.check_claim_grounded(
-            llm_claim.text, llm_claim.source_ids, cfg.grounding_min
-        )
-        # Optional LLM corroboration (never authoritative).
-        judge_verdict = None
-        for sid in llm_claim.source_ids:
-            src_text = retrieval.corpus_text_for(sid)
-            if src_text:
-                verdict = llm.judge_claim(llm_claim.text, src_text, cfg.use_llm_judge)
-                if verdict is not None:
-                    judge_total += 1
-                    judge_supported += 1 if verdict["supported"] else 0
-                    judge_verdict = verdict
-                break
-        support = llm_claim.support
-        relevance = llm_claim.relevance
-        if support is None and llm_claim.source_ids:
-            found = retrieval.locate_sentence(llm_claim.text, llm_claim.source_ids[0])
-            if found:
-                support = ClaimSupport(source_id=llm_claim.source_ids[0], start=found[0], end=found[1],
-                                       sentence=found[2])
-        if not relevance:
-            relevance = float(retrieval.embed([llm_claim.text])[0] @ retrieval.embed_query(query))
-        claims.append(Claim(
-            text=llm_claim.text,
-            source_ids=llm_claim.source_ids,
-            grounded=grounded,
-            grounding_score=round(score, 4),
-            relevance=round(relevance, 4),
-            support=support,
-        ))
-        grounding_rows.append({
-            "claim": llm_claim.text,
-            "source_ids": llm_claim.source_ids,
-            "deterministic_score": round(score, 4),
-            "threshold": cfg.grounding_min,
-            "grounded": grounded,
-            "relevance": round(relevance, 4),
-            "judge": judge_verdict,  # {supported, reason} or null
-        })
-        if not grounded:
-            ungrounded.append(llm_claim.text)
-
-    judge_note = (f", judge {judge_supported}/{judge_total} supported"
-                  if judge_total else "")
-    grounding_data = {
-        "claims": grounding_rows,
-        "method": ("deterministic embedding similarity, authoritative; "
-                   "LLM judge as corroboration" if judge_total
-                   else "deterministic embedding similarity"),
-        "judge_model": config.JUDGE_MODEL if judge_total else None,
-        "judge_summary": (f"{judge_supported}/{judge_total} supported"
-                          if judge_total else "judge not run"),
-    }
-    if not cfg.enable_grounding_guard:
-        # Guard disabled: still compute scores for display, but do not let an
-        # ungrounded claim block the answer. Makes the guard's effect visible.
-        ungrounded = []
-        trace.append(TraceStep(name="grounding check", status="skip",
-                               detail="guard disabled" + judge_note,
-                               ms=timer.lap_ms(), data=grounding_data))
-    elif ungrounded:
-        trace.append(TraceStep(
-            name="grounding check", status="fail",
-            detail=f"{len(ungrounded)} claim(s) below grounding threshold "
-                   f"{cfg.grounding_min:.2f}" + judge_note,
-            ms=timer.lap_ms(), data=grounding_data,
-        ))
-    else:
-        trace.append(TraceStep(
-            name="grounding check", status="pass",
-            detail=f"all {len(claims)} claim(s) grounded in cited sources"
-                   + judge_note,
-            ms=timer.lap_ms(), data=grounding_data,
-        ))
-
-    # --- 8. Dosage guard ---------------------------------------------------
-    answer_body = " ".join(c.text for c in claims)
-    detected_values = guards_output.extract_values(answer_body)
-    if not cfg.enable_dosage_guard:
-        dose_ok, dose_detail, dose_checked = True, "guard disabled", []
-        trace.append(TraceStep(name="dosage guard", status="skip",
-                               detail="guard disabled", ms=timer.lap_ms(),
-                               data={"detected_values": detected_values,
-                                     "verified": [], "enabled": False}))
-    else:
-        dose_ok, dose_detail, dose_checked = guards_output.dosage_guard(
-            answer_body, source_records, redacted)
-        trace.append(TraceStep(name="dosage guard",
-                               status="pass" if dose_ok else "fail",
-                               detail=dose_detail, ms=timer.lap_ms(),
-                               data={"detected_values": detected_values,
-                                     "verified": dose_checked,
-                                     "rule": "every value-with-unit must be stated by a "
-                                             "retrieved source about the same medicine",
-                                     "ok": dose_ok}))
-
-    # --- 9. Patient checks -------------------------------------------------
-    findings: list[PatientFinding] = []
-    if patient is None or patient.is_empty():
-        trace.append(TraceStep(name="patient checks", status="skip",
-                               detail="no patient details given", ms=timer.lap_ms()))
-    else:
-        checked = patient_checks.review(query, claims, patient)
-        findings = checked.findings
-        blocking = checked.blocking
-        warnings = [f for f in findings if f.severity == "warn"]
-        trace.append(TraceStep(
-            name="patient checks",
-            status="fail" if blocking else "warn" if warnings else "pass" if checked.medicines else "info",
-            detail=(blocking.message if blocking
-                    else f"{len(warnings)} warning(s) for {', '.join(checked.medicines)}" if warnings
-                    else f"no problems for this patient with {', '.join(checked.medicines)}" if checked.medicines
-                    else "no formulary medicines in the question or answer"),
-            ms=timer.lap_ms(),
-            data={"medicines": checked.medicines, "findings": [f.model_dump() for f in findings],
-                  "derived": checked.derived},
-        ))
-        if blocking and not ungrounded and dose_ok:
-            reason = blocking.message.rstrip(".")
-            return _finish(decision="refuse",
-                           answer_text=REFUSAL_PREFIX + blocking.message,
-                           refused_reason=reason[0].lower() + reason[1:], reason_code="patient_unsafe", claims=claims, sources=sources,
-                           trace=trace, llm_used=llm_used, timer=timer, extras=extras,
-                           patient_findings=findings)
-
-    # --- 10. Decision gate -------------------------------------------------
-    if ungrounded:
-        reason = f"a claim could not be grounded: \"{ungrounded[0]}\""
-        return _finish(decision="refuse",
-                       answer_text=REFUSAL_PREFIX
-                       + "A statement could not be grounded in the sources.",
-                       refused_reason=reason, reason_code="claim_ungrounded", claims=claims, sources=sources,
-                       trace=trace, llm_used=llm_used, timer=timer, extras=extras)
-    if not dose_ok:
-        return _finish(decision="refuse",
-                       answer_text=REFUSAL_PREFIX + dose_detail.capitalize() + ".",
-                       refused_reason=dose_detail, reason_code="dose_unsupported", claims=claims, sources=sources,
-                       trace=trace, llm_used=llm_used, timer=timer, extras=extras)
+    # --- 7-10. Grounding, dosage, patient checks and the decision ------------
+    verdict = verify_claims(query, llm_answer.claims, source_records, patient, cfg, timer=timer)
+    trace.extend(verdict.trace)
+    if verdict.decision == "refuse":
+        return _finish(decision="refuse", answer_text=REFUSAL_PREFIX + verdict.message,
+                       refused_reason=verdict.refused_reason, reason_code=verdict.reason_code,
+                       claims=verdict.claims, sources=sources, trace=trace, llm_used=llm_used, timer=timer,
+                       extras=extras, patient_findings=verdict.findings if verdict.reason_code == "patient_unsafe" else None)
+    claims, findings = verdict.claims, verdict.findings
 
     # --- Answer ------------------------------------------------------------
     answer_text = _assemble_answer(claims)

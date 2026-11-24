@@ -1,0 +1,218 @@
+{
+  "decision": "refuse",
+  "outcome": "refused",
+  "answer_text": "I cannot answer this safely. The question refers to something the trusted sources do not cover. It was not sent for review (this was a test run).",
+  "refused_reason": "the term 'quelvarin' does not appear in any trusted source",
+  "claims": [],
+  "sources": [
+    {
+      "id": "BOLM-D1032",
+      "title": "Bolmuririn: dosage and administration",
+      "snippet": "The standard adult regimen of Bolmuririn is 75 mL twice daily, taken in the morning before food, for an initial course of 21 days. The dose is not increased without specialist input.",
+      "score": 0.6173,
+      "topic": "bolmuririn",
+      "section": "Dosage and Administration",
+      "kind": "drug",
+      "rank": 1,
+      "above_gate": true
+    },
+    {
+      "id": "NOSP-D0112",
+      "title": "Nospulondel: dosage and administration",
+      "snippet": "The standard adult regimen of Nospulondel is 25 mg once daily, taken after the evening meal, for an initial course of 14 days. The dose is not increased without specialist input.",
+      "score": 0.5977,
+      "topic": "nospulondel",
+      "section": "Dosage and Administration",
+      "kind": "drug",
+      "rank": 2,
+      "above_gate": true
+    },
+    {
+      "id": "VODF-D1042",
+      "title": "Vodfonravil suspension: dosage and administration",
+      "snippet": "The standard adult regimen of Vodfonravil suspension is 5 mg every 12 hours, taken twice daily with water, for an initial course of 14 days. The dose is not increased without specialist input.",
+      "score": 0.6157,
+      "topic": "vodfonravil",
+      "section": "Dosage and Administration",
+      "kind": "drug",
+      "rank": 3,
+      "above_gate": true
+    },
+    {
+      "id": "MANP-D1132",
+      "title": "Manpolondel: dosage and administration",
+      "snippet": "The standard adult regimen of Manpolondel is 15 mL once daily, taken in the morning with food, for an initial course of 10 days. The dose is not increased without specialist input.",
+      "score": 0.5966,
+      "topic": "manpolondel",
+      "section": "Dosage and Administration",
+      "kind": "drug",
+      "rank": 4,
+      "above_gate": true
+    }
+  ],
+  "trace": [
+    {
+      "name": "pii redaction",
+      "status": "pass",
+      "detail": "no identifiers found",
+      "ms": 0,
+      "explain": "Before anything is logged, embedded, or sent to a model, identifiers are replaced with placeholders such as [NAME] and [DATE]. Each detector proposes spans with a score; checksums (NHS mod-11, Luhn for cards and provider numbers, mod-97 for IBANs, social security rules) and real calendar dates confirm them, and nearby cue words ('patient', 'husband', 'DOB') raise or lower the score. Names come from titles, relation and role cues, 'SURNAME, Given', and a bundled list of given names; words the documents know, medicine names and months are never names, and a dose or an age under 90 is never removed. If spaCy or Presidio is installed it can add people and places. Ages over 89 become 90. This is a safety net, not a guarantee.",
+      "data": null
+    },
+    {
+      "name": "scope check",
+      "status": "pass",
+      "detail": "no scope or injection issues",
+      "ms": 0,
+      "explain": "Rejects empty or over-long queries and obvious prompt-injection patterns such as 'ignore previous instructions'. A blocked query refuses here and goes no further.",
+      "data": null
+    },
+    {
+      "name": "rate limit",
+      "status": "pass",
+      "detail": "within rate limit",
+      "ms": 0,
+      "explain": "A simple in-memory limiter caps requests per minute per process, so a burst of traffic cannot overwhelm the service.",
+      "data": null
+    },
+    {
+      "name": "retrieve",
+      "status": "pass",
+      "detail": "top-4 from corpus (keyword + embedding), best score 0.62",
+      "ms": 14,
+      "explain": "The query is embedded with a sentence-transformer and compared against every document vector in the vector store, alongside a keyword search. The top-k passages are returned with cosine similarity scores.",
+      "data": {
+        "results": [
+          {
+            "id": "BOLM-D1032",
+            "title": "Bolmuririn: dosage and administration",
+            "score": 0.6173,
+            "kind": "drug",
+            "section": "Dosage and Administration"
+          },
+          {
+            "id": "NOSP-D0112",
+            "title": "Nospulondel: dosage and administration",
+            "score": 0.5977,
+            "kind": "drug",
+            "section": "Dosage and Administration"
+          },
+          {
+            "id": "VODF-D1042",
+            "title": "Vodfonravil suspension: dosage and administration",
+            "score": 0.6157,
+            "kind": "drug",
+            "section": "Dosage and Administration"
+          },
+          {
+            "id": "MANP-D1132",
+            "title": "Manpolondel: dosage and administration",
+            "score": 0.5966,
+            "kind": "drug",
+            "section": "Dosage and Administration"
+          }
+        ]
+      }
+    },
+    {
+      "name": "retrieval gate",
+      "status": "pass",
+      "detail": "best score 0.62 clears threshold 0.30",
+      "ms": 0,
+      "explain": "If even the best passage scores below the retrieval threshold, the system refuses now, before any text is generated. The cheapest refusal happens before a model is ever called.",
+      "data": {
+        "best_score": 0.6173,
+        "threshold": 0.3,
+        "cleared": true
+      }
+    },
+    {
+      "name": "source coverage",
+      "status": "fail",
+      "detail": "the term 'quelvarin' does not appear in any trusted source",
+      "ms": 0,
+      "explain": "A deterministic check that the contentful terms in the question (drug and condition names, clinical terms, qualifiers like 'children') appear in the retrieved sources; everyday words like 'email' or 'meeting' are not held against them. A term the index has but the passages lack gets one more search aimed at it, kept to the topic the question names. Catches questions about things the corpus never mentions, before generation.",
+      "data": {
+        "checked_terms": [
+          "quelvarin"
+        ],
+        "covered": [],
+        "uncovered": [
+          "quelvarin"
+        ],
+        "in_index": {
+          "quelvarin": false
+        },
+        "question_values": [],
+        "unsupported_values": [],
+        "unsupported_forms": [],
+        "age": null,
+        "unanswerable_request": null
+      }
+    },
+    {
+      "name": "generate",
+      "status": "skip",
+      "detail": "not reached",
+      "ms": 0,
+      "explain": "The question and the retrieved sources are sent to the LLM, which must return structured JSON: a list of claims, each citing the source ids it came from. With no API key, an extractive fallback picks up to three sentences from the passages about the topic, scored on meaning, on the question's own words and on whether the passage is the kind of section that answers it (dose, side effects, symptoms...), and gives each part of a two-part question its own sentence. Either way the output is the same shape and passes through the same guards.",
+      "data": null
+    },
+    {
+      "name": "schema validate",
+      "status": "skip",
+      "detail": "not reached",
+      "ms": 0,
+      "explain": "The model output is parsed and validated against a strict Pydantic schema. Malformed output is retried once, then falls back to extractive. Free-text answers are never accepted.",
+      "data": null
+    },
+    {
+      "name": "grounding check",
+      "status": "skip",
+      "detail": "not reached",
+      "ms": 0,
+      "explain": "For every claim, a deterministic embedding similarity is computed between the claim and its cited source. The claim must cite a real source and clear the grounding threshold, and a sentence that names no medicine must belong to the passage it cites: every name and clinical term in it has to be in that passage. Each claim also records how relevant it is to the question and where in the passage it sits, for information only. When a live LLM is configured, a second, cheaper model acts as a judge and is asked, strictly, whether the source supports the claim. The deterministic result is authoritative; the judge is recorded as corroboration so the demo stays reproducible.",
+      "data": null
+    },
+    {
+      "name": "dosage guard",
+      "status": "skip",
+      "detail": "not reached",
+      "ms": 0,
+      "explain": "The showpiece check, and deterministic: every value with a clinical unit in the answer (for example '15 mg') must be stated by a retrieved source about the medicine it is attributed to. Numbers and units are compared, so '15 mg' and 'fifteen milligrams' match and '15 mcg' does not. Otherwise the system refuses and names the offending value.",
+      "data": null
+    },
+    {
+      "name": "decision",
+      "status": "fail",
+      "detail": "REFUSE, the term 'quelvarin' does not appear in any trusted source",
+      "ms": 0,
+      "explain": "The gate. Refuse if any input guard blocked, the retrieval gate failed, coverage failed, the model had insufficient context, any claim is ungrounded, or the dosage guard failed. A refusal is put in the review queue when one is running, and the answer says whether it was; the reason is also given as a stable code. Otherwise answer, assembling the grounded claims into prose with bracketed citations.",
+      "data": null
+    }
+  ],
+  "audit_id": "rec-ask-2",
+  "total_ms": 15,
+  "llm_used": false,
+  "patient_findings": [],
+  "reason_code": "term_not_covered",
+  "review": {
+    "routed": false,
+    "case_id": null,
+    "note": "this was a test run"
+  },
+  "explanation": {
+    "summary": "The question names something the retrieved sources do not mention.",
+    "missing_terms": [
+      "quelvarin"
+    ],
+    "suggestions": [
+      "Check the spelling of the name.",
+      "Ask about the medicine or condition by its listed name."
+    ]
+  },
+  "redaction": {
+    "kinds": {},
+    "redacted_query": "What is the standard dose of Quelvarin?"
+  }
+}

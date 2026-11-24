@@ -4,7 +4,9 @@ to the LLM."""
 
 from __future__ import annotations
 
+import math
 import re
+import threading
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -90,12 +92,29 @@ class RateLimiter:
     def __init__(self, limit_per_minute: int):
         self.limit = limit_per_minute
         self._by_client: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
 
     # Buckets are dropped once they fall outside the window, so the dict holds
     # only callers seen in the last minute. It used to keep one deque per
     # distinct client id for the lifetime of the process, which grows without
     # bound on a public instance.
     _SWEEP_EVERY = 256
+
+    def hit(self, client_id: str, limit: int, now: float | None = None) -> tuple[bool, int, int]:
+        """Count a request against `limit` per minute for this client. Returns
+        whether it is allowed, how many more fit in the window, and the seconds
+        until a slot frees. Safe to call from several threads."""
+        now = now if now is not None else time.monotonic()
+        cutoff = now - 60.0
+        with self._lock:
+            events = self._by_client.setdefault(client_id, deque())
+            while events and events[0] <= cutoff:
+                events.popleft()
+            if len(events) >= limit:
+                return False, 0, max(1, math.ceil(events[0] + 60.0 - now))
+            events.append(now)
+            wait = max(1, math.ceil(events[0] + 60.0 - now)) if events else 60
+            return True, limit - len(events), wait
 
     def allow(self, client_id: str = "global", now: float | None = None) -> bool:
         now = now if now is not None else time.monotonic()
@@ -116,6 +135,8 @@ class RateLimiter:
 
 
 _limiter = RateLimiter(config.RATE_LIMIT_PER_MINUTE)
+# Per API key; limits come from the key, not from this object.
+key_limiter = RateLimiter(0)
 
 
 def check_rate_limit(client_id: str = "global") -> GuardResult:

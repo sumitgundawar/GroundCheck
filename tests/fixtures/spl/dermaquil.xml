@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document xmlns="urn:hl7-org:v3">
+  <title>DERMAQUIL (dermaquil acetate) cream</title>
+  <effectiveTime value="20220301"/>
+  <setId root="5b1f6f0e-0000-4000-8000-0000000000cc"/>
+  <author><assignedEntity><representedOrganization><name>Sample Dermatology LLC</name></representedOrganization></assignedEntity></author>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48780-1"/>
+          <subject>
+            <manufacturedProduct>
+              <manufacturedProduct>
+                <name>Dermaquil</name>
+                <formCode displayName="CREAM"/>
+                <asEntityWithGeneric><genericMedicine><name>dermaquil acetate</name></genericMedicine></asEntityWithGeneric>
+                <ingredient classCode="ACTIB">
+                  <quantity><numerator value="1" unit="g"/><denominator value="100" unit="g"/></quantity>
+                  <ingredientSubstance><name>DERMAQUIL ACETATE</name></ingredientSubstance>
+                </ingredient>
+              </manufacturedProduct>
+              <consumedIn><substanceAdministration><routeCode displayName="TOPICAL"/></substanceAdministration></consumedIn>
+            </manufacturedProduct>
+          </subject>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="34067-9"/>
+          <title>INDICATIONS AND USAGE</title>
+          <text><paragraph>Dermaquil 1% cream is indicated for fictional dermal flushing.</paragraph></text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="34068-7"/>
+          <title>DOSAGE AND ADMINISTRATION</title>
+          <text><paragraph>Apply a thin layer of Dermaquil 1% cream to the affected area twice daily. Use the 0.5% strength for patients with sensitive skin.</paragraph></text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</document>

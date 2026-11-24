@@ -210,3 +210,63 @@ def verify(max_problems: int = 20) -> dict:
         "head": {"seq": chain.last_seq, "hash": chain.last_hash},
         "verified_at": db.utcnow().isoformat(),
     }
+
+
+# --- Ed25519 signatures and non-question audit events -----------------------
+# Used by knowledge packs (app/packs.py): a publisher signs a manifest, and the
+# installer verifies it against keys the operator trusts.
+
+def ed25519_generate() -> tuple[bytes, bytes]:
+    """Returns (private, public) as raw 32-byte keys."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    private = Ed25519PrivateKey.generate()
+    return (private.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw,
+                                  serialization.NoEncryption()),
+            private.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
+
+
+def ed25519_public(private: bytes) -> bytes:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    return Ed25519PrivateKey.from_private_bytes(private).public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+
+def ed25519_sign(private: bytes, message: bytes) -> bytes:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    return Ed25519PrivateKey.from_private_bytes(private).sign(message)
+
+
+def ed25519_verify(public: bytes, signature: bytes, message: bytes) -> bool:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+    try:
+        Ed25519PublicKey.from_public_bytes(public).verify(signature, message)
+        return True
+    except (InvalidSignature, ValueError):
+        return False
+
+
+def key_fingerprint(public: bytes) -> str:
+    return hashlib.sha256(public).hexdigest()[:16]
+
+
+def record_event(event: str, detail: dict, user_id: int | None = None) -> str | None:
+    """Chain an administrative event (not a question) into the audit trail.
+    Returns the audit id, or None when there is no database to write to."""
+    import secrets
+
+    if not db.ready():
+        return None
+    audit_id = secrets.token_hex(8)
+    with write_lock, db.session() as s:
+        append(s, db.AuditRecord(
+            audit_id=audit_id, user_id=user_id, decision="event", query=event[:200], total_ms=0,
+            llm_used=False, test_run=True,   # not a question: kept out of usage and quality statistics
+            record={"audit_id": audit_id, "event": event, "detail": detail, "user_id": user_id, "test_run": True}))
+    return audit_id

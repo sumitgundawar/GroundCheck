@@ -656,12 +656,14 @@ _TENS = {
     "seventy": 70, "eighty": 80, "ninety": 90,
 }
 _FRACTIONS = {"half": 0.5, "quarter": 0.25}
+_MULTIPLIERS = {"hundred": 100, "thousand": 1000}
 _NUM_WORDS = {**_ONES, **_TENS, **_FRACTIONS}
 
 # A quantity is either digits (15, 2.5) or one-to-two number words
 # (fifteen, twenty five, twenty-five), optionally part of a range.
-_NUMWORD_ALT = "|".join(sorted(_NUM_WORDS, key=len, reverse=True))
-_QTY = rf"(?:\d{{1,3}}(?:,\d{{3}})+(?:\.\d+)?|\d+(?:\.\d+)?|(?:{_NUMWORD_ALT})(?:[\s-]+(?:{_NUMWORD_ALT}))?)"
+_NUMWORD_ALT = "|".join(sorted({**_NUM_WORDS, **_MULTIPLIERS}, key=len, reverse=True))
+_QTY = (rf"(?:\d{{1,3}}(?:,\d{{3}})+(?:\.\d+)?|\d+(?:\.\d+)?|"
+        rf"(?:{_NUMWORD_ALT})(?:[\s-]+(?:{_NUMWORD_ALT})){{0,3}})")
 _RANGE_SEP = r"(?:\s*(?:to|-|–|—|or)\s*)"
 _VALUE_RE = re.compile(
     rf"\b({_QTY})(?:{_RANGE_SEP}({_QTY}))?\s*({_UNIT_ALT})(?![A-Za-z])",
@@ -692,15 +694,20 @@ def _word_to_number(token: str) -> float | None:
     except ValueError:
         pass
     parts = re.split(r"[\s-]+", token)
-    total = 0.0
+    total = current = 0.0
     matched = False
     for p in parts:
         if p in _NUM_WORDS:
-            total += _NUM_WORDS[p]
+            current += _NUM_WORDS[p]
             matched = True
+        elif p in _MULTIPLIERS and matched:
+            if p == "thousand":
+                total, current = total + (current or 1) * 1000, 0.0
+            else:
+                current = (current or 1) * 100
         else:
             return None
-    return total if matched else None
+    return total + current if matched else None
 
 
 def _fmt_num(n: float) -> str:
