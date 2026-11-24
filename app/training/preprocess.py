@@ -53,3 +53,40 @@ def normalise(batch, mean: list[float], std: list[float], in_channels: int):
     if mean_t.shape[1] != x.shape[1]:
         mean_t, std_t = mean_t.mean().view(1, 1, 1, 1), std_t.mean().view(1, 1, 1, 1)
     return (x - mean_t) / std_t
+
+
+def augment(x, generator=None):
+    """Label-preserving changes to a normalised float batch, drawn per image:
+    a random shift, a rotation of up to 8 degrees, a crop covering 90-100% of
+    the image resized back, light brightness and contrast jitter and light
+    Gaussian noise. No flips, which would swap left and right."""
+    import math
+
+    import torch
+    import torch.nn.functional as F
+
+    n = x.shape[0]
+    dev = x.device
+
+    def uniform(low, high, shape):
+        return low + (high - low) * torch.rand(shape, device=dev, generator=generator)
+
+    angle = uniform(-8.0, 8.0, (n,)) * math.pi / 180
+    scale = uniform(0.9, 1.0, (n,)).sqrt()
+    shift = uniform(-1.0, 1.0, (n, 2)) * (1 - scale).unsqueeze(1) + uniform(-0.125, 0.125, (n, 2))
+    cos, sin = torch.cos(angle) * scale, torch.sin(angle) * scale
+    theta = torch.stack([torch.stack([cos, -sin, shift[:, 0]], 1), torch.stack([sin, cos, shift[:, 1]], 1)], 1)
+    grid = F.affine_grid(theta, list(x.shape), align_corners=False)
+    x = F.grid_sample(x, grid, mode="bilinear", padding_mode="border", align_corners=False)
+    gain = 1 + uniform(-0.1, 0.1, (n, 1, 1, 1))
+    bias = uniform(-0.1, 0.1, (n, 1, 1, 1))
+    noise = torch.randn(x.shape, device=dev, generator=generator) * 0.03
+    return x * gain + bias + noise
+
+
+def tta_views(batch):
+    """The batch as is, then shifted a few pixels two ways, for test-time averaging."""
+    import torch
+
+    shift = max(1, batch.shape[-1] // 32)
+    return [batch, torch.roll(batch, (shift, shift), dims=(2, 3)), torch.roll(batch, (-shift, -shift), dims=(2, 3))]

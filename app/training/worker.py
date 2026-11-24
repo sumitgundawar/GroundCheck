@@ -78,17 +78,7 @@ def _load_images(folder: Path, items, size: int, channels: int, progress: Progre
 
 
 def _augment(x):
-    """Label-preserving changes for scans: small shifts and brightness and
-    contrast jitter. No flips, which would swap left and right."""
-    import torch
-
-    n = x.shape[0]
-    shift = max(1, x.shape[-1] // 16)
-    dx, dy = random.randint(-shift, shift), random.randint(-shift, shift)
-    x = torch.roll(x, shifts=(dy, dx), dims=(2, 3))
-    gain = 1 + (torch.rand(n, 1, 1, 1, device=x.device) - 0.5) * 0.2
-    bias = (torch.rand(n, 1, 1, 1, device=x.device) - 0.5) * 0.2
-    return x * gain + bias
+    return preprocess.augment(x)
 
 
 def _recalibrate_batch_norm(model, images, device, batch_size, mean, std, in_channels, max_batches=50):
@@ -130,21 +120,27 @@ def _features(model, arch, images, device, batch_size, mean, std, in_channels, p
     return [np.concatenate(parts) for parts in per_block]
 
 
-def _predict(model, images, labels, device, batch_size, mean, std, in_channels, progress, what):
+def _predict(model, images, labels, device, batch_size, mean, std, in_channels, progress, what,
+             temperature=1.0, tta=False):
+    """Probabilities after temperature scaling, the mean loss, and raw logits
+    (averaged over views when tta is on)."""
     import torch
 
     model.eval()
-    all_probs, losses = [], []
+    all_logits, losses = [], []
     with torch.no_grad():
         for start in range(0, len(images), batch_size):
             progress.check_cancel()
-            xb = preprocess.normalise(images[start:start + batch_size].to(device), mean, std, in_channels)
-            logits = model(xb)
+            raw = images[start:start + batch_size].to(device)
+            views = preprocess.tta_views(raw) if tta else [raw]
+            logits = torch.stack([model(preprocess.normalise(v, mean, std, in_channels)).float()
+                                  for v in views]).mean(0)
             yb = labels[start:start + batch_size].to(device)
-            losses.append(torch.nn.functional.cross_entropy(logits, yb, reduction="sum").item())
-            all_probs.append(torch.softmax(logits.float(), dim=1).cpu().numpy())
-    probs = np.concatenate(all_probs) if all_probs else np.zeros((0, 0))
-    return probs, sum(losses) / max(1, len(images))
+            losses.append(torch.nn.functional.cross_entropy(logits / temperature, yb, reduction="sum").item())
+            all_logits.append(logits.cpu().numpy())
+    logits = np.concatenate(all_logits) if all_logits else np.zeros((0, 0))
+    probs = metrics.softmax(logits, temperature) if len(logits) else logits
+    return probs, sum(losses) / max(1, len(images)), logits
 
 
 def train(run_dir: Path, resume: bool = False) -> None:
@@ -200,7 +196,7 @@ def train(run_dir: Path, resume: bool = False) -> None:
     model = architectures.build(arch, len(classes), in_channels, pretrained).to(device)
     counts = torch.bincount(labels["train"], minlength=len(classes)).float()
     class_weights = (counts.sum() / (len(classes) * counts.clamp(min=1))).to(device)
-    criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+    criterion = torch.nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.05)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(run["learning_rate"]), weight_decay=1e-4)
     epochs, batch_size = int(run["epochs"]), int(run["batch_size"])
     steps_per_epoch = math.ceil(len(tensors["train"]) / batch_size)
@@ -252,8 +248,8 @@ def train(run_dir: Path, resume: bool = False) -> None:
                             eta_seconds=round(elapsed / done_here * (epochs * steps_per_epoch - done)),
                             train_loss=running_loss / seen, message=f"Epoch {epoch} of {epochs}")
         _recalibrate_batch_norm(model, tensors["train"], device, batch_size, mean, std, in_channels)
-        val_probs, val_loss = _predict(model, tensors["val"], labels["val"], device, batch_size * 2,
-                                       mean, std, in_channels, progress, "validation")
+        val_probs, val_loss, _ = _predict(model, tensors["val"], labels["val"], device, batch_size * 2,
+                                          mean, std, in_channels, progress, "validation")
         val_acc = float((val_probs.argmax(1) == labels["val"].numpy()).mean()) if len(val_probs) else None
         history.append({"epoch": epoch, "train_loss": round(running_loss / seen, 5),
                         "train_accuracy": round(running_correct / seen, 5), "val_loss": round(val_loss, 5),
@@ -275,8 +271,11 @@ def train(run_dir: Path, resume: bool = False) -> None:
 
     progress.update(force=True, phase="evaluating", message="Evaluating the best model", percent=100, eta_seconds=0)
     model.load_state_dict(best["state"])
-    val_probs, _ = _predict(model, tensors["val"], labels["val"], device, batch_size * 2, mean, std, in_channels,
-                            progress, "validation")
+    tta = bool(run.get("tta"))
+    _, _, val_logits = _predict(model, tensors["val"], labels["val"], device, batch_size * 2, mean, std,
+                                in_channels, progress, "validation", tta=tta)
+    temperature = metrics.fit_temperature(val_logits, labels["val"].numpy())
+    val_probs = metrics.softmax(val_logits, temperature)
     threshold = metrics.choose_threshold(val_probs, labels["val"].numpy(), config.MODEL_TARGET_ACCURACY,
                                          config.MODEL_MIN_CONFIDENCE)
     validation = metrics.evaluate(val_probs, labels["val"].numpy(), classes, threshold["threshold"])
@@ -290,8 +289,8 @@ def train(run_dir: Path, resume: bool = False) -> None:
 
     test = None
     if len(tensors["test"]):
-        test_probs, _ = _predict(model, tensors["test"], labels["test"], device, batch_size * 2, mean, std,
-                                 in_channels, progress, "test")
+        test_probs, _, _ = _predict(model, tensors["test"], labels["test"], device, batch_size * 2, mean, std,
+                                    in_channels, progress, "test", temperature=temperature, tta=tta)
         test = metrics.evaluate(test_probs, labels["test"].numpy(), classes, threshold["threshold"])
         test_flags, _ = novelty.flagged(_features(model, arch, tensors["test"], device, batch_size * 2, mean, std,
                                                   in_channels, progress), stats, novelty_cutoffs)
@@ -314,6 +313,8 @@ def train(run_dir: Path, resume: bool = False) -> None:
         "input": {"image_size": size, "channels": channels, "model_channels": in_channels,
                   "mean": mean, "std": std},
         "threshold": threshold,
+        "temperature": round(temperature, 4),
+        "tta": tta,
         "novelty": {"method": "mahalanobis-per-block", "cutoffs": novelty_cutoffs, "flag_rate": novelty.FLAG_RATE},
         "validation": validation,
         "test": test,

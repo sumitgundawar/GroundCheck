@@ -291,3 +291,56 @@ def test_api_rules(studio, monkeypatch):
         assert client.get("/api/models/nope").status_code == 400
         bad = client.post("/api/training/runs", json={"name": "x", "dataset": str(studio / "scans"), "device": "tpu"})
         assert bad.status_code == 400 and "device" in bad.json()["detail"]
+
+
+def test_temperature_scaling_lowers_calibration_error():
+    torch = pytest.importorskip("torch")
+    rng = np.random.default_rng(3)
+    n = 4000
+    labels = rng.integers(0, 3, n)
+    true_logits = rng.normal(0, 1.2, (n, 3))
+    true_logits[np.arange(n), labels] += 1.5
+    sample = metrics.softmax(true_logits)
+    labels = np.array([rng.choice(3, p=p) for p in sample])
+    overconfident = true_logits * 3.0
+    temperature = metrics.fit_temperature(overconfident, labels)
+    assert 2.0 < temperature < 4.5
+    before = metrics.calibration_error(metrics.softmax(overconfident).max(1), metrics.softmax(overconfident).argmax(1) == labels)
+    scaled = metrics.softmax(overconfident, temperature)
+    after = metrics.calibration_error(scaled.max(1), scaled.argmax(1) == labels)
+    assert after < before * 0.5
+    assert torch is not None
+
+
+def test_augmentation_keeps_shape_and_never_flips():
+    torch = pytest.importorskip("torch")
+    from app.training import preprocess
+
+    x = torch.zeros(6, 1, 32, 32)
+    x[:, :, :, :8] = 1.0  # a left-side marker
+    torch.manual_seed(0)
+    out = preprocess.augment(x)
+    assert out.shape == x.shape
+    assert (out[:, :, :, :16].mean(dim=(1, 2, 3)) > out[:, :, :, 16:].mean(dim=(1, 2, 3))).all()
+    shifts = {round(float(v), 3) for v in out[:, 0, 16, 4]}
+    assert len(shifts) > 1  # drawn per image, not per batch
+    assert len(preprocess.tta_views(x)) == 3
+
+
+def test_a_card_without_temperature_predicts_as_before(studio, monkeypatch):
+    pytest.importorskip("torch")
+    from app.training import architectures
+
+    model = architectures.build("small_cnn" if "small_cnn" in architectures.ARCHITECTURES else
+                                next(iter(architectures.ARCHITECTURES)), 2, 1)
+    model.eval()
+    card = {"architecture": next(iter(architectures.ARCHITECTURES)), "classes": ["a", "b"],
+            "input": {"image_size": 32, "channels": 1, "model_channels": 1, "mean": [0.5], "std": [0.25]},
+            "threshold": {"threshold": 0.0, "met": True, "target": 0.9}}
+    monkeypatch.setattr(library, "_load", lambda model_id: (model, dict(card)))
+    image = _png(120)
+    old = library.predict("x", image)
+    card["temperature"] = 1.0
+    assert library.predict("x", image)["probabilities"] == old["probabilities"]
+    card["temperature"] = 3.0
+    assert library.predict("x", image)["confidence"] < old["confidence"]

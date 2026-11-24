@@ -5,7 +5,7 @@
   "must_refuse_total": 1004,
   "answerable_correct": 1004,
   "must_refuse_correct": 1004,
-  "generated_at": "2026-09-19T19:40:53.252182+00:00",
+  "generated_at": "2026-11-24T14:09:56.833800+00:00",
   "sample_cases": [
     {
       "query": "What is the dose of Kunpenravil?",
@@ -371,8 +371,228 @@
   "patient": {
     "total": 383,
     "passed": 383,
-    "must_refuse_total": 314,
+    "must_refuse_total": 315,
     "unsafe_answers": 0,
     "failures": []
+  },
+  "phrasing": {
+    "total": 320,
+    "answered": 319,
+    "over_refusal_rate": 0.0031,
+    "over_refused": [
+      {
+        "query": "Can I email the answer to a colleague? What should not be taken with Messenestal?",
+        "reason": "no sufficiently relevant source was found"
+      }
+    ]
+  },
+  "pii": {
+    "cases": 389,
+    "spans": 340,
+    "overall": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 340,
+      "fp": 0,
+      "fn": 0
+    },
+    "per_kind": {
+      "ADDRESS": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      "AGE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 7,
+        "fp": 0,
+        "fn": 0
+      },
+      "CARD": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 12,
+        "fp": 0,
+        "fn": 0
+      },
+      "DATE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 52,
+        "fp": 0,
+        "fn": 0
+      },
+      "EMAIL": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 13,
+        "fp": 0,
+        "fn": 0
+      },
+      "ID": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 21,
+        "fp": 0,
+        "fn": 0
+      },
+      "IP ADDRESS": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 6,
+        "fp": 0,
+        "fn": 0
+      },
+      "NAME": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 154,
+        "fp": 0,
+        "fn": 0
+      },
+      "NHS NUMBER": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 31,
+        "fp": 0,
+        "fn": 0
+      },
+      "NUMBER": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      "PHONE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 22,
+        "fp": 0,
+        "fn": 0
+      },
+      "POSTCODE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 7,
+        "fp": 0,
+        "fn": 0
+      },
+      "SSN": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 8,
+        "fp": 0,
+        "fn": 0
+      },
+      "URL": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      "ZIP": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      }
+    },
+    "p95_ms": 0.102,
+    "targets_met": true
+  },
+  "answer_quality": {
+    "cases": 827,
+    "answered": 827,
+    "claim_precision": 1.0,
+    "section_recall": 1.0,
+    "claims_per_answer": 1.261,
+    "targets_met": true,
+    "by_section": {
+      "Adverse Reactions": {
+        "cases": 85,
+        "found": 85,
+        "gold": 85,
+        "relevant": 85,
+        "claims": 85
+      },
+      "Contraindications": {
+        "cases": 95,
+        "found": 95,
+        "gold": 95,
+        "relevant": 95,
+        "claims": 95
+      },
+      "Dosage and Administration": {
+        "cases": 88,
+        "found": 88,
+        "gold": 88,
+        "relevant": 88,
+        "claims": 88
+      },
+      "Drug Interactions": {
+        "cases": 75,
+        "found": 75,
+        "gold": 75,
+        "relevant": 100,
+        "claims": 100
+      },
+      "Information": {
+        "cases": 84,
+        "found": 84,
+        "gold": 84,
+        "relevant": 84,
+        "claims": 84
+      },
+      "Monitoring": {
+        "cases": 78,
+        "found": 78,
+        "gold": 78,
+        "relevant": 116,
+        "claims": 116
+      },
+      "Prognosis": {
+        "cases": 77,
+        "found": 77,
+        "gold": 77,
+        "relevant": 146,
+        "claims": 146
+      },
+      "Symptoms": {
+        "cases": 77,
+        "found": 77,
+        "gold": 77,
+        "relevant": 77,
+        "claims": 77
+      },
+      "Treatment": {
+        "cases": 168,
+        "found": 168,
+        "gold": 168,
+        "relevant": 252,
+        "claims": 252
+      }
+    }
   }
 }

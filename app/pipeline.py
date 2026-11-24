@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import threading
 import time
 from collections import OrderedDict
 
 from . import audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, retrieval
-from .schemas import AskResponse, Claim, PatientContext, PatientFinding, Settings, Source, TraceStep
+from .schemas import (AskResponse, Claim, ClaimSupport, Explanation, PatientContext, PatientFinding, Redaction, Review, Settings,
+                      Source, TraceStep)
 
 # The full ordered set of stage names, used to render skipped stages after an
 # early refusal so the trace always shows the complete instrument.
@@ -57,12 +59,42 @@ def _skip_after(trace: list[TraceStep], last_done: str) -> None:
         trace.append(TraceStep(name=name, status="skip", detail="not reached", ms=0))
 
 
+_NOT_SENT = re.compile(r" It was not sent for review \([^)]*\)\.$")
+
+
+def _route(*, review: bool, check_only: bool, outcome: str, audit_id: str, query: str,
+           reason: str, reason_code: str | None, site_id: int | None) -> Review:
+    """Put a refusal in front of a reviewer, if that is possible, and say what
+    happened. The answer text may claim routing only when this returns True."""
+    if check_only:
+        return Review(note="this was a release check")
+    if not review:
+        return Review(note="this was a test run")
+    if outcome == "not_evaluated":
+        return Review(note="the request was not evaluated")
+    if not config.REVIEW_QUEUE:
+        return Review(note="the review queue is switched off")
+    if audit.store.backend() != "database":
+        return Review(note="no review database is configured")
+    case_id = governance.record_refusal(audit_id, query, reason, site_id, reason_code)
+    if case_id is None:
+        return Review(note="the review queue could not record it")
+    return Review(routed=True, case_id=case_id, note=f"review case {case_id}")
+
+
+def _routing_sentence(review: Review, outcome: str) -> str:
+    if outcome == "not_evaluated":
+        return ""
+    return " " + ROUTED if review.routed else f" It was not sent for review ({review.note})."
+
+
 def _finish(
     *,
     decision: str,
     answer_text: str,
     outcome: str | None = None,
     refused_reason: str | None,
+    reason_code: str | None = None,
     claims: list[Claim],
     sources: list[Source],
     trace: list[TraceStep],
@@ -70,8 +102,22 @@ def _finish(
     timer: _Timer,
     extras: dict,
     patient_findings: list[PatientFinding] | None = None,
+    explanation: Explanation | None = None,
 ) -> AskResponse:
+    """answer_text, for a refusal, is the message without its routing
+    sentence: whether the question was routed is only known once the review
+    queue has been tried."""
     audit_id = audit.store.new_id()
+    outcome = outcome or ("answered" if decision == "answer" else "refused")
+    from . import sites
+
+    site_id = sites.of_user(extras.get("user_id"))
+    review = Review()
+    if decision == "refuse":
+        review = _route(review=extras.get("review", True), check_only=bool(extras.get("check_only")),
+                        outcome=outcome, audit_id=audit_id, query=str(extras.get("redacted_query", "")),
+                        reason=refused_reason or "", reason_code=reason_code, site_id=site_id)
+        answer_text += _routing_sentence(review, outcome)
     # Final decision step.
     if decision == "answer":
         trace.append(TraceStep(name="decision", status="pass",
@@ -88,7 +134,7 @@ def _finish(
             step.explain = STAGE_EXPLAIN.get(step.name, "")
     response = AskResponse(
         decision=decision,
-        outcome=outcome or ("answered" if decision == "answer" else "refused"),
+        outcome=outcome,
         answer_text=answer_text,
         refused_reason=refused_reason,
         claims=claims,
@@ -98,28 +144,75 @@ def _finish(
         total_ms=timer.total_ms(),
         llm_used=llm_used,
         patient_findings=patient_findings or [],
+        reason_code=reason_code,
+        review=review,
+        explanation=explanation or (_explain(reason_code, refused_reason) if decision == "refuse" else Explanation()),
+        redaction=extras.get("redaction") or Redaction(),
     )
     if extras.get("check_only"):
         return response
     saved = {k: v for k, v in extras.items()
-             if k not in ("user_id", "review", "check_only", "remember", "raw_query")}
+             if k not in ("user_id", "review", "check_only", "remember", "raw_query", "redaction")}
     key = extras.get("remember")
     if key and not any(step.name == "rate limit" and step.status == "fail" for step in trace):
         _remember_answer(key, response, saved)
     if not extras.get("review", True):
         saved["test_run"] = True  # kept in the audit trail, left out of usage reports
-    from . import sites
-
-    site_id = sites.of_user(extras.get("user_id"))
     audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"), site_id=site_id)
     if not saved.get("test_run"):
         kind = (extras.get("provider") or {}).get("kind") if llm_used else None
         monitoring.observe_answer(decision, response.total_ms,
                                   "local" if kind == "local" else "cloud" if llm_used else "extractive")
         monitoring.observe_stages(decision, trace)
-    if decision == "refuse" and extras.get("review", True) and audit.store.backend() == "database":
-        governance.record_refusal(audit_id, str(extras.get("redacted_query", "")), refused_reason or "", site_id)
     return response
+
+
+def _recover(query: str, report: dict, results: list, cfg: "Settings") -> list:
+    """A question term the retrieved passages lack but the index has: one more
+    search aimed at it. Only passages about the topic the question names are
+    kept, so a word found in another medicine's passage can never cover it."""
+    terms = [t for t in report.get("uncovered", []) if retrieval.document_frequency(t) > 0]
+    named = retrieval.topics_mentioned(query)
+    if not terms or not named:
+        return []
+    have = {r["id"] for r, _ in results}
+    topics = set(named.values())
+    hits = retrieval.search(" ".join(terms) + " " + " ".join(named), cfg.top_k)
+    return [(r, s) for r, s in hits if r["id"] not in have and r.get("topic", "").lower() in topics]
+
+
+_EXPLAIN_SUMMARY = {
+    "input_blocked": "The question was stopped by an input guard before any source was searched.",
+    "rate_limited": "Too many requests were sent in a short time; the question was not evaluated.",
+    "no_relevant_source": "None of the sources was close enough to the question to answer from.",
+    "term_not_covered": "The question names something the retrieved sources do not mention.",
+    "population_not_covered": "The sources do not cover the age group the question is about.",
+    "stated_value_unsupported": "The question states a dose that no source about this medicine gives.",
+    "form_unsupported": "The question names a form or route the sources do not describe.",
+    "limit_not_stated": "The sources mention the subject but state no such dose limit.",
+    "combination_forbidden": "The sources say these must not be combined, so no combined dose exists.",
+    "insufficient_context": "The retrieved sources do not contain a sentence that answers the question.",
+    "claim_ungrounded": "A drafted statement could not be traced back to the sources.",
+    "dose_unsupported": "The drafted answer contained a dose the sources do not support.",
+    "patient_unsafe": "The patient's details make the answer unsafe to give.",
+}
+_EXPLAIN_SUGGESTION = {
+    "term_not_covered": ["Check the spelling of the name.", "Ask about the medicine or condition by its listed name."],
+    "population_not_covered": ["Ask about the adult guidance, or consult a specialist source."],
+    "stated_value_unsupported": ["Ask without the dose to see what the sources state."],
+    "form_unsupported": ["Ask about the plain form, or check the product's own label."],
+    "limit_not_stated": ["Ask for the usual dose, which the sources do state."],
+    "no_relevant_source": ["Name the medicine or condition and what you want to know about it."],
+    "insufficient_context": ["Ask one thing at a time, naming the medicine or condition."],
+    "input_blocked": ["Rephrase the question as a plain clinical question."],
+}
+
+
+def _explain(code: str | None, reason: str | None, missing: list[str] | None = None) -> Explanation:
+    if code is None:
+        return Explanation()
+    return Explanation(summary=_EXPLAIN_SUMMARY.get(code, reason or ""), missing_terms=missing or [],
+                       suggestions=_EXPLAIN_SUGGESTION.get(code, []))
 
 
 REFUSAL_PREFIX = "I cannot answer this safely. "
@@ -129,10 +222,17 @@ ROUTED = "The question has been routed for review."
 # step. These make the pipeline self-documenting on the frontend.
 STAGE_EXPLAIN = {
     "pii redaction":
-        "Before anything is logged, embedded, or sent to a model, names, dates, "
-        "record and NHS numbers, phone numbers, email and street addresses and "
-        "postcodes are replaced with placeholders such as [NAME] and [DATE]. "
-        "Ages over 89 become 90. Rule-based: a safety net, not a guarantee.",
+        "Before anything is logged, embedded, or sent to a model, identifiers are "
+        "replaced with placeholders such as [NAME] and [DATE]. Each detector "
+        "proposes spans with a score; checksums (NHS mod-11, Luhn for cards and "
+        "provider numbers, mod-97 for IBANs, social security rules) and real "
+        "calendar dates confirm them, and nearby cue words ('patient', 'husband', "
+        "'DOB') raise or lower the score. Names come from titles, relation and "
+        "role cues, 'SURNAME, Given', and a bundled list of given names; words "
+        "the documents know, medicine names and months are never names, and a "
+        "dose or an age under 90 is never removed. If spaCy or Presidio is "
+        "installed it can add people and places. Ages over 89 become 90. This is "
+        "a safety net, not a guarantee.",
     "scope check":
         "Rejects empty or over-long queries and obvious prompt-injection "
         "patterns such as 'ignore previous instructions'. A blocked query "
@@ -156,15 +256,21 @@ STAGE_EXPLAIN = {
         "happens before a model is ever called.",
     "source coverage":
         "A deterministic check that the contentful terms in the question (drug "
-        "and condition names, qualifiers like 'children') actually appear in the "
-        "retrieved sources. Catches questions about things the corpus never "
-        "mentions, before generation.",
+        "and condition names, clinical terms, qualifiers like 'children') appear "
+        "in the retrieved sources; everyday words like 'email' or 'meeting' are "
+        "not held against them. A term the index has but the passages lack gets "
+        "one more search aimed at it, kept to the topic the question names. "
+        "Catches questions about things the corpus never mentions, before "
+        "generation.",
     "generate":
         "The question and the retrieved sources are sent to the LLM, which must "
         "return structured JSON: a list of claims, each citing the source ids it "
-        "came from. With no API key, an extractive fallback lifts the most "
-        "relevant sentence from each passage instead. Either way the output is "
-        "the same shape and passes through the same guards.",
+        "came from. With no API key, an extractive fallback picks up to three "
+        "sentences from the passages about the topic, scored on meaning, on the "
+        "question's own words and on whether the passage is the kind of section "
+        "that answers it (dose, side effects, symptoms...), and gives each part "
+        "of a two-part question its own sentence. Either way the output is the "
+        "same shape and passes through the same guards.",
     "schema validate":
         "The model output is parsed and validated against a strict Pydantic "
         "schema. Malformed output is retried once, then falls back to "
@@ -172,21 +278,28 @@ STAGE_EXPLAIN = {
     "grounding check":
         "For every claim, a deterministic embedding similarity is computed "
         "between the claim and its cited source. The claim must cite a real "
-        "source and clear the grounding threshold. When a live LLM is "
+        "source and clear the grounding threshold, and a sentence that names no "
+        "medicine must belong to the passage it cites: every name and clinical "
+        "term in it has to be in that passage. Each claim also records how "
+        "relevant it is to the question and where in the passage it sits, for "
+        "information only. When a live LLM is "
         "configured, a second, cheaper model acts as a judge and is asked, "
         "strictly, whether the source supports the claim. The deterministic "
         "result is authoritative; the judge is recorded as corroboration so the "
         "demo stays reproducible.",
     "dosage guard":
         "The showpiece check, and deterministic: every value with a clinical "
-        "unit in the answer (for example '15 mg') must appear verbatim in a "
-        "retrieved source, or the system refuses and names the offending value. "
-        "The cheapest check catches the most dangerous mistake.",
+        "unit in the answer (for example '15 mg') must be stated by a retrieved "
+        "source about the medicine it is attributed to. Numbers and units are "
+        "compared, so '15 mg' and 'fifteen milligrams' match and '15 mcg' does "
+        "not. Otherwise the system refuses and names the offending value.",
     "decision":
         "The gate. Refuse if any input guard blocked, the retrieval gate failed, "
         "coverage failed, the model had insufficient context, any claim is "
-        "ungrounded, or the dosage guard failed. Otherwise answer, assembling "
-        "the grounded claims into prose with bracketed citations.",
+        "ungrounded, or the dosage guard failed. A refusal is put in the review "
+        "queue when one is running, and the answer says whether it was; the "
+        "reason is also given as a stable code. Otherwise answer, assembling the "
+        "grounded claims into prose with bracketed citations.",
 }
 
 
@@ -283,6 +396,14 @@ def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool)
     response = cached.model_copy(deep=True)
     response.audit_id = audit.store.new_id()
     response.total_ms = timer.total_ms()
+    site_id = sites.of_user(user_id)
+    if response.decision == "refuse":
+        response.review = _route(review=review, check_only=False, outcome=response.outcome,
+                                 audit_id=response.audit_id, query=str(extras.get("redacted_query", "")),
+                                 reason=response.refused_reason or "", reason_code=response.reason_code,
+                                 site_id=site_id)
+        text = _NOT_SENT.sub("", response.answer_text.removesuffix(" " + ROUTED))
+        response.answer_text = text + _routing_sentence(response.review, response.outcome)
     # The trace is the earlier run's. Say so, rather than leaving an audit
     # record that reads as though every check ran again for this question:
     # the stage timings below belong to the run named here.
@@ -294,12 +415,8 @@ def _reuse(cached: AskResponse, extras: dict, user_id: int | None, review: bool)
                                               "had not changed. The earlier run's checks are shown "
                                               "unchanged, and this request has its own audit record.",
                                 data={"of_audit_id": cached.audit_id})] + response.trace
-    site_id = sites.of_user(user_id)
     audit.store.save(response.audit_id, response, {**extras, "from_cache": True}, user_id=user_id, site_id=site_id)
     monitoring.observe_answer(response.decision, response.total_ms, "cache")
-    if response.decision == "refuse" and review and audit.store.backend() == "database":
-        governance.record_refusal(response.audit_id, str(extras.get("redacted_query", "")),
-                                  response.refused_reason or "", site_id)
     return response
 
 
@@ -336,6 +453,8 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         redacted = raw_query
         pii_status, pii_detail = "skip", "guard disabled"
     extras["redacted_query"] = redacted
+    extras["redaction"] = (Redaction(kinds=dict(cleaned.found), redacted_query=redacted)
+                           if cfg.enable_pii_redaction else Redaction())
     trace.append(TraceStep(name="pii redaction", status=pii_status,
                            detail=pii_detail, ms=timer.lap_ms()))
 
@@ -349,8 +468,8 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
     if not scope.ok:
         _skip_after(trace, "scope check")
         return _finish(decision="refuse",
-                       answer_text=REFUSAL_PREFIX + scope.reason + " " + ROUTED,
-                       refused_reason=scope.reason, claims=[], sources=[],
+                       answer_text=REFUSAL_PREFIX + scope.reason,
+                       refused_reason=scope.reason, reason_code="input_blocked", claims=[], sources=[],
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
     rate = guards_input.GuardResult(True, detail="not applied to release checks") if check_only \
@@ -365,7 +484,7 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         _skip_after(trace, "rate limit")
         return _finish(decision="refuse", outcome="not_evaluated",
                        answer_text=REFUSAL_PREFIX + rate.reason,
-                       refused_reason=rate.reason, claims=[], sources=[],
+                       refused_reason=rate.reason, reason_code="rate_limited", claims=[], sources=[],
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
     query = redacted.strip()
@@ -415,8 +534,8 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         _skip_after(trace, "retrieval gate")
         return _finish(decision="refuse",
                        answer_text=REFUSAL_PREFIX
-                       + "No sufficiently relevant source was found. " + ROUTED,
-                       refused_reason=reason, claims=[], sources=sources,
+                       + "No sufficiently relevant source was found.",
+                       refused_reason=reason, reason_code="no_relevant_source", claims=[], sources=sources,
                        trace=trace, llm_used=False, timer=timer, extras=extras)
     trace.append(TraceStep(
         name="retrieval gate", status="pass",
@@ -427,16 +546,33 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
 
     # --- 4. Source coverage -----------------------------------------------
     if not cfg.enable_coverage_guard:
-        covered, cover_detail = True, "guard disabled"
+        covered, cover_detail, cover_code, cover_report = True, "guard disabled", None, {}
         trace.append(TraceStep(name="source coverage", status="skip",
                                detail="guard disabled", ms=timer.lap_ms()))
     else:
-        covered, cover_detail = guards_output.coverage_check(query, source_records)
+        cover_report = guards_output.coverage_report(query, source_records)
+        covered, cover_detail, cover_code = guards_output.coverage_verdict(query, source_records, cover_report)
+        if not covered and cover_code == "term_not_covered":
+            added = _recover(query, cover_report, results, cfg)
+            if added:
+                results = results + added
+                source_records = [r for r, _ in results]
+                sources += [
+                    Source(id=r["id"], title=r["title"], snippet=r["text"], score=round(s, 4),
+                           topic=r.get("topic", ""), section=r.get("section", ""),
+                           kind=r.get("kind", "condition"), rank=len(sources) + i + 1,
+                           above_gate=s >= cfg.retrieval_min_score)
+                    for i, (r, s) in enumerate(added)
+                ]
+                extras["retrieved"] = [{"id": r["id"], "score": s} for r, s in results]
+                cover_report = guards_output.coverage_report(query, source_records)
+                covered, cover_detail, cover_code = guards_output.coverage_verdict(query, source_records, cover_report)
+                cover_report["targeted_retrieval"] = [r["id"] for r, _ in added]
         trace.append(TraceStep(
             name="source coverage",
             status="pass" if covered else "fail",
             detail=cover_detail,
-            data=guards_output.coverage_report(query, source_records),
+            data=cover_report,
             ms=timer.lap_ms(),
         ))
     if not covered:
@@ -445,8 +581,10 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         return _finish(decision="refuse",
                        answer_text=REFUSAL_PREFIX
                        + "The question refers to something the trusted sources "
-                       "do not cover. " + ROUTED,
-                       refused_reason=reason, claims=[], sources=sources,
+                       "do not cover.",
+                       refused_reason=reason, reason_code=cover_code,
+                       explanation=_explain(cover_code, reason, cover_report.get("uncovered") if cover_code == "term_not_covered" else None),
+                       claims=[], sources=sources,
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
     # --- 5. Generate -------------------------------------------------------
@@ -458,6 +596,23 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
     if not llm_used:
         llm_answer = llm.generate_extractive(query, results, cfg.retrieval_min_score)
     extras["llm_raw"] = llm_answer.model_dump()
+    # An extractive answer may cite a passage of the topic that retrieval ranked
+    # below the cut. It is a source of the answer like any other: show it, and
+    # let the dosage guard read it.
+    shown = {r["id"] for r in source_records}
+    wanted = [sid for c in llm_answer.claims for sid in c.source_ids if sid not in shown]
+    if wanted:
+        scores = retrieval.passage_scores(query, wanted)
+        for sid in dict.fromkeys(wanted):
+            record = retrieval.record_for(sid)
+            if record is None:
+                continue
+            score = scores.get(sid, 0.0)
+            source_records.append(record)
+            sources.append(Source(id=sid, title=record["title"], snippet=record["text"], score=round(score, 4),
+                                  topic=record.get("topic", ""), section=record.get("section", ""),
+                                  kind=record.get("kind", "condition"), rank=len(sources) + 1,
+                                  above_gate=score >= cfg.retrieval_min_score))
     trace.append(TraceStep(
         name="generate",
         status="pass" if llm_used else "info",
@@ -485,8 +640,8 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         return _finish(decision="refuse",
                        answer_text=REFUSAL_PREFIX
                        + "The sources do not contain enough information to "
-                       "answer safely. " + ROUTED,
-                       refused_reason=reason, claims=[], sources=sources,
+                       "answer safely.",
+                       refused_reason=reason, reason_code="insufficient_context", claims=[], sources=sources,
                        trace=trace, llm_used=llm_used, timer=timer, extras=extras)
 
     # --- 7. Grounding check ------------------------------------------------
@@ -510,11 +665,22 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                     judge_supported += 1 if verdict["supported"] else 0
                     judge_verdict = verdict
                 break
+        support = llm_claim.support
+        relevance = llm_claim.relevance
+        if support is None and llm_claim.source_ids:
+            found = retrieval.locate_sentence(llm_claim.text, llm_claim.source_ids[0])
+            if found:
+                support = ClaimSupport(source_id=llm_claim.source_ids[0], start=found[0], end=found[1],
+                                       sentence=found[2])
+        if not relevance:
+            relevance = float(retrieval.embed([llm_claim.text])[0] @ retrieval.embed_query(query))
         claims.append(Claim(
             text=llm_claim.text,
             source_ids=llm_claim.source_ids,
             grounded=grounded,
             grounding_score=round(score, 4),
+            relevance=round(relevance, 4),
+            support=support,
         ))
         grounding_rows.append({
             "claim": llm_claim.text,
@@ -522,6 +688,7 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
             "deterministic_score": round(score, 4),
             "threshold": cfg.grounding_min,
             "grounded": grounded,
+            "relevance": round(relevance, 4),
             "judge": judge_verdict,  # {supported, reason} or null
         })
         if not grounded:
@@ -577,8 +744,8 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                                detail=dose_detail, ms=timer.lap_ms(),
                                data={"detected_values": detected_values,
                                      "verified": dose_checked,
-                                     "rule": "every value-with-unit must appear "
-                                             "verbatim in a retrieved source",
+                                     "rule": "every value-with-unit must be stated by a "
+                                             "retrieved source about the same medicine",
                                      "ok": dose_ok}))
 
     # --- 9. Patient checks -------------------------------------------------
@@ -605,8 +772,8 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         if blocking and not ungrounded and dose_ok:
             reason = blocking.message.rstrip(".")
             return _finish(decision="refuse",
-                           answer_text=REFUSAL_PREFIX + blocking.message + " " + ROUTED,
-                           refused_reason=reason[0].lower() + reason[1:], claims=claims, sources=sources,
+                           answer_text=REFUSAL_PREFIX + blocking.message,
+                           refused_reason=reason[0].lower() + reason[1:], reason_code="patient_unsafe", claims=claims, sources=sources,
                            trace=trace, llm_used=llm_used, timer=timer, extras=extras,
                            patient_findings=findings)
 
@@ -615,15 +782,13 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         reason = f"a claim could not be grounded: \"{ungrounded[0]}\""
         return _finish(decision="refuse",
                        answer_text=REFUSAL_PREFIX
-                       + "A statement could not be grounded in the sources. "
-                       + ROUTED,
-                       refused_reason=reason, claims=claims, sources=sources,
+                       + "A statement could not be grounded in the sources.",
+                       refused_reason=reason, reason_code="claim_ungrounded", claims=claims, sources=sources,
                        trace=trace, llm_used=llm_used, timer=timer, extras=extras)
     if not dose_ok:
         return _finish(decision="refuse",
-                       answer_text=REFUSAL_PREFIX + dose_detail.capitalize()
-                       + ". " + ROUTED,
-                       refused_reason=dose_detail, claims=claims, sources=sources,
+                       answer_text=REFUSAL_PREFIX + dose_detail.capitalize() + ".",
+                       refused_reason=dose_detail, reason_code="dose_unsupported", claims=claims, sources=sources,
                        trace=trace, llm_used=llm_used, timer=timer, extras=extras)
 
     # --- Answer ------------------------------------------------------------

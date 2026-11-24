@@ -1,0 +1,1605 @@
+{
+ "description": "Golden-answerable questions wrapped in everyday framings (a colleague asking, an email, an audit). Each should be answered exactly as its plain form is.",
+ "cases": [
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is Lumvumyn Deficiency?",
+   "base": "What is Lumvumyn Deficiency?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is Lumvumyn Deficiency?",
+   "base": "What is Lumvumyn Deficiency?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is Lumvumyn Deficiency?",
+   "base": "What is Lumvumyn Deficiency?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is Lumvumyn Deficiency?",
+   "base": "What is Lumvumyn Deficiency?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is Lumvumyn Deficiency? Asking for the team meeting tomorrow.",
+   "base": "What is Lumvumyn Deficiency?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is Lumvumyn Deficiency?",
+   "base": "What is Lumvumyn Deficiency?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is Lumvumyn Deficiency?",
+   "base": "What is Lumvumyn Deficiency?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is Lumvumyn Deficiency?",
+   "base": "What is Lumvumyn Deficiency?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What should not be taken with Molpunendal?",
+   "base": "What should not be taken with Molpunendal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What should not be taken with Molpunendal?",
+   "base": "What should not be taken with Molpunendal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What should not be taken with Molpunendal?",
+   "base": "What should not be taken with Molpunendal?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what should not be taken with Molpunendal?",
+   "base": "What should not be taken with Molpunendal?",
+   "expect": "answer"
+  },
+  {
+   "query": "What should not be taken with Molpunendal? Asking for the team meeting tomorrow.",
+   "base": "What should not be taken with Molpunendal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what should not be taken with Molpunendal?",
+   "base": "What should not be taken with Molpunendal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what should not be taken with Molpunendal?",
+   "base": "What should not be taken with Molpunendal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What should not be taken with Molpunendal?",
+   "base": "What should not be taken with Molpunendal?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How often is Barpudor Disorder reviewed?",
+   "base": "How often is Barpudor Disorder reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How often is Barpudor Disorder reviewed?",
+   "base": "How often is Barpudor Disorder reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How often is Barpudor Disorder reviewed?",
+   "base": "How often is Barpudor Disorder reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how often is Barpudor Disorder reviewed?",
+   "base": "How often is Barpudor Disorder reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "How often is Barpudor Disorder reviewed? Asking for the team meeting tomorrow.",
+   "base": "How often is Barpudor Disorder reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how often is Barpudor Disorder reviewed?",
+   "base": "How often is Barpudor Disorder reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how often is Barpudor Disorder reviewed?",
+   "base": "How often is Barpudor Disorder reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How often is Barpudor Disorder reviewed?",
+   "base": "How often is Barpudor Disorder reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is Bimfelay Dysregulation?",
+   "base": "What is Bimfelay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is Bimfelay Dysregulation?",
+   "base": "What is Bimfelay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is Bimfelay Dysregulation?",
+   "base": "What is Bimfelay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is Bimfelay Dysregulation?",
+   "base": "What is Bimfelay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is Bimfelay Dysregulation? Asking for the team meeting tomorrow.",
+   "base": "What is Bimfelay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is Bimfelay Dysregulation?",
+   "base": "What is Bimfelay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is Bimfelay Dysregulation?",
+   "base": "What is Bimfelay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is Bimfelay Dysregulation?",
+   "base": "What is Bimfelay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: When should Dorpenostan not be used?",
+   "base": "When should Dorpenostan not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? When should Dorpenostan not be used?",
+   "base": "When should Dorpenostan not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? When should Dorpenostan not be used?",
+   "base": "When should Dorpenostan not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, when should Dorpenostan not be used?",
+   "base": "When should Dorpenostan not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "When should Dorpenostan not be used? Asking for the team meeting tomorrow.",
+   "base": "When should Dorpenostan not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, when should Dorpenostan not be used?",
+   "base": "When should Dorpenostan not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, when should Dorpenostan not be used?",
+   "base": "When should Dorpenostan not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? When should Dorpenostan not be used?",
+   "base": "When should Dorpenostan not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How often is Sorbonyn Deficiency reviewed?",
+   "base": "How often is Sorbonyn Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How often is Sorbonyn Deficiency reviewed?",
+   "base": "How often is Sorbonyn Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How often is Sorbonyn Deficiency reviewed?",
+   "base": "How often is Sorbonyn Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how often is Sorbonyn Deficiency reviewed?",
+   "base": "How often is Sorbonyn Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "How often is Sorbonyn Deficiency reviewed? Asking for the team meeting tomorrow.",
+   "base": "How often is Sorbonyn Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how often is Sorbonyn Deficiency reviewed?",
+   "base": "How often is Sorbonyn Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how often is Sorbonyn Deficiency reviewed?",
+   "base": "How often is Sorbonyn Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How often is Sorbonyn Deficiency reviewed?",
+   "base": "How often is Sorbonyn Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How is Merpetyn Disorder monitored?",
+   "base": "How is Merpetyn Disorder monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How is Merpetyn Disorder monitored?",
+   "base": "How is Merpetyn Disorder monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How is Merpetyn Disorder monitored?",
+   "base": "How is Merpetyn Disorder monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how is Merpetyn Disorder monitored?",
+   "base": "How is Merpetyn Disorder monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "How is Merpetyn Disorder monitored? Asking for the team meeting tomorrow.",
+   "base": "How is Merpetyn Disorder monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how is Merpetyn Disorder monitored?",
+   "base": "How is Merpetyn Disorder monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how is Merpetyn Disorder monitored?",
+   "base": "How is Merpetyn Disorder monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How is Merpetyn Disorder monitored?",
+   "base": "How is Merpetyn Disorder monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What are the symptoms of Loskidoth Disorder?",
+   "base": "What are the symptoms of Loskidoth Disorder?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What are the symptoms of Loskidoth Disorder?",
+   "base": "What are the symptoms of Loskidoth Disorder?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What are the symptoms of Loskidoth Disorder?",
+   "base": "What are the symptoms of Loskidoth Disorder?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what are the symptoms of Loskidoth Disorder?",
+   "base": "What are the symptoms of Loskidoth Disorder?",
+   "expect": "answer"
+  },
+  {
+   "query": "What are the symptoms of Loskidoth Disorder? Asking for the team meeting tomorrow.",
+   "base": "What are the symptoms of Loskidoth Disorder?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what are the symptoms of Loskidoth Disorder?",
+   "base": "What are the symptoms of Loskidoth Disorder?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what are the symptoms of Loskidoth Disorder?",
+   "base": "What are the symptoms of Loskidoth Disorder?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What are the symptoms of Loskidoth Disorder?",
+   "base": "What are the symptoms of Loskidoth Disorder?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is the dose of Nedmusestal?",
+   "base": "What is the dose of Nedmusestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is the dose of Nedmusestal?",
+   "base": "What is the dose of Nedmusestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is the dose of Nedmusestal?",
+   "base": "What is the dose of Nedmusestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is the dose of Nedmusestal?",
+   "base": "What is the dose of Nedmusestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is the dose of Nedmusestal? Asking for the team meeting tomorrow.",
+   "base": "What is the dose of Nedmusestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is the dose of Nedmusestal?",
+   "base": "What is the dose of Nedmusestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is the dose of Nedmusestal?",
+   "base": "What is the dose of Nedmusestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is the dose of Nedmusestal?",
+   "base": "What is the dose of Nedmusestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is Massadufen used for?",
+   "base": "What is Massadufen used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is Massadufen used for?",
+   "base": "What is Massadufen used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is Massadufen used for?",
+   "base": "What is Massadufen used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is Massadufen used for?",
+   "base": "What is Massadufen used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is Massadufen used for? Asking for the team meeting tomorrow.",
+   "base": "What is Massadufen used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is Massadufen used for?",
+   "base": "What is Massadufen used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is Massadufen used for?",
+   "base": "What is Massadufen used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is Massadufen used for?",
+   "base": "What is Massadufen used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How much Kudromulex is given?",
+   "base": "How much Kudromulex is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How much Kudromulex is given?",
+   "base": "How much Kudromulex is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How much Kudromulex is given?",
+   "base": "How much Kudromulex is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how much Kudromulex is given?",
+   "base": "How much Kudromulex is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "How much Kudromulex is given? Asking for the team meeting tomorrow.",
+   "base": "How much Kudromulex is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how much Kudromulex is given?",
+   "base": "How much Kudromulex is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how much Kudromulex is given?",
+   "base": "How much Kudromulex is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How much Kudromulex is given?",
+   "base": "How much Kudromulex is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is the dose of Kunpenravil?",
+   "base": "What is the dose of Kunpenravil?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is the dose of Kunpenravil?",
+   "base": "What is the dose of Kunpenravil?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is the dose of Kunpenravil?",
+   "base": "What is the dose of Kunpenravil?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is the dose of Kunpenravil?",
+   "base": "What is the dose of Kunpenravil?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is the dose of Kunpenravil? Asking for the team meeting tomorrow.",
+   "base": "What is the dose of Kunpenravil?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is the dose of Kunpenravil?",
+   "base": "What is the dose of Kunpenravil?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is the dose of Kunpenravil?",
+   "base": "What is the dose of Kunpenravil?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is the dose of Kunpenravil?",
+   "base": "What is the dose of Kunpenravil?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is Kunpenravil used for?",
+   "base": "What is Kunpenravil used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is Kunpenravil used for?",
+   "base": "What is Kunpenravil used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is Kunpenravil used for?",
+   "base": "What is Kunpenravil used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is Kunpenravil used for?",
+   "base": "What is Kunpenravil used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is Kunpenravil used for? Asking for the team meeting tomorrow.",
+   "base": "What is Kunpenravil used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is Kunpenravil used for?",
+   "base": "What is Kunpenravil used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is Kunpenravil used for?",
+   "base": "What is Kunpenravil used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is Kunpenravil used for?",
+   "base": "What is Kunpenravil used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is the dose of Bossodavine?",
+   "base": "What is the dose of Bossodavine?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is the dose of Bossodavine?",
+   "base": "What is the dose of Bossodavine?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is the dose of Bossodavine?",
+   "base": "What is the dose of Bossodavine?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is the dose of Bossodavine?",
+   "base": "What is the dose of Bossodavine?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is the dose of Bossodavine? Asking for the team meeting tomorrow.",
+   "base": "What is the dose of Bossodavine?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is the dose of Bossodavine?",
+   "base": "What is the dose of Bossodavine?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is the dose of Bossodavine?",
+   "base": "What is the dose of Bossodavine?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is the dose of Bossodavine?",
+   "base": "What is the dose of Bossodavine?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How often is Nolleseen Dysregulation reviewed?",
+   "base": "How often is Nolleseen Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How often is Nolleseen Dysregulation reviewed?",
+   "base": "How often is Nolleseen Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How often is Nolleseen Dysregulation reviewed?",
+   "base": "How often is Nolleseen Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how often is Nolleseen Dysregulation reviewed?",
+   "base": "How often is Nolleseen Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "How often is Nolleseen Dysregulation reviewed? Asking for the team meeting tomorrow.",
+   "base": "How often is Nolleseen Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how often is Nolleseen Dysregulation reviewed?",
+   "base": "How often is Nolleseen Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how often is Nolleseen Dysregulation reviewed?",
+   "base": "How often is Nolleseen Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How often is Nolleseen Dysregulation reviewed?",
+   "base": "How often is Nolleseen Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is Ronladoxine used for?",
+   "base": "What is Ronladoxine used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is Ronladoxine used for?",
+   "base": "What is Ronladoxine used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is Ronladoxine used for?",
+   "base": "What is Ronladoxine used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is Ronladoxine used for?",
+   "base": "What is Ronladoxine used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is Ronladoxine used for? Asking for the team meeting tomorrow.",
+   "base": "What is Ronladoxine used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is Ronladoxine used for?",
+   "base": "What is Ronladoxine used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is Ronladoxine used for?",
+   "base": "What is Ronladoxine used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is Ronladoxine used for?",
+   "base": "What is Ronladoxine used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: When should Pullosestal not be used?",
+   "base": "When should Pullosestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? When should Pullosestal not be used?",
+   "base": "When should Pullosestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? When should Pullosestal not be used?",
+   "base": "When should Pullosestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, when should Pullosestal not be used?",
+   "base": "When should Pullosestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "When should Pullosestal not be used? Asking for the team meeting tomorrow.",
+   "base": "When should Pullosestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, when should Pullosestal not be used?",
+   "base": "When should Pullosestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, when should Pullosestal not be used?",
+   "base": "When should Pullosestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? When should Pullosestal not be used?",
+   "base": "When should Pullosestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How is Veltris Syndrome treated?",
+   "base": "How is Veltris Syndrome treated?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How is Veltris Syndrome treated?",
+   "base": "How is Veltris Syndrome treated?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How is Veltris Syndrome treated?",
+   "base": "How is Veltris Syndrome treated?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how is Veltris Syndrome treated?",
+   "base": "How is Veltris Syndrome treated?",
+   "expect": "answer"
+  },
+  {
+   "query": "How is Veltris Syndrome treated? Asking for the team meeting tomorrow.",
+   "base": "How is Veltris Syndrome treated?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how is Veltris Syndrome treated?",
+   "base": "How is Veltris Syndrome treated?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how is Veltris Syndrome treated?",
+   "base": "How is Veltris Syndrome treated?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How is Veltris Syndrome treated?",
+   "base": "How is Veltris Syndrome treated?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is the treatment for Nodtidyn Dysregulation?",
+   "base": "What is the treatment for Nodtidyn Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is the treatment for Nodtidyn Dysregulation?",
+   "base": "What is the treatment for Nodtidyn Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is the treatment for Nodtidyn Dysregulation?",
+   "base": "What is the treatment for Nodtidyn Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is the treatment for Nodtidyn Dysregulation?",
+   "base": "What is the treatment for Nodtidyn Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is the treatment for Nodtidyn Dysregulation? Asking for the team meeting tomorrow.",
+   "base": "What is the treatment for Nodtidyn Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is the treatment for Nodtidyn Dysregulation?",
+   "base": "What is the treatment for Nodtidyn Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is the treatment for Nodtidyn Dysregulation?",
+   "base": "What is the treatment for Nodtidyn Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is the treatment for Nodtidyn Dysregulation?",
+   "base": "What is the treatment for Nodtidyn Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What should not be taken with Gankululex?",
+   "base": "What should not be taken with Gankululex?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What should not be taken with Gankululex?",
+   "base": "What should not be taken with Gankululex?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What should not be taken with Gankululex?",
+   "base": "What should not be taken with Gankululex?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what should not be taken with Gankululex?",
+   "base": "What should not be taken with Gankululex?",
+   "expect": "answer"
+  },
+  {
+   "query": "What should not be taken with Gankululex? Asking for the team meeting tomorrow.",
+   "base": "What should not be taken with Gankululex?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what should not be taken with Gankululex?",
+   "base": "What should not be taken with Gankululex?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what should not be taken with Gankululex?",
+   "base": "What should not be taken with Gankululex?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What should not be taken with Gankululex?",
+   "base": "What should not be taken with Gankululex?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How much Tamdamravil is given?",
+   "base": "How much Tamdamravil is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How much Tamdamravil is given?",
+   "base": "How much Tamdamravil is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How much Tamdamravil is given?",
+   "base": "How much Tamdamravil is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how much Tamdamravil is given?",
+   "base": "How much Tamdamravil is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "How much Tamdamravil is given? Asking for the team meeting tomorrow.",
+   "base": "How much Tamdamravil is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how much Tamdamravil is given?",
+   "base": "How much Tamdamravil is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how much Tamdamravil is given?",
+   "base": "How much Tamdamravil is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How much Tamdamravil is given?",
+   "base": "How much Tamdamravil is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is Galsosyn Imbalance?",
+   "base": "What is Galsosyn Imbalance?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is Galsosyn Imbalance?",
+   "base": "What is Galsosyn Imbalance?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is Galsosyn Imbalance?",
+   "base": "What is Galsosyn Imbalance?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is Galsosyn Imbalance?",
+   "base": "What is Galsosyn Imbalance?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is Galsosyn Imbalance? Asking for the team meeting tomorrow.",
+   "base": "What is Galsosyn Imbalance?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is Galsosyn Imbalance?",
+   "base": "What is Galsosyn Imbalance?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is Galsosyn Imbalance?",
+   "base": "What is Galsosyn Imbalance?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is Galsosyn Imbalance?",
+   "base": "What is Galsosyn Imbalance?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How is Vodpinel Syndrome monitored?",
+   "base": "How is Vodpinel Syndrome monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How is Vodpinel Syndrome monitored?",
+   "base": "How is Vodpinel Syndrome monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How is Vodpinel Syndrome monitored?",
+   "base": "How is Vodpinel Syndrome monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how is Vodpinel Syndrome monitored?",
+   "base": "How is Vodpinel Syndrome monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "How is Vodpinel Syndrome monitored? Asking for the team meeting tomorrow.",
+   "base": "How is Vodpinel Syndrome monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how is Vodpinel Syndrome monitored?",
+   "base": "How is Vodpinel Syndrome monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how is Vodpinel Syndrome monitored?",
+   "base": "How is Vodpinel Syndrome monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How is Vodpinel Syndrome monitored?",
+   "base": "How is Vodpinel Syndrome monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is the treatment for Nolleseen Dysregulation?",
+   "base": "What is the treatment for Nolleseen Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is the treatment for Nolleseen Dysregulation?",
+   "base": "What is the treatment for Nolleseen Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is the treatment for Nolleseen Dysregulation?",
+   "base": "What is the treatment for Nolleseen Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is the treatment for Nolleseen Dysregulation?",
+   "base": "What is the treatment for Nolleseen Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is the treatment for Nolleseen Dysregulation? Asking for the team meeting tomorrow.",
+   "base": "What is the treatment for Nolleseen Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is the treatment for Nolleseen Dysregulation?",
+   "base": "What is the treatment for Nolleseen Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is the treatment for Nolleseen Dysregulation?",
+   "base": "What is the treatment for Nolleseen Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is the treatment for Nolleseen Dysregulation?",
+   "base": "What is the treatment for Nolleseen Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is Nalsulizane used for?",
+   "base": "What is Nalsulizane used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is Nalsulizane used for?",
+   "base": "What is Nalsulizane used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is Nalsulizane used for?",
+   "base": "What is Nalsulizane used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is Nalsulizane used for?",
+   "base": "What is Nalsulizane used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is Nalsulizane used for? Asking for the team meeting tomorrow.",
+   "base": "What is Nalsulizane used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is Nalsulizane used for?",
+   "base": "What is Nalsulizane used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is Nalsulizane used for?",
+   "base": "What is Nalsulizane used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is Nalsulizane used for?",
+   "base": "What is Nalsulizane used for?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How often is Sermileus Deficiency reviewed?",
+   "base": "How often is Sermileus Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How often is Sermileus Deficiency reviewed?",
+   "base": "How often is Sermileus Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How often is Sermileus Deficiency reviewed?",
+   "base": "How often is Sermileus Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how often is Sermileus Deficiency reviewed?",
+   "base": "How often is Sermileus Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "How often is Sermileus Deficiency reviewed? Asking for the team meeting tomorrow.",
+   "base": "How often is Sermileus Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how often is Sermileus Deficiency reviewed?",
+   "base": "How often is Sermileus Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how often is Sermileus Deficiency reviewed?",
+   "base": "How often is Sermileus Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How often is Sermileus Deficiency reviewed?",
+   "base": "How often is Sermileus Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How often is Sulsanas Dysregulation reviewed?",
+   "base": "How often is Sulsanas Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How often is Sulsanas Dysregulation reviewed?",
+   "base": "How often is Sulsanas Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How often is Sulsanas Dysregulation reviewed?",
+   "base": "How often is Sulsanas Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how often is Sulsanas Dysregulation reviewed?",
+   "base": "How often is Sulsanas Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "How often is Sulsanas Dysregulation reviewed? Asking for the team meeting tomorrow.",
+   "base": "How often is Sulsanas Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how often is Sulsanas Dysregulation reviewed?",
+   "base": "How often is Sulsanas Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how often is Sulsanas Dysregulation reviewed?",
+   "base": "How often is Sulsanas Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How often is Sulsanas Dysregulation reviewed?",
+   "base": "How often is Sulsanas Dysregulation reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What are the symptoms of Sonpasund Syndrome?",
+   "base": "What are the symptoms of Sonpasund Syndrome?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What are the symptoms of Sonpasund Syndrome?",
+   "base": "What are the symptoms of Sonpasund Syndrome?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What are the symptoms of Sonpasund Syndrome?",
+   "base": "What are the symptoms of Sonpasund Syndrome?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what are the symptoms of Sonpasund Syndrome?",
+   "base": "What are the symptoms of Sonpasund Syndrome?",
+   "expect": "answer"
+  },
+  {
+   "query": "What are the symptoms of Sonpasund Syndrome? Asking for the team meeting tomorrow.",
+   "base": "What are the symptoms of Sonpasund Syndrome?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what are the symptoms of Sonpasund Syndrome?",
+   "base": "What are the symptoms of Sonpasund Syndrome?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what are the symptoms of Sonpasund Syndrome?",
+   "base": "What are the symptoms of Sonpasund Syndrome?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What are the symptoms of Sonpasund Syndrome?",
+   "base": "What are the symptoms of Sonpasund Syndrome?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What are the side effects of Runkenizane?",
+   "base": "What are the side effects of Runkenizane?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What are the side effects of Runkenizane?",
+   "base": "What are the side effects of Runkenizane?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What are the side effects of Runkenizane?",
+   "base": "What are the side effects of Runkenizane?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what are the side effects of Runkenizane?",
+   "base": "What are the side effects of Runkenizane?",
+   "expect": "answer"
+  },
+  {
+   "query": "What are the side effects of Runkenizane? Asking for the team meeting tomorrow.",
+   "base": "What are the side effects of Runkenizane?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what are the side effects of Runkenizane?",
+   "base": "What are the side effects of Runkenizane?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what are the side effects of Runkenizane?",
+   "base": "What are the side effects of Runkenizane?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What are the side effects of Runkenizane?",
+   "base": "What are the side effects of Runkenizane?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What should not be taken with Vomverumide?",
+   "base": "What should not be taken with Vomverumide?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What should not be taken with Vomverumide?",
+   "base": "What should not be taken with Vomverumide?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What should not be taken with Vomverumide?",
+   "base": "What should not be taken with Vomverumide?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what should not be taken with Vomverumide?",
+   "base": "What should not be taken with Vomverumide?",
+   "expect": "answer"
+  },
+  {
+   "query": "What should not be taken with Vomverumide? Asking for the team meeting tomorrow.",
+   "base": "What should not be taken with Vomverumide?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what should not be taken with Vomverumide?",
+   "base": "What should not be taken with Vomverumide?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what should not be taken with Vomverumide?",
+   "base": "What should not be taken with Vomverumide?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What should not be taken with Vomverumide?",
+   "base": "What should not be taken with Vomverumide?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How is Sorbonyn Deficiency monitored?",
+   "base": "How is Sorbonyn Deficiency monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How is Sorbonyn Deficiency monitored?",
+   "base": "How is Sorbonyn Deficiency monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How is Sorbonyn Deficiency monitored?",
+   "base": "How is Sorbonyn Deficiency monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how is Sorbonyn Deficiency monitored?",
+   "base": "How is Sorbonyn Deficiency monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "How is Sorbonyn Deficiency monitored? Asking for the team meeting tomorrow.",
+   "base": "How is Sorbonyn Deficiency monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how is Sorbonyn Deficiency monitored?",
+   "base": "How is Sorbonyn Deficiency monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how is Sorbonyn Deficiency monitored?",
+   "base": "How is Sorbonyn Deficiency monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How is Sorbonyn Deficiency monitored?",
+   "base": "How is Sorbonyn Deficiency monitored?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is the dose of Rotmitufen?",
+   "base": "What is the dose of Rotmitufen?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is the dose of Rotmitufen?",
+   "base": "What is the dose of Rotmitufen?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is the dose of Rotmitufen?",
+   "base": "What is the dose of Rotmitufen?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is the dose of Rotmitufen?",
+   "base": "What is the dose of Rotmitufen?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is the dose of Rotmitufen? Asking for the team meeting tomorrow.",
+   "base": "What is the dose of Rotmitufen?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is the dose of Rotmitufen?",
+   "base": "What is the dose of Rotmitufen?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is the dose of Rotmitufen?",
+   "base": "What is the dose of Rotmitufen?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is the dose of Rotmitufen?",
+   "base": "What is the dose of Rotmitufen?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What should not be taken with Messenestal?",
+   "base": "What should not be taken with Messenestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What should not be taken with Messenestal?",
+   "base": "What should not be taken with Messenestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What should not be taken with Messenestal?",
+   "base": "What should not be taken with Messenestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what should not be taken with Messenestal?",
+   "base": "What should not be taken with Messenestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "What should not be taken with Messenestal? Asking for the team meeting tomorrow.",
+   "base": "What should not be taken with Messenestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what should not be taken with Messenestal?",
+   "base": "What should not be taken with Messenestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what should not be taken with Messenestal?",
+   "base": "What should not be taken with Messenestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What should not be taken with Messenestal?",
+   "base": "What should not be taken with Messenestal?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How often is Manmidas Deficiency reviewed?",
+   "base": "How often is Manmidas Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How often is Manmidas Deficiency reviewed?",
+   "base": "How often is Manmidas Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How often is Manmidas Deficiency reviewed?",
+   "base": "How often is Manmidas Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how often is Manmidas Deficiency reviewed?",
+   "base": "How often is Manmidas Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "How often is Manmidas Deficiency reviewed? Asking for the team meeting tomorrow.",
+   "base": "How often is Manmidas Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how often is Manmidas Deficiency reviewed?",
+   "base": "How often is Manmidas Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how often is Manmidas Deficiency reviewed?",
+   "base": "How often is Manmidas Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How often is Manmidas Deficiency reviewed?",
+   "base": "How often is Manmidas Deficiency reviewed?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How much Kormalizane is given?",
+   "base": "How much Kormalizane is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How much Kormalizane is given?",
+   "base": "How much Kormalizane is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How much Kormalizane is given?",
+   "base": "How much Kormalizane is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how much Kormalizane is given?",
+   "base": "How much Kormalizane is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "How much Kormalizane is given? Asking for the team meeting tomorrow.",
+   "base": "How much Kormalizane is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how much Kormalizane is given?",
+   "base": "How much Kormalizane is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how much Kormalizane is given?",
+   "base": "How much Kormalizane is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How much Kormalizane is given?",
+   "base": "How much Kormalizane is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: When should Sumlaladine not be used?",
+   "base": "When should Sumlaladine not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? When should Sumlaladine not be used?",
+   "base": "When should Sumlaladine not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? When should Sumlaladine not be used?",
+   "base": "When should Sumlaladine not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, when should Sumlaladine not be used?",
+   "base": "When should Sumlaladine not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "When should Sumlaladine not be used? Asking for the team meeting tomorrow.",
+   "base": "When should Sumlaladine not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, when should Sumlaladine not be used?",
+   "base": "When should Sumlaladine not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, when should Sumlaladine not be used?",
+   "base": "When should Sumlaladine not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? When should Sumlaladine not be used?",
+   "base": "When should Sumlaladine not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: How much Kulferondel is given?",
+   "base": "How much Kulferondel is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? How much Kulferondel is given?",
+   "base": "How much Kulferondel is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? How much Kulferondel is given?",
+   "base": "How much Kulferondel is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, how much Kulferondel is given?",
+   "base": "How much Kulferondel is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "How much Kulferondel is given? Asking for the team meeting tomorrow.",
+   "base": "How much Kulferondel is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, how much Kulferondel is given?",
+   "base": "How much Kulferondel is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, how much Kulferondel is given?",
+   "base": "How much Kulferondel is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? How much Kulferondel is given?",
+   "base": "How much Kulferondel is given?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is the dose of Vamsemoltin?",
+   "base": "What is the dose of Vamsemoltin?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is the dose of Vamsemoltin?",
+   "base": "What is the dose of Vamsemoltin?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is the dose of Vamsemoltin?",
+   "base": "What is the dose of Vamsemoltin?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is the dose of Vamsemoltin?",
+   "base": "What is the dose of Vamsemoltin?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is the dose of Vamsemoltin? Asking for the team meeting tomorrow.",
+   "base": "What is the dose of Vamsemoltin?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is the dose of Vamsemoltin?",
+   "base": "What is the dose of Vamsemoltin?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is the dose of Vamsemoltin?",
+   "base": "What is the dose of Vamsemoltin?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is the dose of Vamsemoltin?",
+   "base": "What is the dose of Vamsemoltin?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: When should Milrusestal not be used?",
+   "base": "When should Milrusestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? When should Milrusestal not be used?",
+   "base": "When should Milrusestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? When should Milrusestal not be used?",
+   "base": "When should Milrusestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, when should Milrusestal not be used?",
+   "base": "When should Milrusestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "When should Milrusestal not be used? Asking for the team meeting tomorrow.",
+   "base": "When should Milrusestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, when should Milrusestal not be used?",
+   "base": "When should Milrusestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, when should Milrusestal not be used?",
+   "base": "When should Milrusestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? When should Milrusestal not be used?",
+   "base": "When should Milrusestal not be used?",
+   "expect": "answer"
+  },
+  {
+   "query": "My colleague asked me this and I wasn't sure: What is Susfitay Dysregulation?",
+   "base": "What is Susfitay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Can I email the answer to a colleague? What is Susfitay Dysregulation?",
+   "base": "What is Susfitay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it correct that this is covered in the guidance? What is Susfitay Dysregulation?",
+   "base": "What is Susfitay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "For the yearly audit, what is Susfitay Dysregulation?",
+   "base": "What is Susfitay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "What is Susfitay Dysregulation? Asking for the team meeting tomorrow.",
+   "base": "What is Susfitay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Quick question before the ward round, what is Susfitay Dysregulation?",
+   "base": "What is Susfitay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Could you remind me, per our local policy, what is Susfitay Dysregulation?",
+   "base": "What is Susfitay Dysregulation?",
+   "expect": "answer"
+  },
+  {
+   "query": "Is it right that the sources say something about this? What is Susfitay Dysregulation?",
+   "base": "What is Susfitay Dysregulation?",
+   "expect": "answer"
+  }
+ ]
+}

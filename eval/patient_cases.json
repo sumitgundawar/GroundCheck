@@ -205,7 +205,7 @@
    "age_years": 8,
    "weight_kg": 25
   },
-  "expect": "answer",
+  "expect": "refuse",
   "codes": [
    "paediatric_dose"
   ]
@@ -218,7 +218,7 @@
   },
   "expect": "refuse",
   "codes": [
-   "missing_data"
+   "paediatric_dose"
   ]
  },
  {

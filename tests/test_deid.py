@@ -118,3 +118,137 @@ def test_the_pipeline_never_keeps_the_original():
         assert secret not in stored
     step = next(s for s in response.trace if s.name == "pii redaction")
     assert step.detail == "removed 1 NHS number, 1 date, 1 name"
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("John Smith has a fever", "[NAME] has a fever"),
+    ("Patient: SMITH, John", "Patient: [NAME]"),
+    ("mrs o'neil needs caloradine", "mrs [NAME] needs caloradine"),
+    ("nurse Kelly Brown checked", "nurse [NAME] checked"),
+    ("Sarah, 34, pregnant", "[NAME], 34, pregnant"),
+    ("husband Raj called", "husband [NAME] called"),
+    ("insurance id ABC123456", "insurance id [ID]"),
+    ("card 4111 1111 1111 1111", "card [CARD]"),
+    ("SSN 123456789", "SSN [SSN]"),
+    ("IBAN GB82 WEST 1234 5698 7654 32", "IBAN [ID]"),
+    ("NPI 1234567893", "NPI [ID]"),
+])
+def test_v2_detectors(text, expected):
+    assert clean(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "Will Caloradine interact with warfarin?",
+    "May I give Caloradine with food?",
+    "Grace period for the next Caloradine dose?",
+    "Bill the patient after the review",
+    "Faith in the guidance",
+    "Mr Caloradine dose",
+    "What is the dose of 5 mg/kg for 12/12 months?",
+    "Can Caloradine be given at 1,000,000 units daily for 14 days?",
+    "A 12 year old needs 250 mg twice daily",
+    "Give 10 mg/kg over 30 minutes",
+    "Wilson disease and Caloradine",
+    "SSN-like 123456789 is a dose count",
+    "4111 1111 1111 1112 is not a card number checksum",
+])
+def test_nothing_that_looks_like_a_name_or_number_is_removed_wrongly(text):
+    result = clean(text)
+    assert "[NAME]" not in result and "[CARD]" not in result and "[SSN]" not in result
+    assert result == text or result.replace("[NUMBER]", "") != result  # only the long-number fallback may fire
+
+
+def test_undashed_ssn_needs_context_and_checksums_are_validated():
+    assert deid._ssn_ok("123456789") and not deid._ssn_ok("000123456") and not deid._ssn_ok("900123456")
+    assert deid._luhn_ok("4111111111111111") and not deid._luhn_ok("4111111111111112")
+    assert deid._iban_ok("GB82 WEST 1234 5698 7654 32") and not deid._iban_ok("GB82 WEST 1234 5698 7654 33")
+    assert deid._npi_ok("1234567893") and not deid._npi_ok("1234567890")
+    assert clean("SSN 123456789") == "SSN [SSN]"
+    assert clean("dose 123456789 times") != "dose [SSN] times"
+
+
+def test_impossible_dates_are_not_dates():
+    assert clean("on 31/02/2024") == "on 31/02/2024"
+    assert clean("on 13/05/2024") == "on [DATE]"
+
+
+def test_entities_have_positions_and_never_values():
+    text = "Mr John Smith, DOB 12/03/1948"
+    result = deid.deidentify(text, retrieval.is_known_term)
+    assert [e.kind for e in result.entities] == ["name", "date"]
+    first = result.entities[0]
+    assert text[first.start:first.end] == "John Smith" and 0 < first.score <= 1 and first.detector
+    assert not any(isinstance(v, str) and "Smith" in v for e in result.entities for v in vars(e).values())
+
+
+def test_a_known_term_is_never_a_name_even_beside_a_cue():
+    assert clean("patient Caloradine Veltris dose") == "patient Caloradine Veltris dose"
+    assert clean("Dr Veltris dose") == "Dr Veltris dose"
+    assert clean("nurse Quorl checked") == "nurse Quorl checked"
+
+
+def test_missing_ner_packages_change_nothing(monkeypatch):
+    import builtins
+
+    from app import config
+
+    real_import = builtins.__import__
+
+    def refuse(name, *args, **kwargs):
+        if name.split(".")[0] in ("presidio_analyzer", "spacy"):
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    sample = ["John Smith has a fever", "Patient: SMITH, John DOB 03/04/1950", "Sarah, 34, pregnant, caloradine?",
+              "What is the standard dose of Caloradine?", "lives at 12 Oak Rd, Leeds LS1 4AP"]
+    monkeypatch.setattr(config, "DEID_NER", "off")
+    expected = [clean(s) for s in sample]
+    monkeypatch.setattr(config, "DEID_NER", "auto")
+    monkeypatch.setattr(deid, "_NER_LOADED", False)
+    monkeypatch.setattr(deid, "_NER_FN", None)
+    monkeypatch.setattr(builtins, "__import__", refuse)
+    assert [clean(s) for s in sample] == expected
+    monkeypatch.setattr(builtins, "__import__", real_import)
+    monkeypatch.setattr(deid, "_NER_LOADED", False)
+
+
+def test_ner_proposals_never_override_a_known_term(monkeypatch):
+    from app import config
+
+    def fake(text):
+        return [("name", text.index("Caloradine"), text.index("Caloradine") + 10, 0.9),
+                ("name", text.index("Priya"), text.index("Priya") + 5, 0.6)]
+
+    monkeypatch.setattr(config, "DEID_NER", "on")
+    monkeypatch.setattr(deid, "_NER_LOADED", True)
+    monkeypatch.setattr(deid, "_NER_FN", fake)
+    assert clean("Caloradine for Priya here") == "Caloradine for [NAME] here"
+    monkeypatch.setattr(deid, "_NER_LOADED", False)
+    monkeypatch.setattr(deid, "_NER_FN", None)
+
+
+def test_the_gold_sentences_are_found_and_nothing_is_wrongly_removed():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("pii_eval", Path(__file__).resolve().parent.parent / "scripts" / "pii_eval.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    result = module.evaluate()
+    assert result["cases"] >= 200
+    assert result["overall"]["recall"] >= 0.95 and result["overall"]["precision"] >= 0.97, result["misses"][:5]
+
+
+def test_redaction_is_fast_without_ner(monkeypatch):
+    import time
+
+    from app import config
+
+    monkeypatch.setattr(config, "DEID_NER", "off")
+    text = "Mr John Smith, DOB 12/03/1948, NHS 943 476 5919, lives at 12 Oak Rd Leeds LS1 4AP: what is the dose of Caloradine?"
+    clean(text)
+    times = []
+    for _ in range(100):
+        t = time.perf_counter()
+        clean(text)
+        times.append((time.perf_counter() - t) * 1000)
+    assert sorted(times)[94] < 3

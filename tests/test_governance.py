@@ -83,6 +83,50 @@ def test_categories():
     assert governance.categorise("") == "other"
 
 
+@pytest.mark.parametrize("reason,code,category", [
+    ("the value '99 mg' in the question is not stated by any source about what it asks about", None, "stated dose not in sources"),
+    ("the value '999 mg' is not supported by a source about this medicine", None, "dose not in sources"),
+    ("no trusted source about this describes a 'xr' form or route, and the dose of one form is not the dose of another",
+     None, "form not covered"),
+    ("the term 'zyntrafen' does not appear in any retrieved source", None, "term not in sources"),
+    ("the question is about a 6-year-old, and no trusted source covers children", None, "patient group not covered"),
+    ("Caloradine should be avoided in pregnancy", None, "patient safety block"),
+    ("something unrecognised", "patient_unsafe", "patient safety block"),
+    ("something unrecognised", "dose_unsupported", "dose not in sources"),
+    ("This request was blocked by an input guard.", "input_blocked", "blocked input"),
+])
+def test_current_wordings_are_categorised(reason, code, category):
+    assert governance.categorise(reason, code) == category
+
+
+def test_a_refusal_really_routed_says_so_and_names_the_case(queue):
+    r = pipeline.run(REFUSED)
+    assert r.review.routed and r.review.case_id == _cases()[0]["id"]
+    assert pipeline.ROUTED in r.answer_text
+    assert r.reason_code == "term_not_covered"
+
+
+def test_a_refusal_not_reviewed_does_not_claim_to_be(queue):
+    r = pipeline.run(REFUSED, review=False)
+    assert r.decision == "refuse" and not r.review.routed and r.review.case_id is None
+    assert pipeline.ROUTED not in r.answer_text
+    assert "not sent for review" in r.answer_text and r.review.note in r.answer_text
+    assert _cases() == []
+
+
+def test_a_remembered_refusal_recomputes_routing(queue, monkeypatch):
+    monkeypatch.setattr(config, "ANSWER_CACHE_SECONDS", 60)
+    pipeline.clear_answer_cache()
+    first = pipeline.run(REFUSED)
+    again = pipeline.run(REFUSED)
+    assert first.review.routed and again.review.routed and again.review.case_id == first.review.case_id
+    monkeypatch.setattr(config, "REVIEW_QUEUE", False)
+    off = pipeline.run(REFUSED)
+    assert not off.review.routed and pipeline.ROUTED not in off.answer_text
+    assert "switched off" in off.answer_text
+    pipeline.clear_answer_cache()
+
+
 # --- Flagging answers ------------------------------------------------------------
 
 def test_flagging_an_answer_opens_a_high_priority_case(queue):

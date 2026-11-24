@@ -171,7 +171,13 @@ def predict(model_id: str, image_bytes: bytes) -> dict:
     array = preprocess.to_array(image, spec["image_size"], spec["channels"]).copy()
     x = preprocess.normalise(torch.from_numpy(array[None]), spec["mean"], spec["std"], spec["model_channels"])
     logits, feats = novelty.forward(model, card["architecture"], x)
-    probs = torch.softmax(logits, dim=1)[0].tolist()
+    temperature = float(card.get("temperature") or 1.0)
+    if card.get("tta"):
+        with torch.no_grad():
+            views = preprocess.tta_views(torch.from_numpy(array[None]))
+            logits = torch.stack([model(preprocess.normalise(v, spec["mean"], spec["std"], spec["model_channels"]))
+                                  for v in views]).mean(0)
+    probs = torch.softmax(logits / temperature, dim=1)[0].tolist()
     distance = None
     if "_novelty_stats" in card:
         _, worst = novelty.flagged(feats, card["_novelty_stats"], card["novelty"]["cutoffs"])

@@ -25,6 +25,7 @@ os.environ["AUDIT_PERSIST"] = "false"
 os.environ["REVIEW_QUEUE"] = "false"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app import config  # noqa: E402
 from app import pipeline  # noqa: E402
@@ -50,6 +51,40 @@ def run_adversarial() -> dict:
         rows.append({"query": c["query"], "expect": c["expect"], "got": got,
                      "ok": ok, "note": c.get("note", "")})
     return {"total": len(cases), "passed": passed, "cases": rows}
+
+
+PHRASING_PATH = config.ROOT_DIR / "eval" / "phrasing.json"
+
+
+def run_phrasing() -> dict | None:
+    """Answerable questions wrapped in everyday framings ("my colleague asked",
+    "can I email"). Each should be answered as its plain form is; a refusal is
+    an over-refusal, the safe direction, and is measured rather than gated."""
+    if not PHRASING_PATH.exists():
+        return None
+    cases = json.loads(PHRASING_PATH.read_text(encoding="utf-8"))["cases"]
+    refused = [(c["query"], r.refused_reason) for c in cases
+               for r in [pipeline.run(c["query"], review=False)] if r.decision != "answer"]
+    return {"total": len(cases), "answered": len(cases) - len(refused),
+            "over_refusal_rate": round(len(refused) / len(cases), 4),
+            "over_refused": [{"query": q, "reason": why} for q, why in refused[:10]]}
+
+
+def run_pii() -> dict | None:
+    if not (config.ROOT_DIR / "eval" / "pii_cases.json").exists():
+        return None
+    import pii_eval
+
+    result = pii_eval.evaluate()
+    return {k: result[k] for k in ("cases", "spans", "overall", "per_kind", "p95_ms", "targets_met")}
+
+
+def run_answer_quality() -> dict:
+    import answer_quality_eval
+
+    result = answer_quality_eval.evaluate()
+    return {k: result[k] for k in ("cases", "answered", "claim_precision", "section_recall",
+                                   "claims_per_answer", "targets_met", "by_section")}
 
 
 PATIENT_PATH = config.ROOT_DIR / "eval" / "patient_cases.json"
@@ -125,6 +160,9 @@ def main() -> None:
 
     adversarial = run_adversarial()
     patient = run_patient_cases()
+    phrasing = run_phrasing()
+    pii = run_pii()
+    answer_quality = run_answer_quality()
 
     summary = {
         "total": len(cases),
@@ -138,6 +176,9 @@ def main() -> None:
         "cases": sample,
         "adversarial": adversarial,
         "patient": patient,
+        "phrasing": phrasing,
+        "pii": pii,
+        "answer_quality": answer_quality,
     }
 
     config.EVAL_SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -155,6 +196,16 @@ def main() -> None:
         for r in adversarial["cases"]:
             if not r["ok"]:
                 print(f"  limitation: expect={r['expect']} got={r['got']} :: {r['query']}")
+
+    if phrasing:
+        print(f"Everyday phrasings: {phrasing['answered']}/{phrasing['total']} answered "
+              f"({phrasing['over_refusal_rate']:.1%} over-refused).")
+    if pii:
+        o = pii["overall"]
+        print(f"PII detection: precision {o['precision']:.3f}, recall {o['recall']:.3f} over {pii['spans']} spans, "
+              f"p95 {pii['p95_ms']} ms.")
+    print(f"Answer quality: claim precision {answer_quality['claim_precision']:.3f}, section recall "
+          f"{answer_quality['section_recall']:.3f}, {answer_quality['claims_per_answer']:.2f} claims per answer.")
 
     if patient:
         print(f"Patient scenarios: {patient['passed']}/{patient['total']} correct, "

@@ -12,46 +12,55 @@ let lastRetrievedIds = [];
 // explainer shown before any question is asked.
 const PIPELINE_STAGES = [
   ["input guards", "Redact PII, reject injection and out-of-scope input, rate limit."],
-  ["embed + retrieve", "Embed the query and rank passages by a blend of embedding similarity and keyword match, with cosine scores."],
+  ["embed + retrieve", "Embed the query and rank passages by a blend of embedding similarity and keyword match, with similarity scores."],
   ["retrieval gate", "If the best passage is below threshold, refuse now, before any generation."],
   ["source coverage", "Check the question's entities actually appear in the retrieved sources."],
   ["generate", "LLM returns structured, cited claims. Extractive fallback if no LLM is available."],
   ["schema validate", "Validate the output against a strict schema. Retry once, then fall back."],
   ["grounding check", "Deterministic claim-to-source similarity, with an LLM judge as corroboration."],
-  ["dosage guard", "Every value with a clinical unit must appear verbatim in a source, or refuse."],
+  ["dosage guard", "Every dose in the answer must be stated by a source about that medicine, or refuse."],
   ["decision", "Answer with citations, or refuse with a specific reason and route for review."],
 ];
 
 // Display names for pipeline stages whose internal names read awkwardly.
 const STAGE_LABELS = { "pii redaction": "De-identification" };
 
-// Plain-language explanation shown in the refusal callout, keyed by a stable
-// phrase found in the refusal reason.
+// Plain-language explanation shown in the refusal callout, keyed by the
+// stable reason code. refusalExplanation() is the fallback for responses and
+// stored records that carry only prose.
+const REASON_EXPLAIN = {
+  input_blocked: "The query was stopped by an input guard before reaching the pipeline.",
+  rate_limited: "Too many requests in a short window. This protects the live service.",
+  no_relevant_source: "No document was similar enough to the question to be trustworthy, so the system refused before generating anything.",
+  term_not_covered: "The question names something the trusted sources never mention, so there is nothing to ground an answer on.",
+  population_not_covered: "The question is about a patient group the sources don't cover, so an answer written for adults could be unsafe.",
+  stated_value_unsupported: "The question states a value that no trusted source supports, so confirming it could be unsafe.",
+  form_unsupported: "The question names a form or route that no source about this medicine describes.",
+  limit_not_stated: "The sources give a dose but no limit, so they can't answer a question about a maximum or minimum.",
+  combination_forbidden: "The sources say these must not be used together, so there is no safe combined dose to give.",
+  insufficient_context: "The retrieved sources did not contain enough to answer safely.",
+  claim_ungrounded: "A statement in the draft answer was not sufficiently supported by its cited source.",
+  dose_unsupported: "The draft answer contained a dose that no source about this medicine states.",
+  patient_unsafe: "The answer from the sources doesn't fit the patient you described. The check above names the rule.",
+};
+const REASON_FALLBACK = "The pipeline could not produce a fully grounded answer, so it declined.";
+
 function refusalExplanation(reason) {
   const r = (reason || "").toLowerCase();
-  if (r.includes("in the question does not appear"))
-    return "The question states a value that no trusted source supports, so confirming it could be unsafe.";
-  if (r.includes("no trusted source covers"))
-    return "The question is about a patient group the sources don't cover, so an answer written for adults could be unsafe.";
-  if (r.includes("states a maximum") || r.includes("states a minimum"))
-    return "The sources give a dose but no limit, so they can't answer a question about a maximum or minimum.";
-  if (r.includes("must not be combined"))
-    return "The sources say these must not be used together, so there is no safe combined dose to give.";
-  if (r.includes("not appear in any trusted source") || r.includes("do not cover"))
-    return "The question names something the trusted sources never mention, so there is nothing to ground an answer on.";
-  if (r.includes("no sufficiently relevant source"))
-    return "No document was similar enough to the question to be trustworthy, so the system refused before generating anything.";
-  if (r.includes("not supported by any source"))
-    return "The answer contained a value with a clinical unit that does not appear, character for character, in any retrieved source.";
-  if (r.includes("could not be grounded"))
-    return "A statement in the draft answer was not sufficiently supported by its cited source.";
-  if (r.includes("enough information"))
-    return "The retrieved sources did not contain enough to answer safely.";
-  if (r.includes("input guard") || r.includes("blocked"))
-    return "The query was stopped by an input guard before reaching the pipeline.";
-  if (r.includes("rate limit"))
-    return "Too many requests in a short window. This protects the live service.";
-  return "The pipeline could not produce a fully grounded answer, so it declined.";
+  const has = (...needles) => needles.some((n) => r.includes(n));
+  if (has("is not stated by any source", "in the question does not appear")) return REASON_EXPLAIN.stated_value_unsupported;
+  if (has("describes a '")) return REASON_EXPLAIN.form_unsupported;
+  if (has("no trusted source covers")) return REASON_EXPLAIN.population_not_covered;
+  if (has("states a maximum", "states a minimum", "no trusted source states a")) return REASON_EXPLAIN.limit_not_stated;
+  if (has("must not be combined")) return REASON_EXPLAIN.combination_forbidden;
+  if (has("not supported by a source about", "not supported by any source")) return REASON_EXPLAIN.dose_unsupported;
+  if (has("does not appear in any", "do not cover")) return REASON_EXPLAIN.term_not_covered;
+  if (has("no sufficiently relevant source")) return REASON_EXPLAIN.no_relevant_source;
+  if (has("could not be grounded")) return REASON_EXPLAIN.claim_ungrounded;
+  if (has("enough information")) return REASON_EXPLAIN.insufficient_context;
+  if (has("input guard", "blocked")) return REASON_EXPLAIN.input_blocked;
+  if (has("rate limit")) return REASON_EXPLAIN.rate_limited;
+  return REASON_FALLBACK;
 }
 
 // ---------- Boot ----------
@@ -719,6 +728,7 @@ function render(data) {
     $("decision-reason").textContent = `Not safe for this patient: ${block.medicine}`;
     $("refuse-explain").textContent = "The answer from the sources doesn't fit the patient you described. The check above names the rule, and what the formulary gives instead where it can.";
   }
+  lastQueryTerms = termsFrom((data.redaction && data.redaction.redacted_query) || $("query").value);
   renderSources(data);
   renderTrace(data.trace || []);
   renderAudit(data.audit_id);
@@ -738,8 +748,9 @@ function renderDecision(data) {
     chip.textContent = "ANSWER";
     const ids = citedIds(data);
     reason.textContent = ids.length ? `Grounded in ${ids.join(", ")}.` : "Grounded in cited sources.";
-    body.appendChild(renderAnswerWithCitations(data.answer_text));
+    body.appendChild(renderAnswerWithCitations(data.answer_text, data));
     callout.hidden = true;
+    renderClaimRows(data);
     resetFlag(data.audit_id);
   } else {
     chip.className = "status-chip refuse";
@@ -748,8 +759,111 @@ function renderDecision(data) {
     reason.textContent = data.refused_reason ? capitalize(data.refused_reason) : "";
     callout.hidden = false;
     $("refuse-detail").textContent = data.refused_reason || "No grounded answer available.";
-    $("refuse-explain").textContent = refusalExplanation(data.refused_reason);
+    renderRefusalExplanation(data);
+    renderRoutedLine(data);
+    renderClaimRows(null);
   }
+  renderRedaction(data.redaction);
+}
+
+function renderRefusalExplanation(data) {
+  const explain = $("refuse-explain");
+  const ex = data.explanation || {};
+  const generic = REASON_EXPLAIN[data.reason_code] || refusalExplanation(data.refused_reason);
+  explain.textContent = "";
+  appendHighlighted(explain, ex.summary || generic, ex.missing_terms || []);
+  const box = $("refuse-suggestions");
+  box.textContent = "";
+  const tips = (ex.suggestions || []).filter(Boolean);
+  box.hidden = !tips.length;
+  if (!tips.length) return;
+  const label = document.createElement("span");
+  label.className = "eyebrow";
+  label.textContent = "Try instead";
+  const row = document.createElement("div");
+  row.className = "suggestion-chips";
+  tips.forEach((text) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip suggestion";
+    chip.textContent = text;
+    chip.addEventListener("click", () => { $("query").value = text; submitQuery(text); });
+    row.appendChild(chip);
+  });
+  box.append(label, row);
+}
+
+// Text with each term wrapped in <mark>, built from text nodes only.
+function appendHighlighted(parent, text, terms, cls = "term-miss") {
+  const list = (terms || []).map((t) => String(t).trim()).filter((t) => t.length > 1);
+  if (!list.length) { parent.appendChild(document.createTextNode(text)); return; }
+  const esc = list.sort((a, b) => b.length - a.length).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const re = new RegExp(`(${esc.join("|")})`, "gi");
+  text.split(re).forEach((part, i) => {
+    if (i % 2) { const m = document.createElement("mark"); m.className = cls; m.textContent = part; parent.appendChild(m); }
+    else if (part) parent.appendChild(document.createTextNode(part));
+  });
+}
+
+function renderRoutedLine(data) {
+  const line = $("routed-line");
+  const review = data.review;
+  line.textContent = "";
+  line.hidden = !review;
+  if (!review) return;
+  if (review.routed) {
+    line.append("No answer is shown. Routed for review");
+    if (review.case_id != null) {
+      line.append(" as ");
+      if (canSee("review")) {
+        const link = document.createElement("a");
+        link.href = "#/review";
+        link.className = "case-link";
+        link.textContent = `case #${review.case_id}`;
+        link.addEventListener("click", () => { setTimeout(() => openCase(review.case_id), 150); });
+        line.appendChild(link);
+      } else line.append(`case #${review.case_id}`);
+    }
+    line.append(".");
+  } else {
+    line.textContent = review.note || "Not routed for review.";
+  }
+}
+
+const REDACTION_LABEL = {
+  NAME: ["name", "names"], DATE: ["date", "dates"], CARD: ["card number", "card numbers"],
+  EMAIL: ["email address", "email addresses"], PHONE: ["phone number", "phone numbers"],
+  ID: ["identifier", "identifiers"], SSN: ["national ID", "national IDs"], ADDRESS: ["address", "addresses"],
+};
+
+function renderRedaction(red) {
+  const box = $("redaction-line");
+  box.textContent = "";
+  const kinds = (red && red.kinds) || {};
+  const total = Object.values(kinds).reduce((a, b) => a + b, 0);
+  box.hidden = !total || !red.redacted_query;
+  if (box.hidden) return;
+  const label = document.createElement("span");
+  label.className = "eyebrow";
+  label.textContent = "De-identified before checking";
+  const q = document.createElement("span");
+  q.className = "redacted-query";
+  red.redacted_query.split(/(\[[A-Z_]+\])/).forEach((part) => {
+    if (/^\[[A-Z_]+\]$/.test(part)) {
+      const chip = document.createElement("span");
+      chip.className = "pii-chip";
+      chip.textContent = part;
+      q.appendChild(chip);
+    } else if (part) q.appendChild(document.createTextNode(part));
+  });
+  const counts = Object.entries(kinds).map(([k, n]) => {
+    const names = REDACTION_LABEL[k.toUpperCase()] || [k.toLowerCase(), `${k.toLowerCase()}s`];
+    return `${n} ${n === 1 ? names[0] : names[1]}`;
+  });
+  const note = document.createElement("span");
+  note.className = "redaction-count";
+  note.textContent = `${counts.join(", ")} removed`;
+  box.append(label, q, note);
 }
 
 function citedIds(data) {
@@ -758,7 +872,14 @@ function citedIds(data) {
   return [...ids];
 }
 
-function renderAnswerWithCitations(text) {
+function supportFor(data, id) {
+  for (const c of (data && data.claims) || []) {
+    if (c.support && c.support.source_id === id && (c.source_ids || []).includes(id)) return c.support;
+  }
+  return null;
+}
+
+function renderAnswerWithCitations(text, data) {
   const frag = document.createDocumentFragment();
   const re = /\[([A-Z]+-[A-Za-z0-9]+)\]/g;
   let last = 0, m;
@@ -769,16 +890,119 @@ function renderAnswerWithCitations(text) {
     a.className = "citation";
     a.textContent = `[${id}]`;
     a.href = `#src-${id}`;
-    a.addEventListener("click", (e) => {
-      e.preventDefault();
-      const card = $(`src-${id}`);
-      if (card) { card.scrollIntoView({ behavior: REDUCED_MOTION ? "auto" : "smooth", block: "center" }); flash(card); }
-    });
+    a.addEventListener("click", (e) => { e.preventDefault(); showSupport(id, supportFor(data, id), true); });
+    a.addEventListener("mouseenter", () => showSupport(id, supportFor(data, id), false));
+    a.addEventListener("focus", () => showSupport(id, supportFor(data, id), false));
+    a.addEventListener("mouseleave", clearSupport);
+    a.addEventListener("blur", clearSupport);
     frag.appendChild(a);
     last = re.lastIndex;
   }
   if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
   return frag;
+}
+
+function showSupport(id, support, flashCard) {
+  const card = $(`src-${id}`);
+  if (!card) return;
+  clearSupport();
+  card.classList.add("linked");
+  const snippet = card.querySelector(".source-snippet");
+  if (support && snippet && snippet.dataset.text) {
+    const text = snippet.dataset.text;
+    let start = support.start, end = support.end;
+    if (!(Number.isInteger(start) && Number.isInteger(end) && text.slice(start, end) === support.sentence)) {
+      start = text.indexOf(support.sentence);
+      end = start + support.sentence.length;
+    }
+    if (start >= 0 && end > start) {
+      snippet.textContent = "";
+      snippet.append(text.slice(0, start));
+      const mark = document.createElement("mark");
+      mark.className = "support";
+      mark.textContent = text.slice(start, end);
+      snippet.append(mark, text.slice(end));
+      mark.dataset.applied = "1";
+    }
+  }
+  if (flashCard) { card.scrollIntoView({ behavior: REDUCED_MOTION ? "auto" : "smooth", block: "center" }); flash(card); }
+}
+
+function clearSupport() {
+  document.querySelectorAll(".source-card.linked").forEach((card) => {
+    card.classList.remove("linked");
+    const snippet = card.querySelector(".source-snippet");
+    if (snippet && snippet.querySelector("mark.support")) renderSnippet(snippet, snippet.dataset.text, queryTerms());
+  });
+}
+
+let lastQueryTerms = [];
+function queryTerms() { return lastQueryTerms; }
+
+const STOPWORDS = new Set("the and for with what how does can should are was were this that from have has not you your about into when which who whom may much many dose doses give given take taking".split(" "));
+function termsFrom(text) {
+  return [...new Set((text || "").replace(/\[[A-Z_]+\]/g, " ").toLowerCase().split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && !STOPWORDS.has(w)))];
+}
+
+function renderSnippet(el, text, terms) {
+  el.textContent = "";
+  appendHighlighted(el, text, terms, "term-hit");
+}
+
+function renderClaimRows(data) {
+  const list = $("claim-rows"), summary = $("answer-summary");
+  list.textContent = "";
+  const claims = (data && data.claims) || [];
+  list.hidden = summary.hidden = !claims.length;
+  if (!claims.length) return;
+  const sources = new Set(claims.flatMap((c) => c.source_ids || []));
+  const grounded = claims.every((c) => c.grounded);
+  const dosed = (data.trace || []).find((t) => t.name === "dosage guard");
+  const parts = [`${claims.length} ${claims.length === 1 ? "claim" : "claims"} from ${sources.size} ${sources.size === 1 ? "source" : "sources"}`];
+  if (grounded) parts.push("all grounded");
+  if (dosed && dosed.status === "pass") parts.push("doses verified");
+  summary.textContent = parts.join(" · ");
+  claims.forEach((c) => {
+    const li = document.createElement("li");
+    li.className = "claim-row";
+    const text = document.createElement("span");
+    text.className = "claim-row-text";
+    text.textContent = c.text;
+    const cites = document.createElement("span");
+    cites.className = "claim-row-cites";
+    (c.source_ids || []).forEach((id) => {
+      const a = document.createElement("a");
+      a.className = "citation";
+      a.href = `#src-${id}`;
+      a.textContent = `[${id}]`;
+      a.addEventListener("click", (e) => { e.preventDefault(); showSupport(id, supportFor(data, id) || (c.support && c.support.source_id === id ? c.support : null), true); });
+      a.addEventListener("focus", () => showSupport(id, c.support && c.support.source_id === id ? c.support : null, false));
+      a.addEventListener("mouseenter", () => showSupport(id, c.support && c.support.source_id === id ? c.support : null, false));
+      a.addEventListener("mouseleave", clearSupport);
+      a.addEventListener("blur", clearSupport);
+      cites.appendChild(a);
+    });
+    li.append(text, cites);
+    if (typeof c.relevance === "number") {
+      const rel = document.createElement("span");
+      rel.className = "relevance";
+      rel.title = `Relevance to the question: ${c.relevance.toFixed(2)}`;
+      const bar = document.createElement("span");
+      bar.className = "relevance-bar";
+      bar.setAttribute("role", "img");
+      bar.setAttribute("aria-label", `Relevance ${Math.round(c.relevance * 100)} percent`);
+      const fill = document.createElement("span");
+      fill.style.width = `${Math.round(Math.max(0, Math.min(1, c.relevance)) * 100)}%`;
+      bar.appendChild(fill);
+      const num = document.createElement("span");
+      num.className = "relevance-num";
+      num.textContent = c.relevance.toFixed(2);
+      rel.append(bar, num);
+      li.appendChild(rel);
+    }
+    list.appendChild(li);
+  });
 }
 
 function flash(el) { el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 800); }
@@ -842,7 +1066,8 @@ function renderSources(data) {
 
     const snippet = document.createElement("p");
     snippet.className = "source-snippet";
-    snippet.textContent = s.snippet;
+    snippet.dataset.text = s.snippet || "";
+    renderSnippet(snippet, s.snippet || "", lastQueryTerms);
 
     const scoreRow = document.createElement("div");
     scoreRow.className = "score-row";
@@ -854,7 +1079,7 @@ function renderSources(data) {
     bar.appendChild(fill);
     const num = document.createElement("span");
     num.className = "score-num";
-    num.textContent = "cosine";
+    num.textContent = "similarity";
     scoreRow.append(bar, num);
 
     card.append(head, title, meta, snippet, scoreRow);
@@ -936,23 +1161,102 @@ function buildStageDetail(step) {
   if (Array.isArray(d.results)) { frag.appendChild(retrieveDetail(d.results)); return frag; }
   if (Array.isArray(d.claims)) { frag.appendChild(groundingDetail(d)); return frag; }
   if (d.detected_values) { frag.appendChild(dosageDetail(d)); return frag; }
+  if (Array.isArray(d.checked_terms)) { frag.appendChild(coverageDetail(d)); return frag; }
   // Generic key/value detail for any other stage data (gate, coverage, etc.).
   frag.appendChild(kvDetail(d));
   return frag;
 }
 
-function kvDetail(obj) {
+function kvDetail(obj, depth = 0) {
   const wrap = document.createElement("div");
-  wrap.className = "stage-data";
+  wrap.className = "stage-data" + (depth ? " nested" : "");
   for (const [k, v] of Object.entries(obj)) {
     const row = document.createElement("div");
     row.className = "data-line";
     const key = document.createElement("span");
     key.className = "mono strong"; key.textContent = k.replace(/_/g, " ");
+    row.appendChild(key);
+    const complex = v && typeof v === "object" && (Array.isArray(v) ? v.some((x) => x && typeof x === "object") : true);
+    if (complex && depth < 5) {
+      row.classList.add("data-block");
+      const inner = Array.isArray(v) ? Object.fromEntries(v.map((x, i) => [String(i + 1), x])) : v;
+      row.appendChild(kvDetail(inner, depth + 1));
+    } else {
+      const val = document.createElement("span");
+      val.className = "data-muted";
+      val.textContent = Array.isArray(v) ? (v.length ? v.join(", ") : "(none)") : v === null || v === undefined ? "(none)" : String(v);
+      row.appendChild(val);
+    }
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function termChips(label, terms, cls) {
+  const row = document.createElement("div");
+  row.className = "data-line term-row";
+  const key = document.createElement("span");
+  key.className = "mono strong";
+  key.textContent = label;
+  const chips = document.createElement("span");
+  chips.className = "term-chips";
+  if (!terms || !terms.length) {
+    chips.className += " data-muted";
+    chips.textContent = "(none)";
+  } else terms.forEach((t) => {
+    const chip = document.createElement("span");
+    chip.className = `term-chip ${cls}`;
+    chip.textContent = t;
+    chips.appendChild(chip);
+  });
+  row.append(key, chips);
+  return row;
+}
+
+function coverageDetail(d) {
+  const wrap = document.createElement("div");
+  wrap.className = "stage-data";
+  const table = document.createElement("table");
+  table.className = "coverage-table";
+  const head = document.createElement("thead");
+  const hr = document.createElement("tr");
+  ["Term in the question", "Found in sources"].forEach((t) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = t; hr.appendChild(th); });
+  head.appendChild(hr);
+  const body = document.createElement("tbody");
+  const covered = new Set(d.covered || []);
+  (d.checked_terms || []).forEach((t) => {
+    const tr = document.createElement("tr");
+    const term = document.createElement("td");
+    term.className = "mono";
+    term.textContent = t;
+    const state = document.createElement("td");
+    const ok = covered.has(t);
+    const chip = document.createElement("span");
+    chip.className = `term-chip ${ok ? "covered" : "uncovered"}`;
+    chip.textContent = ok ? "covered" : "not covered";
+    state.appendChild(chip);
+    tr.append(term, state);
+    body.appendChild(tr);
+  });
+  table.append(head, body);
+  wrap.appendChild(d.checked_terms.length ? table : Object.assign(document.createElement("p"), { className: "data-muted", textContent: "No distinctive terms in the question to check." }));
+  if (d.question_values && d.question_values.length) wrap.appendChild(termChips("values stated", d.question_values, "neutral"));
+  if (d.unsupported_values && d.unsupported_values.length) wrap.appendChild(termChips("unsupported values", d.unsupported_values, "uncovered"));
+  if (d.unsupported_forms && d.unsupported_forms.length) wrap.appendChild(termChips("unsupported forms", d.unsupported_forms, "uncovered"));
+  const age = d.age;
+  if (age && typeof age === "object") {
+    const row = document.createElement("div");
+    row.className = "data-line";
+    const key = document.createElement("span");
+    key.className = "mono strong";
+    key.textContent = "age";
     const val = document.createElement("span");
     val.className = "data-muted";
-    val.textContent = Array.isArray(v) ? (v.length ? v.join(", ") : "(none)") : String(v);
-    row.append(key, val);
+    val.textContent = `${age.phrase || age.years} (${age.group})`;
+    const chip = document.createElement("span");
+    chip.className = `term-chip ${age.covered ? "covered" : "uncovered"}`;
+    chip.textContent = age.covered ? "sources cover this group" : "no source covers this group";
+    row.append(key, val, chip);
     wrap.appendChild(row);
   }
   return wrap;
@@ -1056,7 +1360,7 @@ function dosageDetail(d) {
     const verified = (d.verified || []).includes(v);
     const status = document.createElement("span");
     status.className = "claim-stat " + (verified ? "ok" : "bad");
-    status.textContent = verified ? "verbatim in a source" : "NOT found in any source";
+    status.textContent = verified ? "stated by a source" : "NOT stated by any source";
     row.append(val, status);
     wrap.appendChild(row);
   });
@@ -5038,6 +5342,9 @@ async function loadEvalSummary() {
       : "";
     renderAdversarial(data.adversarial);
     renderPatientEval(data.patient);
+    renderPiiEval(data.pii);
+    renderMetricBlock("answer-quality-block", "Answer quality", "How well the answers read and how closely they follow their sources.", data.answer_quality);
+    renderMetricBlock("phrasing-block", "Phrasing robustness", "The same question worded differently should get the same decision.", data.phrasing);
     $("eval-foot").textContent = foot;
   } catch (_) { $("eval-summary-inline").textContent = "unavailable"; }
 }
@@ -5081,6 +5388,63 @@ function renderAdversarial(adv) {
     list.appendChild(li);
   });
   wrap.appendChild(list);
+}
+
+function metricText(v) { return typeof v === "number" ? (v <= 1 ? `${(v * 100).toFixed(v === 1 || v === 0 ? 0 : 1)}%` : v.toLocaleString()) : String(v); }
+
+function renderPiiEval(pii) {
+  const wrap = $("pii-eval-block");
+  if (!wrap) return;
+  wrap.textContent = "";
+  const kinds = pii && typeof pii === "object" ? (pii.per_kind || pii.kinds || pii) : null;
+  const rows = kinds ? Object.entries(kinds).filter(([, v]) => v && typeof v === "object" && ("f1" in v || "precision" in v || "recall" in v)) : [];
+  wrap.hidden = !rows.length;
+  if (!rows.length) return;
+  const head = document.createElement("div"); head.className = "adv-head";
+  const title = document.createElement("span"); title.className = "eyebrow"; title.textContent = "De-identification accuracy";
+  head.appendChild(title);
+  const note = document.createElement("p"); note.className = "adv-note";
+  note.textContent = "Per kind of personal detail: precision is how much of what was removed really was that kind, recall is how much of that kind was removed.";
+  const table = document.createElement("table"); table.className = "coverage-table pii-table";
+  const thead = document.createElement("thead"); const hr = document.createElement("tr");
+  ["Kind", "Precision", "Recall", "F1"].forEach((t) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = t; hr.appendChild(th); });
+  thead.appendChild(hr);
+  const tbody = document.createElement("tbody");
+  rows.forEach(([kind, v]) => {
+    const tr = document.createElement("tr");
+    [kind, v.precision, v.recall, v.f1].forEach((cell, i) => {
+      const td = document.createElement("td");
+      td.className = i ? "mono num" : "mono";
+      td.textContent = i && cell != null ? metricText(cell) : cell == null ? "n/a" : String(cell);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.append(thead, tbody);
+  wrap.append(head, note, table);
+}
+
+function renderMetricBlock(id, titleText, noteText, block) {
+  const wrap = $(id);
+  if (!wrap) return;
+  wrap.textContent = "";
+  const entries = block && typeof block === "object"
+    ? Object.entries(block).filter(([, v]) => typeof v === "number" || typeof v === "string") : [];
+  wrap.hidden = !entries.length;
+  if (!entries.length) return;
+  const head = document.createElement("div"); head.className = "adv-head";
+  const title = document.createElement("span"); title.className = "eyebrow"; title.textContent = titleText;
+  head.appendChild(title);
+  const note = document.createElement("p"); note.className = "adv-note"; note.textContent = noteText;
+  const grid = document.createElement("dl"); grid.className = "metric-grid";
+  entries.forEach(([k, v]) => {
+    const box = document.createElement("div"); box.className = "metric";
+    const dt = document.createElement("dt"); dt.textContent = k.replace(/_/g, " ");
+    const dd = document.createElement("dd"); dd.textContent = metricText(v);
+    box.append(dt, dd);
+    grid.appendChild(box);
+  });
+  wrap.append(head, note, grid);
 }
 
 // ---------- Utils ----------

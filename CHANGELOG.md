@@ -3,6 +3,76 @@
 Dates are when the work landed on `main`. Versions follow the app's
 `config.VERSION`.
 
+## 2.0.0 — unreleased
+
+### Refusals say what happened
+
+- **Reason codes.** Every refusal carries a stable `reason_code`
+  (`term_not_covered`, `population_not_covered`, `dose_unsupported`,
+  `patient_unsafe`...) next to the unchanged `refused_reason` text. Review
+  reports group by the code, and by phrase for older records.
+- **Routing is real.** The answer says "routed for review" only when a review
+  case was opened, and says why not otherwise ("not sent for review (this was a
+  test run)"). `review` on the response gives `routed` and the `case_id`; a
+  remembered answer re-checks this for each request.
+- **Explanations and redaction on the response.** `explanation` names the
+  missing terms and what to try instead; `redaction` gives the placeholder
+  counts and the question with placeholders, never the removed values. Claims
+  carry `relevance` and the `support` sentence and offsets they were taken from.
+
+### De-identification
+
+- Candidate spans with scores, checksums (NHS mod-11, Luhn for cards and
+  provider numbers, mod-97 IBANs, social security rules), real calendar dates,
+  and cue words within four words. New `[CARD]` placeholder.
+- Names from titles in any case, relation and role cues ("husband Raj", "seen
+  by nurse Kelly Brown"), "SURNAME, Given", and a bundled list of given names.
+  Words the documents know, medicine names and months are never names, and a
+  dose or an age under 90 is never removed.
+- Optional named-entity recognition (`DEID_NER=auto|off|on`) when Presidio or
+  spaCy is installed; nothing changes when it is not.
+- `scripts/pii_eval.py` measures it on `eval/pii_cases.json` (389 synthetic
+  sentences, 340 gold spans, including "John Smith has a fever" and "Sarah, 34,
+  pregnant"): precision 0.90 and recall 0.67 before, 1.00 and 1.00 now. The
+  cases and the detectors were written by the same people, so read the number
+  as a regression guard, not a forecast.
+
+### Coverage guard
+
+- A question word has to be found in the sources only if it is a qualifier, a
+  form or species, a clinical term (`app/data/clinical_terms.txt`) or not
+  ordinary English (`app/data/common_words.txt`): an invented or misspelled
+  medicine is still caught, "email", "meeting" and "yearly" no longer refuse a
+  question. Over-refusal on 320 everyday phrasings (`eval/phrasing.json`) fell
+  from 87.5% to 0.3%.
+- A term the index has but the retrieved passages lack gets one more search,
+  limited to the topic the question names. Its refusal reads "any retrieved
+  source" rather than "any trusted source".
+
+### Extractive answers
+
+- Sentences are pooled from the passages about the topic, retrieved or not, and
+  scored 0.6 meaning, 0.25 the question's own words, 0.15 whether the section
+  is the kind that answers (dose, side effects, symptoms...); at most three
+  are kept, and each part of a two-part question needs its own.
+  `scripts/answer_quality_eval.py`: claim precision 0.20 to 1.00, section
+  recall 0.79 to 1.00, claims per answer 3.99 to 1.25.
+
+### Guards
+
+- A generic sentence that names no medicine ("Once X settles, the dose is
+  tapered") must belong to the passage it cites: every name and clinical term
+  in it has to be in that passage. Wrong claims accepted by the guard
+  evaluation fell from 6 to 0; wrong doses stay at 0.
+
+### Evaluation
+
+- `run_eval.py` also writes `pii`, `answer_quality` and `phrasing` blocks.
+- Two patient scenarios changed expectation, because the answer now states the
+  Mendel solution regimen where it used to quote another sentence: an 8-year-old
+  asked about the dose, or the standard course, is refused with the
+  weight-based dose the formulary gives.
+
 ## 1.0.0 — 2026-09-18
 
 The release that turns the reference pipeline into a platform a clinic or

@@ -47,11 +47,11 @@ HAND = [
     ("What is the standard dose of Caloradine?", {"age_years": 29, "sex": "female", "weight_kg": 60, "egfr": 110,
                                                   "breastfeeding": True}, "answer", []),
     ("What is Caloradine used for?", {"age_years": 60, "allergies": ["quorl"]}, "answer", []),
-    # The answer describes the course without an adult dose, so it's safe, and
-    # the child's weight-based dose is added as information.
-    ("What is the standard course of Mendel solution?", {"age_years": 8, "weight_kg": 25}, "answer", ["paediatric_dose"]),
+    # The answer states the adult regimen, so a child's is refused with the
+    # weight-based dose the formulary gives instead.
+    ("What is the standard course of Mendel solution?", {"age_years": 8, "weight_kg": 25}, "refuse", ["paediatric_dose"]),
     # The answer includes Caloradine too, whose dose can't be checked for a child without kidney function.
-    ("What is the dose of Mendel solution?", {"age_years": 8, "weight_kg": 25}, "refuse", ["missing_data"]),
+    ("What is the dose of Mendel solution?", {"age_years": 8, "weight_kg": 25}, "refuse", ["paediatric_dose"]),
     ("What is the standard course of Mendel solution?", {"age_years": 4, "weight_kg": 16}, "refuse",
      ["paediatric_not_covered"]),
     ("What is the standard course of Mendel solution?", {"age_years": 8}, "refuse", ["missing_data"]),

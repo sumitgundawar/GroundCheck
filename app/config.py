@@ -93,6 +93,9 @@ HYBRID_RETRIEVAL = _get("HYBRID_RETRIEVAL", "true").lower() in ("1", "true", "ye
 HYBRID_ALPHA = min(1.0, max(0.0, _get_float("HYBRID_ALPHA", 0.5)))
 RETRIEVAL_MIN_SCORE = _get_float("RETRIEVAL_MIN_SCORE", 0.30)
 GROUNDING_MIN = _get_float("GROUNDING_MIN", 0.45)
+# The extractive generator keeps a sentence only if its blended score reaches
+# this floor and 0.8 of the best sentence's score.
+EXTRACT_MIN_SCORE = _get_float("EXTRACT_MIN_SCORE", 0.30)
 
 # --- Paths -----------------------------------------------------------------
 INDEX_DIR = ROOT_DIR / _get("INDEX_DIR", "index")
@@ -141,6 +144,11 @@ SESSION_COOKIE_SECURE = _get("SESSION_COOKIE_SECURE", "true").lower() in ("1", "
 LOGIN_MAX_FAILURES = _get_int("LOGIN_MAX_FAILURES", 5)
 LOGIN_LOCKOUT_MINUTES = _get_float("LOGIN_LOCKOUT_MINUTES", 15.0)
 PASSWORD_MIN_LENGTH = _get_int("PASSWORD_MIN_LENGTH", 12)
+
+# Optional named-entity recognition layered over the rule-based de-identifier:
+# "auto" and "on" use Presidio or spaCy when installed and fall back silently,
+# "off" never loads either.
+DEID_NER = _get("DEID_NER", "auto").lower()
 
 # --- Review and governance ------------------------------------------------------
 # Open a review case for every refusal (repeats of an open question are grouped).

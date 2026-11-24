@@ -103,3 +103,27 @@ def test_embeddings_are_safe_for_concurrent_requests():
     with ThreadPoolExecutor(max_workers=16) as pool:
         got = list(pool.map(lambda q: retrieval.embed([q])[0], queries))
     assert np.allclose(np.stack(got), expected, atol=1e-5)
+
+
+# --- Sentence-level helpers for the extractive generator ---------------------
+
+def test_sentence_spans_slice_back_to_the_sentences():
+    text = "Caloradine is oral. The dose is 15 mg once daily. It is taken with food."
+    spans = retrieval.sentence_spans(text)
+    assert [text[a:b] for a, b in spans] == retrieval.split_sentences(text)
+
+
+def test_locate_sentence_finds_the_exact_sentence_and_its_offsets():
+    text = retrieval.corpus_text_for("CALO-001")
+    sentence = retrieval.split_sentences(text)[1]
+    start, end, found = retrieval.locate_sentence(sentence, "CALO-001")
+    assert text[start:end] == sentence == found
+    assert retrieval.locate_sentence("anything", "NOPE-000") is None
+
+
+def test_topic_records_and_passage_scores():
+    records = retrieval.topic_records({"Veltris Syndrome"})
+    assert {r["id"] for r in records} >= {"VELT-001", "VELT-002", "VELT-003"}
+    scores = retrieval.passage_scores("How is Veltris syndrome treated?", ["VELT-002", "NOPE-000"])
+    assert set(scores) == {"VELT-002"} and 0 < scores["VELT-002"] <= 1
+    assert retrieval.record_for("VELT-001")["topic"] == "veltris syndrome"

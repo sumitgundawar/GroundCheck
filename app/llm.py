@@ -17,7 +17,7 @@ import json
 import re
 
 from . import config, local_ai, retrieval
-from .schemas import LLMAnswer, LLMClaim
+from .schemas import ClaimSupport, LLMAnswer, LLMClaim
 
 # Whether a cloud model is configured. Fixed at startup, since it depends only
 # on the environment.
@@ -205,11 +205,154 @@ def judge_claim(claim_text: str, source_text: str,
         return None
 
 
+# What a question asks for: the corpus sections that answer it, and the way a
+# sentence that answers it reads. A sentence from one of the sections is
+# preferred; so is one that reads like an answer, wherever it sits. A question
+# that matches none leaves every sentence equal.
+_INTENTS = [
+    ("interactions", re.compile(r"\binteract\w*|\btaken with\b|\bcombin\w*|\btogether with\b|\balongside\b|\bmixed with\b|"
+                               r"\bwith other (?:medicines|drugs)\b", re.I), {"Drug Interactions"},
+     re.compile(r"combin|interact|should not be taken|must not be|avoid|together|alongside", re.I)),
+    ("contraindications", re.compile(r"\bcontraindicat\w*|\bnot be used\b|\bmust not\b|\bavoid\w*|\bwho should not\b|"
+                                    r"\bshould not (?:take|use|be given)\b", re.I), {"Contraindications"},
+     re.compile(r"contraindicat|should not be used|avoid|sensitivity|must not|not be given|allerg", re.I)),
+    ("adverse effects", re.compile(r"\bside[- ]effects?\b|\badverse\b|\breactions?\b|\bunwanted\b|\bharms?\b", re.I),
+     {"Adverse Reactions"}, re.compile(r"side effects?|adverse|may cause|can cause|\bcauses?\b", re.I)),
+    ("dose", re.compile(r"\bdos(?:e|es|age|ing|ed)\b|\bhow much\b|\bregimen\b|\badminister\w*|\bmg\b|"
+                       r"\b(?:given|take|taken)\b(?!\s+(?:with|together))", re.I), {"Dosage and Administration"},
+     re.compile(r"\d+(?:\.\d+)?\s*(?:mg|mcg|µg|g|ml|units?|iu)\b|\b(?:once|twice|daily|regimen|started at)\b", re.I)),
+    ("monitoring", re.compile(r"\bmonitor\w*|\bchecked\b|\bblood tests?\b|\bfollow[- ]?up\b", re.I), {"Monitoring"},
+     re.compile(r"monitor|measured|checked|marker|reported on a scale|every \w+ (?:weeks?|days?|months?)", re.I)),
+    ("review", re.compile(r"\breview\w*|\bprognosis\b|\boutlook\b|\brecover\w*|\bhow long\b", re.I), {"Prognosis"},
+     re.compile(r"review|outlook|prognosis|recover|taper|normalis", re.I)),
+    ("indication", re.compile(r"\bused for\b|\bindicat\w*|\bprescribed\b|\bwhat is \S+(?: \S+){0,2} for\b", re.I),
+     {"Indications and Usage"}, re.compile(r"used (?:for|in)|indicated|management of|prescribed", re.I)),
+    ("symptoms", re.compile(r"\bsymptoms?\b|\bsigns?\b|\bfeatures?\b|\bpresent(?:s|ation)?\b", re.I), {"Symptoms"},
+     re.compile(r"symptom|characteri[sz]ed by|complaints|features|notice|presents? with|signs", re.I)),
+    ("management", re.compile(r"\btreat\w*|\bmanag\w*|\btherapy\b|\bfirst[- ]line\b|\bnext step\b|\bescalat\w*|"
+                             r"\bnot respond\w*|\bconservative\b", re.I), {"Treatment"},
+     re.compile(r"managed|management|treatment|first-line|therapy|conservative|started", re.I)),
+    ("cause", re.compile(r"\bcaus(?:e|es|ed)\b|\baetiology\b|\bwhy does\b", re.I), {"Causes"},
+     re.compile(r"caus|arises|associated with|driver|due to", re.I)),
+]
+_SPLIT_PARTS = re.compile(r"\?\s+(?=\S)|;\s*|,?\s+and\s+(?=(?:can|could|is|are|does|do|should|how|what|when|which|who)\b)|"
+                          r",\s*(?=(?:can|could|is|are|does|do|should|how|what|when|which|who)\b)", re.I)
+
+
+def classify_intent(text: str) -> set[str]:
+    """The corpus sections that answer a question, from how it is worded."""
+    return _intent(text)[0]
+
+
+def _intent(text: str) -> tuple[set[str], list[re.Pattern]]:
+    sections: set[str] = set()
+    cues: list[re.Pattern] = []
+    for _name, pattern, found, cue in _INTENTS:
+        if pattern.search(text):
+            sections |= found
+            cues.append(cue)
+    if not sections and re.search(r"\bwhat is\b|\btell me about\b|\bwhat are\b", text, re.I):
+        sections.add("Information")
+    return sections, cues
+
+
+def split_question(query: str) -> list[str]:
+    """A question asking two things, as its parts. Each part must name what it
+    asks for, so a stray clause is not made into a question of its own."""
+    parts = [p.strip(" ?.,") for p in _SPLIT_PARTS.split(query) if p and p.strip(" ?.,")]
+    parts = [p for p in parts if classify_intent(p)]
+    return parts if len(parts) > 1 else [query]
+
+
+def _select(part: str, pool: list[dict], skip: set[str], limit: int = 3) -> list[dict]:
+    """The sentences that best answer one question: scored on meaning, on the
+    question's key terms and on whether the section is the kind that answers
+    it; kept above a floor and within 0.8 of the best; chosen with a penalty
+    for repeating one already taken."""
+    from . import guards_output
+
+    if not pool:
+        return []
+    intent, cues = _intent(part)
+    # The topic's own name is in every one of its sentences: it cannot tell them apart.
+    from .deid import _FUNCTION
+
+    terms = list(dict.fromkeys(w for w in retrieval.tokenize(part)
+                               if len(w) >= 4 and w not in _FUNCTION and w not in skip))
+    query_vec = retrieval.embed_query(part)
+    scored = []
+    for item in pool:
+        cosine = float(item["vec"] @ query_vec)
+        stems = set().union(*(guards_output._stems(w) for w in guards_output._source_vocabulary(item["sentence"])))
+        overlap = sum(bool(guards_output._stems(t) & stems) for t in terms) / len(terms) if terms else 0.0
+        in_section = item["section"] in intent
+        reads_so = any(c.search(item["sentence"]) for c in cues)
+        prior = (1.0 if in_section else 0.7 if reads_so else 0.0) if intent else 0.5
+        scored.append({**item, "relevance": 0.6 * cosine + 0.25 * overlap + 0.15 * prior,
+                       "in_section": in_section, "reads_so": reads_so,
+                       "phrase": len(terms) >= 2 and overlap == 1.0})
+    # Where the question names the kind of passage that answers it and such
+    # a sentence clears the floor, the others are not candidates, unless one
+    # repeats at least two of the question's own words and all of them
+    # ("first-line management"). With none in such a section, a sentence that
+    # reads like an answer is preferred to one that merely sounds like the
+    # question.
+    if intent:
+        floor = config.EXTRACT_MIN_SCORE
+        in_section = [x for x in scored if x["in_section"] and x["relevance"] >= floor]
+        if in_section:
+            scored = [x for x in scored if x["relevance"] >= floor and (x["in_section"] or x["phrase"])]
+            scored = [x for x in scored if x["reads_so"]] or scored
+        else:
+            scored = [x for x in scored if x["reads_so"] and x["relevance"] >= floor] or scored
+    top = max(scored, key=lambda x: x["relevance"])
+    if top["relevance"] < config.EXTRACT_MIN_SCORE:
+        return []
+    floor = max(config.EXTRACT_MIN_SCORE, 0.8 * top["relevance"])
+    # Sentences beside the best one in its own passage that read as answers too
+    # belong with it: "monitored every three weeks" follows the marker's name.
+    candidates = sorted((x for x in scored if x["relevance"] >= floor or x["phrase"]
+                         or (intent and x["reads_so"] and x["record"] is top["record"]
+                             and x["relevance"] >= config.EXTRACT_MIN_SCORE)),
+                        key=lambda x: -x["relevance"])
+    chosen: list[dict] = []
+    seen_text: set[str] = set()
+    while candidates and len(chosen) < limit:
+        def mmr(x: dict) -> float:
+            redundancy = max((float(x["vec"] @ c["vec"]) for c in chosen), default=0.0)
+            return 0.7 * x["relevance"] - 0.3 * redundancy
+        pick = max(candidates, key=mmr)
+        candidates.remove(pick)
+        key = " ".join(pick["sentence"].lower().split())
+        if key in seen_text or any(float(pick["vec"] @ c["vec"]) > 0.92 for c in chosen):
+            continue
+        seen_text.add(key)
+        chosen.append(pick)
+    return chosen
+
+
+def _name_the_subject(sentence: str, record: dict) -> str:
+    """A dose in a sentence that does not say what is dosed ("The standard adult
+    regimen is 15 mg") is attributed to nothing when the question names several
+    medicines, so it leads with the subject of the passage's own title."""
+    from . import guards_output
+
+    subject = (record.get("title") or "").split(":")[0].strip()
+    if ":" not in (record.get("title") or "") or not guards_output._canonical_pairs(sentence):
+        return sentence
+    if guards_output._named_sources(sentence, [record]):
+        return sentence
+    return f"{subject}: {sentence}"
+
+
 def generate_extractive(query: str, scored_sources: list[tuple[dict, float]],
                         min_score: float | None = None) -> LLMAnswer:
-    """Deterministic fallback. One claim per retrieved passage above the
-    retrieval threshold, using that passage's most query-relevant sentence.
-    This path goes through the same grounding and dosage guards."""
+    """Deterministic fallback: sentences lifted from the sources, chosen for the
+    question rather than one per passage. When the question names a topic, the
+    candidates are the sentences of that topic's passages, retrieved or not,
+    since retrieval alone often ranks the wrong section of the right topic
+    first. A question with several parts needs a sentence for each, or the
+    sources do not answer it. Goes through the same grounding and dosage guards."""
     threshold = config.RETRIEVAL_MIN_SCORE if min_score is None else min_score
 
     # When the question names drugs or conditions, keep only passages about
@@ -224,8 +367,39 @@ def generate_extractive(query: str, scored_sources: list[tuple[dict, float]],
         ]
         scored_sources = on_topic or scored_sources
 
-    kept = [record for record, score in scored_sources if score >= threshold]
-    sentences = retrieval.best_sentences(query, [record["text"] for record in kept])
-    claims = [LLMClaim(text=sentence, source_ids=[record["id"]])
-              for record, sentence in zip(kept, sentences)]
+    records = [record for record, score in scored_sources if score >= threshold]
+    if named and records:
+        have = {r["id"] for r in records}
+        records += [r for r in retrieval.topic_records(set(named.values())) if r["id"] not in have]
+    if not records:
+        return LLMAnswer(insufficient_context=True, claims=[])
+
+    vectors = retrieval.passage_vectors([r["text"] for r in records])
+    pool = []
+    for order, (record, (spans, vecs)) in enumerate(zip(records, vectors)):
+        for (a, b), vec in zip(spans, vecs):
+            pool.append({"record": record, "order": order, "start": a, "end": b, "vec": vec,
+                         "sentence": record["text"][a:b], "section": record.get("section", "")})
+
+    parts = split_question(query)
+    # With one topic its name is in every sentence and tells none apart; with
+    # several, it says which medicine a sentence is about.
+    skip = ({w for topic in named.values() for w in retrieval.tokenize(topic)} | set(named)
+            if len(set(named.values())) == 1 else set())
+    picks: list[list[dict]] = [_select(part, pool, skip) for part in parts]
+    if any(not p for p in picks):
+        return LLMAnswer(insufficient_context=True, claims=[])
+    cap = max(3, len(parts))
+    merged: list[dict] = []
+    for rank in range(3):
+        for part_picks in picks:
+            if rank < len(part_picks) and all(part_picks[rank] is not m for m in merged) and len(merged) < cap:
+                merged.append(part_picks[rank])
+    merged.sort(key=lambda x: (x["order"], x["start"]))
+    several = len(set(named.values())) > 1
+    claims = [LLMClaim(text=_name_the_subject(x["sentence"], x["record"]) if several else x["sentence"],
+                       source_ids=[x["record"]["id"]], relevance=round(x["relevance"], 4),
+                       support=ClaimSupport(source_id=x["record"]["id"], start=x["start"], end=x["end"],
+                                            sentence=x["sentence"]))
+              for x in merged]
     return LLMAnswer(insufficient_context=not claims, claims=claims)

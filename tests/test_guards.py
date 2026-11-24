@@ -428,3 +428,62 @@ def test_stems_are_frozen_because_they_are_cached():
     with pytest.raises(AttributeError):
         stems.add("anything")
     assert guards_output._stems("dosing") & guards_output._stems("dose")
+
+
+# --- Which question words must the sources cover ----------------------------
+
+@pytest.mark.parametrize("query", [
+    "Can I email the answer to a colleague? What is the dose of Caloradine?",
+    "For the yearly audit, what is the dose of Caloradine?",
+    "Asking for the team meeting tomorrow: what is Veltris syndrome?",
+])
+def test_everyday_words_are_not_held_against_the_sources(query):
+    terms = guards_output._salient_terms(query)
+    assert not {"email", "colleague", "yearly", "audit", "meeting", "tomorrow", "team"} & set(terms)
+
+
+@pytest.mark.parametrize("word", [
+    "Gravitis", "Zalortin", "Rotmiitufen", "Calorodine", "headache", "kidney", "driving", "grams", "dog", "oral", "XR",
+])
+def test_invented_names_misspellings_and_clinical_terms_stay_salient(word):
+    assert word.lower() in guards_output._salient_terms(f"What is the dose of {word}?")
+
+
+def test_a_name_before_its_kind_is_salient_even_when_it_is_an_english_word():
+    assert "graver" in guards_output._salient_terms("what interacts with graver dysregulation?")
+
+
+def test_wordlists_have_no_corpus_names_or_their_near_misses():
+    common = guards_output._wordlist("common_words.txt")
+    names = {m["topic"].split()[0] for m in retrieval.all_metadata() if m.get("kind") != "reference"}
+    assert not common & names and not common & guards_output._wordlist("clinical_terms.txt")
+
+
+def test_the_term_wording_says_retrieved_when_the_index_has_the_word():
+    sources = [r for r, _ in retrieval.search("What is the dose of Caloradine?", 2)]
+    # "quorl" is in the index (Veltris passages) but not in these Caloradine sources.
+    only = [r for r in sources if "quorl" not in r["text"].lower() and r["topic"] == "caloradine"]
+    covered, detail, code = guards_output.coverage_verdict("What is Caloradine quorl?", only)
+    assert not covered and code == "term_not_covered" and "any retrieved source" in detail
+    covered, detail, code = guards_output.coverage_verdict("What is the dose of Zalortin?", only)
+    assert not covered and "any trusted source" in detail
+
+
+def test_a_targeted_retrieval_only_keeps_passages_about_the_named_topic():
+    from app import pipeline
+    from app.schemas import Settings
+
+    report = {"uncovered": ["fatigue"]}
+    got = pipeline._recover("What is the dose of Caloradine regarding fatigue?", report, [], Settings())
+    assert all(r["topic"].lower() == "caloradine" for r, _ in got)
+    assert pipeline._recover("What about fatigue?", report, [], Settings()) == []
+    assert pipeline._recover("What is the dose of Caloradine?", {"uncovered": ["zzzzz"]}, [], Settings()) == []
+
+
+# --- A generic sentence must belong to the passage it cites -------------------
+
+def test_a_generic_sentence_from_another_passage_is_not_grounded():
+    ok, _ = guards_output.check_claim_grounded("Once vexin settles, the dose is tapered with a specialist.", ["CALO-001"])
+    assert not ok
+    ok, _ = guards_output.check_claim_grounded("Caloradine should not be combined with Orrin-blockers.", ["CALO-001"])
+    assert ok

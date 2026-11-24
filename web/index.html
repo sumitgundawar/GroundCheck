@@ -656,12 +656,15 @@
         </form>
       </section>
 
-      <section class="panel decision-panel" id="decision-panel" hidden>
+      <section class="panel decision-panel" id="decision-panel" aria-live="polite" aria-atomic="false" hidden>
         <div class="decision-head">
           <span class="status-chip" id="decision-chip"></span>
           <span class="decision-reason" id="decision-reason"></span>
         </div>
+        <p class="redaction-line" id="redaction-line" hidden></p>
         <div class="answer-body" id="answer-body"></div>
+        <p class="answer-summary" id="answer-summary" hidden></p>
+        <ol class="claim-rows" id="claim-rows" aria-label="Claims in the answer" hidden></ol>
         <div class="flag-row" id="flag-row" hidden>
           <button type="button" class="btn btn-sm btn-ghost" id="flag-open">Flag this answer for review</button>
           <button type="button" class="btn btn-sm btn-ghost" id="incident-from-answer">Report an incident</button>
@@ -693,9 +696,8 @@
           <span class="eyebrow">Why it refused</span>
           <p id="refuse-detail"></p>
           <p class="refuse-explain" id="refuse-explain"></p>
-          <span class="routed" id="routed-line">
-            No answer is shown. The question has been routed for review.
-          </span>
+          <div class="refuse-suggestions" id="refuse-suggestions" hidden></div>
+          <span class="routed" id="routed-line" hidden></span>
         </div>
       </section>
 
@@ -1080,6 +1082,9 @@
           <p class="eval-foot" id="eval-foot"></p>
           <div class="adversarial-block" id="adversarial-block" hidden></div>
           <div class="adversarial-block" id="patient-eval-block" hidden></div>
+          <div class="adversarial-block" id="pii-eval-block" hidden></div>
+          <div class="adversarial-block" id="answer-quality-block" hidden></div>
+          <div class="adversarial-block" id="phrasing-block" hidden></div>
         </div>
       </section>
 

@@ -50,6 +50,36 @@ def calibration_error(confidence: np.ndarray, correct: np.ndarray, bins: int = 1
     return float(total)
 
 
+def fit_temperature(logits: np.ndarray, labels: np.ndarray) -> float:
+    """The temperature that minimises negative log-likelihood of logits / T on
+    held-out images (LBFGS on log T). 1.0 when there is nothing to fit."""
+    import torch
+
+    if len(labels) < 2:
+        return 1.0
+    z = torch.tensor(np.asarray(logits), dtype=torch.float64)
+    y = torch.tensor(np.asarray(labels), dtype=torch.long)
+    log_t = torch.zeros(1, dtype=torch.float64, requires_grad=True)
+    optimizer = torch.optim.LBFGS([log_t], lr=0.5, max_iter=100, line_search_fn="strong_wolfe")
+
+    def closure():
+        optimizer.zero_grad()
+        loss = torch.nn.functional.cross_entropy(z / log_t.exp(), y)
+        loss.backward()
+        return loss
+
+    optimizer.step(closure)
+    t = float(log_t.exp().item())
+    return min(max(t, 0.05), 20.0) if np.isfinite(t) else 1.0
+
+
+def softmax(logits: np.ndarray, temperature: float = 1.0) -> np.ndarray:
+    z = np.asarray(logits, dtype=np.float64) / temperature
+    z = z - z.max(axis=1, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+
 def wilson_lower(correct: np.ndarray | float, total: np.ndarray | float, z: float = 1.96):
     """Lower bound of the 95% Wilson score interval for a proportion."""
     total = np.maximum(total, 1)

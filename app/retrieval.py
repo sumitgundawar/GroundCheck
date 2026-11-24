@@ -471,16 +471,26 @@ def cache_stats() -> dict:
         return {"questions": len(_QUERY_VECTORS), "passages": len(_SENTENCE_VECTORS)}
 
 
-def best_sentences(query: str, passages: list[str]) -> list[str]:
-    """The sentence of each passage most similar to the query. Sentences are
-    embedded once per passage and kept, and the question once; a
-    sentence-transformer also batches far better than it repeats, so what is
-    left is embedded in a single call. Answering took two thirds of a second
-    when every passage was embedded on its own, for every question."""
-    if not passages:
-        return []
-    query_vec = embed_query(query)
-    split = [split_sentences(text) for text in passages]
+def sentence_spans(text: str) -> list[tuple[int, int]]:
+    """(start, end) of each sentence in text, matching split_sentences."""
+    spans = []
+    pos = 0
+    for part in _SENTENCE_SPLIT.split(text):
+        start = text.find(part, pos)
+        if start < 0 or not part.strip():
+            continue
+        spans.append((start, start + len(part.rstrip())))
+        pos = start + len(part)
+    return spans or [(0, len(text.rstrip()))]
+
+
+def passage_vectors(passages: list[str]) -> list[tuple[list[tuple[int, int]], np.ndarray]]:
+    """Each passage's sentence spans and their vectors. A passage's sentences are
+    the same for every question, so the vectors are embedded once and kept, and
+    what is missing is embedded in a single call: a sentence-transformer
+    batches far better than it repeats, and answering took two thirds of a
+    second when every passage was embedded on its own."""
+    split = [sentence_spans(text) for text in passages]
     keys = [hashlib.sha256(text.encode("utf-8")).hexdigest() for text in passages]
     known: dict[str, np.ndarray] = {}
     missing: list[int] = []
@@ -492,7 +502,7 @@ def best_sentences(query: str, passages: list[str]) -> list[str]:
             else:
                 missing.append(i)
     if missing:
-        flat = [s for i in missing for s in split[i]]
+        flat = [passages[i][a:b] for i in missing for a, b in split[i]]
         vectors = embed(flat)
         start = 0
         with _CACHE_LOCK:
@@ -503,11 +513,55 @@ def best_sentences(query: str, passages: list[str]) -> list[str]:
                 _SENTENCE_VECTORS[keys[i]] = block
             while len(_SENTENCE_VECTORS) > _sentence_cache_size():
                 _SENTENCE_VECTORS.popitem(last=False)
+    return [(spans, known[key]) for spans, key in zip(split, keys)]
+
+
+def best_sentences(query: str, passages: list[str]) -> list[str]:
+    """The sentence of each passage most similar to the query."""
+    if not passages:
+        return []
+    query_vec = embed_query(query)
     out = []
-    for sentences, key in zip(split, keys):
-        sims = known[key] @ query_vec
-        out.append(sentences[int(np.argmax(sims))])
+    for text, (spans, vectors) in zip(passages, passage_vectors(passages)):
+        a, b = spans[int(np.argmax(vectors @ query_vec))]
+        out.append(text[a:b])
     return out
+
+
+def topic_records(topics: set[str]) -> list[dict]:
+    """Every passage of these topics, in corpus order."""
+    wanted = {t.lower() for t in topics}
+    return [r for r in _state().metadata if r.get("topic", "").lower() in wanted]
+
+
+def passage_scores(query: str, ids: list[str]) -> dict[str, float]:
+    """Cosine of the question against each passage, from the stored vectors."""
+    state = _state()
+    rows = state.cache.get("row_of")
+    if rows is None:
+        rows = {record["id"]: i for i, record in enumerate(state.metadata)}
+        state.cache["row_of"] = rows
+    found = [(sid, rows[sid]) for sid in ids if sid in rows]
+    if not found:
+        return {}
+    vectors = state.store.vectors([row for _, row in found])
+    query_vec = embed_query(query)
+    return {sid: _cosine(float(np.dot(vec, query_vec))) for (sid, _), vec in zip(found, vectors)}
+
+
+def locate_sentence(claim_text: str, source_id: str) -> tuple[int, int, str] | None:
+    """Where in a cited passage a claim comes from: the sentence it repeats
+    exactly, else the sentence most similar to it."""
+    text = corpus_text_for(source_id)
+    if not text:
+        return None
+    spans, vectors = passage_vectors([text])[0]
+    flat = " ".join(claim_text.split())
+    for a, b in spans:
+        if " ".join(text[a:b].split()) == flat:
+            return a, b, text[a:b]
+    a, b = spans[int(np.argmax(vectors @ embed_query(claim_text)))]
+    return a, b, text[a:b]
 
 
 def best_sentence(query: str, passage_text: str) -> str:
@@ -545,6 +599,15 @@ def topics_mentioned(query: str) -> dict[str, str]:
     """Corpus topics a question names, as {name word: topic}."""
     names = _topic_names()
     return {w: names[w] for w in set(tokenize(query)) if w in names}
+
+
+def record_for(source_id: str) -> dict | None:
+    state = _state()
+    by_id = state.cache.get("by_id")
+    if by_id is None:
+        by_id = {record["id"]: record for record in state.metadata}
+        state.cache["by_id"] = by_id
+    return by_id.get(source_id)
 
 
 def corpus_text_for(source_id: str) -> str | None:

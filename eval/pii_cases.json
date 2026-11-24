@@ -1,0 +1,3944 @@
+{
+ "description": "Synthetic sentences with gold PII spans. Every name, number and address is invented; the checksummed numbers are generated, not real. Kinds follow the placeholder: NAME, DATE, AGE (over 89), NHS NUMBER, SSN, ID, PHONE, EMAIL, URL, IP ADDRESS, POSTCODE, ZIP, ADDRESS, NUMBER, CARD. Sentences in the negatives group contain nothing to remove.",
+ "cases": [
+  {
+   "text": "John Smith has a fever, what dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "Patient: SMITH, John needs a review of Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 9,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "mrs o'neil needs caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "seen by nurse Kelly Brown on ward 5",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 14,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "Sarah, 34, pregnant, caloradine dose?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 5
+    }
+   ]
+  },
+  {
+   "text": "her husband Raj asked about the dose",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "Mr John Smith needs a dose",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "reviewed by Dr. Ahmed yesterday",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 16,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "my patient Jane Doe has a rash",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 11,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "patient named Priya Patel",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 14,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "Name: Oluwaseun Adeyemi",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "DR KHAN asked me to check the Caloradine dose",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 7
+    }
+   ]
+  },
+  {
+   "text": "referred by Michael Hughes last week",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "the carer Fatima rang about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 10,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "his daughter Chloe Walker is the next of kin",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 13,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "his son Declan collects the prescription",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "mr murphy is allergic to penicillin",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "ms okafor takes Caloradine daily",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "Prof Johansson wrote the plan",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 5,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "wife Ingrid gave the medicines",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 5,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "Is the Caloradine dose right for Maria Garcia?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 33,
+     "end": 45
+    }
+   ]
+  },
+  {
+   "text": "Liam Fraser is 71 and takes Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "called Tariq Khan about his dose",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 7,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "Hello, I am Wei Chen and want the Caloradine dose",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "Dose of Caloradine for Elena Rossi, aged 45?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 34
+    }
+   ]
+  },
+  {
+   "text": "mum Aoife is worried about the side effects",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "partner Carlos phoned the ward",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "nurse Mei Lin checked the chart",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "pt Bashir Ali reports a headache",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "first name Zubin and surname Rao",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 11,
+     "end": 16
+    },
+    {
+     "kind": "NAME",
+     "start": 29,
+     "end": 32
+    }
+   ]
+  },
+  {
+   "text": "Thandi Mbeki asked how often quorl levels are monitored",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 12
+    }
+   ]
+  },
+  {
+   "text": "Please note Sipho Dlamini is on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "Marcus Taylor: is he safe on Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "Surname: Kowalski",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 9,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "my brother Imran takes Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 11,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "friend Olga told me about it",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 7,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "Mx Rivers needs a dose check",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "spoke to Hannah Murphy this morning",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 9,
+     "end": 22
+    }
+   ]
+  },
+  {
+   "text": "admitted by Ngozi Okafor at night",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "Patient Yusuf Singh presents with fatigue",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "Tariq O'Neil has a fever, what is the dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 12
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine safe for Raj Patel?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 32
+    }
+   ]
+  },
+  {
+   "text": "patient Priya Fraser was started on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "Dr Khan asked how Veltris syndrome is treated",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 7
+    }
+   ]
+  },
+  {
+   "text": "Mrs Patel wants to know what Caloradine is used for",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "mr Mbeki cannot take Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "husband Dmitri asked about the side effects of Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "nurse Priya Garcia is checking the chart",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "Kelly Adeyemi has a fever, what is the dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine safe for Aoife Adeyemi?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 36
+    }
+   ]
+  },
+  {
+   "text": "patient Ahmed Garcia was started on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "Dr Rossi asked how Veltris syndrome is treated",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "Mrs Okafor wants to know what Caloradine is used for",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "mr Rossi cannot take Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "husband Oluwaseun asked about the side effects of Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "nurse Jorge Singh is checking the chart",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "Oluwaseun Okafor has a fever, what is the dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine safe for Oluwaseun Fraser?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 39
+    }
+   ]
+  },
+  {
+   "text": "patient Elena O'Neil was started on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "Dr Garcia asked how Veltris syndrome is treated",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "Mrs Fraser wants to know what Caloradine is used for",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "mr Rossi cannot take Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "husband Mei asked about the side effects of Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "nurse Marcus Brown is checking the chart",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "Michael Rossi has a fever, what is the dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine safe for Jorge Kowalski?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 37
+    }
+   ]
+  },
+  {
+   "text": "patient Hannah Nguyen was started on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "Dr Adeyemi asked how Veltris syndrome is treated",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "Mrs Patel wants to know what Caloradine is used for",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "mr Kowalski cannot take Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "husband Liam asked about the side effects of Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 12
+    }
+   ]
+  },
+  {
+   "text": "nurse Kelly Murphy is checking the chart",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "Ngozi Rossi has a fever, what is the dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine safe for Imran Taylor?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 35
+    }
+   ]
+  },
+  {
+   "text": "patient Hannah Walker was started on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "Dr Brown asked how Veltris syndrome is treated",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "Mrs Okafor wants to know what Caloradine is used for",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "mr Rossi cannot take Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "husband Mei asked about the side effects of Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "nurse Liam Murphy is checking the chart",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "Declan Taylor has a fever, what is the dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine safe for Mei Chowdhury?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 36
+    }
+   ]
+  },
+  {
+   "text": "patient Priya Nguyen was started on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "Dr Garcia asked how Veltris syndrome is treated",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "Mrs Murphy wants to know what Caloradine is used for",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "mr Johansson cannot take Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 12
+    }
+   ]
+  },
+  {
+   "text": "husband Kelly asked about the side effects of Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "nurse Yusuf Adeyemi is checking the chart",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "Zainab Fraser has a fever, what is the dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine safe for Jorge Murphy?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 35
+    }
+   ]
+  },
+  {
+   "text": "patient Tariq Khan was started on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "Dr Johansson asked how Veltris syndrome is treated",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 12
+    }
+   ]
+  },
+  {
+   "text": "Mrs Taylor wants to know what Caloradine is used for",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "mr Adeyemi cannot take Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 10
+    }
+   ]
+  },
+  {
+   "text": "husband Carlos asked about the side effects of Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "nurse Olga Adeyemi is checking the chart",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 6,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "Oluwaseun Walker has a fever, what is the dose of Caloradine?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine safe for Kwame Rossi?",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 23,
+     "end": 34
+    }
+   ]
+  },
+  {
+   "text": "patient Yusuf Taylor was started on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "Dr Singh asked how Veltris syndrome is treated",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "Mrs Siobhan Smith is on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "referred by Siobhan Brown",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "patient Odalys Johansson asked about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "patient Thuy Walker asked about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "Mrs Thuy Singh is on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "patient Ravindra Adeyemi asked about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "referred by Ravindra Singh",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "Mrs Bashir O'Neil is on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "Mrs Bashir Garcia is on Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "patient Mthunzi Okafor asked about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 22
+    }
+   ]
+  },
+  {
+   "text": "patient Odalys Brown asked about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "patient Thuy Okafor asked about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "patient Ravindra Rossi asked about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 22
+    }
+   ]
+  },
+  {
+   "text": "patient Bashir Walker asked about Caloradine",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "referred by Ekaterina Garcia",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 28
+    }
+   ]
+  },
+  {
+   "text": "referred by Siobhan Chowdhury",
+   "group": "names",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 29
+    }
+   ]
+  },
+  {
+   "text": "DOB 12/03/1948",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 4,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "admitted 2024-03-12",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 9,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "since 12.05.2023",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 6,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "on 3rd March 2024",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 3,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "on March 3, 2024",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 3,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "review in Sept 2025",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 10,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "born 1/2/80",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "admitted last Tuesday 14 Feb",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 22,
+     "end": 28
+    }
+   ]
+  },
+  {
+   "text": "DOB: 03/04/1950 please check Caloradine",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "discharged on 21 June 2023",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 14,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "seen on 15-08-2022 for a rash",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 8,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "date of birth 9 November 1961",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 14,
+     "end": 29
+    }
+   ]
+  },
+  {
+   "text": "appointment July 14 with the clinic",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "seen January 5, 1995, dose of Caloradine?",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "DOB 15 December 2001",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 4,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "born 13 August 1943",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "born 1938-04-02",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "born February 6, 1973",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "DOB 2002-01-04",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 4,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "next review 04/06/2008",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 22
+    }
+   ]
+  },
+  {
+   "text": "DOB 28 April 2008",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 4,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "admitted on June 21, 1974 with a fever",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "seen 16 February 1944, dose of Caloradine?",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "born 16/08/1969",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "admitted on 4th Jun 1973 with a fever",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "seen January 16, 1950, dose of Caloradine?",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 5,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "DOB 1976-09-07",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 4,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "next review 1th Feb 1968",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "DOB 23.5.1996",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 4,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "admitted on April 12, 1998 with a fever",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "next review December 11, 1958",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 29
+    }
+   ]
+  },
+  {
+   "text": "admitted on 26th Sep 1981 with a fever",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "admitted on 7.9.1993 with a fever",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "DOB 1.5.1990",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 4,
+     "end": 12
+    }
+   ]
+  },
+  {
+   "text": "admitted on 23 November 1974 with a fever",
+   "group": "dates",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 12,
+     "end": 28
+    }
+   ]
+  },
+  {
+   "text": "dose for a 94 year old",
+   "group": "age",
+   "spans": [
+    {
+     "kind": "AGE",
+     "start": 11,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "patient aged 101",
+   "group": "age",
+   "spans": [
+    {
+     "kind": "AGE",
+     "start": 13,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "a 97-year-old man on Caloradine",
+   "group": "age",
+   "spans": [
+    {
+     "kind": "AGE",
+     "start": 2,
+     "end": 4
+    }
+   ]
+  },
+  {
+   "text": "she is 92 years old",
+   "group": "age",
+   "spans": [
+    {
+     "kind": "AGE",
+     "start": 7,
+     "end": 9
+    }
+   ]
+  },
+  {
+   "text": "aged 105 and frail",
+   "group": "age",
+   "spans": [
+    {
+     "kind": "AGE",
+     "start": 5,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "NHS number 943 476 5919",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 11,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "NHS 9434765919",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 4,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "SSN 123-45-6789",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "SSN",
+     "start": 4,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "MRN: A1234567",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 5,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "hospital number is RX 88123",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 19,
+     "end": 27
+    }
+   ]
+  },
+  {
+   "text": "insurance id ABC123456",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 13,
+     "end": 22
+    }
+   ]
+  },
+  {
+   "text": "SSN 123456789 for the claim",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "SSN",
+     "start": 4,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "ref 4412 998 7765 21",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NUMBER",
+     "start": 4,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "card 4111 1111 1111 1111",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 5,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "paid with 5500005555555559",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 10,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "NI number QQ 12 34 56 C",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 10,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "member id ZX99812",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 10,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "policy number PL-4455-12",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 14,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "IBAN GB82 WEST 1234 5698 7654 32",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 5,
+     "end": 32
+    }
+   ]
+  },
+  {
+   "text": "NPI 1234567893",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 4,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "patient id P-554231",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 11,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "case number CS-2024-0098",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 12,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "NHS: 551 313 7356 please check dose",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 5,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "NHS number 122 202 9723",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 11,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "NHS: 975 288 2005 please check dose",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 5,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "NHS: 182 633 0437 please check dose",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 5,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "his NHS no is 839 548 6200",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 14,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "NHS: 880 729 0227 please check dose",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 5,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "NHS number 791 805 8887",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 11,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "his NHS no is 180 334 0185",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 14,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "his NHS no is 347 887 8381",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 14,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "his NHS no is 837 261 6752",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 14,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "NHS number 361 341 2527",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 11,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "his NHS no is 273 167 2323",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 14,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "NHS: 686 563 5515 please check dose",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 5,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "NHS: 505 877 0652 please check dose",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "NHS NUMBER",
+     "start": 5,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "paid by credit card 3711311440241",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 20,
+     "end": 33
+    }
+   ]
+  },
+  {
+   "text": "visa 3728897514026149 expiry 04/27",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 5,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "paid by credit card 4193 1417 0586 4925",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 20,
+     "end": 39
+    }
+   ]
+  },
+  {
+   "text": "paid by credit card 512402344834782",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 20,
+     "end": 35
+    }
+   ]
+  },
+  {
+   "text": "visa 374000883873711 expiry 04/27",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 5,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "paid by credit card 6011 7868 4335 3265 022",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 20,
+     "end": 43
+    }
+   ]
+  },
+  {
+   "text": "paid by credit card 3720 1684 9340 7223",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 20,
+     "end": 39
+    }
+   ]
+  },
+  {
+   "text": "card 3758 5304 3520 5616",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 5,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "paid by credit card 5180141269060441",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 20,
+     "end": 36
+    }
+   ]
+  },
+  {
+   "text": "card 5196572492086828892",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "CARD",
+     "start": 5,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "SSN 335-20-1510",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "SSN",
+     "start": 4,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "SSN 236-91-6909",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "SSN",
+     "start": 4,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "SSN 485-67-1831",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "SSN",
+     "start": 4,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "SSN 644-97-5006",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "SSN",
+     "start": 4,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "social security 370-10-8486",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "SSN",
+     "start": 16,
+     "end": 27
+    }
+   ]
+  },
+  {
+   "text": "SSN 615-78-2506",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "SSN",
+     "start": 4,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "NPI 7414333774",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 4,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "provider 1740931922 prescribed it",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 9,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "provider 4499207072 prescribed it",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 9,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "provider 1374847774 prescribed it",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 9,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "NPI 8341704715",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 4,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "IBAN FR14 2004 1010 0505 0001 3M02 606",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 5,
+     "end": 38
+    }
+   ]
+  },
+  {
+   "text": "IBAN DE89 3704 0044 0532 0130 00",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 5,
+     "end": 32
+    }
+   ]
+  },
+  {
+   "text": "IBAN DE89 3704 0044 0532 0130 00",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 5,
+     "end": 32
+    }
+   ]
+  },
+  {
+   "text": "IBAN DE89 3704 0044 0532 0130 00",
+   "group": "ids",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 5,
+     "end": 32
+    }
+   ]
+  },
+  {
+   "text": "call 07700 900123",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 5,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "call +44 20 7946 0958",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 5,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "call (415) 555-2671",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 5,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "email jo.bloggs@nhs.net",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "EMAIL",
+     "start": 6,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "see https://ehr.example.org/patient/123",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "URL",
+     "start": 4,
+     "end": 39
+    }
+   ]
+  },
+  {
+   "text": "from 192.168.0.14",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "IP ADDRESS",
+     "start": 5,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "from 2001:db8::ff00:42:8329",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "IP ADDRESS",
+     "start": 5,
+     "end": 27
+    }
+   ]
+  },
+  {
+   "text": "lives at 221B Baker Street",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "ADDRESS",
+     "start": 9,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "London NW1 6XE",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "POSTCODE",
+     "start": 7,
+     "end": 14
+    }
+   ]
+  },
+  {
+   "text": "Springfield, IL 62704",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "ZIP",
+     "start": 16,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "lives at 12 Oak Rd, Leeds LS1 4AP",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "ADDRESS",
+     "start": 9,
+     "end": 18
+    },
+    {
+     "kind": "POSTCODE",
+     "start": 26,
+     "end": 33
+    }
+   ]
+  },
+  {
+   "text": "her husband Raj called on 0207 946 0958",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 15
+    },
+    {
+     "kind": "PHONE",
+     "start": 26,
+     "end": 39
+    }
+   ]
+  },
+  {
+   "text": "phone 07700 900938 about the dose",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 6,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "phone 0161 496 0617 about the dose",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 6,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "mobile: (415) 555-5983",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 8,
+     "end": 22
+    }
+   ]
+  },
+  {
+   "text": "ring me on +44 7700 900003",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 11,
+     "end": 26
+    }
+   ]
+  },
+  {
+   "text": "mobile: +44 7700 900352",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 8,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "phone 020 7946 0768 about the dose",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 6,
+     "end": 19
+    }
+   ]
+  },
+  {
+   "text": "mobile: 07700 900012",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 8,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "ring me on (415) 555-1251",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 11,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "ring me on 0161 496 0854",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 11,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "ring me on 212-555-4353",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 11,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "contact sam.t99@nhs.net",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "EMAIL",
+     "start": 8,
+     "end": 23
+    }
+   ]
+  },
+  {
+   "text": "contact dr.lee@clinic.example.co.uk",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "EMAIL",
+     "start": 8,
+     "end": 35
+    }
+   ]
+  },
+  {
+   "text": "email dr.lee@clinic.example.co.uk the dose",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "EMAIL",
+     "start": 6,
+     "end": 33
+    }
+   ]
+  },
+  {
+   "text": "email a.khan@example.org the dose",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "EMAIL",
+     "start": 6,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "email dr.lee@clinic.example.co.uk the dose",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "EMAIL",
+     "start": 6,
+     "end": 33
+    }
+   ]
+  },
+  {
+   "text": "logged in from 10.230.70.165",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "IP ADDRESS",
+     "start": 15,
+     "end": 28
+    }
+   ]
+  },
+  {
+   "text": "logged in from 10.146.248.13",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "IP ADDRESS",
+     "start": 15,
+     "end": 28
+    }
+   ]
+  },
+  {
+   "text": "logged in from 10.65.87.121",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "IP ADDRESS",
+     "start": 15,
+     "end": 27
+    }
+   ]
+  },
+  {
+   "text": "logged in from 10.212.175.73",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "IP ADDRESS",
+     "start": 15,
+     "end": 28
+    }
+   ]
+  },
+  {
+   "text": "lives in M1 1AE area",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "POSTCODE",
+     "start": 9,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "lives in B33 8TH area",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "POSTCODE",
+     "start": 9,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "posted to M1 1AE",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "POSTCODE",
+     "start": 10,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "lives in SW1A 1AA area",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "POSTCODE",
+     "start": 9,
+     "end": 17
+    }
+   ]
+  },
+  {
+   "text": "lives in LS1 4AP area",
+   "group": "contact",
+   "spans": [
+    {
+     "kind": "POSTCODE",
+     "start": 9,
+     "end": 16
+    }
+   ]
+  },
+  {
+   "text": "Mr Wei Brown, DOB 3 April 1994, NHS 837 576 2830: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 12
+    },
+    {
+     "kind": "DATE",
+     "start": 18,
+     "end": 30
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 36,
+     "end": 48
+    }
+   ]
+  },
+  {
+   "text": "Mr Aoife Adeyemi, DOB 06/06/2001, NHS 535 493 0669: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 16
+    },
+    {
+     "kind": "DATE",
+     "start": 22,
+     "end": 32
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 38,
+     "end": 50
+    }
+   ]
+  },
+  {
+   "text": "Mr Kelly Mbeki, DOB 7.7.1964, NHS 074 952 8834: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 14
+    },
+    {
+     "kind": "DATE",
+     "start": 20,
+     "end": 28
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 34,
+     "end": 46
+    }
+   ]
+  },
+  {
+   "text": "Mr Priya Hughes, DOB 8th Dec 1981, NHS 764 020 6790: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 15
+    },
+    {
+     "kind": "DATE",
+     "start": 21,
+     "end": 33
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 39,
+     "end": 51
+    }
+   ]
+  },
+  {
+   "text": "Mr Liam Smith, DOB 3 August 1997, NHS 731 322 8171: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 13
+    },
+    {
+     "kind": "DATE",
+     "start": 19,
+     "end": 32
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 38,
+     "end": 50
+    }
+   ]
+  },
+  {
+   "text": "Mr Priya Fraser, DOB 1930-01-25, NHS 390 424 8618: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 15
+    },
+    {
+     "kind": "DATE",
+     "start": 21,
+     "end": 31
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 37,
+     "end": 49
+    }
+   ]
+  },
+  {
+   "text": "Mr Michael Adeyemi, DOB 2004-09-10, NHS 643 900 8471: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 18
+    },
+    {
+     "kind": "DATE",
+     "start": 24,
+     "end": 34
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 40,
+     "end": 52
+    }
+   ]
+  },
+  {
+   "text": "Mr Carlos Murphy, DOB April 21, 1990, NHS 761 436 5372: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 16
+    },
+    {
+     "kind": "DATE",
+     "start": 22,
+     "end": 36
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 42,
+     "end": 54
+    }
+   ]
+  },
+  {
+   "text": "Mr Oluwaseun Murphy, DOB 23th Dec 1976, NHS 630 481 3732: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 19
+    },
+    {
+     "kind": "DATE",
+     "start": 25,
+     "end": 38
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 44,
+     "end": 56
+    }
+   ]
+  },
+  {
+   "text": "Mr Mei Kowalski, DOB 8.8.1958, NHS 419 792 3767: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 15
+    },
+    {
+     "kind": "DATE",
+     "start": 21,
+     "end": 29
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 35,
+     "end": 47
+    }
+   ]
+  },
+  {
+   "text": "Mr Imran Patel, DOB 20/03/1980, NHS 309 260 0266: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 14
+    },
+    {
+     "kind": "DATE",
+     "start": 20,
+     "end": 30
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 36,
+     "end": 48
+    }
+   ]
+  },
+  {
+   "text": "Mr Ngozi Murphy, DOB 1940-02-24, NHS 532 870 4657: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 15
+    },
+    {
+     "kind": "DATE",
+     "start": 21,
+     "end": 31
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 37,
+     "end": 49
+    }
+   ]
+  },
+  {
+   "text": "Mr Tariq Taylor, DOB 06/02/1930, NHS 415 618 3653: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 15
+    },
+    {
+     "kind": "DATE",
+     "start": 21,
+     "end": 31
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 37,
+     "end": 49
+    }
+   ]
+  },
+  {
+   "text": "Mr Zainab Walker, DOB 27/07/1941, NHS 735 873 5579: what is the standard dose of Caloradine?",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 16
+    },
+    {
+     "kind": "DATE",
+     "start": 22,
+     "end": 32
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 38,
+     "end": 50
+    }
+   ]
+  },
+  {
+   "text": "patient Sarah Garcia phone 07700 900253 email dr.lee@clinic.example.co.uk asks about Veltris syndrome",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 20
+    },
+    {
+     "kind": "PHONE",
+     "start": 27,
+     "end": 39
+    },
+    {
+     "kind": "EMAIL",
+     "start": 46,
+     "end": 73
+    }
+   ]
+  },
+  {
+   "text": "patient Priya Patel phone +44 7700 900765 email r_oneil@mail.example.com asks about Veltris syndrome",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 19
+    },
+    {
+     "kind": "PHONE",
+     "start": 26,
+     "end": 41
+    },
+    {
+     "kind": "EMAIL",
+     "start": 48,
+     "end": 72
+    }
+   ]
+  },
+  {
+   "text": "patient Tariq Chowdhury phone 07700 900044 email a.khan@example.org asks about Veltris syndrome",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 23
+    },
+    {
+     "kind": "PHONE",
+     "start": 30,
+     "end": 42
+    },
+    {
+     "kind": "EMAIL",
+     "start": 49,
+     "end": 67
+    }
+   ]
+  },
+  {
+   "text": "patient Sarah Okafor phone +44 7700 900732 email dr.lee@clinic.example.co.uk asks about Veltris syndrome",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 20
+    },
+    {
+     "kind": "PHONE",
+     "start": 27,
+     "end": 42
+    },
+    {
+     "kind": "EMAIL",
+     "start": 49,
+     "end": 76
+    }
+   ]
+  },
+  {
+   "text": "patient Marcus Johansson phone 0161 496 0821 email r_oneil@mail.example.com asks about Veltris syndrome",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 24
+    },
+    {
+     "kind": "PHONE",
+     "start": 31,
+     "end": 44
+    },
+    {
+     "kind": "EMAIL",
+     "start": 51,
+     "end": 75
+    }
+   ]
+  },
+  {
+   "text": "patient Marcus O'Neil phone 212-555-7549 email a.khan@example.org asks about Veltris syndrome",
+   "group": "combined",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 21
+    },
+    {
+     "kind": "PHONE",
+     "start": 28,
+     "end": 40
+    },
+    {
+     "kind": "EMAIL",
+     "start": 47,
+     "end": 65
+    }
+   ]
+  },
+  {
+   "text": "What is the standard dose of Caloradine?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What is the dose of Caloradine for a 5 year old?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What is the dose of Caloradine for an 89 year old?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Can Caloradine be given at 1,000,000 units daily for 14 days?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Give 10 000 000 units of Caloradine?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Is the patient Caloradine dose different in renal failure?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Does Dr Caloradine exist?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What dose for a patient with Veltris syndrome?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Is 5 mg in May too much?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Guidance changed in 2024, what is the dose now?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "HbA1c of 7.5 and BP 140/90, what next?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Give 2.5 mg twice a day for 7 days",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Patient Presenting With Fever",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What is the dose of 5 mg/kg for 12/12 months?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Will Caloradine interact with warfarin?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "May I give Caloradine with food?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Grace period for the next Caloradine dose?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Bill the patient after the Caloradine review",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Faith in the Caloradine dosing guidance",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Mr Caloradine dose",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Dr Veltris syndrome",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "How often are quorl levels monitored in 12/12 months?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Is it correct that Caloradine is taken 15 mg once daily?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Give 10 mg/kg over 30 minutes",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Take 1 tablet every 6 hours for 3 days",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What happened in March?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Guidance from January says what about Caloradine?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Review the dose in 6 weeks",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "A 12 year old needs 250 mg twice daily",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "eGFR 45 mL/min, what dose?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "creatinine 120 umol/L and K 5.1",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Weight 70 kg, dose 3.5 mg/kg",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Page 12 of the Caloradine guideline",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Section 4.2 of the label says what?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Table 3 lists 5 doses",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "2 to 3 tablets 3 times a day",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Is 0.5 mg safe at 36 weeks?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Patient with Veltris syndrome on Caloradine 15 mg",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Max dose 40 mg per day for 7-14 days",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Pregnant patient with fever, what next?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Sarah's Caloradine guidance",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Can you tell me about quorl levels?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Old guidance from 2019 says 10 mg",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Over 65 years old, reduce dose?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Stage 4 disease, 20 mg",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "BP 120/80 and pulse 72, continue?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Lot 4417 of Caloradine was recalled",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Ward 5 needs Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Bed 12 on ward 3 needs a dose check",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Room 204 patient with fever",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Version 2.1.3 of the guideline",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Dose at 08:00 and 20:00",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Is Caloradine 15 mg or 30 mg at 9.30am?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Call the pharmacy about Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Email the dose to the team",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What do I tell the patient's mother?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "The nurse practitioner asked about the dose",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Ask the consultant about it",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "My colleague asked how Veltris syndrome is treated",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Mark the chart when Caloradine is given",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Rose is the name of the ward, what is the dose?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Hope the dose is right",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Dawn shift needs Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Joy of Caloradine dosing guidance",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Pat down the dressing and give Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Wilson disease and Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Addison disease and the dose",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Parkinson disease and Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Down syndrome and the dose",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Crohn disease treatment",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Graves disease and Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What is Rilsidon Imbalance?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "How is Veltris Syndrome Treated?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "WHEN IS RUNSANUFEN PRESCRIBED?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Please, what interacts with Gonlitestal?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Monday clinic needs the dose",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "On Tuesday the dose changed",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "In April the dose was 15 mg",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Is 1 in 4 patients affected?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Prevalence 3.5%, what next?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Incidence 1,200 per 100,000",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Take 15 mg 3 times daily for 14 days then stop",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "How many mg in 0.015 g?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What is 15 mcg in mg?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Dose of 1 000 mg daily",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Weight 7.5 kg, age 6 months, dose?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "What is the dose for a 90 mg patient?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Is a 20 mg dose OK at 8 pm?",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Phase 3 trial of Caloradine 15 mg",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Grade 2 toxicity on Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Drug A and drug B interact",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Vitamin B12 and Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "Type 2 diabetes with Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "COVID-19 and Caloradine",
+   "group": "negatives",
+   "spans": []
+  },
+  {
+   "text": "In June 2024 guidance changed",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 3,
+     "end": 12
+    }
+   ]
+  },
+  {
+   "text": "Dr Patel's clinic called about Caloradine",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 3,
+     "end": 8
+    }
+   ]
+  },
+  {
+   "text": "Ask Mrs Jenkins about the Caloradine dose",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 8,
+     "end": 15
+    }
+   ]
+  },
+  {
+   "text": "my neighbour Dave Collins takes Caloradine",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 13,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "Rahul, 52, has a cough: Caloradine dose?",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 5
+    }
+   ]
+  },
+  {
+   "text": "Ms. Oyelaran-Smith is asking about side effects",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "Dr. Lakshmi Narayanan asked about Veltris syndrome",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 4,
+     "end": 21
+    }
+   ]
+  },
+  {
+   "text": "The patient, Margaret Thompson, is 78 and takes Caloradine",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 13,
+     "end": 30
+    }
+   ]
+  },
+  {
+   "text": "Margaret Thompson (DOB 1/1/1950) takes Caloradine",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 17
+    },
+    {
+     "kind": "DATE",
+     "start": 23,
+     "end": 31
+    }
+   ]
+  },
+  {
+   "text": "ALEX JOHNSON NEEDS A CALORADINE DOSE CHECK",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 12
+    }
+   ]
+  },
+  {
+   "text": "Peter Walsh is on Caloradine and warfarin",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "Referred by Dr Anita Rao to the clinic",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 24
+    }
+   ]
+  },
+  {
+   "text": "next of kin is Eleanor Price, phone 07911 123456",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 15,
+     "end": 28
+    },
+    {
+     "kind": "PHONE",
+     "start": 36,
+     "end": 48
+    }
+   ]
+  },
+  {
+   "text": "Mohamed Hassan's NHS number is 943 476 5919",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 0,
+     "end": 14
+    },
+    {
+     "kind": "NHS NUMBER",
+     "start": 31,
+     "end": 43
+    }
+   ]
+  },
+  {
+   "text": "e-mail me at clinic.desk@example.org with the dose",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "EMAIL",
+     "start": 13,
+     "end": 36
+    }
+   ]
+  },
+  {
+   "text": "records at http://records.example.net/p/889 show a rash",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "URL",
+     "start": 11,
+     "end": 43
+    }
+   ]
+  },
+  {
+   "text": "Tel: 0113 496 0123 (ward 7)",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "PHONE",
+     "start": 5,
+     "end": 18
+    }
+   ]
+  },
+  {
+   "text": "ID ZZ-77412 is the passport reference",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 3,
+     "end": 11
+    }
+   ]
+  },
+  {
+   "text": "lives at 7 Elm Grove in Bristol",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "ADDRESS",
+     "start": 9,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "He was born on the 4th of May 1962",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "DATE",
+     "start": 15,
+     "end": 34
+    }
+   ]
+  },
+  {
+   "text": "Dose for a 93 yo woman?",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "AGE",
+     "start": 11,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "Is Caloradine ok for a 91 yr old?",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "AGE",
+     "start": 23,
+     "end": 25
+    }
+   ]
+  },
+  {
+   "text": "Grandmother Beatrice is 88 and takes Caloradine",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "sister Nkechi is a nurse",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 7,
+     "end": 13
+    }
+   ]
+  },
+  {
+   "text": "Zoe Caloradine",
+   "group": "held_out",
+   "spans": []
+  },
+  {
+   "text": "What did Mr Ogunleye say about Veltris syndrome?",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "NAME",
+     "start": 12,
+     "end": 20
+    }
+   ]
+  },
+  {
+   "text": "Passport X1234567 was shown",
+   "group": "held_out",
+   "spans": [
+    {
+     "kind": "ID",
+     "start": 9,
+     "end": 17
+    }
+   ]
+  }
+ ]
+}

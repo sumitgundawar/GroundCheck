@@ -20,6 +20,7 @@ the guards' own code:
   unit            mg read as mcg, the number unchanged          must be rejected
   crossed         another medicine's dose, both passages given  must be rejected
   substituted     a sentence from an unrelated passage          must be rejected
+                  (including generic ones that name no medicine)
   fabricated      a plausible sentence about nothing in it      must be rejected
 
 A guard that accepts a mutated claim is a hole in the only check standing
@@ -177,15 +178,16 @@ def main() -> int:
         total += c["cases"]
         accepted += c["accepted"]
         print(f"{family:16} {c['cases']:>8,} {c['passed']:>8,} {c['accepted']:>9,} {c['over_rejected']:>14,}")
-    # A dose that is wrong is a safety failure and fails the run. A generic
-    # sentence attributed to the wrong passage ("the dose is not increased
-    # without specialist input") is within the noise floor of any similarity
-    # check, so it is measured and reported rather than gated on — tuning until
-    # that number reads zero would be tuning the measurement, not the guard.
-    gated = ("number", "unit", "crossed", "fabricated")
+    # A wrong claim the guards accept is a safety failure and fails the run. A
+    # generic sentence ("Once X settles, the dose is tapered") attributed to
+    # the wrong passage is gated too, since the guards now require such a
+    # sentence to belong to the passage it cites.
+    gated = ("number", "unit", "crossed", "fabricated", "substituted")
     unsafe = sum(result["families"][f]["accepted"] for f in gated if f in result["families"])
     boilerplate = accepted - unsafe
-    print(f"\n{total:,} claims, {unsafe:,} wrong doses accepted "
+    wrong_doses = sum(result["families"][f]["accepted"] for f in ("number", "unit", "crossed", "fabricated")
+                      if f in result["families"])
+    print(f"\n{total:,} claims, {accepted:,} wrong claims accepted, {wrong_doses:,} wrong doses accepted "
           f"(and {boilerplate:,} generic sentences attributed to the wrong passage)")
 
     for escape in result["escapes"][:5]:
@@ -198,7 +200,7 @@ def main() -> int:
         report = report.with_suffix(".sample.json")
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(
-        {"cases": total, "accepted_wrong_claims": accepted, "accepted_wrong_doses": unsafe,
+        {"cases": total, "accepted_wrong_claims": accepted, "accepted_wrong_doses": wrong_doses,
          "misattributed_generic_sentences": boilerplate,
          "families": {k: dict(v) for k, v in result["families"].items()},
          "escapes": result["escapes"]}, indent=2) + "\n")

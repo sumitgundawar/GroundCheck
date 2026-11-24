@@ -18,6 +18,14 @@ Decision = Literal["answer", "refuse"]
 # would read "we checked and it isn't safe" where the truth is "we never
 # checked". Key on this field.
 Outcome = Literal["answered", "refused", "not_evaluated"]
+# Why a request was refused, as a stable code. `refused_reason` is prose for a
+# person and its wording can change; integrators and reports key on this.
+ReasonCode = Literal[
+    "input_blocked", "rate_limited", "no_relevant_source", "term_not_covered",
+    "population_not_covered", "stated_value_unsupported", "form_unsupported",
+    "limit_not_stated", "combination_forbidden", "insufficient_context",
+    "claim_ungrounded", "dose_unsupported", "patient_unsafe",
+]
 
 
 class Settings(BaseModel):
@@ -116,11 +124,22 @@ class Source(BaseModel):
     above_gate: bool = True
 
 
+class ClaimSupport(BaseModel):
+    """Where in a cited passage a claim was lifted from (character offsets)."""
+
+    source_id: str
+    start: int
+    end: int
+    sentence: str
+
+
 class Claim(BaseModel):
     text: str
     source_ids: list[str] = []
     grounded: bool = False
     grounding_score: float = 0.0
+    relevance: float = 0.0
+    support: ClaimSupport | None = None
 
 
 class TraceStep(BaseModel):
@@ -133,6 +152,28 @@ class TraceStep(BaseModel):
     # viewer can see exactly what happened behind the scenes.
     explain: str = ""
     data: dict | None = None
+
+
+class Review(BaseModel):
+    """Whether a refusal was really put in front of a reviewer, and if not, why."""
+
+    routed: bool = False
+    case_id: int | None = None
+    note: str = ""
+
+
+class Explanation(BaseModel):
+    summary: str = ""
+    missing_terms: list[str] = []
+    suggestions: list[str] = []
+
+
+class Redaction(BaseModel):
+    """What the PII layer removed from the question: counts by kind, and the
+    question with placeholders. Never the removed values."""
+
+    kinds: dict[str, int] = {}
+    redacted_query: str = ""
 
 
 class AskResponse(BaseModel):
@@ -150,12 +191,20 @@ class AskResponse(BaseModel):
     total_ms: int
     llm_used: bool
     patient_findings: list[PatientFinding] = []
+    reason_code: ReasonCode | None = None
+    review: Review = Review()
+    explanation: Explanation = Explanation()
+    redaction: Redaction = Redaction()
 
 
 # --- The structured output the LLM is required to return -------------------
 class LLMClaim(BaseModel):
     text: str
     source_ids: list[str]
+    # Filled by the extractive generator only: how relevant the sentence is to
+    # the question, and where in the cited passage it sits.
+    relevance: float = 0.0
+    support: ClaimSupport | None = None
 
 
 class LLMAnswer(BaseModel):

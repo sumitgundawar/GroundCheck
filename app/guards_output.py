@@ -139,6 +139,63 @@ _FORM_TERMS = {
 }
 
 
+@lru_cache(maxsize=None)
+def _wordlist(name: str) -> frozenset[str]:
+    try:
+        return frozenset((config.DATA_DIR / name).read_text(encoding="utf-8").split())
+    except OSError:
+        return frozenset()
+
+
+def _in_list(word: str, words: frozenset[str]) -> bool:
+    """Whether the word, or its plain inflection (plural, -ed, -ing, -ly), is in
+    the list. Deliberately narrower than _stems: that one also swaps -i for -y,
+    which turns an invented "Gravitis" into the English "gravity"."""
+    if word in words:
+        return True
+    for ending, restore in (("s", ""), ("es", ""), ("ed", ""), ("ed", "e"), ("d", ""), ("ing", ""), ("ing", "e"),
+                            ("ly", "")):
+        if word.endswith(ending) and len(word) - len(ending) >= 4 and word[: -len(ending)] + restore in words:
+            return True
+    return False
+
+
+def _is_clinical(word: str) -> bool:
+    return _in_list(word, _wordlist("clinical_terms.txt"))
+
+
+def _is_common(word: str) -> bool:
+    return _in_list(word, _wordlist("common_words.txt"))
+
+
+# A medicine's or condition's name is the word before its kind ("Graver
+# dysregulation"), whether or not the word is also in the dictionary.
+_ENTITY_SUFFIX = {"dysregulation", "disorder", "deficiency", "imbalance", "syndrome"}
+
+# Things a question can ask about that no source need mention: everyday words,
+# but ones a clinical answer would have to address, so a source that is silent
+# on them cannot answer. Units are here because an answer in another unit is a
+# different dose.
+_ABSENT_FACT_TERMS = {
+    "driving", "drive", "driver", "machinery", "exercise", "sport", "sports", "diet", "food", "foods", "fasting",
+    "travel", "flying", "caffeine", "coffee", "smoking", "drinking", "sleeping", "gram", "grams", "kilogram",
+    "kilograms", "milligram", "milligrams", "microgram", "micrograms", "litre", "litres", "liter", "liters",
+    "millilitre", "millilitres", "cure", "cures", "cured", "curing", "vaccine", "surgery", "vegan", "vegetarian",
+    "herbal", "organic", "homeopathic", "cost", "price",
+}
+
+
+def _salient(word: str) -> bool:
+    """Whether a question word has to be found in the sources. A qualifier, a
+    species and a clinical term (symptom, organ, condition, procedure) always
+    do; so does anything that is not ordinary English, which is what an invented
+    medicine or a misspelled one looks like. Everyday words (email, meeting,
+    yearly) carry no clinical meaning and are not held against the sources."""
+    if word in _QUALIFIER_TERMS or word in _SHORT_SALIENT or word in _ABSENT_FACT_TERMS or _is_clinical(word):
+        return True
+    return not _is_common(word)
+
+
 def _salient_terms(query: str) -> list[str]:
     from .deid import PLACEHOLDER
 
@@ -149,9 +206,10 @@ def _salient_terms(query: str) -> list[str]:
     # had already decided this was an adult the sources do cover.
     query = _AGE_RE.sub(" ", query)
     terms = []
-    for match in _WORD.finditer(query.replace("’", "'")):
-        raw = _CONTRACTION.sub("", match.group(0))
+    raws = [_CONTRACTION.sub("", m.group(0)) for m in _WORD.finditer(query.replace("’", "'"))]
+    for n, raw in enumerate(raws):
         word = raw.lower()
+        names_something = n + 1 < len(raws) and raws[n + 1].lower() in _ENTITY_SUFFIX
         if word in _FORM_TERMS and (len(word) > 2 or raw.isupper()):
             # A form or a route is never noise, whatever the stopword list
             # says: "topical" and "oral" were both being dropped here, so a
@@ -162,6 +220,8 @@ def _salient_terms(query: str) -> list[str]:
             terms.append(word)
             continue
         if (len(word) < 4 and word not in _SHORT_SALIENT) or word in _STOPWORDS or word in _CONVERSATIONAL:
+            continue
+        if not names_something and not _salient(word):
             continue
         terms.append(word)
     # Preserve order, drop duplicates.
@@ -440,6 +500,7 @@ def coverage_report(query: str, sources: list[dict]) -> dict:
         "checked_terms": terms,
         "covered": covered,
         "uncovered": uncovered,
+        "in_index": {t: retrieval.document_frequency(t) > 0 for t in uncovered},
         "question_values": question_values,
         "unsupported_values": unsupported_values,
         "unsupported_forms": unsupported_forms,
@@ -448,12 +509,14 @@ def coverage_report(query: str, sources: list[dict]) -> dict:
     }
 
 
-def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:
-    """Return (covered, detail). The detail names the most important gap:
-    a dose the question states that no source supports, then an age group no
-    source addresses, then the most significant missing term, then a request
-    the sources can't answer (a dose limit or a combined dose they don't give)."""
-    report = coverage_report(query, sources)
+def coverage_verdict(query: str, sources: list[dict],
+                     report: dict | None = None) -> tuple[bool, str, str | None]:
+    """Return (covered, detail, reason_code). The detail names the most
+    important gap: a dose the question states that no source supports, then an
+    age group no source addresses, then the most significant missing term, then
+    a request the sources can't answer (a dose limit or a combined dose they
+    don't give)."""
+    report = report or coverage_report(query, sources)
     if report["unsupported_values"]:
         value = report["unsupported_values"][0]
         # Scoped to sources about the subject, so the wording says so: the
@@ -461,20 +524,28 @@ def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:
         # medicine, and saying otherwise put a false statement into an audit
         # record a safety officer is meant to rely on.
         return False, (f"the value '{value}' in the question is not stated by any "
-                       f"source about what it asks about")
+                       f"source about what it asks about"), "stated_value_unsupported"
     if report["unsupported_forms"]:
         form = report["unsupported_forms"][0]
         return False, (f"no trusted source about this describes a '{form}' form or route, "
-                       f"and the dose of one form is not the dose of another")
+                       f"and the dose of one form is not the dose of another"), "form_unsupported"
     age = report["age"]
     if age and not age["covered"]:
         return False, (f"the question is about {_with_article(age['phrase'])}, and no "
-                       f"trusted source covers {age['group']}")
+                       f"trusted source covers {age['group']}"), "population_not_covered"
     if report["uncovered"]:
-        return False, f"the term '{report['uncovered'][0]}' does not appear in any trusted source"
+        term = report["uncovered"][0]
+        where = "retrieved" if report.get("in_index", {}).get(term) else "trusted"
+        return False, f"the term '{term}' does not appear in any {where} source", "term_not_covered"
     if report["unanswerable_request"]:
-        return False, report["unanswerable_request"]
-    return True, "all question terms are represented in the retrieved sources"
+        detail = report["unanswerable_request"]
+        return False, detail, "combination_forbidden" if "combined" in detail else "limit_not_stated"
+    return True, "all question terms are represented in the retrieved sources", None
+
+
+def coverage_check(query: str, sources: list[dict]) -> tuple[bool, str]:
+    covered, detail, _ = coverage_verdict(query, sources)
+    return covered, detail
 
 
 # --------------------------------------------------------------------------
@@ -513,7 +584,31 @@ def check_claim_grounded(claim_text: str, source_ids: list[str],
     if not valid_texts:
         return False, 0.0
     best = max(grounding_score(claim_text, text) for text in valid_texts)
+    if best >= threshold and not _anchored(claim_text, source_ids):
+        return False, best
     return best >= threshold, best
+
+
+def _anchored(claim_text: str, source_ids: list[str]) -> bool:
+    """Whether a sentence belongs to the passage it cites. One that names the
+    passage's subject does; so does a near-verbatim lift. A generic sentence
+    ("Once X settles, the dose is tapered") that does neither is only as close
+    to the passage as its ordinary words are, and a similar one from a different
+    medicine's passage scores the same. It belongs only if every one of its
+    own content words is in the passage."""
+    records = [r for r in (retrieval.record_for(sid) for sid in source_ids) if r]
+    if not records:
+        return False
+    text = " ".join(r.get("text", "") for r in records)
+    stems = set().union(*(_stems(w) for w in _source_vocabulary(text + " " + " ".join(r.get("title", "") for r in records))))
+    # A name or clinical term the passage never uses is not in it, however
+    # close the rest of the sentence is.
+    if any(not _stems(t) & stems for t in _salient_terms(claim_text)):
+        return False
+    if _named_sources(claim_text, records) or _lexical_overlap(claim_text, text) >= 0.85:
+        return True
+    words = [m.group(0).lower() for m in _WORD.finditer(claim_text) if len(m.group(0)) >= 5]
+    return all(_stems(w) & stems for w in words)
 
 
 # --------------------------------------------------------------------------

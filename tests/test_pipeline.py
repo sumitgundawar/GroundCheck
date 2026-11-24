@@ -290,3 +290,33 @@ def test_guards_cannot_be_switched_off_by_a_request_where_it_matters(monkeypatch
     demo = pipeline.run("What is the dose of Zalortin for Veltris syndrome?",
                         settings=ungoverned, review=False)
     assert demo.decision == "answer"
+
+
+def test_every_refusal_carries_a_reason_code():
+    cases = {
+        "What is the standard dose of Zyntrafen?": "term_not_covered",
+        "What is the dose of Caloradine for a 6 year old?": "population_not_covered",
+        "How do I treat a broken arm at home?": "no_relevant_source",
+    }
+    for query, code in cases.items():
+        r = pipeline.run(query, review=False)
+        assert r.reason_code == code, (query, r.reason_code, r.refused_reason)
+        assert r.explanation.summary
+    assert pipeline.run("What is the standard dose of Caloradine?", review=False).reason_code is None
+
+
+def test_the_response_says_what_was_removed_without_the_values():
+    r = pipeline.run("Mr John Smith, DOB 12/03/1948: what is the standard dose of Caloradine?", review=False)
+    assert r.redaction.kinds == {"date": 1, "name": 1}
+    assert "Smith" not in r.redaction.redacted_query and "[NAME]" in r.redaction.redacted_query
+    assert pipeline.run("What is the standard dose of Caloradine?", review=False).redaction.kinds == {}
+
+
+def test_everyday_framings_are_answered_as_the_plain_question_is():
+    for q in ["Can I email the answer to a colleague? What is the standard dose of Caloradine?",
+              "My colleague asked me this and I wasn't sure: how is Veltris syndrome treated?",
+              "For the yearly audit, what is the dose of Caloradine?"]:
+        assert pipeline.run(q, review=False).decision == "answer", q
+    for q in ["What is the dose of Caloradine in grams?", "Is Caloradine safe while driving?",
+              "What interacts with Graver dysregulation?"]:
+        assert pipeline.run(q, review=False).decision == "refuse", q

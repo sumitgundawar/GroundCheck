@@ -48,22 +48,51 @@ def _key(query: str) -> str:
     return encryption.keyring().lookup_hash(normalised)
 
 
-def categorise(reason: str) -> str:
-    """A short, stable category for a refusal reason, for grouping in reports."""
+_CODE_CATEGORY = {
+    "input_blocked": "blocked input",
+    "rate_limited": "rate limited",
+    "no_relevant_source": "no relevant source",
+    "term_not_covered": "term not in sources",
+    "population_not_covered": "patient group not covered",
+    "stated_value_unsupported": "stated dose not in sources",
+    "form_unsupported": "form not covered",
+    "limit_not_stated": "dose limit not stated",
+    "combination_forbidden": "combination not allowed",
+    "insufficient_context": "not enough information",
+    "claim_ungrounded": "claim not grounded",
+    "dose_unsupported": "dose not in sources",
+    "patient_unsafe": "patient safety block",
+}
+
+
+def categorise(reason: str, reason_code: str | None = None) -> str:
+    """A short, stable category for a refusal, for grouping in reports. The
+    reason code decides when there is one; older records carry only the prose,
+    which is matched by phrase."""
+    if reason_code in _CODE_CATEGORY:
+        return _CODE_CATEGORY[reason_code]
     r = (reason or "").lower()
     rules = (
         ("in the question does not appear", "stated dose not in sources"),
+        ("in the question is not stated", "stated dose not in sources"),
+        ("describes a '", "form not covered"),
         ("no trusted source covers", "patient group not covered"),
         ("does not appear in any trusted source", "term not in sources"),
+        ("does not appear in any retrieved source", "term not in sources"),
         ("states a maximum", "dose limit not stated"),
         ("states a minimum", "dose limit not stated"),
         ("must not be combined", "combination not allowed"),
         ("no sufficiently relevant source", "no relevant source"),
         ("could not be grounded", "claim not grounded"),
         ("not supported by any source", "dose not in sources"),
+        ("not supported by a source about", "dose not in sources"),
         ("enough information", "not enough information"),
         ("input guard", "blocked input"),
         ("rate limit", "rate limited"),
+        ("the patient", "patient safety block"),
+        ("pregnancy", "patient safety block"),
+        ("breastfeeding", "patient safety block"),
+        ("is ruled out", "patient safety block"),
     )
     for needle, category in rules:
         if needle in r:
@@ -116,14 +145,16 @@ def _case_summary(case: ReviewCase, names: dict[int, str], now: datetime) -> dic
 
 # --- Creating cases ------------------------------------------------------------
 
-def record_refusal(audit_id: str, query: str, reason: str, site_id: int | None = None) -> None:
+def record_refusal(audit_id: str, query: str, reason: str, site_id: int | None = None,
+                   reason_code: str | None = None) -> int | None:
     """Open a review case for a refusal, or add to the open case for the same
-    question. Never raises: a failure here must not affect the answer."""
+    question. Returns the case id, or None when nothing was recorded. Never
+    raises: a failure here must not affect the answer."""
     if not config.REVIEW_QUEUE or not db.ready() or not query.strip():
-        return
-    category = categorise(reason)
+        return None
+    category = categorise(reason, reason_code)
     if category in ("rate limited",):
-        return
+        return None
     try:
         key = _key(query)
         now = utcnow()
@@ -135,7 +166,7 @@ def record_refusal(audit_id: str, query: str, reason: str, site_id: int | None =
                 case.occurrences += 1
                 case.last_seen_at = now
                 case.last_audit_id = audit_id
-                return
+                return case.id
             case = ReviewCase(
                 kind="refusal", priority="normal", query=query.strip()[:2000], query_key=key,
                 reason=reason or "", reason_category=category, first_audit_id=audit_id,
@@ -145,10 +176,12 @@ def record_refusal(audit_id: str, query: str, reason: str, site_id: int | None =
             s.add(case)
             s.flush()
             _event(s, case, "opened", note=f"Refused: {reason}")
+            return case.id
     except Exception:  # noqa: BLE001
         import logging
 
         logging.getLogger("groundcheck.governance").exception("Couldn't record a review case for %s", audit_id)
+    return None
 
 
 def flag_answer(audit_id: str, note: str, user_id: int | None, site_scope: int | None = None) -> dict:
@@ -427,7 +460,8 @@ def report(days: int = 30, site_id: int | None = None) -> dict:
         model_drafted = sum(bool(r.llm_used) for r in records)
         for r in records:
             if r.decision == "refuse":
-                category = categorise(r.record.get("response", {}).get("refused_reason") or "")
+                category = categorise(r.record.get("response", {}).get("refused_reason") or "",
+                                      r.record.get("response", {}).get("reason_code"))
                 reasons[category] = reasons.get(category, 0) + 1
             settings = r.record.get("settings") or {}
             if any(settings.get(k) is False for k in ("enable_pii_redaction", "enable_injection_guard",
@@ -514,7 +548,7 @@ def usage(days: int = 30, site_id: int | None = None) -> dict:
                         entry = cited.setdefault(sid, {"id": sid, "title": titles.get(sid) or sid, "citations": 0})
                         entry["citations"] += 1
             else:
-                category = categorise(response.get("refused_reason") or "")
+                category = categorise(response.get("refused_reason") or "", response.get("reason_code"))
                 reasons[category] = reasons.get(category, 0) + 1
             if r.user_id:
                 by_user[r.user_id] = by_user.get(r.user_id, 0) + 1
