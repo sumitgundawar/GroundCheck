@@ -2291,7 +2291,7 @@ const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`
 
 function selectTab(name) {
   review.tab = name;
-  for (const tab of ["queue", "hazards", "report"]) {
+  for (const tab of ["queue", "hazards", "report", "controls"]) {
     const on = tab === name;
     $(`tab-${tab}`).setAttribute("aria-selected", String(on));
     $(`tab-${tab}`).tabIndex = on ? 0 : -1;
@@ -2304,6 +2304,7 @@ function selectTab(name) {
 function loadReviewTab() {
   if (review.tab === "queue") return loadReviews();
   if (review.tab === "hazards") return loadHazards();
+  if (review.tab === "controls") return loadControls();
   return loadReport();
 }
 
@@ -2555,6 +2556,68 @@ function openHazard(h) {
   if (editable) $("hazard-title").focus();
 }
 
+// ---------- Control mapping ----------
+const controlsState = { data: null };
+
+async function loadControls() {
+  let data;
+  try { data = await api("/api/governance/controls"); }
+  catch (err) { showMessage("review-message", err.message, true); return; }
+  controlsState.data = data;
+  $("controls-banner").textContent = data.banner;
+  const totals = $("controls-totals");
+  totals.textContent = "";
+  Object.entries(data.statuses).forEach(([status, label]) => {
+    const tile = document.createElement("div");
+    tile.className = "report-tile";
+    const l = document.createElement("span"); l.className = "report-label"; l.textContent = label;
+    const v = document.createElement("strong"); v.className = "report-value"; v.textContent = String(data.totals[status]);
+    tile.append(l, v);
+    totals.appendChild(tile);
+  });
+  if (data.problems.length) showMessage("review-message", `The mapping has ${plural(data.problems.length, "problem")}: ${data.problems[0]}`, true);
+  renderControls(data);
+}
+
+function renderControls(data) {
+  const host = $("controls-frameworks");
+  host.textContent = "";
+  if (!data) return;
+  const only = $("controls-status").value;
+  data.frameworks.forEach((framework) => {
+    const rows = framework.controls.filter((c) => !only || c.status === only);
+    if (!rows.length) return;
+    const h = document.createElement("h3");
+    h.textContent = `${framework.name} (${rows.length})`;
+    const wrap = document.createElement("div");
+    wrap.className = "users-table-wrap";
+    const table = document.createElement("table");
+    table.className = "users-table controls-table";
+    const head = document.createElement("thead");
+    const hr = document.createElement("tr");
+    ["Control", "Title", "Status", "How the product helps", "Evidence"].forEach((t) => {
+      const th = document.createElement("th"); th.scope = "col"; th.textContent = t; hr.appendChild(th);
+    });
+    head.appendChild(hr);
+    const body = document.createElement("tbody");
+    rows.forEach((c) => {
+      const tr = document.createElement("tr");
+      const cells = [c.id, c.title, c.status_label, c.how, c.evidence.length ? c.evidence.join(", ") : "none"];
+      cells.forEach((text, i) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        if (i === 0 || i === 4) td.className = "mono";
+        if (i === 2) td.className = `control-status control-${c.status}`;
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    table.append(head, body);
+    wrap.appendChild(table);
+    host.append(h, wrap);
+  });
+}
+
 async function loadReport() {
   const days = $("report-days").value;
   $("safety-case-download").href = `/api/governance/safety-case?days=${days}`;
@@ -2680,11 +2743,29 @@ async function verifyAudit() {
   trigger.textContent = "Verify audit trail";
 }
 
+async function loadTelemetry() {
+  let t;
+  try { t = await api("/api/telemetry"); }
+  catch (_) { return; }
+  $("telemetry-summary").textContent = t.enabled
+    ? `On. Once a week this install sends the fields below to ${t.url || "no address (TELEMETRY_URL is not set, so nothing is sent)"}. Nothing else is sent.`
+    : `Off. Nothing is sent. ${t.how_to_enable} If you turn it on, once a week it sends only the fields below.`;
+  const list = $("telemetry-fields");
+  list.textContent = "";
+  Object.entries(t.fields).forEach(([name, meaning]) => {
+    const dt = document.createElement("dt"); dt.className = "mono"; dt.textContent = name;
+    const dd = document.createElement("dd"); dd.textContent = meaning;
+    list.append(dt, dd);
+  });
+  $("telemetry-sample").textContent = `Example of what would be sent: ${JSON.stringify(t.sample)}`;
+}
+
 async function loadProtection() {
   let data;
   try { data = await api("/api/data-protection"); }
   catch (_) { $("protection-admin").hidden = true; return; }  // admins only
   $("protection-admin").hidden = false;
+  loadTelemetry();
   const e = data.encryption, sig = data.audit_signing, ret = data.retention;
   const rows = [
     ["Encryption at rest", e.enabled
@@ -2726,7 +2807,63 @@ async function runRetention() {
   } catch (err) { showMessage("protection-message", err.message, true); }
 }
 
+// ---------- Feedback on an answer ----------
+function resetFeedback(auditId) {
+  const row = $("feedback-row");
+  row.hidden = !auditId;
+  row.dataset.auditId = auditId || "";
+  $("feedback-form").hidden = true;
+  $("feedback-message").hidden = true;
+  $("feedback-reason").value = "";
+  $("feedback-comment").value = "";
+  setRated(null);
+  if (!auditId) return;
+  api(`/api/audit/${auditId}/feedback`).then((data) => {
+    if (row.dataset.auditId === auditId && data.feedback) setRated(data.feedback.rating);
+  }).catch(() => { /* feedback is optional */ });
+}
+
+function setRated(rating) {
+  $("feedback-up").setAttribute("aria-pressed", String(rating === "up"));
+  $("feedback-down").setAttribute("aria-pressed", String(rating === "down"));
+}
+
+async function sendFeedback(body) {
+  const auditId = $("feedback-row").dataset.auditId;
+  const sent = await api(`/api/audit/${auditId}/feedback`, { method: "POST", body });
+  setRated(sent.feedback.rating);
+  $("feedback-form").hidden = true;
+  showMessage("feedback-message", sent.feedback.case_id
+    ? "Thank you. This answer has been sent to a reviewer."
+    : "Thank you. Your feedback was saved.");
+  if (sent.feedback.case_id) refreshReviewCount();
+}
+
+function wireFeedback() {
+  $("feedback-up").addEventListener("click", async () => {
+    $("feedback-form").hidden = true;
+    try { await sendFeedback({ rating: "up" }); }
+    catch (err) { showMessage("feedback-message", err.message, true); }
+  });
+  $("feedback-down").addEventListener("click", () => {
+    $("feedback-form").hidden = false;
+    $("feedback-message").hidden = true;
+    $("feedback-reason").focus();
+  });
+  $("feedback-cancel").addEventListener("click", () => { $("feedback-form").hidden = true; });
+  $("feedback-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    formBusy(form, true);
+    try {
+      await sendFeedback({ rating: "down", reason: $("feedback-reason").value || null, comment: $("feedback-comment").value || null });
+    } catch (err) { showMessage("feedback-message", err.message, true); }
+    formBusy(form, false);
+  });
+}
+
 function resetFlag(auditId) {
+  resetFeedback(auditId);
   $("flag-row").hidden = !auditId;
   $("flag-row").dataset.auditId = auditId || "";
   $("flag-open").hidden = false;
@@ -2736,7 +2873,7 @@ function resetFlag(auditId) {
 }
 
 function wireReview() {
-  const tabs = ["queue", "hazards", "report"];
+  const tabs = ["queue", "hazards", "report", "controls"];
   tabs.forEach((name, i) => {
     const tab = $(`tab-${name}`);
     tab.addEventListener("click", () => selectTab(name));
@@ -2750,6 +2887,7 @@ function wireReview() {
   });
   ["review-status", "review-mine", "review-overdue"].forEach((id) => $(id).addEventListener("change", loadReviews));
   $("report-days").addEventListener("change", loadReport);
+  $("controls-status").addEventListener("change", () => renderControls(controlsState.data));
 
   $("case-assign").addEventListener("click", () => {
     const value = $("case-assignee").value;
@@ -2819,6 +2957,7 @@ function wireReview() {
   $("audit-verify").addEventListener("click", verifyAudit);
   $("retention-run").addEventListener("click", runRetention);
 
+  wireFeedback();
   $("flag-open").addEventListener("click", () => {
     $("flag-open").hidden = true;
     $("flag-form").hidden = false;
@@ -2984,6 +3123,32 @@ async function loadUsage() {
   renderBars($("usage-sources"), data.top_sources.map((x) => ({ label: `${x.title} (${x.id})`, value: x.citations })), "No answers cited a source in this period.");
   $("usage-users-panel").hidden = !account.authRequired;
   renderBars($("usage-users"), data.by_user.map((x) => ({ label: x.name, value: x.questions })), "No signed-in questions in this period.");
+  loadAdoption();
+}
+
+async function loadAdoption() {
+  const days = $("usage-days").value;
+  const panel = $("adoption-panel");
+  $("pilot-report-download").href = `/api/governance/pilot-report?days=${days}`;
+  let m;
+  try { m = await api(`/api/metrics/adoption?days=${days}`); }
+  catch (_) { panel.hidden = true; return; }  // admins only
+  panel.hidden = false;
+  $("adoption-message").hidden = true;
+  const pct = (n) => n === null ? "–" : `${Math.round(n * 1000) / 10}%`;
+  const c = m.clinicians, q = m.questions, f = m.feedback, r = m.reviews;
+  const stats = $("adoption-stats");
+  stats.textContent = "";
+  stats.append(
+    statTile("Active clinicians", c.active_in_period.toLocaleString(), `${c.weekly_active.toLocaleString()} in the last 7 days`),
+    statTile("Questions per clinician", c.questions_per_active_clinician === null ? "–" : String(c.questions_per_active_clinician), "signed-in questions only"),
+    statTile("Answer rate", pct(q.answer_rate), `${q.answered.toLocaleString()} of ${q.total.toLocaleString()} answered`),
+    statTile("Feedback", f.total ? pct(f.positive_rate) : "–", f.total ? `${f.up} useful, ${f.down} not` : "none yet"),
+    statTile("Time to close a review", r.median_hours_to_close === null ? "–" : `${r.median_hours_to_close} h`, `${r.resolved} closed, ${r.open_now} open now`),
+    statTile("Added to the test set", String(m.tests_added), `${plural(m.documents_approved, "document")} approved`),
+  );
+  renderBars($("adoption-weekly"), c.weekly.map((w) => ({ label: `Week of ${w.week_start}`, value: w.active_clinicians })), "No activity in this period.");
+  renderBars($("adoption-feedback"), Object.entries(f.by_reason).map(([k, v]) => ({ label: capitalize(k.replace("_", " ")), value: v })), "No thumbs down in this period.");
 }
 const usageState = { daily: null };
 

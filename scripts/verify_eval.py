@@ -9,6 +9,11 @@ false_fail   a correct answer (expect pass) that was failed. Target: 2% or less.
 false_review a correct answer sent to a person instead of passed. Reported.
 missed_fail  a case expected to fail that was sent to review: safe, but less
              precise than it could be. Reported.
+missed_review an answer that is true but not what was asked (expect "review")
+             that was failed rather than sent to a person. Reported.
+
+Cases with "split": "heldout" come from scripts/build_verify_holdout.py. They
+are never tuned on, and are reported on their own.
 
 Cases are built from the corpus by scripts/build_verify_cases.py.
 """
@@ -35,6 +40,32 @@ SUMMARY = ROOT / "eval" / "verify_summary.json"
 MAX_FALSE_FAIL = 0.02
 
 
+def _summarise(rows: list[dict], latencies: list[float]) -> dict:
+    latencies = sorted(latencies)
+    correct = sum(r["expect"] == "pass" for r in rows)
+    by_category: dict[str, Counter] = defaultdict(Counter)
+    for r in rows:
+        by_category[r["category"]]["total"] += 1
+        for key in KEYS:
+            by_category[r["category"]][key] += int(r[key])
+    count = {k: sum(r[k] for r in rows) for k in KEYS}
+    summary = {
+        "cases": len(rows), "correct_answers": correct, "wrong_answers": len(rows) - correct,
+        **count,
+        "false_fail_rate": round(count["false_fail"] / correct, 4) if correct else 0.0,
+        "false_review_rate": round(count["false_review"] / correct, 4) if correct else 0.0,
+        "p50_ms": round(latencies[len(latencies) // 2], 1) if latencies else 0.0,
+        "p95_ms": round(latencies[int(len(latencies) * 0.95)], 1) if latencies else 0.0,
+        "by_category": {k: dict(v) for k, v in sorted(by_category.items())},
+    }
+    summary["targets_met"] = (summary["wrong_pass"] == 0 and summary["false_fail_rate"] <= MAX_FALSE_FAIL
+                              and summary["redaction_missed"] == 0)
+    return summary
+
+
+KEYS = ("wrong_pass", "false_fail", "false_review", "missed_fail", "missed_review", "redaction_missed")
+
+
 def evaluate(cases: list[dict]) -> dict:
     rows, latencies = [], []
     for c in cases:
@@ -48,35 +79,19 @@ def evaluate(cases: list[dict]) -> dict:
             got, code, redacted = "error", "source_not_found", False
         latencies.append((time.perf_counter() - started) * 1000)
         expect = c["expect"]
-        wrong_pass = expect != "pass" and got == "pass"
-        false_fail = expect == "pass" and got == "fail"
-        false_review = expect == "pass" and got == "review"
-        missed_fail = expect == "fail" and got == "review"
-        redaction_missed = bool(c.get("expect_redaction")) and not redacted
-        rows.append({"id": c["id"], "category": c["category"], "expect": expect, "got": got, "code": code,
-                     "wrong_pass": wrong_pass, "false_fail": false_fail, "false_review": false_review,
-                     "missed_fail": missed_fail, "redaction_missed": redaction_missed})
-    latencies.sort()
-    correct = sum(r["expect"] == "pass" for r in rows)
-    by_category: dict[str, Counter] = defaultdict(Counter)
-    for r in rows:
-        by_category[r["category"]]["total"] += 1
-        for key in ("wrong_pass", "false_fail", "false_review", "missed_fail", "redaction_missed"):
-            by_category[r["category"]][key] += int(r[key])
-    summary = {
-        "cases": len(rows), "correct_answers": correct,
-        "wrong_answers": len(rows) - correct,
-        "wrong_pass": sum(r["wrong_pass"] for r in rows),
-        "false_fail": sum(r["false_fail"] for r in rows),
-        "false_fail_rate": round(sum(r["false_fail"] for r in rows) / correct, 4) if correct else 0.0,
-        "false_review": sum(r["false_review"] for r in rows),
-        "missed_fail": sum(r["missed_fail"] for r in rows),
-        "redaction_missed": sum(r["redaction_missed"] for r in rows),
-        "p50_ms": round(latencies[len(latencies) // 2], 1), "p95_ms": round(latencies[int(len(latencies) * 0.95)], 1),
-        "by_category": {k: dict(v) for k, v in sorted(by_category.items())},
-    }
-    summary["targets_met"] = (summary["wrong_pass"] == 0 and summary["false_fail_rate"] <= MAX_FALSE_FAIL
-                              and summary["redaction_missed"] == 0)
+        rows.append({"id": c["id"], "category": c["category"], "split": c.get("split", "tuned"), "expect": expect,
+                     "got": got, "code": code,
+                     "wrong_pass": expect != "pass" and got == "pass",
+                     "false_fail": expect == "pass" and got == "fail",
+                     "false_review": expect == "pass" and got == "review",
+                     "missed_fail": expect == "fail" and got == "review",
+                     "missed_review": expect == "review" and got == "fail",
+                     "redaction_missed": bool(c.get("expect_redaction")) and not redacted})
+    summary = _summarise(rows, latencies)
+    held = [(r, l) for r, l in zip(rows, latencies) if r["split"] == "heldout"]
+    if held:
+        summary["heldout"] = _summarise([r for r, _ in held], [l for _, l in held])
+        summary["heldout"].pop("p50_ms"), summary["heldout"].pop("p95_ms")
     return {"summary": summary, "rows": rows}
 
 
@@ -95,9 +110,19 @@ def main() -> int:
     by_id = {c["id"]: c for c in cases}
     print(f"{s['cases']} cases: wrong_pass={s['wrong_pass']} false_fail={s['false_fail']} "
           f"({s['false_fail_rate']:.2%} of {s['correct_answers']} correct) false_review={s['false_review']} "
-          f"missed_fail={s['missed_fail']} redaction_missed={s['redaction_missed']} "
+          f"false_review_rate={s['false_review_rate']:.2%} missed_fail={s['missed_fail']} "
+          f"missed_review={s['missed_review']} redaction_missed={s['redaction_missed']} "
           f"p50={s['p50_ms']}ms p95={s['p95_ms']}ms")
-    for key in ("wrong_pass", "false_fail", "redaction_missed"):
+    if "heldout" in s:
+        h = s["heldout"]
+        print(f"  held-out {h['cases']}: wrong_pass={h['wrong_pass']} false_fail={h['false_fail']} "
+              f"({h['false_fail_rate']:.2%}) false_review={h['false_review']} ({h['false_review_rate']:.2%}) "
+              f"missed_fail={h['missed_fail']} missed_review={h['missed_review']}")
+        for name, v in h["by_category"].items():
+            flags = {k: v[k] for k in KEYS if v.get(k)}
+            if flags:
+                print(f"    {name} (of {v['total']}): {flags}")
+    for key in ("wrong_pass", "false_fail", "false_review", "redaction_missed"):
         bad = [r for r in rows if r[key]]
         for r in bad[:args.show]:
             c = by_id[r["id"]]

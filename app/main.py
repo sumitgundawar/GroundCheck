@@ -13,16 +13,16 @@ import json
 from urllib.parse import quote
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt, StrictStr
 from sqlalchemy import select
 
 from . import (
-    audit, auth, config, db, encryption, governance, integrity, llm, local_ai, logging_setup, monitoring, pipeline,
-    releases, retention, retrieval, sites, sso,
+    analytics, api_v1, apikeys, audit, auth, compliance_controls, config, db, encryption, evidence, feedback, governance,
+    integrity, llm, local_ai, logging_setup, monitoring, pipeline, releases, retention, retrieval, sites, sso, telemetry,
 )
 from .schemas import AskRequest, AskResponse, Settings
 
@@ -41,7 +41,7 @@ async def lifespan(_: FastAPI):
     # Warm the model and load the prebuilt index before serving traffic. On a
     # new server whose index lives on an empty data volume, build it first.
     retrieval.get_model()
-    checks = None
+    checks = reporting = None
     try:
         retrieval.load_index()
     except FileNotFoundError:
@@ -59,11 +59,14 @@ async def lifespan(_: FastAPI):
             logging.getLogger("groundcheck").exception("Couldn't record the baseline release")
         if config.ALERT_INTERVAL_SECONDS > 0:
             checks = asyncio.create_task(_alert_loop())
+        if telemetry.enabled():
+            reporting = asyncio.create_task(_telemetry_loop())
     try:
         yield
     finally:
-        if checks is not None:
-            checks.cancel()
+        for task in (checks, reporting):
+            if task is not None:
+                task.cancel()
 
 
 def _evaluate_alerts_once() -> None:
@@ -88,6 +91,14 @@ async def _alert_loop() -> None:
         except Exception:  # noqa: BLE001 - keep checking
             logging.getLogger("groundcheckhealth").exception("Alert evaluation failed")
         await asyncio.sleep(config.ALERT_INTERVAL_SECONDS)
+
+
+async def _telemetry_loop() -> None:
+    """Offer the weekly telemetry post every six hours; send_if_due decides."""
+    await asyncio.sleep(300)
+    while True:
+        await run_in_threadpool(telemetry.send_if_due)
+        await asyncio.sleep(6 * 3600)
 
 
 app = FastAPI(title="GroundCheckHealth", version=config.VERSION, lifespan=lifespan,
@@ -126,6 +137,8 @@ async def reject_cross_site_writes(request: Request, call_next):
         if origin and origin.rstrip("/") != f"{request.url.scheme}://{request.url.netloc}":
             forwarded_host = request.headers.get("x-forwarded-host")
             if not (forwarded_host and origin.split("://", 1)[-1].rstrip("/") == forwarded_host):
+                if api_v1.in_envelope(request.url.path):
+                    return api_v1.envelope(403, "forbidden", "Cross-site request refused.")
                 return JSONResponse({"detail": "Cross-site request refused."}, status_code=403)
     return await call_next(request)
 
@@ -141,10 +154,14 @@ async def require_sign_in(request: Request, call_next):
     """With accounts required, every API endpoint needs a signed-in session
     unless it is listed as public. New endpoints are protected by default."""
     path = request.url.path
-    if config.AUTH_REQUIRED and path.startswith("/api/") and path not in PUBLIC_API:
+    # /api/v1 authenticates with API keys, in api_v1.Gateway.
+    if config.AUTH_REQUIRED and path.startswith("/api/") and path not in PUBLIC_API and not (
+            path == "/api/v1" or path.startswith("/api/v1/")):
         token = _session_token(request)
         principal = await run_in_threadpool(auth.session_principal, token) if token and db.ready() else None
         if principal is None:
+            if api_v1.in_envelope(path):
+                return api_v1.envelope(401, "unauthorized", "Sign in to continue.")
             return JSONResponse({"detail": "Sign in to continue."}, status_code=401)
     return await call_next(request)
 
@@ -484,6 +501,59 @@ def users_delete(user_id: int, admin: auth.Principal = Depends(_admin)) -> dict:
         return {"user": auth.delete_user(user_id, acting_user_id=admin.id)}
     except auth.AuthError as exc:
         raise _auth_error(exc) from exc
+
+
+# --- API keys (for the /api/v1 clients) ---------------------------------------------
+
+class NewKeyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: StrictStr
+    scopes: list[StrictStr]
+    site_id: StrictInt | None = None
+    expires_in_days: StrictFloat | StrictInt | None = None
+    rpm_limit: StrictInt | None = None
+    monthly_quota: StrictInt | None = None
+
+
+def _key_admin(request: Request) -> auth.Principal | None:
+    _require_database()
+    return require_manager(request, "admin")
+
+
+@app.post("/api/keys", status_code=201)
+def keys_create(body: NewKeyRequest, request: Request) -> dict:
+    """Make an API key. The secret is in this response and nowhere else, ever."""
+    admin = _key_admin(request)
+    site_id = body.site_id
+    if admin is not None and admin.site_id is not None:
+        if site_id not in (None, admin.site_id):
+            raise HTTPException(status_code=403, detail="You can only make keys for your own site.")
+        site_id = admin.site_id
+    made = apikeys.create(body.name, body.scopes, site_id, admin.id if admin else None, body.expires_in_days,
+                          body.rpm_limit, body.monthly_quota)
+    integrity.record_event("api_key.created", {"key_id": made["id"], "prefix": made["prefix"],
+                                               "scopes": made["scopes"], "site_id": made["site_id"]},
+                           admin.id if admin else None)
+    return made
+
+
+@app.get("/api/keys")
+def keys_list(request: Request) -> dict:
+    admin = _key_admin(request)
+    return {"keys": apikeys.list_keys(admin.site_id if admin else None), "scopes": list(apikeys.SCOPES)}
+
+
+@app.post("/api/keys/{key_id}/revoke")
+def keys_revoke(key_id: int, request: Request) -> dict:
+    admin = _key_admin(request)
+    revoked = apikeys.revoke(key_id, admin.site_id if admin else None)
+    integrity.record_event("api_key.revoked", {"key_id": key_id, "prefix": revoked["prefix"]},
+                           admin.id if admin else None)
+    return revoked
+
+
+app.include_router(api_v1.router)
+api_v1.install(app)
 
 
 @app.get("/")
@@ -928,6 +998,29 @@ def flag_answer(audit_id: str, body: FlagRequest, request: Request,
         raise _governance_error(exc) from exc
 
 
+class FeedbackRequest(BaseModel):
+    rating: str
+    reason: str | None = None
+    comment: str | None = None
+
+
+@app.post("/api/audit/{audit_id}/feedback")
+def answer_feedback(audit_id: str, body: FeedbackRequest, request: Request,
+                    user: auth.Principal | None = Depends(require_role("clinician"))) -> dict:
+    _require_database()
+    try:
+        return {"feedback": feedback.submit(audit_id, body.rating, body.reason, body.comment,
+                                            user.id if user else None, _site(user), own_only=_audit_scope(user) is not None)}
+    except feedback.FeedbackError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/audit/{audit_id}/feedback")
+def answer_feedback_mine(audit_id: str, user: auth.Principal | None = Depends(require_role("clinician"))) -> dict:
+    _require_database()
+    return {"feedback": feedback.get_mine(audit_id, user.id if user else None)}
+
+
 @app.get("/api/reviews")
 def reviews_list(request: Request, status: str = "open", mine: bool = False, overdue: bool = False) -> dict:
     user = require_manager(request, "reviewer")
@@ -1119,6 +1212,100 @@ def governance_surveillance(request: Request, days: int = 90) -> Response:
         raise _governance_error(exc) from exc
     return Response(text, media_type="text/markdown; charset=utf-8", headers={
         "Content-Disposition": 'attachment; filename="groundcheck-surveillance.md"'})
+
+
+def _report_site(user: auth.Principal | None, site: str | None) -> int | None:
+    """The site a report covers: the person's own, or, for group-wide staff,
+    the one named by `site` (a site key), or every site."""
+    if _site(user) is not None:
+        return _site(user)
+    if not site:
+        return None
+    with db.session() as s:
+        row = sites.by_key(s, site)
+        if row is None:
+            raise HTTPException(status_code=400, detail="There is no site with that key.")
+        return row.id
+
+
+def _date_param(value: str | None, name: str):
+    from datetime import date
+
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"{name} must be a date like 2026-10-01.") from exc
+
+
+def _period(days: int, start: str | None, end: str | None) -> dict:
+    if start or end:
+        return {"start": _date_param(start, "from"), "end": _date_param(end, "to"), "days": None}
+    return {"days": days}
+
+
+@app.get("/api/metrics/adoption")
+def metrics_adoption(request: Request, days: int = 30, site: str | None = None,
+                     start: str | None = Query(None, alias="from"), end: str | None = Query(None, alias="to")) -> dict:
+    user = require_manager(request, "admin")
+    _require_database()
+    try:
+        period = _period(days, start, end)
+        return analytics.adoption_metrics(period.pop("days"), _report_site(user, site), **period)
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+
+
+@app.get("/api/governance/pilot-report")
+def governance_pilot_report(request: Request, days: int = 30, site: str | None = None,
+                            start: str | None = Query(None, alias="from"),
+                            end: str | None = Query(None, alias="to")) -> Response:
+    user = require_manager(request, "admin")
+    _require_database()
+    try:
+        site_id = _report_site(user, site)
+        name = ""
+        if site_id is not None:
+            with db.session() as s:
+                row = s.get(db.Site, site_id)
+                name = row.name if row else ""
+        period = _period(days, start, end)
+        text = analytics.pilot_report_markdown(period.pop("days"), site_id, site_name=name, **period)
+    except Exception as exc:  # noqa: BLE001
+        raise _governance_error(exc) from exc
+    return Response(text, media_type="text/markdown; charset=utf-8", headers={
+        "Content-Disposition": 'attachment; filename="groundcheck-pilot-report.md"'})
+
+
+@app.get("/api/governance/evidence-pack")
+def governance_evidence_pack(request: Request) -> Response:
+    user = require_manager(request, "admin")
+    _require_database()
+    if user is not None and user.site_id is not None:
+        raise HTTPException(status_code=403, detail="The evidence pack covers every site: ask an administrator who isn't tied to one.")
+    data = evidence.build()
+    return Response(data, media_type="application/zip", headers={
+        "Content-Disposition": 'attachment; filename="groundcheck-evidence-pack.zip"'})
+
+
+@app.get("/api/governance/controls")
+def governance_controls(request: Request) -> dict:
+    require_manager(request, "reviewer")
+    return compliance_controls.matrix()
+
+
+@app.get("/api/governance/controls.csv")
+def governance_controls_csv(request: Request) -> Response:
+    require_manager(request, "reviewer")
+    return Response(compliance_controls.to_csv(compliance_controls.matrix()), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="groundcheck-control-matrix.csv"'})
+
+
+@app.get("/api/telemetry")
+def telemetry_status(request: Request) -> dict:
+    require_manager(request, "admin")
+    return telemetry.status()
 
 
 # --- EHR integration --------------------------------------------------------------

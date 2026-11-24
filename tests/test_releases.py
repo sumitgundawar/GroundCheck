@@ -198,3 +198,105 @@ def test_a_release_that_checked_nothing_does_not_pass(setup, monkeypatch, tmp_pa
     assert not check["passed"], "a release that checked nothing was reported as passing"
     assert "No safety checks" in check.get("error", "")
     assert status["release"]["status"] == "failed"
+
+
+# --- Knowledge packs gate a release -----------------------------------------------------
+
+PACK_QUESTION = QUESTION
+
+
+def _pack_cases(*cases):
+    return [{"query": q, "expect": e, "pack": "demo@1.0.0"} for q, e in cases]
+
+
+def test_a_pack_case_that_must_be_refused_but_is_answered_blocks_the_release(setup, monkeypatch):
+    from app import packs
+
+    knowledge.rebuild_index("Empty")
+    _approve()
+    monkeypatch.setattr(packs, "release_gate_cases", lambda root=None: _pack_cases((PACK_QUESTION, "refuse")))
+    blocked = knowledge.rebuild_index("Falls guideline")["release"]
+    assert blocked["status"] == "failed" and not blocked["check"]["passed"]
+    assert blocked["check"]["pack_failures"] == 1 and blocked["check"]["groups"]["packs"]["unsafe"] == 1
+    assert blocked["check"]["pack_failure_examples"] == [{"pack": "demo@1.0.0", "query": PACK_QUESTION,
+                                                          "expected": "refuse", "got": "answer"}]
+    assert pipeline.run(QUESTION).decision == "refuse"          # nothing went live
+
+
+def test_a_pack_case_that_must_be_answered_but_is_refused_also_blocks_it(setup, monkeypatch):
+    from app import packs
+
+    knowledge.rebuild_index("Empty")
+    _approve()
+    monkeypatch.setattr(packs, "release_gate_cases", lambda root=None: _pack_cases(
+        (PACK_QUESTION, "answer"), ("What is the standard dose of Zyntrafen?", "answer")))
+    blocked = knowledge.rebuild_index("Falls guideline")["release"]
+    assert blocked["status"] == "failed" and blocked["check"]["unsafe"] == 0
+    assert blocked["check"]["pack_failures"] == 1 and blocked["check"]["groups"]["packs"] == {
+        "total": 2, "passed": 1, "unsafe": 0, "over_refused": 1}
+    with pytest.raises(releases.ReleaseError, match="didn't pass"):
+        releases.promote(blocked["id"], None, "x")
+
+
+def test_a_release_that_passes_every_pack_case_goes_live(setup, monkeypatch):
+    from app import packs
+
+    _approve()
+    monkeypatch.setattr(packs, "release_gate_cases", lambda root=None: _pack_cases(
+        (PACK_QUESTION, "answer"), ("What is the standard dose of Zyntrafen?", "refuse")))
+    release = knowledge.rebuild_index("Falls guideline")["release"]
+    assert release["status"] == "live" and release["check"]["passed"] and release["check"]["pack_failures"] == 0
+    assert release["check"]["groups"]["packs"] == {"total": 2, "passed": 2, "unsafe": 0, "over_refused": 0}
+    assert pipeline.run(QUESTION).decision == "answer"
+
+
+def test_pack_cases_run_against_the_candidate_and_leave_no_trace(setup, monkeypatch):
+    from app import audit, packs
+
+    _approve()
+    monkeypatch.setattr(packs, "release_gate_cases", lambda root=None: _pack_cases((PACK_QUESTION, "answer")))
+    before = audit.store.count()
+    knowledge.rebuild_index("Falls guideline")
+    assert audit.store.count() == before
+
+
+def test_a_pack_gate_that_cannot_run_fails_the_release(setup, monkeypatch):
+    from app import packs
+
+    knowledge.rebuild_index("Empty")
+    _approve()
+
+    def broken(root=None):
+        raise OSError("store unreadable")
+
+    monkeypatch.setattr(packs, "release_gate_cases", broken)
+    release = knowledge.rebuild_index("Falls guideline")["release"]
+    assert release["status"] == "failed" and "couldn't run" in release["check"]["error"]
+
+
+def test_a_real_imported_pack_gates_the_release(setup, monkeypatch, tmp_path):
+    import json
+
+    from test_packs import FALLS, META, imp, make
+
+    monkeypatch.setenv("PACK_STORE_DIR", str(tmp_path / "store"))
+    good = [{"query": PACK_QUESTION, "expect": "answer"},
+            {"query": "How soon should a Quelvarin risk assessment be completed after admission?", "expect": "refuse"}]
+    r = imp(make(files={"documents/falls.html": FALLS, "eval.json": json.dumps(good).encode()}), keys={},
+            override=True, override_reason="gate test")
+    for d in r["documents"]:
+        knowledge.review(d["id"], "approve", None, "", allow_self_approval=True)
+    live = knowledge.rebuild_index("With the pack")["release"]
+    assert live["status"] == "live" and live["check"]["groups"]["packs"]["total"] == 2
+    assert live["check"]["pack_failures"] == 0
+
+    bad = [{"query": PACK_QUESTION, "expect": "refuse"}]
+    r2 = imp(make(meta={"version": "1.0.1"}, files={"documents/falls.html": FALLS + b"<p>Extra.</p>",
+                                                    "eval.json": json.dumps(bad).encode()}), keys={},
+             override=True, override_reason="gate test 2")
+    for d in r2["documents"]:
+        knowledge.review(d["id"], "approve", None, "", allow_self_approval=True)
+    blocked = knowledge.rebuild_index("With the second pack")["release"]
+    assert blocked["status"] == "failed" and blocked["check"]["pack_failures"] >= 1
+    still_live = [x for x in releases.list_releases()["releases"] if x["status"] == "live"]
+    assert len(still_live) == 1 and still_live[0]["id"] == live["id"]

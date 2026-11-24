@@ -112,7 +112,7 @@ def test_local_model_is_used_only_when_ollama_has_it(monkeypatch):
 def test_local_model_takes_precedence_over_cloud(monkeypatch):
     monkeypatch.setattr(config, "FORCE_EXTRACTIVE", False)
     monkeypatch.setattr(llm, "LLM_AVAILABLE", True)
-    assert llm.active_provider() == {"kind": "cloud", "model": config.GEN_MODEL}
+    assert llm.active_provider() == {"kind": "cloud", "model": config.GEN_MODEL, "provider": "openai_compatible"}
     monkeypatch.setattr(local_ai, "ollama_version", lambda: "0.32.15")
     monkeypatch.setattr(local_ai, "installed_models", lambda: [{"name": "gemma3:4b", "size_gb": 3.3}])
     local_ai.select_model("gemma3:4b")

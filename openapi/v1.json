@@ -1,0 +1,1469 @@
+{
+  "components": {
+    "schemas": {
+      "AskResponse": {
+        "properties": {
+          "answer_text": {
+            "title": "Answer Text",
+            "type": "string"
+          },
+          "audit_id": {
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "claims": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "title": "Claims",
+            "type": "array"
+          },
+          "decision": {
+            "enum": [
+              "answer",
+              "refuse"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Explanation",
+            "default": {
+              "missing_terms": [],
+              "suggestions": [],
+              "summary": ""
+            }
+          },
+          "llm_used": {
+            "title": "Llm Used",
+            "type": "boolean"
+          },
+          "outcome": {
+            "default": "refused",
+            "enum": [
+              "answered",
+              "refused",
+              "not_evaluated"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "patient_findings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PatientFinding"
+            },
+            "title": "Patient Findings",
+            "type": "array"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "input_blocked",
+                  "rate_limited",
+                  "no_relevant_source",
+                  "term_not_covered",
+                  "population_not_covered",
+                  "stated_value_unsupported",
+                  "form_unsupported",
+                  "limit_not_stated",
+                  "combination_forbidden",
+                  "insufficient_context",
+                  "claim_ungrounded",
+                  "dose_unsupported",
+                  "patient_unsafe"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "redaction": {
+            "$ref": "#/components/schemas/Redaction",
+            "default": {
+              "kinds": {},
+              "redacted_query": ""
+            }
+          },
+          "refused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused Reason"
+          },
+          "review": {
+            "$ref": "#/components/schemas/Review",
+            "default": {
+              "note": "",
+              "routed": false
+            }
+          },
+          "sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "total_ms": {
+            "title": "Total Ms",
+            "type": "integer"
+          },
+          "trace": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TraceStep"
+            },
+            "title": "Trace",
+            "type": "array"
+          }
+        },
+        "required": [
+          "decision",
+          "answer_text",
+          "audit_id",
+          "total_ms",
+          "llm_used"
+        ],
+        "title": "AskResponse",
+        "type": "object"
+      },
+      "Claim": {
+        "properties": {
+          "grounded": {
+            "default": false,
+            "title": "Grounded",
+            "type": "boolean"
+          },
+          "grounding_score": {
+            "default": 0.0,
+            "title": "Grounding Score",
+            "type": "number"
+          },
+          "relevance": {
+            "default": 0.0,
+            "title": "Relevance",
+            "type": "number"
+          },
+          "source_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Ids",
+            "type": "array"
+          },
+          "support": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimSupport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "Claim",
+        "type": "object"
+      },
+      "ClaimSupport": {
+        "description": "Where in a cited passage a claim was lifted from (character offsets).",
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "integer"
+          },
+          "sentence": {
+            "title": "Sentence",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source_id",
+          "start",
+          "end",
+          "sentence"
+        ],
+        "title": "ClaimSupport",
+        "type": "object"
+      },
+      "DoseIssue": {
+        "properties": {
+          "claim": {
+            "title": "Claim",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "claim",
+          "value",
+          "message"
+        ],
+        "title": "DoseIssue",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ErrorDetail"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "Explanation": {
+        "properties": {
+          "missing_terms": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Terms",
+            "type": "array"
+          },
+          "suggestions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "title": "Explanation",
+        "type": "object"
+      },
+      "PatientContext": {
+        "additionalProperties": false,
+        "description": "The patient a question is about. Every field is optional, but a dose\nquestion for a medicine whose rules need a value (for example kidney\nfunction) is refused until that value is given. There's deliberately no\nfield for names or record numbers.",
+        "properties": {
+          "age_years": {
+            "anyOf": [
+              {
+                "maximum": 130.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Years"
+          },
+          "allergies": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Allergies",
+            "type": "array"
+          },
+          "breastfeeding": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breastfeeding"
+          },
+          "child_pugh": {
+            "anyOf": [
+              {
+                "enum": [
+                  "A",
+                  "B",
+                  "C"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Pugh"
+          },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Conditions",
+            "type": "array"
+          },
+          "creatinine_umol_l": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 3000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creatinine Umol L"
+          },
+          "egfr": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "mL/min/1.73 m2",
+            "title": "Egfr"
+          },
+          "labs": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "enum": [
+                "potassium",
+                "sodium",
+                "inr",
+                "platelets",
+                "alt",
+                "qtc"
+              ]
+            },
+            "title": "Labs",
+            "type": "object"
+          },
+          "medicines": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "title": "Medicines",
+            "type": "array"
+          },
+          "pregnant": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pregnant"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "enum": [
+                  "female",
+                  "male",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sex"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "maximum": 400.0,
+                "minimum": 0.3,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "title": "PatientContext",
+        "type": "object"
+      },
+      "PatientFinding": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "medicine": {
+            "title": "Medicine",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "rule_id": {
+            "default": "",
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "block",
+              "warn",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "code",
+          "medicine",
+          "message"
+        ],
+        "title": "PatientFinding",
+        "type": "object"
+      },
+      "Redaction": {
+        "description": "What the PII layer removed from the question: counts by kind, and the\nquestion with placeholders. Never the removed values.",
+        "properties": {
+          "kinds": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Kinds",
+            "type": "object"
+          },
+          "redacted_query": {
+            "default": "",
+            "title": "Redacted Query",
+            "type": "string"
+          }
+        },
+        "title": "Redaction",
+        "type": "object"
+      },
+      "Review": {
+        "description": "Whether a refusal was really put in front of a reviewer, and if not, why.",
+        "properties": {
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "routed": {
+            "default": false,
+            "title": "Routed",
+            "type": "boolean"
+          }
+        },
+        "title": "Review",
+        "type": "object"
+      },
+      "Source": {
+        "properties": {
+          "above_gate": {
+            "default": true,
+            "title": "Above Gate",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "default": "condition",
+            "title": "Kind",
+            "type": "string"
+          },
+          "rank": {
+            "default": 0,
+            "title": "Rank",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "section": {
+            "default": "",
+            "title": "Section",
+            "type": "string"
+          },
+          "snippet": {
+            "title": "Snippet",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "topic": {
+            "default": "",
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "snippet",
+          "score"
+        ],
+        "title": "Source",
+        "type": "object"
+      },
+      "TraceStep": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "explain": {
+            "default": "",
+            "title": "Explain",
+            "type": "string"
+          },
+          "ms": {
+            "title": "Ms",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warn",
+              "fail",
+              "skip",
+              "info"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "detail",
+          "ms"
+        ],
+        "title": "TraceStep",
+        "type": "object"
+      },
+      "V1AskRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9-]{1,62}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "V1AskRequest",
+        "type": "object"
+      },
+      "V1VerifyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9-]{1,62}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          }
+        },
+        "required": [
+          "question",
+          "answer"
+        ],
+        "title": "V1VerifyRequest",
+        "type": "object"
+      },
+      "VerifiedClaim": {
+        "properties": {
+          "grounded": {
+            "title": "Grounded",
+            "type": "boolean"
+          },
+          "issues": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "relevance": {
+            "default": 0.0,
+            "title": "Relevance",
+            "type": "number"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "support": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClaimSupport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "grounded"
+        ],
+        "title": "VerifiedClaim",
+        "type": "object"
+      },
+      "VerifyRedaction": {
+        "properties": {
+          "kinds": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Kinds",
+            "type": "object"
+          },
+          "redacted_answer": {
+            "default": "",
+            "title": "Redacted Answer",
+            "type": "string"
+          },
+          "redacted_query": {
+            "default": "",
+            "title": "Redacted Query",
+            "type": "string"
+          }
+        },
+        "title": "VerifyRedaction",
+        "type": "object"
+      },
+      "VerifyResponse": {
+        "properties": {
+          "audit_id": {
+            "title": "Audit Id",
+            "type": "string"
+          },
+          "claims": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VerifiedClaim"
+            },
+            "title": "Claims",
+            "type": "array"
+          },
+          "decision": {
+            "enum": [
+              "pass",
+              "fail",
+              "review"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "dose_issues": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DoseIssue"
+            },
+            "title": "Dose Issues",
+            "type": "array"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/Explanation",
+            "default": {
+              "missing_terms": [],
+              "suggestions": [],
+              "summary": ""
+            }
+          },
+          "latency_ms": {
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "patient_findings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PatientFinding"
+            },
+            "title": "Patient Findings",
+            "type": "array"
+          },
+          "reason_code": {
+            "enum": [
+              "verified",
+              "input_blocked",
+              "claim_ungrounded",
+              "dose_unsupported",
+              "patient_unsafe",
+              "citation_invalid",
+              "answer_off_topic",
+              "claim_unverified",
+              "no_checkable_claims",
+              "no_relevant_source"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "redaction": {
+            "$ref": "#/components/schemas/VerifyRedaction",
+            "default": {
+              "kinds": {},
+              "redacted_answer": "",
+              "redacted_query": ""
+            }
+          },
+          "review": {
+            "$ref": "#/components/schemas/Review",
+            "default": {
+              "note": "",
+              "routed": false
+            }
+          },
+          "sources": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VerifySource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "unsupported_claims": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Unsupported Claims",
+            "type": "array"
+          }
+        },
+        "required": [
+          "decision",
+          "reason_code",
+          "audit_id",
+          "latency_ms"
+        ],
+        "title": "VerifyResponse",
+        "type": "object"
+      },
+      "VerifySource": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "topic": {
+            "default": "",
+            "title": "Topic",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "VerifySource",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "description": "An API key, as an alternative to Bearer.",
+        "in": "header",
+        "name": "X-API-Key",
+        "type": "apiKey"
+      },
+      "HTTPBearer": {
+        "description": "An API key: `Authorization: Bearer gck_...`.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Ground, check and audit answers from any model. Errors are {\"error\": {\"code\", \"message\"}}.",
+    "title": "GroundCheck API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/ask": {
+      "post": {
+        "operationId": "ask_api_v1_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V1AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing, invalid, revoked or expired API key."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The key lacks the scope, or belongs to another site."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request or a text in it is too large."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request is not valid."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Rate limit or monthly quota reached. See Retry-After."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Ask a question GroundCheck answers",
+        "tags": [
+          "v1"
+        ]
+      }
+    },
+    "/api/v1/audit/{audit_id}": {
+      "get": {
+        "operationId": "audit_record_api_v1_audit__audit_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "audit_id",
+            "required": true,
+            "schema": {
+              "title": "Audit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Audit Record Api V1 Audit  Audit Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing, invalid, revoked or expired API key."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The key lacks the scope, or belongs to another site."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing, invalid, revoked or expired API key."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request or a text in it is too large."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request is not valid."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Rate limit or monthly quota reached. See Retry-After."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Read one audit record",
+        "tags": [
+          "v1"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Api V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Is the service up (no key needed)",
+        "tags": [
+          "v1"
+        ]
+      }
+    },
+    "/api/v1/usage": {
+      "get": {
+        "operationId": "usage_api_v1_usage_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "group_by",
+            "required": false,
+            "schema": {
+              "default": "key",
+              "enum": [
+                "key",
+                "day",
+                "site",
+                "endpoint",
+                "decision"
+              ],
+              "title": "Group By",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 10,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 10,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/csv": {}
+            },
+            "description": "JSON, or CSV with format=csv."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing, invalid, revoked or expired API key."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The key lacks the scope, or belongs to another site."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request or a text in it is too large."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request is not valid."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Rate limit or monthly quota reached. See Retry-After."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Request counts by key, day, site, endpoint or decision",
+        "tags": [
+          "v1"
+        ]
+      }
+    },
+    "/api/v1/verify": {
+      "post": {
+        "operationId": "verify_answer_api_v1_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V1VerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing, invalid, revoked or expired API key."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The key lacks the scope, or belongs to another site."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Missing, invalid, revoked or expired API key."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request or a text in it is too large."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request is not valid."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Rate limit or monthly quota reached. See Retry-After."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          },
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Check an answer that another model wrote",
+        "tags": [
+          "v1"
+        ]
+      }
+    }
+  }
+}

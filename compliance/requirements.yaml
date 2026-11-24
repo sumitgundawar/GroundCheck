@@ -1,0 +1,507 @@
+# Software requirements register (IEC 62304 style) and the tests that verify them.
+#
+# Not a certification and not a complete clinical safety case: it is the list of
+# behaviours this software promises, with the hazard each one controls and the
+# automated tests that check it. `python scripts/trace_matrix.py` turns it into
+# a trace matrix; CI fails when a test names a requirement that isn't here or a
+# link matches no test, and warns for a requirement with no test.
+#
+# Linking a test: put @pytest.mark.req("GC-REQ-012") on it (or
+# pytestmark = pytest.mark.req(...) for a file), or list a prefix of its node id
+# under `tests:` below.
+#
+# Hazards are stable references (HZ-nn). A deployment's own hazard log should cite
+# them, so its entries and this register stay linked.
+
+hazards:
+  - {id: HZ-01, title: "An answer states a clinical fact, dose or instruction no approved source supports"}
+  - {id: HZ-02, title: "A dose or dosing rule is wrong for the patient (weight, age, kidney function, maximum)"}
+  - {id: HZ-03, title: "A medicine the system doesn't know is treated as if it were checked"}
+  - {id: HZ-04, title: "An allergy, contraindication or interaction is missed"}
+  - {id: HZ-05, title: "Patient-identifying information is stored, logged or sent to a third party"}
+  - {id: HZ-06, title: "The record of what the system answered is lost, altered or unattributable"}
+  - {id: HZ-07, title: "Someone sees or changes data they have no right to (another site, another user)"}
+  - {id: HZ-08, title: "Unapproved, withdrawn or out-of-date content is used to answer"}
+  - {id: HZ-09, title: "A change goes live without the safety checks having run"}
+  - {id: HZ-10, title: "An EHR integration gives the clinician false assurance or acts on the wrong patient"}
+  - {id: HZ-11, title: "Patient identifiers remain in imaging data that is stored or shared"}
+  - {id: HZ-12, title: "An unsafe event is not escalated, reviewed or reported in time"}
+
+requirements:
+  # --- Grounded answering ------------------------------------------------------------------
+  - id: GC-REQ-001
+    area: Answering
+    text: "An answer is made only of claims that each cite an approved source passage and pass the per-claim grounding check; anything else is refused."
+    risk_control: "Output grounding check in the pipeline; refusal when a claim has no supporting source."
+    hazards: [HZ-01]
+    tests:
+      - tests/test_pipeline.py::test_grounded_management_answers
+      - tests/test_guards.py::test_a_generic_sentence_from_another_passage_is_not_grounded
+      - tests/test_pipeline.py::test_extractive_answer_only_uses_passages_about_the_named_drug
+
+  - id: GC-REQ-002
+    area: Answering
+    text: "A dose, strength, frequency or percentage in an answer must appear, with its unit, in the cited sources; a value the sources don't state is refused."
+    risk_control: "Dosage guard comparing every dosage value to the source text."
+    hazards: [HZ-01, HZ-02]
+    tests:
+      - tests/test_guards.py::test_dosage_
+      - tests/test_guards.py::test_dose_stated_in_question
+      - tests/test_pipeline.py::test_dosage_trap_refuses
+      - tests/test_pipeline.py::test_dosage_guard_
+
+  - id: GC-REQ-003
+    area: Answering
+    text: "A dose is only accepted from a source about the medicine it names; a source about another medicine, or a question naming two medicines, can't supply it."
+    risk_control: "Source attribution in the dosage guard."
+    hazards: [HZ-01, HZ-02]
+    tests:
+      - tests/test_guards.py::test_a_dose_must_come_from_a_source_about_the_medicine_it_names
+      - tests/test_guards.py::test_a_question_naming_two_medicines_cannot_attribute_an_unnamed_dose
+      - tests/test_pipeline.py::test_a_dose_must_come_from_a_source_about_the_named_medicine
+
+  - id: GC-REQ-004
+    area: Answering
+    text: "A medicine, condition or other entity the approved sources don't contain (an invented or misspelled name included) is refused, never answered from a near match."
+    risk_control: "Source-coverage guard on salient question terms."
+    hazards: [HZ-03, HZ-01]
+    tests:
+      - tests/test_guards.py::test_coverage_flags_unknown_entity
+      - tests/test_guards.py::test_invented_names_misspellings_and_clinical_terms_stay_salient
+      - tests/test_pipeline.py::test_misspelled_names_are_refused_not_matched_by_prefix
+
+  - id: GC-REQ-005
+    area: Answering
+    text: "A question the approved content doesn't cover is refused at the retrieval gate, which judges by the best-scoring passage."
+    risk_control: "Retrieval gate threshold."
+    hazards: [HZ-01]
+    tests:
+      - tests/test_pipeline.py::test_out_of_scope_refuses_at_retrieval_gate
+      - tests/test_retrieval.py::test_retrieval_gate_uses_best_score_not_first_result
+      - tests/test_knowledge.py::test_an_empty_index_refuses_everything
+
+  - id: GC-REQ-006
+    area: Answering
+    text: "The decision to answer or refuse is made by deterministic code; no language-model output can turn a refusal into an answer."
+    risk_control: "Decision gate independent of generation; judge verdicts only ever add refusals."
+    hazards: [HZ-01]
+    tests:
+      - tests/test_pipeline.py::test_a_judge_that_says_yes_cannot_turn_a_refusal_into_an_answer
+      - tests/test_pipeline.py::test_a_judge_that_says_no_cannot_turn_an_answer_into_a_refusal
+
+  - id: GC-REQ-007
+    area: Answering
+    text: "Every refusal carries a stable reason code and an explanation naming what was missing, and is never reported as a refusal when it was only rate-limited."
+    risk_control: "Reason codes in the response schema."
+    hazards: [HZ-12]
+    tests:
+      - tests/test_pipeline.py::test_every_refusal_carries_a_reason_code
+      - tests/test_pipeline.py::test_every_refusal_has_specific_reason
+      - tests/test_pipeline.py::test_refusals_give_the_right_reason
+      - tests/test_pipeline.py::test_a_rate_limited_question_is_not_reported_as_a_refusal
+
+  - id: GC-REQ-008
+    area: Answering
+    text: "Empty questions and prompt-injection attempts are blocked before retrieval or generation."
+    risk_control: "Input guards."
+    hazards: [HZ-01]
+    tests:
+      - tests/test_guards.py::test_injection_patterns_blocked
+      - tests/test_guards.py::test_empty_query_blocked
+      - tests/test_guards.py::test_clean_query_passes_scope
+
+  - id: GC-REQ-009
+    area: Answering
+    text: "A request cannot switch off a safety guard where it matters, and a guard that was disabled is reported as skipped, not as passed."
+    risk_control: "Guard configuration is server-side; trace marks skipped guards."
+    hazards: [HZ-01, HZ-03]
+    tests:
+      - tests/test_pipeline.py::test_guards_cannot_be_switched_off_by_a_request_where_it_matters
+      - tests/test_pipeline.py::test_disabled_guards_are_marked_skip_not_pass
+      - tests/test_pipeline.py::test_default_settings_match_no_settings
+
+  - id: GC-REQ-010
+    area: Answering
+    text: "Requests are rate limited per client so one caller can't exhaust the service."
+    risk_control: "Sliding-window rate limiter."
+    hazards: [HZ-12]
+    tests:
+      - tests/test_guards.py::test_rate_limiter_
+
+  # --- Patient-aware checks ------------------------------------------------------------------
+  - id: GC-REQ-011
+    area: Patient checks
+    text: "An answer is stopped, or a warning added, for a patient's allergies, contraindications, duplicate medicines and interactions, by severity, from either medicine."
+    risk_control: "Patient-aware checks against the structured formulary."
+    hazards: [HZ-04]
+    tests:
+      - tests/test_patient_checks.py::test_interaction_severity_decides_whether_an_answer_stops
+      - tests/test_patient_checks.py::test_an_interaction_counts_from_either_medicine
+      - tests/test_patient_checks.py::test_duplicate_classes_and_medicines_already_taken
+      - tests/test_patient_checks.py::test_a_moderate_interaction_is_noted_without_stopping_the_answer
+
+  - id: GC-REQ-012
+    area: Patient checks
+    text: "Children's doses use the weight-based dose and cap; an adult dose for a child is blocked, and a weight-based medicine without a weight is refused."
+    risk_control: "Paediatric and weight rules in patient checks."
+    hazards: [HZ-02]
+    tests:
+      - tests/test_patient_checks.py::test_an_adult_dose_for_a_child_is_blocked_with_the_weight_based_dose
+      - tests/test_patient_checks.py::test_paediatric_doses_are_capped
+      - tests/test_patient_checks.py::test_weight_based_
+      - tests/test_patient_checks.py::test_a_dose_above_the_weight_based_maximum_is_blocked
+
+  - id: GC-REQ-013
+    area: Patient checks
+    text: "Kidney function (eGFR, or creatinine clearance with the sex it needs) adjusts or blocks a dose; missing kidney data is refused, not guessed."
+    risk_control: "Renal rules and missing-data refusal."
+    hazards: [HZ-02]
+    tests:
+      - tests/test_patient_checks.py::test_kidney_function_from_creatinine_clearance
+      - tests/test_patient_checks.py::test_sex_is_required_when_the_kidney_figure_comes_from_creatinine
+
+  - id: GC-REQ-014
+    area: Patient checks
+    text: "A dose above the stated maximum, counted per day and per dose with its frequency, is blocked."
+    risk_control: "Maximum-dose rules."
+    hazards: [HZ-02]
+    tests:
+      - tests/test_patient_checks.py::test_doses_above_the_maximum_are_blocked
+      - tests/test_patient_checks.py::test_a_twice_daily_maximum_is_a_daily_maximum
+      - tests/test_patient_checks.py::test_a_per_dose_maximum_accounts_for_how_often_it_is_given
+      - tests/test_patient_checks.py::test_a_thousands_separator_in_a_dose_is_not_truncated
+
+  - id: GC-REQ-015
+    area: Patient checks
+    text: "Pregnancy and breastfeeding rules apply, and patient data that is invalid or contradictory is refused."
+    risk_control: "Patient context validation and reproductive-status rules."
+    hazards: [HZ-02, HZ-04]
+    tests:
+      - tests/test_patient_checks.py::test_breastfeeding_rules
+      - tests/test_patient_checks.py::test_patient_data_is_validated
+
+  - id: GC-REQ-016
+    area: Patient checks
+    text: "A formulary that is invalid is refused at load, and the bundled demonstration formulary is declared synthetic wherever it is described."
+    risk_control: "Formulary schema validation; synthetic flag in discovery."
+    hazards: [HZ-03]
+    tests:
+      - tests/test_patient_checks.py::test_invalid_formularies_are_refused
+      - tests/test_patient_checks.py::test_the_demo_formulary_is_valid_and_complete
+      - tests/test_ehr.py::test_the_ehr_is_told_the_formulary_is_invented
+
+  - id: GC-REQ-017
+    area: Patient checks
+    text: "The patient context is audited without names or record numbers, and patient checks are recorded in the audit trace."
+    risk_control: "PatientContext has no identifier fields; audit records the checks."
+    hazards: [HZ-05, HZ-06]
+    tests:
+      - tests/test_patient_checks.py::test_the_pipeline_records_patient_checks_and_audits_the_patient
+
+  # --- De-identification -------------------------------------------------------------------------
+  - id: GC-REQ-018
+    area: De-identification
+    text: "Names, identifiers, dates and contact details in a question are replaced by placeholders before the question is stored or sent to a model, and the original is never kept."
+    risk_control: "Layered PII detection before retrieval and generation."
+    hazards: [HZ-05]
+    tests:
+      - tests/test_deid.py::test_identifiers_are_replaced
+      - tests/test_deid.py::test_the_pipeline_never_keeps_the_original
+      - tests/test_deid.py::test_v2_detectors
+
+  - id: GC-REQ-019
+    area: De-identification
+    text: "Checksummed identifiers (NHS number, card, IBAN, SSN) are recognised by their checksum, and clinical text that merely looks like a name or number is not removed."
+    risk_control: "Checksum validation and known-term protection."
+    hazards: [HZ-05, HZ-01]
+    tests:
+      - tests/test_deid.py::test_nhs_numbers_need_a_valid_checksum
+      - tests/test_deid.py::test_nothing_that_looks_like_a_name_or_number_is_removed_wrongly
+      - tests/test_deid.py::test_a_known_term_is_never_a_name_even_beside_a_cue
+
+  - id: GC-REQ-020
+    area: De-identification
+    text: "What was removed is reported by kind and position, never by value."
+    risk_control: "Redaction summary without values."
+    hazards: [HZ-05]
+    tests:
+      - tests/test_deid.py::test_summary_reports_kinds_never_values
+      - tests/test_deid.py::test_entities_have_positions_and_never_values
+      - tests/test_pipeline.py::test_the_response_says_what_was_removed_without_the_values
+
+  - id: GC-REQ-021
+    area: Imaging
+    text: "DICOM uploads are de-identified at import (PS3.15 Basic profile with Retain Patient Characteristics and Clean Descriptors), with UIDs replaced consistently and private tags removed."
+    risk_control: "Import-time de-identification."
+    hazards: [HZ-11]
+    tests:
+      - tests/test_imaging.py::test_dicom_is_de_identified_on_import
+      - tests/test_imaging.py::test_burned_in_annotations_are_refused
+
+  - id: GC-REQ-022
+    area: Imaging
+    text: "Text found in an image's pixels is blacked out and the result searched again, or the image is refused; an image flagged for text is never passed unchanged, no setting disables the check, and the BurnedInAnnotation tag is respected but never trusted to say no."
+    risk_control: "Burned-in text detection (OCR when installed, classical detector always) with redact-or-refuse policy."
+    hazards: [HZ-11]
+    tests:
+      - tests/test_burnedin.py
+
+  - id: GC-REQ-023
+    area: Imaging
+    text: "NIfTI volumes are read without trusting the file: size and voxel limits apply before allocation, corrupt, truncated and unsupported files are refused with a reason, orientation is normalised, and no header text is kept."
+    risk_control: "Bounded, validating NIfTI reader."
+    hazards: [HZ-11]
+    tests:
+      - tests/test_nifti.py
+
+  # --- Audit and integrity --------------------------------------------------------------------------
+  - id: GC-REQ-024
+    area: Audit
+    text: "Each question and answer is recorded in a tamper-evident audit trail (a hash chain, signed when a key is set), with the asking user, and an untouched chain verifies."
+    risk_control: "Hash-chained, signed audit records."
+    hazards: [HZ-06]
+    tests:
+      - tests/test_data_protection.py::test_an_untouched_chain_verifies
+      - tests/test_accounts.py::test_audit_records_are_stored_in_the_database_with_the_user
+      - tests/test_data_protection.py::test_existing_records_are_chained_by_the_migration
+
+  - id: GC-REQ-025
+    area: Audit
+    text: "A changed, deleted, truncated or moved audit record is detected by verification, and a signed chain can't be verified without its key."
+    risk_control: "Chain verification."
+    hazards: [HZ-06]
+    tests:
+      - tests/test_data_protection.py::test_changed_deleted_and_truncated_records_are_detected
+      - tests/test_data_protection.py::test_a_signed_chain_needs_its_key
+      - tests/test_data_protection.py::test_moving_a_record_to_another_site_breaks_the_chain
+
+  - id: GC-REQ-026
+    area: Audit
+    text: "Concurrent writers keep one unbroken chain, and retention deletes only what the policy says while the remaining chain still verifies."
+    risk_control: "Serialised appends; retention keeps chain anchors."
+    hazards: [HZ-06]
+    tests:
+      - tests/test_data_protection.py::test_concurrent_writers_keep_one_unbroken_chain
+      - tests/test_data_protection.py::test_retention_
+      - tests/test_data_protection.py::test_resolved_reviews_are_deleted_after_their_period_and_open_ones_never
+
+  - id: GC-REQ-027
+    area: Data protection
+    text: "Questions, answers, reviews, incident text and two-factor secrets are encrypted at rest with keys that can be rotated, each value bound to its column."
+    risk_control: "AES-256-GCM column encryption with a keyring."
+    hazards: [HZ-05]
+    tests:
+      - tests/test_data_protection.py::test_keys_must_be_32_base64_bytes
+      - tests/test_data_protection.py::test_values_are_bound_to_their_column_and_key
+      - tests/test_data_protection.py::test_questions_answers_reviews_and_2fa_secrets_are_encrypted_on_disk
+      - tests/test_data_protection.py::test_rotating_keys_and_turning_encryption_off
+      - tests/test_incidents.py::test_incident_text_is_encrypted_at_rest
+
+  # --- Access control -------------------------------------------------------------------------------
+  - id: GC-REQ-028
+    area: Access control
+    text: "Passwords are stored only as Argon2id hashes, and signing in with a wrong password or an unknown email gives the same error."
+    risk_control: "Argon2id hashing; uniform sign-in failure."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_accounts.py::test_passwords_are_hashed_with_argon2id
+      - tests/test_accounts.py::test_wrong_password_and_unknown_email_give_the_same_error
+
+  - id: GC-REQ-029
+    area: Access control
+    text: "Repeated wrong passwords or two-factor codes lock the account."
+    risk_control: "Lockout counters."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_accounts.py::test_repeated_failures_lock_the_account
+      - tests/test_accounts.py::test_guessing_two_factor_codes_locks_the_account
+      - tests/test_accounts.py::test_a_correct_code_clears_earlier_failures
+
+  - id: GC-REQ-030
+    area: Access control
+    text: "Sessions are stored only as hashes, expire, and end on sign-out, password change or deactivation; cookies are HTTP-only and strict."
+    risk_control: "Hashed, revocable sessions."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_accounts.py::test_sign_in_creates_a_session_stored_as_a_hash
+      - tests/test_accounts.py::test_expired_sessions_are_rejected_and_purged
+      - tests/test_accounts.py::test_sign_out_ends_the_session
+      - tests/test_accounts.py::test_changing_password_signs_out_every_session
+      - tests/test_accounts.py::test_deactivating_a_user_signs_them_out
+      - tests/test_accounts.py::test_session_cookie_is_http_only_and_strict
+
+  - id: GC-REQ-031
+    area: Access control
+    text: "Roles limit what each user can do, and the last administrator can't be removed."
+    risk_control: "Role-ordered permission checks."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_accounts.py::test_roles_limit_what_each_user_can_do
+      - tests/test_accounts.py::test_roles_are_ordered
+      - tests/test_accounts.py::test_the_last_admin_cannot_be_demoted_or_deactivated
+      - tests/test_governance.py::test_api_roles
+
+  - id: GC-REQ-032
+    area: Access control
+    text: "Two-factor authentication is set up only with a valid code, is pending until verified, and is disabled only with the password."
+    risk_control: "TOTP enrolment and verification."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_accounts.py::test_two_factor_
+
+  - id: GC-REQ-033
+    area: Access control
+    text: "Single sign-on accepts only valid tokens from the configured provider (state, nonce, PKCE and signature checked) and links accounts only by verified email."
+    risk_control: "OIDC validation."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_sso.py
+
+  - id: GC-REQ-034
+    area: Access control
+    text: "A clinician can read only the audit records of their own questions."
+    risk_control: "Per-user audit scope."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_accounts.py::test_clinicians_cannot_read_other_users_audit_records
+
+  - id: GC-REQ-035
+    area: Access control
+    text: "Machine access uses API keys that are shown once, stored as hashes, scoped, revocable and expiring, with exact rate limits and monthly quotas."
+    risk_control: "Hashed, scoped API keys with limits."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_api_keys.py
+
+  - id: GC-REQ-036
+    area: Multi-tenancy
+    text: "Within a site, questions, audit records, review cases, incidents, imaging, usage, documents, API keys and users of another site can't be read or changed by any route or function."
+    risk_control: "Site scoping on every read and write path."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_sites.py
+      - tests/test_tenant_isolation.py
+
+  # --- Content governance ---------------------------------------------------------------------------
+  - id: GC-REQ-037
+    area: Governance
+    text: "A document is answered from only after approval by someone other than its uploader, and a new approved version retires the old one."
+    risk_control: "Four-eyes document approval."
+    hazards: [HZ-08]
+    tests:
+      - tests/test_knowledge.py::test_uploader_cannot_approve_their_own_document
+      - tests/test_knowledge.py::test_approving_a_new_version_retires_the_old_one
+      - tests/test_knowledge.py::test_review_rules
+      - tests/test_knowledge.py::test_import_is_pending_with_chunks
+
+  - id: GC-REQ-038
+    area: Governance
+    text: "Retired and expired documents, and passages outside their effective dates, are never cited."
+    risk_control: "Date and status filters in retrieval."
+    hazards: [HZ-08]
+    tests:
+      - tests/test_knowledge.py::test_retired_and_expired_documents_are_not_cited
+      - tests/test_knowledge.py::test_effective_and_expiry_dates
+      - tests/test_knowledge.py::test_search_skips_rows_outside_their_dates
+
+  - id: GC-REQ-039
+    area: Governance
+    text: "A knowledge release goes live only when the safety tests pass, a pack's own cases pass, and a gate that can't run fails the release; rollback restores the last release."
+    risk_control: "Release gate and one-step rollback."
+    hazards: [HZ-09]
+    tests:
+      - tests/test_releases.py
+
+  - id: GC-REQ-040
+    area: Governance
+    text: "A refusal opens one review case with an SLA and escalation, routing is stated truthfully, and resolving a case as a test adds a permanent evaluation case."
+    risk_control: "Review queue with SLA and resolve-as-test."
+    hazards: [HZ-12]
+    tests:
+      - tests/test_governance.py::test_a_refusal_opens_one_case_and_repeats_add_to_it
+      - tests/test_governance.py::test_a_refusal_really_routed_says_so_and_names_the_case
+      - tests/test_governance.py::test_a_refusal_not_reviewed_does_not_claim_to_be
+      - tests/test_governance.py::test_overdue_cases_escalate_once
+      - tests/test_governance.py::test_resolving_as_a_test_adds_a_permanent_evaluation_case
+
+  - id: GC-REQ-041
+    area: Governance
+    text: "Incidents are graded by harm and a regulator or data-protection deadline must be answered before an incident is closed."
+    risk_control: "Incident register with decision gates."
+    hazards: [HZ-12]
+    tests:
+      - tests/test_incidents.py::test_report_investigate_and_close
+      - tests/test_incidents.py::test_regulator_deadlines_must_be_answered_before_closing
+
+  - id: GC-REQ-042
+    area: Governance
+    text: "Knowledge packs and formularies are imported only from sources whose signature verifies against a trusted key, or by a recorded, justified override."
+    risk_control: "Signed packs; override audited."
+    hazards: [HZ-08, HZ-03]
+    tests:
+      - tests/test_packs.py
+      - tests/test_formulary_adapter.py
+
+  # --- EHR integration ----------------------------------------------------------------------------------
+  - id: GC-REQ-043
+    area: EHR
+    text: "Resources read from an EHR are checked against the US Core / UK Core subset the patient checks rely on; missing, invalid or unsafe elements surface as warnings, wrong-type values are never used as lab results, and hostile input is refused."
+    risk_control: "Profile validation with warnings in the patient check."
+    hazards: [HZ-10, HZ-04]
+    tests:
+      - tests/test_fhir_profiles.py
+      - tests/test_ehr.py::test_fhir_resources_map_to_a_patient_without_identifiers
+      - tests/test_ehr.py::test_implausible_results_are_left_out_not_fatal
+
+  - id: GC-REQ-044
+    area: EHR
+    text: "Writing a Provenance and an AuditEvent next to a saved note is off by default, produces valid FHIR R4, never costs the clinician the saved note, and a failed write is recorded in the audit trail."
+    risk_control: "SMART_WRITE_PROVENANCE gating, R4 structure check before sending, failure audited."
+    hazards: [HZ-10, HZ-06]
+    tests:
+      - tests/test_ehr_writeback.py
+
+  - id: GC-REQ-045
+    area: EHR
+    text: "The CDS Hooks service follows the 2.0 specification (discovery, request and response shape, prefetch, signed requests, feedback), refuses expired, replayed, wrong-audience and untrusted tokens, and a medicine it can't check always yields a \"not checked\" card."
+    risk_control: "CDS Hooks conformance suite; fail-visible cards."
+    hazards: [HZ-10, HZ-03]
+    tests:
+      - tests/test_cds_conformance.py
+      - tests/test_ehr.py::test_calls_must_be_signed_by_a_trusted_ehr
+      - tests/test_ehr.py::test_cards_for_unsafe_orders
+
+  - id: GC-REQ-046
+    area: EHR
+    text: "A SMART launch is accepted only from an allowed issuer, with PKCE and a state bound to the browser, and a patient loaded from the EHR carries no names or identifiers."
+    risk_control: "Issuer allow-list, PKCE, identifier-free context."
+    hazards: [HZ-10, HZ-05]
+    tests:
+      - tests/test_ehr.py::test_launches_are_refused_when_unsafe
+      - tests/test_ehr.py::test_an_ehr_launch_loads_the_patient_for_this_browser
+      - tests/test_ehr.py::test_open_servers_load_directly_and_others_are_refused
+
+  # --- Verification and compliance tooling ------------------------------------------------------------------
+  - id: GC-REQ-047
+    area: Compliance
+    text: "Every requirement has at least one test, a test that names an unknown requirement fails the build, and the trace matrix is generated from the register and the collected tests."
+    risk_control: "scripts/trace_matrix.py in CI and the conftest check."
+    hazards: [HZ-09]
+    tests:
+      - tests/test_traceability.py
+
+  - id: GC-REQ-048
+    area: Compliance
+    text: "Every third-party dependency has a licence entry and an intended-use note in the SOUP list, and every embedding and generation model has a version, licence and intended use in the model register."
+    risk_control: "scripts/soup_list.py fails on a dependency without a licence."
+    hazards: [HZ-09]
+    tests:
+      - tests/test_soup.py
+
+  - id: GC-REQ-049
+    area: Multi-tenancy
+    text: "A tenant is created, with its administrator, API key and quota, in one command that records an audit event and never prints a secret twice, and a failed creation leaves nothing behind."
+    risk_control: "Transactional tenant provisioning."
+    hazards: [HZ-07]
+    tests:
+      - tests/test_tenant_isolation.py::test_tenant_create

@@ -4,8 +4,9 @@ decision. Counts only. No question or answer text is stored here.
 `decision` is what the endpoint decided (answer, refuse, pass, fail, review),
 or `error` for a request that was refused before it was evaluated (bad input,
 wrong scope) and `throttled` for one stopped by a rate limit or quota.
-Billable requests are the ones that were evaluated: every decision except
-error and throttled.
+Billable requests are the ones that were evaluated by ask or verify: every
+decision except error and throttled. Reading usage or an audit record is
+counted as a request but never billed.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ log = logging.getLogger("groundcheck.metering")
 
 DECISIONS = ("answer", "refuse", "pass", "fail", "review", "error", "throttled")
 UNBILLED = ("error", "throttled")
+BILLABLE_ENDPOINTS = ("ask", "verify")
 GROUPS = ("key", "day", "site", "endpoint", "decision")
 FIELD = {"key": "key_id", "day": "day", "site": "site_id", "endpoint": "endpoint", "decision": "decision"}
 MAX_DAYS = 366
@@ -87,14 +89,18 @@ def usage(group_by: str = "key", start: str | date | None = None, end: str | dat
     column = {"key": UsageDaily.api_key_id, "day": UsageDaily.day, "site": UsageDaily.site_id,
               "endpoint": UsageDaily.endpoint, "decision": UsageDaily.decision}[group_by]
     with db.session() as s:
-        q = (select(column, UsageDaily.decision, func.sum(UsageDaily.count))
+        q = (select(column, UsageDaily.decision, UsageDaily.endpoint, func.sum(UsageDaily.count))
              .where(UsageDaily.day >= first.isoformat(), UsageDaily.day <= last.isoformat())
-             .group_by(column, UsageDaily.decision))
+             .group_by(column, UsageDaily.decision, UsageDaily.endpoint))
         if site_scope is not None:
             q = q.where(UsageDaily.site_id == site_scope)
         grouped: dict = {}
-        for label, decision, count in s.execute(q):
-            grouped.setdefault(label, {})[decision] = int(count)
+        billed: dict = {}
+        for label, decision, endpoint, count in s.execute(q):
+            decisions = grouped.setdefault(label, {})
+            decisions[decision] = decisions.get(decision, 0) + int(count)
+            if decision not in UNBILLED and endpoint in BILLABLE_ENDPOINTS:
+                billed[label] = billed.get(label, 0) + int(count)
         names: dict = {}
         if group_by == "key":
             for k in s.scalars(select(ApiKey).where(ApiKey.id.in_([x for x in grouped if x]))):
@@ -106,7 +112,7 @@ def usage(group_by: str = "key", start: str | date | None = None, end: str | dat
     for label in sorted(grouped, key=lambda x: (isinstance(x, str), x)):
         decisions = grouped[label]
         row = {FIELD[group_by]: label, "requests": sum(decisions.values()),
-               "billable": sum(v for d, v in decisions.items() if d not in UNBILLED), "decisions": decisions}
+               "billable": billed.get(label, 0), "decisions": decisions}
         if group_by == "key":
             row["name"], row["prefix"] = names.get(label, ("", ""))
         elif group_by == "site":

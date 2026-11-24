@@ -14,7 +14,7 @@ import re
 import threading
 import time
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from . import db
 from .db import Site, User
@@ -109,3 +109,54 @@ def forget_user(user_id: int | None = None) -> None:
 def visible(row_site_id: int | None, scope: int | None) -> bool:
     """Whether someone scoped to `scope` (None: every site) may see a row."""
     return scope is None or row_site_id == scope
+
+
+# --- Provisioning a tenant ---------------------------------------------------------------------
+
+def provision(key: str, name: str, admin_email: str, admin_password: str, *, admin_name: str = "", key_name: str = "",
+              scopes: list[str] | None = None, rpm_limit: int | None = None, monthly_quota: int | None = None,
+              expires_in_days: float | None = None, created_by: int | None = None) -> dict:
+    """A site, its administrator, an API key and a quota, created together. Everything is checked before
+    anything is written, and if a later step fails what was already created is removed, so a failed
+    attempt leaves nothing behind. The audit trail records the creation (never the password or key).
+    The key's secret is returned once, under ["api_key"]["key"]."""
+    from . import apikeys, auth, integrity
+    from .db import ApiKey
+
+    key = (key or "").strip().lower()
+    if not _KEY.match(key):
+        raise SiteError("The key is 2 to 63 lower-case letters, digits or hyphens, such as st-marys.")
+    if not (name or "").strip():
+        raise SiteError("Give the site a name.")
+    try:
+        email = auth.normalise_email(admin_email)
+        auth.check_password_strength(admin_password, email)
+    except auth.AuthError as exc:
+        raise SiteError(str(exc)) from exc
+    with db.session() as s:
+        if by_key(s, key) is not None:
+            raise SiteError("A site with that key already exists.")
+        if s.scalar(select(User).where(User.email == email)):
+            raise SiteError("A user with that email already exists.")
+    scopes = list(scopes) if scopes else ["ask", "verify"]
+    site = admin = made = None
+    try:
+        site = create(key, name)
+        admin = auth.create_user(email, admin_password, role="admin", name=admin_name, site_id=site["id"])
+        made = apikeys.create(key_name or f"{key} service key", scopes, site_id=site["id"], created_by=admin.id,
+                              expires_in_days=expires_in_days, rpm_limit=rpm_limit, monthly_quota=monthly_quota)
+        integrity.record_event("tenant.created", {"site_id": site["id"], "site_key": key, "admin_id": admin.id,
+                                                   "api_key_id": made["id"], "scopes": made["scopes"],
+                                                   "rpm_limit": rpm_limit, "monthly_quota": monthly_quota}, created_by)
+    except Exception as exc:
+        with db.session() as s:
+            if made is not None:
+                s.execute(delete(ApiKey).where(ApiKey.id == made["id"]))
+            if admin is not None:
+                s.execute(delete(User).where(User.id == admin.id))
+            if site is not None:
+                s.execute(delete(Site).where(Site.id == site["id"]))
+        if isinstance(exc, apikeys.ApiKeyError):
+            raise SiteError(exc.message) from exc
+        raise
+    return {"site": site, "admin": {"id": admin.id, "email": admin.email, "role": admin.role}, "api_key": made}

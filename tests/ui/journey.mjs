@@ -246,6 +246,84 @@ async function main() {
     assert(focusVisible, "the ask button has no visible focus");
   });
 
+  console.log("Feedback, adoption, controls and telemetry");
+
+  await check("feedback: a thumbs up is saved and shown as chosen", async () => {
+    equal(await ask(page, "What is the standard dose of Caloradine?"), "ANSWER", "the decision");
+    assert(await page.locator("#feedback-row").isVisible(), "no feedback row under the answer");
+    await page.click("#feedback-up");
+    await page.waitForSelector("#feedback-message:not([hidden])");
+    assert(/saved/i.test(await page.textContent("#feedback-message")), "no confirmation");
+    equal(await page.getAttribute("#feedback-up", "aria-pressed"), "true", "the up button's state");
+  });
+
+  await check("feedback: 'wrong' with a comment goes to a reviewer, with identifiers removed", async () => {
+    equal(await ask(page, "What is the standard dose of Caloradine?"), "ANSWER", "the decision");
+    await page.click("#feedback-down");
+    assert(await page.locator("#feedback-form").isVisible(), "no form after thumbs down");
+    await page.selectOption("#feedback-reason", "wrong");
+    await page.fill("#feedback-comment", "Mr John Smith NHS 943 476 5919 was given this and it was wrong.");
+    await page.click("#feedback-send");
+    await page.waitForSelector("#feedback-message:not([hidden])");
+    assert(/reviewer/i.test(await page.textContent("#feedback-message")), "the message doesn't say it went to a reviewer");
+    const queue = await page.evaluate(async () => (await fetch("/api/reviews?status=open")).json());
+    const flagged = queue.cases.filter((c) => c.kind === "flagged");
+    assert(flagged.length >= 1 && flagged[0].priority === "high", "no high-priority flagged case");
+    assert(!JSON.stringify(queue).includes("943 476 5919") && !JSON.stringify(queue).includes("John Smith"), "an identifier reached the queue");
+  });
+
+  await check("the usage page shows adoption numbers and the pilot report downloads", async () => {
+    await go(page, "usage");
+    await page.waitForSelector("#adoption-panel:not([hidden])");
+    const tiles = await page.locator("#adoption-stats .stat").count();
+    equal(tiles, 6, "adoption tiles");
+    const href = await page.getAttribute("#pilot-report-download", "href");
+    const report = await page.evaluate(async (u) => { const r = await fetch(u); return { ok: r.ok, text: await r.text() }; }, href);
+    assert(report.ok && report.text.startsWith("# GroundCheckHealth pilot report"), "the pilot report did not download");
+    assert(!report.text.includes("John Smith") && !report.text.includes("943 476"), "the report holds an identifier");
+  });
+
+  await check("the controls tab shows the matrix with its banner and filters it", async () => {
+    await go(page, "review");
+    await page.click("#tab-controls");
+    await page.waitForSelector("#controls-frameworks table");
+    assert(/no certification/i.test(await page.textContent("#controls-banner")), "the no-certification banner is missing");
+    const all = await page.locator("#controls-frameworks tbody tr").count();
+    assert(all > 90, `only ${all} controls`);
+    await page.selectOption("#controls-status", "not_addressed");
+    const some = await page.locator("#controls-frameworks tbody tr").count();
+    assert(some > 0 && some < all, `filtering left ${some} of ${all}`);
+    const gone = await page.locator("#controls-frameworks tbody tr td:nth-child(3)", { hasText: "Supported by product" }).count();
+    equal(gone, 0, "supported rows still shown under the not-addressed filter");
+  });
+
+  await check("telemetry is off and documented, and the evidence pack downloads", async () => {
+    await go(page, "data-protection");
+    await page.waitForSelector("#protection-admin:not([hidden])");
+    await page.waitForFunction(() => document.querySelector("#telemetry-summary").textContent.length > 10);
+    assert(/^Off\. Nothing is sent\./.test(await page.textContent("#telemetry-summary")), "telemetry is not shown as off");
+    equal(await page.locator("#telemetry-fields dt").count(), 9, "documented telemetry fields");
+    const pack = await page.evaluate(async () => { const r = await fetch("/api/governance/evidence-pack"); return { type: r.headers.get("content-type"), n: (await r.arrayBuffer()).byteLength }; });
+    assert(pack.type === "application/zip" && pack.n > 1000, `the evidence pack was ${pack.type}, ${pack.n} bytes`);
+  });
+
+  await check("feedback and the controls tab fit a phone screen", async () => {
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
+    const small = await phone.newPage();
+    await small.goto(BASE + "/", { waitUntil: "networkidle" });
+    equal(await ask(small, "What is the standard dose of Caloradine?"), "ANSWER", "the decision");
+    await small.click("#feedback-down");
+    const overflow = () => small.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert((await overflow()) <= 1, "the feedback form makes the page scroll sideways");
+    const box = await small.locator("#feedback-send").boundingBox();
+    assert(box && box.width >= 44 && box.height >= 30, "the send button is too small to tap");
+    await go(small, "review");
+    await small.click("#tab-controls");
+    await small.waitForSelector("#controls-frameworks table");
+    assert((await overflow()) <= 1, "the controls table makes the page scroll sideways");
+    await phone.close();
+  });
+
   await check("nothing on any page overflows a phone screen", async () => {
     const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
     const small = await phone.newPage();

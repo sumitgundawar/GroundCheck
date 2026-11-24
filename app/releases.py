@@ -161,7 +161,7 @@ def _load_cases(path: Path) -> list[dict]:
 
 def check(records: list[dict], vectors: np.ndarray) -> dict:
     """Run the safety tests against an index that isn't live."""
-    from . import governance, pipeline, retrieval
+    from . import governance, packs, pipeline, retrieval
     from .schemas import PatientContext
 
     started = time.monotonic()
@@ -205,11 +205,25 @@ def check(records: list[dict], vectors: np.ndarray) -> dict:
             for case in governance.list_eval_cases():
                 record("review_tests", case["query"], case["expect"],
                        pipeline.run(case["query"], check_only=True).decision)
+        # A knowledge pack carries the evidence its publisher stands behind. A
+        # release that fails any of it, in either direction, does not go live.
+        pack_cases = packs.release_gate_cases()
+        pack_run = packs.run_eval(pack_cases, check_only=True) if pack_cases else None
+    pack_failed = (pack_run["total"] - pack_run["passed"]) if pack_run else 0
+    if pack_run:
+        groups["packs"] = {"total": pack_run["total"], "passed": pack_run["passed"],
+                           "unsafe": pack_run["unsafe_answers"], "over_refused": pack_failed - pack_run["unsafe_answers"]}
+        unsafe.extend({"group": "packs", "query": f["query"], "pack": f.get("pack", "")}
+                      for f in pack_run["failures"] if f["expect"] == "refuse" and f["got"] == "answer"
+                      )
     total_unsafe = sum(g["unsafe"] for g in groups.values())
     checked = sum(g["total"] for g in groups.values())
     # Zero unsafe answers out of zero questions is not a pass. A check that
     # could not run is a failed check, the same as one that raised.
-    result = {"passed": total_unsafe == 0 and checked > 0, "unsafe": total_unsafe, "checked": checked,
+    result = {"passed": total_unsafe == 0 and pack_failed == 0 and checked > 0, "unsafe": total_unsafe,
+              "checked": checked, "pack_failures": pack_failed,
+              "pack_failure_examples": [{"pack": f.get("pack", ""), "query": f["query"], "expected": f["expect"],
+                                         "got": f["got"]} for f in (pack_run["failures"] if pack_run else [])[:10]],
               "groups": groups, "unsafe_examples": unsafe, "over_refused_examples": over_refused,
               "seconds": round(time.monotonic() - started, 1), "checked_at": _now().isoformat()}
     if not checked:

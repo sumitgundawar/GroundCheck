@@ -387,6 +387,41 @@ class SourceChunk(Base):
     __table_args__ = (Index("ix_source_chunks_source_id", "source_id"),)
 
 
+class AnswerFeedback(Base):
+    """A clinician's thumbs up or down on one answer. Kept apart from the audit
+    record, which is signed and never changes. One row per person per answer
+    (`voter` is the user, or "anon" in the open demo); a second submission
+    updates it."""
+
+    __tablename__ = "answer_feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    audit_id: Mapped[str] = mapped_column(String(16), nullable=False)
+    voter: Mapped[str] = mapped_column(String(24), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
+    rating: Mapped[str] = mapped_column(String(4), nullable=False)       # up, down
+    reason: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    comment: Mapped[str] = mapped_column(EncryptedText("answer_feedback.comment"), nullable=False, default="")
+    case_id: Mapped[int | None] = mapped_column(ForeignKey("review_cases.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("audit_id", "voter", name="uq_answer_feedback_voter"),
+        Index("ix_answer_feedback_created_at", "created_at"),
+    )
+
+
+class AppSetting(Base):
+    """A small named value kept by the install itself, such as its random id."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+
 class ReviewCase(Base):
     """A refusal or a flagged answer that a clinician needs to look at.
     Repeats of the same open question are grouped into one case."""

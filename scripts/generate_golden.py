@@ -20,6 +20,11 @@ demo numbers are stable. Deterministic via a fixed seed.
 
 Run from the repository root:
     python scripts/generate_golden.py
+    python scripts/generate_golden.py --seed-file SEED --heldout-out FILE
+
+The second form also splits the set by entity (scripts/eval_split.py): FILE
+gets the held-out part, outside the repository, and eval/golden.json only the
+public part. Without it, golden.json is the whole development set.
 """
 
 from __future__ import annotations
@@ -243,6 +248,11 @@ def build_golden() -> list[dict]:
 
 
 def main() -> None:
+    argv = sys.argv[1:]
+    seed_file = argv[argv.index("--seed-file") + 1] if "--seed-file" in argv else None
+    heldout_out = argv[argv.index("--heldout-out") + 1] if "--heldout-out" in argv else None
+    if bool(seed_file) != bool(heldout_out):
+        sys.exit("--seed-file and --heldout-out go together.")
     cases = build_golden()
     with open(GOLDEN_PATH, "w", encoding="utf-8") as fh:
         json.dump(cases, fh, indent=2, ensure_ascii=False)
@@ -250,6 +260,12 @@ def main() -> None:
     n_ref = sum(1 for c in cases if c["expect"] == "refuse")
     print(f"Wrote {len(cases)} golden cases to {GOLDEN_PATH}")
     print(f"  {n_ans} answerable, {n_ref} must-refuse")
+    if seed_file:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import eval_split
+
+        info = eval_split.create(eval_split.read_seed(Path(seed_file)), Path(heldout_out), apply=True)
+        print(f"Split: {info['public_cases']} public, {info['heldout_cases']} held out (written to {heldout_out}).")
 
 
 if __name__ == "__main__":

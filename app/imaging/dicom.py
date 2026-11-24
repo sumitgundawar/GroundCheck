@@ -162,6 +162,7 @@ def read(uploads: list[tuple[str, bytes]]) -> list[Series]:
     groups: dict[str, list] = {}
     skipped = 0
     refused: list[str] = []
+    scanned_series: set[str] = set()
     for name, data in _files(uploads):
         try:
             ds = pydicom.dcmread(io.BytesIO(data), force=False)
@@ -176,8 +177,11 @@ def read(uploads: list[tuple[str, bytes]]) -> list[Series]:
             skipped += 1
             continue
         original = _identifiers(ds)
+        series_uid = str(ds.get("SeriesInstanceUID", ""))
+        first_of_series = series_uid not in scanned_series
+        scanned_series.add(series_uid)
         try:
-            report = deid.deidentify(ds)
+            report = deid.deidentify(ds, deep=first_of_series)
         except deid.DeidError as exc:
             refused.append(str(exc))
             continue
@@ -220,7 +224,10 @@ def read(uploads: list[tuple[str, bytes]]) -> list[Series]:
                         "position": _position(ds)} for ds, _ in usable],
             patient={k: str(first.get(k)) for k in ("PatientAge", "PatientSex", "PatientSize", "PatientWeight")
                      if first.get(k)},
-            warnings=warnings + ([f"{skipped} files weren't CT or MR images and were skipped."] if skipped else [])
+            warnings=warnings + ([f"Text was found in the pixels of {report['burned_in_flagged']} images and blacked out. "
+                                  "Check the images before sharing them: not every burned-in text can be found."]
+                                 if report.get("burned_in_flagged") else [])
+                     + ([f"{skipped} files weren't CT or MR images and were skipped."] if skipped else [])
                      + ([f"{len(refused)} images were refused: {refused[0]}"] if refused else []),
             deid_report=report,
             original={**first_original, "instances": [rep["_original"]["sop_instance_uid"] for _, rep in usable]},

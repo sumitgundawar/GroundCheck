@@ -3,6 +3,8 @@ models slice by slice with abstention and region heatmaps, and let a
 radiologist sign a report that's exported as a DICOM Structured Report.
 
 - dicom.py: reading files and zips, series assembly, pixels and windows
+- nifti.py: reading .nii and .nii.gz volumes (orientation, limits, no header text kept)
+- burnedin.py: finding text burned into pixels (OCR when installed, a classical detector always)
 - deid.py: DICOM de-identification (PS3.15 Basic Application Confidentiality Profile)
 - store.py: studies, series, analyses and reports in the database and on disk
 - analysis.py: the imaging model interface and the training-library adapter

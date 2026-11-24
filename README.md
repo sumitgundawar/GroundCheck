@@ -374,7 +374,7 @@ from the Ollama registry and the licence each model ships with. Models with
 non-commercial licences are left out. The recommended model is the best one
 that fits your machine with headroom.
 
-A selected local model takes precedence over a cloud model. You can also set
+With `LLM_PROVIDER` unset, a selected local model takes precedence over a cloud model. You can also set
 one without the dashboard: `ollama pull llama3.2:3b`, then
 `LOCAL_MODEL=llama3.2:3b`.
 
@@ -386,6 +386,28 @@ anywhere, or `none` to lock the choice.
 Small local models are slower and less capable than large cloud models. Expect
 several seconds to tens of seconds per answer on a laptop, and more refusals
 when a small model drafts claims the grounding check can't verify.
+
+### Choosing a model provider
+
+`LLM_PROVIDER` picks what drafts answers. Whichever it is, the draft goes
+through the same parsing, grounding and dosage checks, so a provider that
+returns a wrong dose is refused like any other draft, and a provider that
+times out, is rate limited (429), fails (5xx), is cut off, or returns empty or
+malformed output makes the answer fall back to extractive generation.
+
+| `LLM_PROVIDER` | Needs | Notes |
+| --- | --- | --- |
+| _unset_ | `LLM_API_KEY` (or `GROQ_API_KEY`) for a cloud model | The earlier behaviour: a model chosen in the dashboard first, then the OpenAI-compatible endpoint if a key is set, else extractive. |
+| `openai_compatible` | `LLM_API_KEY`, `LLM_BASE_URL`, `GEN_MODEL` | OpenAI, Groq, vLLM, LM Studio and anything speaking the chat completions protocol, with JSON mode. |
+| `anthropic` | `ANTHROPIC_API_KEY`, optional `GEN_MODEL`, `ANTHROPIC_BASE_URL` | The Messages API; the answer schema is passed as a forced tool. |
+| `azure_openai` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | The deployment name selects the model. |
+| `ollama` | A model chosen in the dashboard or `LOCAL_MODEL` | Local models only; no cloud call is ever made. |
+| `none` | | Always extractive. The decision logic is identical; only the drafting differs. |
+
+A provider named here is used on its own: a local model chosen in the
+dashboard is ignored. `GROQ_API_KEY` and `GROQ_BASE_URL` remain as aliases of
+`LLM_API_KEY` and `LLM_BASE_URL`. The question sent to any model has already
+had identifiers replaced with placeholders.
 
 ---
 
@@ -535,6 +557,12 @@ The dashboard is a client of a small JSON API. You can call it directly.
 | `GET /api/hazards` | The hazard log; `POST` adds and `PUT /api/hazards/{id}` updates a hazard |
 | `GET /api/governance/report` | Usage, refusal and review figures for the last `days` |
 | `GET /api/governance/safety-case` | A clinical safety case summary, as Markdown |
+| `POST /api/audit/{id}/feedback` | Thumbs up or down on an answer (`{"rating": "up"\|"down", "reason": "not_useful"\|"incomplete"\|"wrong"\|"too_slow", "comment": "..."}`); `GET` returns your own. "wrong" opens a high-priority review case |
+| `GET /api/metrics/adoption` | Adoption and value numbers (admin; `days`, or `from` and `to`, and `site` for group-wide admins) |
+| `GET /api/governance/pilot-report` | A pilot report for a site and period, as Markdown (admin) |
+| `GET /api/governance/evidence-pack` | The evidence pack zip for a safety officer (admin not tied to one site) |
+| `GET /api/governance/controls` | The control mapping matrix; `/controls.csv` for CSV (reviewer) |
+| `GET /api/telemetry` | What telemetry would send, field by field, and whether it is on (admin) |
 
 ```bash
 curl -X POST http://localhost:8000/api/ask \
@@ -550,6 +578,96 @@ are in `app/schemas.py`, and FastAPI serves interactive docs at `/docs`.
 To override thresholds or switch guards for a single request, add a `settings`
 object, for example `{"query": "...", "settings": {"top_k": 6,
 "enable_dosage_guard": false}}`. Configured defaults are never changed.
+
+### The versioned API for other programs (`/api/v1`)
+
+`/api/v1` is for machine clients: your own service, an EHR integration, another
+company's product. The dashboard keeps using `/api/*`, which is unchanged.
+Python and TypeScript clients are in `sdk/python` and `sdk/typescript`.
+
+**Keys.** An administrator makes a key with `POST /api/keys`
+(`{"name", "scopes", "site_id"?, "expires_in_days"?, "rpm_limit"?, "monthly_quota"?}`).
+The secret (`gck_...`) is in that one response and cannot be shown again; only a
+salted hash is stored. `GET /api/keys` lists keys and `POST /api/keys/{id}/revoke`
+stops one on its next request. Creating and revoking are written to the signed
+audit chain without the secret. A key belongs to one site or, with none, to the
+whole group, and has scopes:
+
+| Scope | Allows |
+| --- | --- |
+| `ask` | `POST /api/v1/ask`: the question goes through the full pipeline |
+| `verify` | `POST /api/v1/verify`: check an answer some other model wrote |
+| `usage` | `GET /api/v1/usage`: request counts |
+| `audit:read` | `GET /api/v1/audit/{id}`: one audit record from the key's own site |
+
+`GET /api/v1/health` needs no key and reveals only status, version and the
+number of indexed passages. Send the key as `Authorization: Bearer gck_...` or
+`X-API-Key`. A key in the URL (`?api_key=`, `?key=`, `?token=`...) is refused
+with 400, because URLs end up in logs.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/verify \
+  -H "Authorization: Bearer $GROUNDCHECK_API_KEY" -H "Content-Type: application/json" \
+  -d '{"question": "What is the standard dose of Caloradine?",
+       "answer": "Caloradine is 150 mg once daily."}'
+```
+
+`verify` splits the answer into claims and looks for each one in the approved
+sources (all of them, or only the `sources` ids you list). The result is
+`decision` `pass`, `fail` or `review`, a `reason_code`
+(`verified`, `claim_ungrounded`, `dose_unsupported`, `patient_unsafe`,
+`citation_invalid`, `answer_off_topic`, `claim_unverified`, `no_checkable_claims`,
+`no_relevant_source`, `input_blocked`), each claim with its supporting sentence,
+the doses that no source states, any patient findings, and an `audit_id`. It is
+strict in one direction: it passes only an answer in which every claim, number,
+unit, negation, frequency, route and population is stated by a source, and
+that answers what was asked. Doses are compared as quantities, so `0.015 g` is
+`15 mg`; millilitres are milligrams only where a source states the strength. An
+answer that is true but about another aspect than the question (side effects
+when the dose was asked) is `review`, and so is wording that cannot be matched.
+No model is called. A `fail` or `review` opens a review case, as a refusal does (not for an input the guards blocked).
+`/api/v1/ask` takes `question`, optional `site` (a site key) and `patient`, and
+returns the same body as `/api/ask`.
+
+**Limits.** A question is at most 400 characters and an answer 8,000, a body
+262,144 bytes; over any of these is 413. At most 20 `sources` ids (422). Control characters (null
+bytes included), invalid Unicode, wrong types, unknown fields and missing fields
+are 422. Neither echoes what was sent.
+
+**Errors** are always `{"error": {"code": "...", "message": "..."}}`, with
+`"details": [{"field", "message"}]` on 422:
+
+| Status | Codes |
+| --- | --- |
+| 400 | `api_key_in_query`, `bad_request` |
+| 401 | `missing_api_key`, `invalid_api_key`, `revoked_api_key`, `expired_api_key` |
+| 403 | `insufficient_scope`, `site_forbidden` |
+| 404 | `not_found` |
+| 413 | `payload_too_large` |
+| 422 | `validation_error`, `unknown_site`, `unknown_source` |
+| 429 | `rate_limited`, `quota_exceeded` (both with `Retry-After`) |
+| 500, 503 | `internal_error`, `service_unavailable` |
+
+Every response has `X-Request-Id` (a safe value you send is echoed). Every
+response to a request with a valid key has `X-RateLimit-Limit`,
+`X-RateLimit-Remaining` and `X-RateLimit-Reset` (seconds). The limit is per key
+per minute (`API_KEY_RPM`, or `rpm_limit` on the key) and applies to every
+endpoint. `monthly_quota` (or `API_KEY_MONTHLY_QUOTA`) caps evaluated `ask` and
+`verify` requests per calendar month (UTC); invalid requests do not use it, and
+it is given back if the server fails.
+
+**Usage.** `GET /api/v1/usage?group_by=key|day|site|endpoint|decision&from=YYYY-MM-DD&to=YYYY-MM-DD`
+(`format=csv` for a spreadsheet) counts requests by the decision they got:
+`answer`, `refuse`, `pass`, `fail`, `review`, or `error` (refused before
+evaluation: bad input, wrong scope, an unknown audit id) or `throttled` (429).
+Only evaluated `ask` and `verify` requests are `billable`. Counts only, never
+text. A request with no valid key is not attributable and is not counted. A key
+tied to a site sees that site's counts; a group-wide key sees all.
+
+The contract is `openapi/v1.json`. `tests/test_api_contract.py` fails on any
+change that would break a client (a removed or retyped field, a tightened
+limit, a new required field) and passes on additions; regenerate it with
+`python scripts/export_openapi.py` when you add something.
 
 ---
 
@@ -906,6 +1024,72 @@ workers the machine can run. Override any of them with `EMBED_BATCH_SIZE`,
 
 ---
 
+## Adoption, feedback and pilot reports
+
+**Feedback.** Under every answer a clinician can mark it useful or not, and for
+a thumbs down say why: not useful, incomplete, wrong, or too slow, with an
+optional comment. Feedback is stored apart from the audit record, which is
+signed and never changes. One person gives one rating per answer; rating again
+replaces it. Comments have identifiers replaced with placeholders before they
+are stored, and a comment that cannot be checked is dropped. "Wrong" on an
+answer also opens a high-priority review case, once per person and answer.
+
+**Adoption dashboard.** The Usage page has an adoption section for admins:
+weekly active clinicians, questions per clinician, answer rate, refusals by
+reason, feedback, review time to close, tests added from reviews and documents
+approved. Days are UTC days. Evaluation runs, administrative events and
+records marked `demo_seed` are not counted, and a site's admin sees only that
+site (documents are shared across sites).
+
+**Pilot report.** `GET /api/governance/pilot-report` (or the button on the
+Usage page) gives a Markdown report for a site and a period: usage, safety
+outcomes, the review loop, top refusal reasons, and a list of document gaps:
+terms the sources lacked, with how many questions each blocked. The report
+prints no question text. Terms from a question in which an identifier was
+found are withheld, as is any term that looks like a name or a number.
+
+**Evidence pack.** `GET /api/governance/evidence-pack` returns one zip: the
+safety case, the hazard log (CSV), the evaluation summaries, the audit-chain
+verification result, the release history, the incident register (titles with
+identifiers removed; no free text), the dependency list, the SBOM and
+dependency audit when CI has produced them, and a configuration snapshot that
+is an allow-list and says only whether each credential is set. `manifest.json`
+holds the SHA-256 of every file and `manifest.sig` the manifest's digest (an
+HMAC under the audit signing key when one is configured). Building it twice
+from the same data gives the same bytes.
+
+**Control mapping.** `compliance/controls.yaml` maps HIPAA Security Rule,
+GDPR, SOC 2 and ISO 27001 Annex A controls to product features and evidence,
+each marked supported by product, customer responsibility or not addressed,
+with an evidence file or an explicit "none". It is shown on the Review page
+(Controls tab), and `python scripts/controls_report.py --check` fails on a
+missing status, a missing pointer or evidence that is not a file. The
+matrix always carries the statement that no certification is held.
+
+### Install telemetry
+
+Off by default. With `TELEMETRY=on` and `TELEMETRY_URL` set, once a week the
+install posts exactly these fields and nothing else. No question, answer, user,
+site, host name, address, document or setting value is ever sent. A failed
+post is dropped silently. The admin page shows the same table and a sample
+before anything is enabled; enabling means setting the variable and restarting.
+
+<!-- telemetry-fields -->
+| Field | Meaning |
+| --- | --- |
+| `schema` | Version of this payload format (an integer). |
+| `install_id` | A random identifier generated on first send. Not derived from anything about the machine or organisation. |
+| `version` | The GroundCheckHealth version, for example 1.0.0. |
+| `db_kind` | The database engine: sqlite, postgresql or mysql. |
+| `llm_provider_kind` | How answers are drafted: extractive (no model), local, or cloud. Not the provider, model or address. |
+| `week_start` | The Monday (UTC date) of the week the counts cover. |
+| `requests_bucket` | Questions asked that week, as a range: 0, 1-9, 10-99, 100-999, 1000-9999 or 10000+. |
+| `answers_bucket` | Of those, answered, as a range. |
+| `refusals_bucket` | Of those, refused, as a range. |
+<!-- /telemetry-fields -->
+
+---
+
 ## Knowledge releases and rollback
 
 Every rebuild of the search index, whether after a document is approved or
@@ -1023,12 +1207,21 @@ evidence, and a qualified person reviews and signs it.
 ## Configuration
 
 All settings are read from the environment with safe defaults (`app/config.py`).
-The only one you may want to set is `GROQ_API_KEY`.
+The only ones you may want to set are `LLM_PROVIDER` and its key.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GROQ_API_KEY` | _empty_ | Enables the live LLM. Empty means extractive mode. |
-| `GROQ_BASE_URL` | `https://api.groq.com/openai/v1` | Any OpenAI-compatible endpoint that supports JSON output mode. |
+| `LLM_PROVIDER` | _empty_ | `openai_compatible`, `anthropic`, `azure_openai`, `ollama` or `none`. See [Choosing a model provider](#choosing-a-model-provider). |
+| `LLM_API_KEY` | _empty_ | Key for an OpenAI-compatible endpoint. `GROQ_API_KEY` is an alias. Empty means extractive mode. |
+| `LLM_BASE_URL` | `https://api.groq.com/openai/v1` | Any OpenAI-compatible endpoint that supports JSON output mode. `GROQ_BASE_URL` is an alias. |
+| `ANTHROPIC_API_KEY` | _empty_ | Key for `LLM_PROVIDER=anthropic`. |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | The Anthropic API address. |
+| `AZURE_OPENAI_API_KEY` | _empty_ | Key for `LLM_PROVIDER=azure_openai`. |
+| `AZURE_OPENAI_ENDPOINT` | _empty_ | For example `https://your-resource.openai.azure.com`. |
+| `AZURE_OPENAI_DEPLOYMENT` | _empty_ | The deployment to call. |
+| `AZURE_OPENAI_API_VERSION` | `2024-10-21` | The API version to request. |
+| `TELEMETRY` | `off` | `on` sends the anonymous weekly counts described under [Install telemetry](#install-telemetry). |
+| `TELEMETRY_URL` | _empty_ | Where telemetry is posted (HTTPS). With none, nothing is sent even when on. |
 | `DATABASE_URL` | `sqlite:///data/groundcheck.db` | Where users, sessions and audit records are stored. |
 | `AUTH_REQUIRED` | `false` | Require sign-in for every API request. |
 | `SESSION_HOURS` | `12` | How long a sign-in lasts. |
@@ -1155,6 +1348,9 @@ pytest -q                                   # 415 tests, including property-base
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
 python scripts/stress_eval.py               # all 265,778 cases (about an hour on 7 cores)
 python scripts/guard_eval.py                # the grounding and dosage guards, against wrong claims
+python scripts/verify_eval.py               # POST /api/v1/verify against right and wrong answers (any wrong pass fails)
+python scripts/export_openapi.py            # rewrite openapi/v1.json after a compatible API change
+(cd sdk/typescript && npm ci && npm test)   # the TypeScript client; sdk/python has its own tests
 scripts/container_smoke.sh groundcheck:test # the built image, the way a site runs it
 cd tests/ui && npm install && npm test      # the browser app, end to end
 python scripts/soak.py --requests 100000    # steady load against a running instance

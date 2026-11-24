@@ -142,7 +142,7 @@ def _check_links(s, data: dict, site_id: int | None = None) -> dict:
     if audit:
         from .db import AuditRecord
 
-        if s.scalar(select(AuditRecord.id).where(AuditRecord.audit_id == audit)) is None:
+        if s.scalar(select(AuditRecord.id).where(AuditRecord.audit_id == audit, AuditRecord.decision != "event")) is None:
             raise IncidentError(f"There's no audit record {audit}.")
     links["audit_id"] = audit or None
     return links

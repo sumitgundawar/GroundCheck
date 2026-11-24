@@ -16,6 +16,8 @@
     python -m app.cli pack build SRC_DIR OUT.gcpack [--sign-key publisher.key]
     python -m app.cli pack inspect FILE.gcpack
     python -m app.cli pack import FILE.gcpack [--override --reason TEXT] [--allow-downgrade]
+    python -m app.cli tenant create --key acme --name "Acme Clinic" --admin-email admin@acme.org
+                                    [--generate-password] [--scopes ask,verify] [--rpm N] [--monthly-quota N]
 
 Passwords are always prompted for, never passed as arguments, so they don't
 end up in shell history."""
@@ -73,6 +75,21 @@ def main(argv: list[str] | None = None) -> int:
     load.add_argument("--override", action="store_true", help="Import although the pack is unsigned or untrusted")
     load.add_argument("--reason", default="", help="Why the override is justified (recorded in the audit trail)")
     load.add_argument("--allow-downgrade", action="store_true", help="Import a version older than one already imported")
+    tenant = sub.add_parser("tenant", help="Provision tenants (sites) for hosted use")
+    tenant_sub = tenant.add_subparsers(dest="tenant_command", required=True)
+    tcreate = tenant_sub.add_parser("create", help="Create a site, its admin, an API key and a quota in one step")
+    tcreate.add_argument("--key", required=True, help="Short lower-case name for the site, such as st-marys")
+    tcreate.add_argument("--name", required=True, help="The site's display name")
+    tcreate.add_argument("--admin-email", required=True)
+    tcreate.add_argument("--admin-name", default="")
+    tcreate.add_argument("--generate-password", action="store_true",
+                         help="Make a strong password for the admin and print it once, instead of prompting")
+    tcreate.add_argument("--key-name", default="", help="Name for the API key")
+    tcreate.add_argument("--scopes", default="ask,verify", help="Comma-separated API key scopes")
+    tcreate.add_argument("--rpm", type=int, default=None, help="API key requests per minute")
+    tcreate.add_argument("--monthly-quota", type=int, default=None, help="API key requests per month")
+    tcreate.add_argument("--expires-days", type=float, default=None, help="API key lifetime in days")
+    tcreate.add_argument("--json", action="store_true", help="Print the result as JSON (it includes the secrets, once)")
     args = parser.parse_args(argv)
 
     if args.command == "pack" and args.pack_command in ("keygen", "build", "inspect"):
@@ -145,6 +162,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{head['seq']} {head['hash']} {head['updated_at']}")
         elif args.command == "pack":
             return _pack_import(args)
+        elif args.command == "tenant":
+            return _tenant_create(args)
         elif args.command == "retention":
             from . import retention
 
@@ -164,6 +183,35 @@ def main(argv: list[str] | None = None) -> int:
     except auth.AuthError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
+    return 0
+
+
+def _tenant_create(args) -> int:
+    import json
+    import secrets
+
+    from . import apikeys, sites
+
+    generated = args.generate_password
+    password = secrets.token_urlsafe(18) if generated else _prompt_password()
+    scopes = [x.strip() for x in args.scopes.split(",") if x.strip()]
+    try:
+        made = sites.provision(args.key, args.name, args.admin_email, password, admin_name=args.admin_name,
+                               key_name=args.key_name, scopes=scopes, rpm_limit=args.rpm, monthly_quota=args.monthly_quota,
+                               expires_in_days=args.expires_days)
+    except (sites.SiteError, apikeys.ApiKeyError) as exc:
+        print(f"Error: {getattr(exc, 'message', None) or exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({**made, **({"admin_password": password} if generated else {})}, indent=2))
+        return 0
+    key = made["api_key"]
+    print(f"Created site {made['site']['key']} (id {made['site']['id']}) with admin {made['admin']['email']}.")
+    if generated:
+        print(f"Admin password (shown once): {password}")
+    print(f"API key {key['prefix']}... scopes {','.join(key['scopes'])}, "
+          f"{key['rpm_limit'] or 'default'} requests/minute, {key['monthly_quota'] or 'no'} monthly quota.")
+    print(f"API key secret (shown once, store it now): {key['key']}")
     return 0
 
 

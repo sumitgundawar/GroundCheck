@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
+import os
+import re
 import secrets
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
@@ -24,9 +27,10 @@ from urllib.parse import urlencode
 import httpx
 from sqlalchemy import delete, select
 
-from . import config, db, fhir
+from . import config, db, fhir, fhir_profiles
 from .db import EhrContext, EhrLaunch, utcnow
 
+log = logging.getLogger("groundcheck.ehr")
 LAUNCH_MINUTES = 10
 # Tests replace this with a mock transport; None uses the network.
 transport: httpx.BaseTransport | None = None
@@ -34,6 +38,33 @@ transport: httpx.BaseTransport | None = None
 
 class SmartError(Exception):
     """A launch or EHR load failed. The message is safe to show."""
+
+
+def _flag(name: str) -> bool:
+    return os.environ.get(name, "false").strip().lower() in ("1", "true", "yes")
+
+
+def provenance_enabled() -> bool:
+    """Write a Provenance next to a saved note. Off unless SMART_WRITE_PROVENANCE is set."""
+    return _flag("SMART_WRITE_PROVENANCE")
+
+
+def audit_event_enabled() -> bool:
+    """Also write an AuditEvent. Needs SMART_WRITE_PROVENANCE and SMART_WRITE_AUDITEVENT."""
+    return provenance_enabled() and _flag("SMART_WRITE_AUDITEVENT")
+
+
+def scope_allows_write(granted: str, resource: str) -> bool:
+    """Whether a space-separated list of SMART scopes lets us create `resource`
+    (SMART v1 .write/.*, or v2 letters containing c)."""
+    for scope in str(granted or "").split():
+        match = re.fullmatch(r"(?:patient|user|system)/([A-Za-z*]+)\.([A-Za-z*]+)", scope)
+        if not match or match.group(1) not in (resource, "*"):
+            continue
+        ops = match.group(2)
+        if ops in ("*", "write") or (set(ops) <= set("cruds") and "c" in ops):
+            return True
+    return False
 
 
 def enabled() -> bool:
@@ -88,6 +119,10 @@ def start(issuer: str, launch: str | None, base_url: str) -> tuple[str, str]:
                         token_endpoint=document["token_endpoint"], created_at=now,
                         expires_at=now + timedelta(minutes=LAUNCH_MINUTES)))
     scopes = config.SMART_SCOPES + (" patient/DocumentReference.write" if config.SMART_WRITE_NOTES else "")
+    if config.SMART_WRITE_NOTES and provenance_enabled():
+        scopes += " patient/Provenance.write"
+        if audit_event_enabled():
+            scopes += " patient/AuditEvent.write"
     params = {"response_type": "code", "client_id": config.SMART_CLIENT_ID, "redirect_uri": redirect_url(base_url),
               "scope": scopes if launch else scopes.replace("launch ", "", 1),
               "state": state, "aud": issuer, "code_challenge": challenge, "code_challenge_method": "S256"}
@@ -132,7 +167,8 @@ def finish(code: str, state: str, cookie_state: str | None, base_url: str) -> st
     access = None
     if can_write:
         expires_in = tokens.get("expires_in") if isinstance(tokens.get("expires_in"), int) else 3600
-        access = {"token": tokens["access_token"], "expires_at": (utcnow() + timedelta(seconds=expires_in)).isoformat()}
+        access = {"token": tokens["access_token"], "expires_at": (utcnow() + timedelta(seconds=expires_in)).isoformat(),
+                  "scope": granted}
     return save(loaded, access)
 
 
@@ -241,11 +277,11 @@ def write_note(context_token: str | None, record: dict, reviewer: str, comment: 
         "category": [{"coding": [{"system": "http://hl7.org/fhir/us/core/CodeSystem/us-core-documentreference-category",
                                   "code": "clinical-note", "display": "Clinical Note"}]}],
         "subject": {"reference": data["source"]["patient"]},
-        "date": now.isoformat(),
+        "date": fhir.instant(now),
         "author": [{"display": reviewer}],
         "description": f"GroundCheckHealth: {str(record.get('redacted_query', ''))[:120]}",
         "content": [{"attachment": {"contentType": "text/plain; charset=utf-8", "title": "GroundCheckHealth answer",
-                                    "creation": now.isoformat(),
+                                    "creation": fhir.instant(now),
                                     "data": base64.b64encode(text.encode("utf-8")).decode("ascii")}}],
         "context": {"related": [{"identifier": {"system": "https://groundcheckhealth.com/audit",
                                                 "value": record.get("audit_id", "")}}]},
@@ -265,8 +301,80 @@ def write_note(context_token: str | None, record: dict, reviewer: str, comment: 
     location = response.headers.get("location", "")
     try:
         created_id = response.json().get("id") if response.content else None
-    except ValueError:
+    except (ValueError, AttributeError):
         created_id = None
     if not created_id and "/DocumentReference/" in location:
         created_id = location.split("/DocumentReference/", 1)[1].split("/")[0]
-    return {"id": created_id, "reference": f"DocumentReference/{created_id}" if created_id else None, "text": text}
+    result = {"id": created_id, "reference": f"DocumentReference/{created_id}" if created_id else None, "text": text}
+    result.update(write_provenance(data, access, result["reference"], record, reviewer, now))
+    return result
+
+
+def _audit_failure(what: str, detail: dict) -> None:
+    from . import integrity
+
+    log.warning("EHR write-back of %s failed: %s", what, detail.get("reason", ""))
+    try:
+        integrity.record_event("ehr_writeback_failed", {"resource": what, **detail})
+    except Exception as exc:  # noqa: BLE001 - recording the failure must not become a second failure
+        log.error("Couldn't audit the failed %s write-back: %s", what, exc)
+
+
+def _create(server: str, token: str, resource: dict) -> tuple[str | None, str | None]:
+    """POST a resource. Returns (id, None) or (None, reason)."""
+    problems = fhir_profiles.validate_r4(resource)
+    if problems:
+        return None, f"not sent, invalid FHIR: {problems[0]}"
+    try:
+        with httpx.Client(timeout=15.0, transport=transport, follow_redirects=False) as client:
+            response = client.post(f"{server}/{resource['resourceType']}", json=resource,
+                                   headers={"Authorization": f"Bearer {token}", "Content-Type": "application/fhir+json",
+                                            "Accept": "application/fhir+json"})
+    except httpx.HTTPError:
+        return None, "couldn't reach the EHR"
+    if response.status_code not in (200, 201):
+        return None, f"the EHR answered {response.status_code}"
+    try:
+        new_id = response.json().get("id") if response.content else None
+    except (ValueError, AttributeError):
+        new_id = None
+    marker = f"/{resource['resourceType']}/"
+    if not new_id and marker in response.headers.get("location", ""):
+        new_id = response.headers["location"].split(marker, 1)[1].split("/")[0]
+    return new_id or "", None
+
+
+def write_provenance(data: dict, access: dict, document: str | None, record: dict, reviewer: str, now) -> dict:
+    """After a note is saved: its Provenance and, if enabled, an AuditEvent.
+    Never raises. A failure leaves the saved note alone and is recorded in the
+    audit trail. Returns {"provenance": ..., "audit_event": ...} statuses."""
+    out: dict = {}
+    if not provenance_enabled():
+        return out
+    if not document:
+        out["provenance"] = {"status": "skipped", "reason": "the EHR didn't say where the note was saved"}
+        return out
+    server, token = data["source"]["server"], access["token"]
+    audit_id = str(record.get("audit_id", ""))
+    granted = access.get("scope")
+    plan = [("Provenance", lambda: fhir.build_provenance(document, audit_id, reviewer, now), "provenance")]
+    if audit_event_enabled():
+        plan.append(("AuditEvent", lambda: fhir.build_audit_event(document, data["source"]["patient"], audit_id, reviewer,
+                                                                   "0", now), "audit_event"))
+    for name, build, key in plan:
+        try:
+            resource = build()
+            if granted is not None and not scope_allows_write(granted, name):
+                out[key] = {"status": "not_permitted", "reason": f"the EHR didn't grant permission to write {name}"}
+                _audit_failure(name, {"document": document, "audit_id_ref": audit_id, "reason": out[key]["reason"]})
+                continue
+            new_id, reason = _create(server, token, resource)
+            if reason:
+                out[key] = {"status": "failed", "reason": reason}
+                _audit_failure(name, {"document": document, "audit_id_ref": audit_id, "reason": reason})
+            else:
+                out[key] = {"status": "written", "reference": f"{name}/{new_id}" if new_id else None}
+        except Exception as exc:  # noqa: BLE001 - the note is already saved; never fail the answer over this
+            out[key] = {"status": "failed", "reason": type(exc).__name__}
+            _audit_failure(name, {"document": document, "audit_id_ref": audit_id, "reason": type(exc).__name__})
+    return out

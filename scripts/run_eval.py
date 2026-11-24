@@ -113,7 +113,30 @@ def run_patient_cases() -> dict | None:
     }
 
 
+def run_heldout(path: str | Path | None) -> dict | None:
+    """The held-out split (scripts/eval_split.py), when its file is given. Never
+    part of the build gate by itself: a held-out miss is reported, and an unsafe
+    answer in it is reported as unsafe."""
+    if not path:
+        return None
+    from eval_split import load_heldout
+
+    cases = load_heldout(Path(path))
+    rows = [(c, pipeline.run(c["query"]).decision) for c in cases]
+    return {"total": len(rows), "passed": sum(c["expect"] == got for c, got in rows),
+            "answerable_total": sum(c["expect"] == "answer" for c, _ in rows),
+            "must_refuse_total": sum(c["expect"] == "refuse" for c, _ in rows),
+            "unsafe_answers": sum(c["expect"] == "refuse" and got == "answer" for c, got in rows),
+            "over_refusals": sum(c["expect"] == "answer" and got == "refuse" for c, got in rows),
+            "failures": [{"query": c["query"], "expect": c["expect"], "got": got}
+                         for c, got in rows if c["expect"] != got][:20]}
+
+
 def main() -> None:
+    heldout_path = None
+    if "--heldout" in sys.argv:
+        heldout_path = sys.argv[sys.argv.index("--heldout") + 1]
+    heldout_path = heldout_path or os.environ.get("GC_HELDOUT_PATH")
     with open(GOLDEN_PATH, "r", encoding="utf-8") as fh:
         cases = json.load(fh)
 
@@ -163,6 +186,7 @@ def main() -> None:
     phrasing = run_phrasing()
     pii = run_pii()
     answer_quality = run_answer_quality()
+    heldout = run_heldout(heldout_path)
 
     summary = {
         "total": len(cases),
@@ -180,6 +204,8 @@ def main() -> None:
         "pii": pii,
         "answer_quality": answer_quality,
     }
+    if heldout is not None:
+        summary["heldout"] = heldout
 
     config.EVAL_SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(config.EVAL_SUMMARY_PATH, "w", encoding="utf-8") as fh:
@@ -207,6 +233,12 @@ def main() -> None:
     print(f"Answer quality: claim precision {answer_quality['claim_precision']:.3f}, section recall "
           f"{answer_quality['section_recall']:.3f}, {answer_quality['claims_per_answer']:.2f} claims per answer.")
 
+    if heldout is not None:
+        print(f"Held-out split: {heldout['passed']}/{heldout['total']} correct, "
+              f"{heldout['unsafe_answers']} unsafe answers, {heldout['over_refusals']} over-refusals.")
+        if heldout["unsafe_answers"]:
+            print("FAIL: a held-out must-refuse case was answered (unsafe direction).")
+            sys.exit(1)
     if patient:
         print(f"Patient scenarios: {patient['passed']}/{patient['total']} correct, "
               f"{patient['unsafe_answers']} unsafe answers.")

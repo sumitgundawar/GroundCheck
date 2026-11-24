@@ -1,0 +1,199 @@
+# Register of the machine-learning models GroundCheckHealth uses or ships: what each is,
+# its version and licence, what it is for and what it must not be used for.
+# `python scripts/soup_list.py` checks it is complete: every default model in app/config.py
+# and every model in the Local AI catalogue must be listed, with the fields below.
+#
+# Intended use is a statement about this software, not a claim about the model in general.
+# No model here makes the answer/refuse decision: that is deterministic code (see
+# GC-REQ-006), and every generated claim is re-checked against the sources.
+
+models:
+  - id: embed-minilm
+    kind: embedding
+    name: sentence-transformers/all-MiniLM-L6-v2
+    version: "unpinned: the revision current at install time (record it in the deployment's release notes)"
+    provider: Sentence-Transformers / Microsoft (Hugging Face Hub)
+    licence: Apache-2.0
+    config_key: EMBED_MODEL
+    intended_use: Ranks approved source passages by similarity to a de-identified question, alongside keyword (BM25) scoring.
+    not_for: Deciding whether to answer; generating text; any language other than English.
+    data_leaves_machine: false
+    notes: Runs locally after a one-off download. English only.
+
+  - id: gen-llama33-70b
+    kind: generation
+    name: llama-3.3-70b-versatile
+    version: "as served by the provider; not pinned"
+    provider: Groq (OpenAI-compatible API), model by Meta
+    licence: Llama 3.3 Community License (served under the provider's terms)
+    config_key: GEN_MODEL
+    intended_use: Drafts claims, each citing a retrieved source passage, from a de-identified question and approved passages.
+    not_for: Answering without sources; any decision that is not re-checked by the deterministic guards.
+    data_leaves_machine: true
+    notes: Only de-identified text and approved passages are sent. Off when no key is set; extractive mode uses no model.
+
+  - id: judge-llama31-8b
+    kind: judge
+    name: llama-3.1-8b-instant
+    version: "as served by the provider; not pinned"
+    provider: Groq (OpenAI-compatible API), model by Meta
+    licence: Llama 3.1 Community License (served under the provider's terms)
+    config_key: JUDGE_MODEL
+    intended_use: A second opinion on whether a claim is supported by its cited passage. Its verdict can only add a refusal.
+    not_for: Turning a refusal into an answer.
+    data_leaves_machine: true
+    notes: Same data handling as the generation model.
+
+  - id: local-gemma3-1b
+    kind: generation
+    name: "gemma3:1b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Google (via Ollama)
+    licence: Gemma Terms of Use
+    intended_use: Local drafting of claims on a machine with little memory; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel; weights are the user's download.
+
+  - id: local-llama32-1b
+    kind: generation
+    name: "llama3.2:1b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Meta (via Ollama)
+    licence: Llama 3.2 Community License
+    intended_use: Local drafting of claims on a machine with little memory; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: local-llama32-3b
+    kind: generation
+    name: "llama3.2:3b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Meta (via Ollama)
+    licence: Llama 3.2 Community License
+    intended_use: Local drafting of claims; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: local-phi4-mini
+    kind: generation
+    name: phi4-mini
+    version: "Ollama tag as downloaded by the user"
+    provider: Microsoft (via Ollama)
+    licence: MIT
+    intended_use: Local drafting of claims; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: local-gemma3-4b
+    kind: generation
+    name: "gemma3:4b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Google (via Ollama)
+    licence: Gemma Terms of Use
+    intended_use: Local drafting of claims; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: local-mistral-7b
+    kind: generation
+    name: "mistral:7b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Mistral AI (via Ollama)
+    licence: Apache-2.0
+    intended_use: Local drafting of claims; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: local-llama31-8b
+    kind: generation
+    name: "llama3.1:8b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Meta (via Ollama)
+    licence: Llama 3.1 Community License
+    intended_use: Local drafting of claims; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: local-qwen25-7b
+    kind: generation
+    name: "qwen2.5:7b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Alibaba Cloud (via Ollama)
+    licence: Apache-2.0
+    intended_use: Local drafting of claims; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: local-gemma3-12b
+    kind: generation
+    name: "gemma3:12b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Google (via Ollama)
+    licence: Gemma Terms of Use
+    intended_use: Local drafting of claims; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: local-qwen25-14b
+    kind: generation
+    name: "qwen2.5:14b"
+    version: "Ollama tag as downloaded by the user"
+    provider: Alibaba Cloud (via Ollama)
+    licence: Apache-2.0
+    intended_use: Local drafting of claims; the guards decide.
+    not_for: Clinical decisions without the deterministic checks.
+    data_leaves_machine: false
+    notes: Chosen in the Local AI panel.
+
+  - id: ner-spacy-en-core-web-sm
+    kind: ner
+    name: en_core_web_sm
+    version: "as installed with spaCy; not pinned"
+    provider: Explosion (spaCy)
+    licence: MIT
+    intended_use: Optional proposal of person names for de-identification. A known clinical term is never replaced.
+    not_for: Deciding that text is free of identifiers.
+    data_leaves_machine: false
+    notes: Optional; de-identification works without it (see GC-REQ-018).
+
+  - id: ner-presidio-analyzer
+    kind: ner
+    name: presidio-analyzer
+    version: "as installed; not pinned"
+    provider: Microsoft Presidio
+    licence: MIT
+    intended_use: Optional second detector for personal data in questions.
+    not_for: Deciding that text is free of identifiers.
+    data_leaves_machine: false
+    notes: Optional.
+
+  - id: imaging-demo-organamnist
+    kind: imaging
+    name: Abdominal CT organ classifier (small CNN trained on OrganAMNIST 64px)
+    version: "trained 2026-09-17; validation accuracy 0.989, test accuracy 0.963 (synthetic-split benchmark)"
+    provider: Trained with GroundCheckHealth's training studio
+    licence: "Model: MIT with the repository. Training data: OrganAMNIST (MedMNIST v2, CC BY 4.0, derived from the LiTS CT collection)."
+    intended_use: Demonstration of the imaging pipeline with abstention on unfamiliar images. Research and evaluation only.
+    not_for: Any clinical use. It is not a medical device and has no external validation.
+    data_leaves_machine: false
+    notes: Organ-centred crops, not full slices; abstains on most real scans.
+
+  - id: imaging-demo-pneumoniamnist
+    kind: imaging
+    name: "Paediatric chest X-ray: pneumonia (small CNN trained on PneumoniaMNIST 64px)"
+    version: "trained 2026-09-17; validation accuracy 0.963, test accuracy 0.894 (benchmark split)"
+    provider: Trained with GroundCheckHealth's training studio
+    licence: "Model: MIT with the repository. Training data: PneumoniaMNIST (MedMNIST v2, CC BY 4.0, from Kermany et al. chest X-ray images)."
+    intended_use: Demonstration of the imaging pipeline. Research and evaluation only.
+    not_for: Any clinical use. It is not a medical device and has no external validation.
+    data_leaves_machine: false
+    notes: One institution's paediatric images; does not generalise.

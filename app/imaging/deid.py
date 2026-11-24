@@ -12,13 +12,19 @@ Characteristics and Clean Descriptors options.
 - Descriptions are kept after removing the patient's own name and IDs from
   them, then text de-identification (app/deid.py)
 - Images marked as having burned-in annotations are refused, because text in
-  the pixels can't be removed reliably
+  the pixels can't be removed reliably. The tag is never trusted to say "no":
+  every image's pixels are also searched for text (burnedin.py). Text found is
+  blacked out (IMAGING_BURNED_IN_ACTION=redact, the default) or the image is
+  refused (=block), and the result is searched again; if text is still found,
+  or the search can't be run, the image is refused. No setting lets a flagged
+  image through as it was. Not finding text is never reported as "clean".
 
 The dataset records what was done (PatientIdentityRemoved, DeidentificationMethod)."""
 
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 
 from pydicom.dataset import Dataset
@@ -27,6 +33,7 @@ from pydicom.uid import generate_uid
 
 from .. import config
 from ..deid import deidentify as deidentify_text
+from . import burnedin
 
 # Emptied (type 2 attributes that must stay present) or removed.
 EMPTY = {
@@ -141,11 +148,43 @@ def _clean(ds: Dataset, report: dict, known: list[tuple[re.Pattern, str]]) -> No
             report["emptied"] += 1
 
 
-def deidentify(ds: Dataset) -> dict:
-    """De-identify a dataset in place and return what was done."""
+def burned_in_action() -> str:
+    """"redact" or "block". Anything else means redact: no value skips the check."""
+    return "block" if os.environ.get("IMAGING_BURNED_IN_ACTION", "redact").strip().lower() == "block" else "redact"
+
+
+def _burned_in(ds: Dataset, deep: bool) -> dict:
+    """Search the pixels for text and deal with what is found. Raises DeidError rather than let a flagged or unchecked image through."""
+    if "PixelData" not in ds:
+        return {"burned_in_flagged": 0, "burned_in_redacted": 0}
+    try:
+        found = burnedin.scan_dataset(ds, deep=deep)
+    except Exception as exc:  # noqa: BLE001 - an image that can't be checked is not let through
+        raise DeidError("The image's pixels couldn't be checked for burned-in text, so it was refused.") from exc
+    if not found.flagged:
+        return {"burned_in_flagged": 0, "burned_in_redacted": 0}
+    if found.reason.startswith(("too busy", "too large")):
+        raise DeidError("The image is too complex to check for burned-in text, so it was refused.")
+    if burned_in_action() == "block":
+        raise DeidError("Text was found in the image's pixels (possibly patient details), so it was refused.")
+    try:
+        burnedin.redact_dataset(ds, found.regions)
+        again = burnedin.scan_dataset(ds, deep=deep)
+    except Exception as exc:  # noqa: BLE001
+        raise DeidError("Text found in the image's pixels couldn't be removed, so it was refused.") from exc
+    if again.flagged:
+        raise DeidError("Text found in the image's pixels couldn't be removed, so it was refused.")
+    return {"burned_in_flagged": 1, "burned_in_redacted": len(found.regions)}
+
+
+def deidentify(ds: Dataset, deep: bool = True) -> dict:
+    """De-identify a dataset in place and return what was done. `deep` adds the
+    slower search for slanted text; callers de-identifying many slices of one
+    series use it for the first and not the rest."""
     if str(ds.get("BurnedInAnnotation", "")).upper() == "YES":
         raise DeidError("This image says it has patient details burned into the pixels, which can't be removed safely.")
     report = {"removed": 0, "emptied": 0, "private_removed": 0, "uids_replaced": 0, "descriptors_cleaned": 0}
+    report.update(_burned_in(ds, deep))
     _clean(ds, report, _known_identifiers(ds))
     if getattr(ds, "file_meta", None) is not None and "MediaStorageSOPInstanceUID" in ds.file_meta:
         ds.file_meta.MediaStorageSOPInstanceUID = ds.SOPInstanceUID
@@ -154,7 +193,8 @@ def deidentify(ds: Dataset) -> dict:
     codes = []
     for value, meaning in (("113100", "Basic Application Confidentiality Profile"),
                            ("113108", "Retain Patient Characteristics Option"),
-                           ("113105", "Clean Descriptors Option")):
+                           ("113105", "Clean Descriptors Option"),
+                           *((("113101", "Clean Pixel Data Option"),) if report["burned_in_redacted"] else ())):
         item = Dataset()
         item.CodeValue, item.CodingSchemeDesignator, item.CodeMeaning = value, "DCM", meaning
         codes.append(item)

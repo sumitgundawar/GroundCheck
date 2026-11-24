@@ -20,13 +20,14 @@ issuer (with its access token) are contacted."""
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
 import httpx
 
-from . import config
+from . import config, fhir_profiles
 from .schemas import PatientContext
 
 LOINC = "http://loinc.org"
@@ -63,18 +64,19 @@ def _clip(text: str, n: int = 80) -> str:
 
 
 def concept_text(concept: dict | None) -> str:
-    if not concept:
+    if not isinstance(concept, dict):
         return ""
-    if concept.get("text"):
+    if isinstance(concept.get("text"), str) and concept["text"]:
         return concept["text"]
-    for coding in concept.get("coding", []):
-        if coding.get("display"):
+    for coding in concept.get("coding") if isinstance(concept.get("coding"), list) else []:
+        if isinstance(coding, dict) and isinstance(coding.get("display"), str) and coding["display"]:
             return coding["display"]
     return ""
 
 
 def _codes(concept: dict | None) -> list[tuple[str, str]]:
-    return [(c.get("system", ""), c.get("code", "")) for c in (concept or {}).get("coding", [])]
+    coding = concept.get("coding") if isinstance(concept, dict) else None
+    return [(c.get("system", ""), c.get("code", "")) for c in coding or [] if isinstance(c, dict)] if isinstance(coding, list) else []
 
 
 def _status(resource: dict, field: str) -> str:
@@ -93,12 +95,13 @@ def validate_base_url(url: str, allowed: list[str]) -> str:
 
 
 class FhirClient:
-    def __init__(self, base_url: str, token: str | None = None, transport: httpx.BaseTransport | None = None):
+    def __init__(self, base_url: str, token: str | None = None, transport: httpx.BaseTransport | None = None,
+                 timeout: float = 15.0):
         self.base_url = base_url.rstrip("/")
         headers = {"Accept": "application/fhir+json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        self._http = httpx.Client(timeout=15.0, headers=headers, transport=transport, follow_redirects=False)
+        self._http = httpx.Client(timeout=timeout, headers=headers, transport=transport, follow_redirects=False)
 
     def close(self) -> None:
         self._http.close()
@@ -124,20 +127,31 @@ class FhirClient:
         if response.status_code >= 400:
             raise FhirError(f"The FHIR server returned an error ({response.status_code}).")
         try:
-            return response.json()
+            body = response.json()
         except ValueError as exc:
             raise FhirError("The FHIR server didn't return FHIR JSON.") from exc
+        if not isinstance(body, dict):
+            raise FhirError("The FHIR server didn't return FHIR JSON.")
+        return body
 
     def search(self, resource: str, params: dict, max_pages: int = 5) -> list[dict]:
         bundle = self.get(resource, {**params, "_count": params.get("_count", 100)})
         found: list[dict] = []
         for _ in range(max_pages):
-            found += [e["resource"] for e in bundle.get("entry", []) if e.get("resource", {}).get("resourceType") == resource]
-            next_link = next((l["url"] for l in bundle.get("link", []) if l.get("relation") == "next"), None)
+            found += _bundle_entries(bundle, resource)
+            next_link = next((l["url"] for l in bundle.get("link", []) if isinstance(l, dict) and l.get("relation") == "next"
+                              and isinstance(l.get("url"), str)), None)
             if not next_link:
                 break
             bundle = self.get(next_link)
         return found
+
+
+def _bundle_entries(bundle, resource_type: str) -> list[dict]:
+    if not isinstance(bundle, dict) or not isinstance(bundle.get("entry"), list):
+        return []
+    return [e["resource"] for e in bundle["entry"]
+            if isinstance(e, dict) and isinstance(e.get("resource"), dict) and e["resource"].get("resourceType") == resource_type]
 
 
 @dataclass
@@ -146,22 +160,30 @@ class EhrPatient:
     source: dict
     observations: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    serious: list[str] = field(default_factory=list)   # data that was unreadable or invalid, so a check may be missing
 
 
 def _age(birth: str, today: date) -> float | None:
+    if not isinstance(birth, str) or len(birth) < 4:
+        return None
     try:
         born = date.fromisoformat(birth[:10]) if len(birth) >= 10 else date(int(birth[:4]), int(birth[5:7] or 1), 1)
     except ValueError:
         return None
+    if born > today:
+        return None
     years = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+    if years > 130:
+        return None
     if years < 2:
         return round((today - born).days / 365.25, 2)
     return float(years)
 
 
 def _when(obs: dict) -> datetime | None:
-    raw = obs.get("effectiveDateTime") or (obs.get("effectivePeriod") or {}).get("end") or obs.get("issued")
-    if not raw:
+    period = obs.get("effectivePeriod") if isinstance(obs.get("effectivePeriod"), dict) else {}
+    raw = obs.get("effectiveDateTime") or period.get("end") or obs.get("issued")
+    if not raw or not isinstance(raw, str):
         return None
     try:
         when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
@@ -174,9 +196,12 @@ def _when(obs: dict) -> datetime | None:
 
 
 def _quantity(kind: str, obs: dict) -> float | None:
-    q = obs.get("valueQuantity") or {}
-    value, unit = q.get("value"), (q.get("code") or q.get("unit") or "").strip()
-    if not isinstance(value, (int, float)):
+    q = obs.get("valueQuantity") if isinstance(obs.get("valueQuantity"), dict) else {}
+    unit = q.get("code") or q.get("unit") or ""
+    value, unit = q.get("value"), unit.strip() if isinstance(unit, str) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    if not isinstance(unit, str):
         return None
     u = unit.lower().replace("μ", "u").replace("µ", "u").replace(" ", "")
     if kind == "creatinine":
@@ -217,11 +242,23 @@ def map_patient(patient: dict, observations: list[dict], allergies: list[dict], 
     today = today or datetime.now(timezone.utc).date()
     warnings: list[str] = []
     ctx: dict = {}
+    patient = patient if isinstance(patient, dict) else {}
+    observations, allergies, medications, conditions = (
+        [r for r in (items or []) if isinstance(r, dict)] for items in (observations, allergies, medications, conditions))
+    serious: list[str] = []
+    try:
+        warnings += fhir_profiles.check_warnings(patient, observations, allergies, medications, conditions)
+        serious = fhir_profiles.check_warnings(patient, observations, allergies, medications, conditions, severities=("error",))
+    except Exception:  # noqa: BLE001 - checking the record's quality must never stop it being read
+        warnings.append("The record's data quality couldn't be checked.")
+        serious = ["The record's data quality couldn't be checked."]
 
     if patient.get("birthDate"):
         age = _age(patient["birthDate"], today)
         if age is not None:
             ctx["age_years"] = age
+        else:
+            warnings.append("The birth date is missing a usable value or is in the future, so age-based checks can't run.")
     if patient.get("gender") in ("female", "male", "other"):
         ctx["sex"] = patient["gender"]
     if patient.get("deceasedBoolean") or patient.get("deceasedDateTime"):
@@ -235,6 +272,9 @@ def map_patient(patient: dict, observations: list[dict], allergies: list[dict], 
         if kind is None:
             continue
         when = _when(obs)
+        if when and when > datetime.now(timezone.utc) + timedelta(days=1):
+            warnings.append(f"A {kind} result is dated in the future, so it was left out.")
+            continue
         best = latest.get(kind)
         if best is None or (when and (best[0] is None or when > best[0])):
             latest[kind] = (when, obs)
@@ -314,8 +354,15 @@ def map_patient(patient: dict, observations: list[dict], allergies: list[dict], 
             del ctx[key]
     if ctx.get("sex") == "male":
         ctx.pop("pregnant", None)
-    context = PatientContext(**ctx)
-    return EhrPatient(context=context, source={**source, "observations": used}, warnings=warnings)
+    try:
+        context = PatientContext(**ctx)
+    except ValueError as exc:
+        bad = {e["loc"][0] for e in getattr(exc, "errors", lambda: [])() if e.get("loc")}
+        warnings.append("Some values in the record were out of range and were left out"
+                        + (f" ({', '.join(sorted(str(b) for b in bad))})." if bad else "."))
+        bad = bad or {"pregnant", "breastfeeding"}
+        context = PatientContext(**{k: v for k, v in ctx.items() if k not in bad})
+    return EhrPatient(context=context, source={**source, "observations": used}, warnings=warnings, serious=serious)
 
 
 def load_patient(client: FhirClient, patient_id: str, source: dict) -> EhrPatient:
@@ -346,3 +393,74 @@ def load_patient(client: FhirClient, patient_id: str, source: dict) -> EhrPatien
 
     return map_patient(patient, observations, allergies, medications, conditions,
                        {**source, "patient": f"Patient/{patient_id}"}, resolve_medication=resolve)
+
+
+# --- What is written back -------------------------------------------------------------------------
+
+AUDIT_SYSTEM = "https://groundcheckhealth.com/audit"
+_V3_DATA_OP = "http://terminology.hl7.org/CodeSystem/v3-DataOperation"
+_PARTICIPANT = "http://terminology.hl7.org/CodeSystem/provenance-participant-type"
+
+
+def instant(value: datetime | None = None) -> str:
+    """A FHIR instant: always with seconds and a time zone."""
+    value = value or datetime.now(timezone.utc)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def build_provenance(target: str, audit_id: str, reviewer: str, recorded: datetime | None = None,
+                     version: str = "") -> dict:
+    """A Provenance linking the written note (e.g. "DocumentReference/123") to
+    GroundCheckHealth, the clinician who reviewed it, and the audit record."""
+    agents = [
+        {"type": {"coding": [{"system": _PARTICIPANT, "code": "assembler", "display": "Assembler"}]},
+         "who": {"display": f"GroundCheckHealth{' ' + version if version else ''}".strip(),
+                 "identifier": {"system": AUDIT_SYSTEM + "/system", "value": "groundcheckhealth"}}},
+        {"type": {"coding": [{"system": _PARTICIPANT, "code": "verifier", "display": "Verifier"}]},
+         "who": {"display": reviewer[:200] or "a clinician"}},
+    ]
+    resource = {
+        "resourceType": "Provenance",
+        "target": [{"reference": target}],
+        "recorded": instant(recorded),
+        "activity": {"coding": [{"system": _V3_DATA_OP, "code": "CREATE", "display": "create"}]},
+        "agent": agents,
+        "entity": [{"role": "source", "what": {"identifier": {"system": AUDIT_SYSTEM, "value": audit_id}}}],
+    }
+    return resource
+
+
+def build_audit_event(target: str, patient: str, audit_id: str, reviewer: str, outcome: str = "0",
+                      recorded: datetime | None = None) -> dict:
+    """An AuditEvent for the create of the note: who asked, which system
+    wrote, what was written and for which patient."""
+    return {
+        "resourceType": "AuditEvent",
+        "type": {"system": "http://terminology.hl7.org/CodeSystem/audit-event-type", "code": "rest", "display": "Restful Operation"},
+        "subtype": [{"system": "http://hl7.org/fhir/restful-interaction", "code": "create", "display": "create"}],
+        "action": "C",
+        "recorded": instant(recorded),
+        "outcome": outcome if outcome in ("0", "4", "8", "12") else "8",
+        "agent": [
+            {"type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/extra-security-role-type",
+                                  "code": "humanuser", "display": "human user"}]},
+             "who": {"display": reviewer[:200] or "a clinician"}, "requestor": True},
+            {"type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/extra-security-role-type",
+                                  "code": "dataprocessor", "display": "data processor"}]},
+             "who": {"display": "GroundCheckHealth"}, "requestor": False},
+        ],
+        "source": {"site": "GroundCheckHealth", "observer": {"display": "GroundCheckHealth"},
+                   "type": [{"system": "http://terminology.hl7.org/CodeSystem/security-source-type", "code": "4",
+                             "display": "Application Server process"}]},
+        "entity": [
+            {"what": {"reference": target},
+             "type": {"system": "http://terminology.hl7.org/CodeSystem/audit-entity-type", "code": "2", "display": "System Object"},
+             "role": {"system": "http://terminology.hl7.org/CodeSystem/object-role", "code": "4", "display": "Domain Resource"},
+             "detail": [{"type": "groundcheck-audit-id", "valueString": audit_id}]},
+            {"what": {"reference": patient},
+             "type": {"system": "http://terminology.hl7.org/CodeSystem/audit-entity-type", "code": "1", "display": "Person"},
+             "role": {"system": "http://terminology.hl7.org/CodeSystem/object-role", "code": "1", "display": "Patient"}},
+        ],
+    }

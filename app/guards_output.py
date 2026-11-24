@@ -5,6 +5,7 @@ in llm.py is corroboration only; the checks here are authoritative."""
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 import re
 
@@ -477,7 +478,8 @@ def coverage_report(query: str, sources: list[dict]) -> dict:
     for record in about:
         source_values |= _canonical_pairs(record.get("text", ""))
     question_values = sorted(_canonical_pairs(query))
-    unsupported_values = [v for v in question_values if v not in source_values]
+    about_texts = [record.get("text", "") for record in about]
+    unsupported_values = [v for v in question_values if not value_supported(v, source_values, about_texts)]
 
     age = _stated_age(query)
     age_report = None
@@ -714,10 +716,83 @@ def _fmt_num(n: float) -> str:
     return str(int(n)) if n == int(n) else str(n)
 
 
+# A concentration ("10 mg/mL") is not a dose: it says how strong a liquid is.
+_CONC_RE = re.compile(
+    rf"\b({_QTY})\s*(mg|mcg|g|milligrams?|micrograms?|grams?)\s*(?:/|per)\s*(?:(\d+(?:\.\d+)?)\s*)?"
+    rf"(ml|millilit(?:re|er)s?)(?![A-Za-z])", re.IGNORECASE)
+_MASS = {"mg": Decimal(1), "mcg": Decimal("0.001"), "g": Decimal(1000)}
+_VOLUME = {"ml": Decimal(1), "l": Decimal(1000)}
+
+
+def _decimal(n: float | str) -> Decimal:
+    return Decimal(str(n))
+
+
+def _shown(value: Decimal) -> str:
+    text = format(value.normalize(), "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def normalise_pair(pair: str) -> str:
+    """A "number unit" pair in one unit per kind of quantity, so equivalent
+    doses are equal: "0.015 g" and "15000 mcg" are both "15 mg". Units that
+    are not a mass or a volume are left alone."""
+    number, _, unit = pair.partition(" ")
+    base = _MASS.get(unit) or _VOLUME.get(unit)
+    if base is None:
+        return pair
+    try:
+        value = Decimal(number) * base
+    except InvalidOperation:
+        return pair
+    return f"{_shown(value)} {'mg' if unit in _MASS else 'ml'}"
+
+
+def concentrations(text: str) -> list[Decimal]:
+    """The strengths a text states, in mg per mL."""
+    found = []
+    for m in _CONC_RE.finditer(text):
+        mass = _word_to_number(m.group(1))
+        unit = _UNIT_CANON.get(m.group(2).lower())
+        volume = _word_to_number(m.group(3)) if m.group(3) else 1.0
+        if mass is not None and unit in _MASS and volume:
+            found.append(_decimal(mass) * _MASS[unit] / _decimal(volume))
+    return found
+
+
+def value_supported(pair: str, stated: set[str], texts: list[str] | tuple[str, ...] = ()) -> bool:
+    """Whether a dose is one the sources state: the same quantity in any unit
+    of the same kind, or, only when a source gives the concentration, the same
+    amount of a liquid and of the medicine in it."""
+    return matching_pair(pair, stated, texts) is not None
+
+
+def matching_pair(pair: str, stated: set[str], texts: list[str] | tuple[str, ...] = ()) -> str | None:
+    """The source's own way of writing the dose `pair` states, or None."""
+    by_norm = {normalise_pair(p): p for p in sorted(stated)}
+    wanted = normalise_pair(pair)
+    if wanted in by_norm:
+        return by_norm[wanted]
+    number, _, unit = wanted.partition(" ")
+    if unit not in ("mg", "ml"):
+        return None
+    for text in texts:
+        for strength in concentrations(text):
+            try:
+                other = (f"{_shown(Decimal(number) * strength)} mg" if unit == "ml"
+                         else f"{_shown(Decimal(number) / strength)} ml")
+            except InvalidOperation:
+                continue
+            if other in by_norm:
+                return by_norm[other]
+    return None
+
+
 def _canonical_pairs(text: str) -> set[str]:
     """Every (number, unit) pair in the text, as canonical strings like
     "15 mg". A range yields a pair for each endpoint."""
     pairs: set[str] = set()
+    text = _CONC_RE.sub(" ", text)
     for m in _VALUE_RE.finditer(text):
         unit = _UNIT_CANON.get(m.group(3).lower())
         if not unit:
@@ -793,7 +868,7 @@ def dosage_guard(answer_text: str, sources: list[dict],
 
     vocab = _source_vocab(sources)
 
-    def supporting(text: str) -> set[str] | None:
+    def supporting(text: str) -> tuple[set[str], list[str]] | None:
         """The values stated by the sources whose own subject `text` names, or
         None when it names none of them.
 
@@ -806,7 +881,8 @@ def dosage_guard(answer_text: str, sources: list[dict],
         about = _named_sources(text, sources)
         if not about:
             return None
-        return {pair for record in about for pair in _canonical_pairs(record.get("text", ""))}
+        return ({pair for record in about for pair in _canonical_pairs(record.get("text", ""))},
+                [record.get("text", "") for record in about])
 
     # A dose belongs to the medicine named beside it, so each sentence is
     # checked against the sources about that sentence's own subject. Checking
@@ -833,13 +909,15 @@ def dosage_guard(answer_text: str, sources: list[dict],
             if len(subjects) == 1:
                 allowed = supporting(f"{query} {sentence}")
             elif len(subjects) > 1:
-                allowed = set()
+                allowed = (set(), [])
         if allowed is None:
             covered = [t for t in _salient_terms(f"{query} {sentence}") if _covered(t, vocab)]
-            allowed = {pair for record in _sources_about(f"{query} {sentence}", covered, sources)
-                       for pair in _canonical_pairs(record.get("text", ""))}
+            about = _sources_about(f"{query} {sentence}", covered, sources)
+            allowed = ({pair for record in about for pair in _canonical_pairs(record.get("text", ""))},
+                       [record.get("text", "") for record in about])
+        values, texts = allowed
         for pair in sorted(stated):
-            if pair not in allowed:
+            if not value_supported(pair, values, texts):
                 return (
                     False,
                     f"the value '{pair}' is not supported by a source about this medicine",

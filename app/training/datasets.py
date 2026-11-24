@@ -11,6 +11,11 @@ In the first, GroundCheckHealth splits the images into training, validation and
 test sets itself, keeping each class's share the same in every set. In the
 second, the folders' own split is used (val and test are optional).
 
+NIfTI volumes (.nii, .nii.gz) can be used in place of images: each volume
+contributes up to 32 axial slices from its middle 80%, and all slices of one
+volume stay in the same split, so a patient never appears in both training and
+validation.
+
 Folders are only read from TRAINING_DATA_DIRS, and a path can't escape them
 through .. or a symbolic link."""
 
@@ -24,6 +29,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .. import config
+from ..imaging import nifti
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}
 SPLIT_NAMES = {"train": {"train", "training"}, "val": {"val", "valid", "validation"}, "test": {"test", "testing"}}
@@ -37,9 +43,14 @@ class DatasetError(ValueError):
 
 @dataclass(frozen=True)
 class ImageItem:
-    path: str       # relative to the dataset folder
+    path: str       # relative to the dataset folder; a volume's slice is "file.nii.gz#12"
     label: int
     split: str      # train, val or test
+    group: str = ""  # the file the image comes from: slices of one volume always share a split
+
+    @property
+    def source(self) -> str:
+        return self.group or self.path
 
 
 def roots() -> list[Path]:
@@ -64,11 +75,17 @@ def resolve(path: str) -> Path:
     return resolved
 
 
-def resolve_file(dataset: Path, relative: str) -> Path:
-    file = (dataset / relative).resolve()
-    if dataset not in file.parents or not file.is_file() or file.suffix.lower() not in IMAGE_EXTENSIONS:
+def _is_image_name(name: str) -> bool:
+    return os.path.splitext(name)[1].lower() in IMAGE_EXTENSIONS or nifti.is_nifti_name(name)
+
+
+def resolve_file(dataset: Path, relative: str):
+    """An image inside the dataset: its path, or for a slice of a volume (file.nii.gz#12) a nifti.SliceRef."""
+    ref = nifti.parse_ref(Path(relative))
+    file = (dataset / (ref.path if ref else relative)).resolve()
+    if dataset not in file.parents or not file.is_file() or not _is_image_name(file.name):
         raise DatasetError("No such image in this dataset.")
-    return file
+    return nifti.SliceRef(file, ref.index) if ref else file
 
 
 def _visible_dirs(folder: Path) -> list[Path]:
@@ -84,7 +101,7 @@ def _images(folder: Path) -> list[Path]:
     for dirpath, dirnames, filenames in os.walk(folder):
         dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
         for name in sorted(filenames):
-            if not name.startswith(".") and os.path.splitext(name)[1].lower() in IMAGE_EXTENSIONS:
+            if not name.startswith(".") and _is_image_name(name):
                 found.append(Path(dirpath) / name)
                 if len(found) > MAX_IMAGES:
                     raise DatasetError(f"This folder has more than {MAX_IMAGES:,} images.")
@@ -98,7 +115,7 @@ def _split_of(name: str) -> str | None:
 
 def _has_images_directly(folder: Path) -> bool:
     try:
-        return any(p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS for p in folder.iterdir())
+        return any(p.is_file() and _is_image_name(p.name) for p in folder.iterdir())
     except OSError:
         return False
 
@@ -130,6 +147,26 @@ def _looks_like_dataset(folder: Path) -> bool:
     return len(sample) >= 2 and with_images >= 2 and with_images >= 0.6 * len(sample)
 
 
+def _units(folder: Path, files: list[Path]) -> list[list[str]]:
+    """Each file as the relative paths it contributes: itself, or a volume's chosen slices."""
+    units = []
+    for f in files:
+        rel = str(f.relative_to(folder))
+        if nifti.is_nifti_name(f.name):
+            try:
+                units.append([f"{rel}#{i}" for i in nifti.training_slices(f)])
+            except nifti.NiftiError:
+                units.append([])           # unreadable: reported by the checks, not trained on
+        else:
+            units.append([rel])
+    return units
+
+
+def _items(unit: list[str], label: int, split: str) -> list[ImageItem]:
+    group = unit[0].rpartition("#")[0] if unit and "#" in unit[0] else ""
+    return [ImageItem(path, label, split, group) for path in unit]
+
+
 def read(path: str, val_fraction: float = 0.15, test_fraction: float = 0.15, seed: int = 7
          ) -> tuple[Path, list[str], list[ImageItem], dict]:
     """The dataset's classes, every image with its class and split, and a
@@ -145,13 +182,14 @@ def read(path: str, val_fraction: float = 0.15, test_fraction: float = 0.15, see
         for split, split_dir in split_dirs.items():
             per_split[split] = {d.name: _images(d) for d in _visible_dirs(split_dir)}
         classes = sorted({c for groups in per_split.values() for c in groups if groups[c]}, key=str.lower)
+        units_of = {f: _units(folder, [f])[0] for groups in per_split.values() for files in groups.values() for f in files}
         train_classes = {c for c, files in per_split["train"].items() if files}
         missing = [c for c in classes if c not in train_classes]
         if missing:
             raise DatasetError(f"These classes have no training images: {', '.join(missing)}.")
         index = {c: i for i, c in enumerate(classes)}
-        items = [ImageItem(str(f.relative_to(folder)), index[c], split)
-                 for split, groups in per_split.items() for c, files in groups.items() if c in index for f in files]
+        items = [i for split, groups in per_split.items() for c, files in groups.items() if c in index for f in files
+                 for i in _items(units_of[f], index[c], split)]
         if "val" not in split_dirs:
             items = _carve(items, "val", val_fraction, seed)
             warnings.append("There's no val folder, so part of the training images is used for validation.")
@@ -168,11 +206,12 @@ def read(path: str, val_fraction: float = 0.15, test_fraction: float = 0.15, see
         for c in classes:
             files = list(groups[c])
             rng.shuffle(files)
+            units = _units(folder, files)
             n_val = max(1, round(len(files) * val_fraction))
             n_test = max(1, round(len(files) * test_fraction)) if len(files) >= 10 else 0
-            for i, f in enumerate(files):
+            for i, unit in enumerate(units):
                 split = "val" if i < n_val else "test" if i < n_val + n_test else "train"
-                items.append(ImageItem(str(f.relative_to(folder)), index[c], split))
+                items.extend(_items(unit, index[c], split))
 
     if len(classes) < 2:
         raise DatasetError("Put images in at least two subfolders, one for each class (for example normal/ and abnormal/).")
@@ -184,6 +223,10 @@ def read(path: str, val_fraction: float = 0.15, test_fraction: float = 0.15, see
     if small:
         raise DatasetError(f"Each class needs at least {MIN_IMAGES_PER_CLASS} training images. "
                            f"Too few in: {', '.join(small)}.")
+    volumes = {i.group for i in items if i.group}
+    if volumes:
+        warnings.append(f"{len(volumes):,} NIfTI volumes are used as axial slices; all slices of one volume stay in "
+                        "the same split. Training shows the middle slices only.")
     totals = [sum(v.values()) for v in counts.values()]
     if max(totals) > 10 * min(totals):
         warnings.append("Some classes have over ten times as many images as others. Training weights classes "
@@ -203,6 +246,7 @@ def read(path: str, val_fraction: float = 0.15, test_fraction: float = 0.15, see
         "layout": layout,
         "classes": [{"name": c, **counts[c], "total": sum(counts[c].values())} for c in classes],
         "total": len(items),
+        "volumes": len(volumes),
         "splits": {s: sum(1 for i in items if i.split == s) for s in ("train", "val", "test")},
         "fingerprint": digest.hexdigest()[:16],
         "samples": samples[:24],
@@ -235,10 +279,13 @@ def find_duplicates(folder: Path, items: list[ImageItem]) -> dict:
     """Identical image files. A copy in both the training set and the
     validation or test set makes the model look better than it is, so those
     copies are left out of validation and test when training."""
-    by_key: dict[bytes, list[ImageItem]] = defaultdict(list)
+    members: dict[str, list[ImageItem]] = defaultdict(list)
     for item in items:
+        members[item.source].append(item)
+    by_key: dict[bytes, list[ImageItem]] = defaultdict(list)
+    for source, group in members.items():
         try:
-            by_key[_content_key(folder / item.path)].append(item)
+            by_key[_content_key(folder / source)].append(group[0])
         except OSError:
             continue
     groups: list[list[ImageItem]] = []
@@ -247,17 +294,17 @@ def find_duplicates(folder: Path, items: list[ImageItem]) -> dict:
             continue
         exact: dict[bytes, list[ImageItem]] = defaultdict(list)
         for item in candidates:
-            exact[_full_hash(folder / item.path)].append(item)
+            exact[_full_hash(folder / item.source)].append(item)
         groups.extend(g for g in exact.values() if len(g) > 1)
     leaked = sorted({i.path for g in groups if any(x.split == "train" for x in g)
-                     for i in g if i.split != "train"})
+                     for rep in g if rep.split != "train" for i in members[rep.source]})
     conflicting = [g for g in groups if len({i.label for i in g}) > 1]
     return {
         "groups": len(groups),
         "extra_copies": sum(len(g) - 1 for g in groups),
         "leaked": leaked,
         "conflicting_labels": len(conflicting),
-        "examples": [[i.path for i in g][:3] for g in (conflicting or groups)[:5]],
+        "examples": [[i.source for i in g][:3] for g in (conflicting or groups)[:5]],
     }
 
 
@@ -269,8 +316,13 @@ def find_identifiers(folder: Path, items: list[ImageItem], seed: int = 7) -> dic
     in_names: dict[str, int] = defaultdict(int)
     name_examples: list[str] = []
     files_with_names = 0
+    seen_sources: set[str] = set()
     for item in items:
-        stem = Path(item.path).stem.replace("_", " ")
+        if item.source in seen_sources:
+            continue
+        seen_sources.add(item.source)
+        stem = Path(item.source).name
+        stem = (stem[: -len(".nii.gz")] if stem.lower().endswith(".nii.gz") else Path(stem).stem).replace("_", " ")
         result = deid.deidentify(stem)
         kinds = {k for k in result.found if k not in ("long number",)}
         for kind in kinds:
@@ -278,13 +330,24 @@ def find_identifiers(folder: Path, items: list[ImageItem], seed: int = 7) -> dic
         if kinds:
             files_with_names += 1
             if len(name_examples) < 3:
-                name_examples.append(item.path)
+                name_examples.append(item.source)
 
     from PIL import Image
 
-    sample = random.Random(seed).sample(items, min(IDENTIFIER_SAMPLE, len(items)))
+    firsts = list({i.source: i for i in items}.values())
+    sample = random.Random(seed).sample(firsts, min(IDENTIFIER_SAMPLE, len(firsts)))
     metadata_files, metadata_examples = 0, []
     for item in sample:
+        if nifti.is_nifti_name(item.source):
+            try:
+                texts = nifti.header_text(nifti.header_only(folder / item.source))
+            except nifti.NiftiError:
+                continue
+            if any(deid.deidentify(t).changed for t in texts):
+                metadata_files += 1
+                if len(metadata_examples) < 3:
+                    metadata_examples.append(item.source)
+            continue
         try:
             with Image.open(folder / item.path) as image:
                 fields = {str(k).lower(): v for k, v in image.info.items() if isinstance(v, (str, bytes))}
@@ -296,7 +359,7 @@ def find_identifiers(folder: Path, items: list[ImageItem], seed: int = 7) -> dic
                for key, v in fields.items() if key not in ("icc_profile", "exif", "dpi", "gamma", "transparency")):
             metadata_files += 1
             if len(metadata_examples) < 3:
-                metadata_examples.append(item.path)
+                metadata_examples.append(item.source)
     return {
         "file_names": files_with_names,
         "file_name_kinds": dict(in_names),
@@ -329,14 +392,13 @@ def inspect(folder: Path, items: list[ImageItem]) -> dict:
 
 
 def _carve(items: list[ImageItem], split: str, fraction: float, seed: int) -> list[ImageItem]:
-    """Move a stratified fraction of the training images into another split."""
+    """Move a stratified fraction of the training images into another split. A volume's slices move together."""
     rng = random.Random(seed)
-    by_label: dict[int, list[ImageItem]] = {}
+    by_label: dict[int, list[str]] = {}
     for item in items:
-        if item.split == "train":
-            by_label.setdefault(item.label, []).append(item)
+        if item.split == "train" and item.source not in by_label.setdefault(item.label, []):
+            by_label[item.label].append(item.source)
     moved: set[str] = set()
-    for group in by_label.values():
-        chosen = rng.sample(group, max(1, round(len(group) * fraction)))
-        moved.update(i.path for i in chosen)
-    return [ImageItem(i.path, i.label, split) if i.path in moved else i for i in items]
+    for sources in by_label.values():
+        moved.update(rng.sample(sources, max(1, round(len(sources) * fraction))))
+    return [ImageItem(i.path, i.label, split, i.group) if i.source in moved and i.split == "train" else i for i in items]

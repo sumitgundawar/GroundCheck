@@ -131,8 +131,62 @@ def _series_summary(row: ImagingSeries) -> dict:
     }
 
 
+def import_nifti(name: str, data: bytes, label: str = "", user_id: int | None = None, site_id: int | None = None,
+                 modality: str | None = None) -> dict:
+    """A NIfTI volume as a series. Nothing from the file's header text is kept, and the modality (which NIfTI
+    doesn't record) is the one given, or guessed from the file name and values."""
+    import hashlib
+
+    from . import nifti
+
+    try:
+        found = nifti.read(nifti.decompress(data))
+    except nifti.NiftiError as exc:
+        raise ImagingError(f"{name or 'The file'}: {exc}") from exc
+    if modality not in (None, "CT", "MR"):
+        raise ImagingError("The modality is CT or MR.")
+    guessed = modality is None
+    modality = modality or nifti.guess_modality(found.array, name)
+    warnings = list(found.warnings) + ([f"NIfTI files don't say whether they're CT or MR; this was taken to be {modality}."]
+                                       if guessed else [])
+    digest = hashlib.sha256(np.ascontiguousarray(found.array).tobytes() + str(found.array.shape).encode()).hexdigest()[:40]
+    uid = f"nifti.{digest}"
+    with db.session() as s:
+        row = s.scalar(select(ImagingSeries).where(ImagingSeries.uid == uid))
+        if row is not None:
+            if site_id is not None and row.site_id != site_id:
+                raise ImagingError("This series has already been imported by another site.")
+            return {"added": [], "existing": [_series_summary(row)]}
+    file = _write_volume(found.array)
+    meta = {"pixel_spacing": found.pixel_spacing, "slice_thickness": found.slice_thickness, "display": found.display,
+            "patient": {}, "warnings": warnings, "deid": {"source": "nifti", "header_text_kept": 0}, "instances": []}
+    with db.session() as s:
+        row = ImagingSeries(uid=uid, study_uid=uid, source="upload", label=label[:200], modality=modality,
+                            description="NIfTI volume", body_part="", slices=int(found.array.shape[0]),
+                            rows=int(found.array.shape[1]), columns=int(found.array.shape[2]), meta=meta, original=None,
+                            file=file, created_by=user_id, site_id=site_id)
+        s.add(row)
+        s.flush()
+        return {"added": [{**_series_summary(row), "warnings": warnings}], "existing": []}
+
+
 def import_series(uploads: list[tuple[str, bytes]], source: str = "upload", label: str = "",
                   user_id: int | None = None, site_id: int | None = None) -> dict:
+    from . import nifti
+
+    volumes = [u for u in uploads if nifti.is_nifti_name(u[0])]
+    if volumes:
+        rest = [u for u in uploads if not nifti.is_nifti_name(u[0])]
+        out = {"added": [], "existing": []}
+        for name, data in volumes:
+            part = import_nifti(name, data, label, user_id, site_id)
+            out["added"] += part["added"]
+            out["existing"] += part["existing"]
+        if rest:
+            part = import_series(rest, source, label, user_id, site_id)
+            out["added"] += part["added"]
+            out["existing"] += part["existing"]
+        return out
     try:
         found = dicom.read(uploads)
     except dicom.DicomError as exc:
@@ -205,6 +259,9 @@ def get_series(series_id: int) -> dict:
 
 def _slice_spacing(meta: dict) -> float | None:
     """The distance between neighbouring slices, in mm, from their positions."""
+    if (meta.get("display") or {}).get("source") == "nifti":
+        step = meta.get("slice_thickness")
+        return round(float(step), 2) if step else None
     if (meta.get("display") or {}).get("plane") in (None, "unknown"):
         return None   # positions are instance numbers, not millimetres
     positions = [i.get("position") for i in meta.get("instances", []) if i.get("position") is not None]
@@ -398,6 +455,8 @@ def report_sr(report_id: int, identified: bool = False) -> tuple[bytes, dict]:
         if row.status == "draft":
             raise ImagingError("Sign the report before exporting it.")
         series = row.series
+        if (series.meta.get("display") or {}).get("source") == "nifti":
+            raise ImagingError("A DICOM report needs a DICOM series; this series came from a NIfTI file.")
         chosen = s.get(ImagingAnalysis, row.analysis_id) if row.analysis_id else None
         previous = s.get(ImagingReport, row.replaces_id) if row.replaces_id else None
         if identified and not series.original:

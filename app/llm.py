@@ -1,8 +1,9 @@
 """LLM integration plus the extractive fallback.
 
-Two providers can draft answers: a local open-source model through Ollama
-(app/local_ai.py), or a cloud model through any OpenAI-compatible API (Groq by
-default). A local model, when one is selected and available, takes precedence.
+A local open-source model through Ollama (app/local_ai.py) or a cloud model
+(app/providers.py: OpenAI-compatible, Anthropic, Azure OpenAI) can draft
+answers; LLM_PROVIDER chooses. Left unset, a local model that is selected and
+available takes precedence over the cloud one.
 
 Every live call is wrapped so that any error, timeout, or malformed output
 silently falls back to extractive generation. The user never sees an error and
@@ -16,7 +17,7 @@ from contextlib import contextmanager
 import json
 import re
 
-from . import config, local_ai, retrieval
+from . import config, local_ai, providers, retrieval
 from .schemas import ClaimSupport, LLMAnswer, LLMClaim
 
 # Whether a cloud model is configured. Fixed at startup, since it depends only
@@ -39,16 +40,30 @@ def extractive_only():
         _thread.extractive = previous
 
 
+def _cloud() -> dict:
+    name = config.LLM_PROVIDER_EFFECTIVE or "openai_compatible"
+    return {"kind": "cloud", "model": providers.model_name(name), "provider": name}
+
+
 def active_provider() -> dict | None:
-    """The model that will draft the next answer, as
-    {"kind": "local" | "cloud", "model": name}, or None for extractive mode."""
+    """The model that will draft the next answer, as {"kind": "local" | "cloud",
+    "model": name} (cloud adds "provider"), or None for extractive mode. With
+    LLM_PROVIDER unset, a local model selected in the dashboard comes first;
+    a provider named in LLM_PROVIDER is used alone."""
     if config.FORCE_EXTRACTIVE or getattr(_thread, "extractive", False):
         return None
+    mode = config.LLM_PROVIDER
+    if mode == "none":
+        return None
+    if mode in providers.CLOUD:
+        return _cloud() if LLM_AVAILABLE else None
     local = local_ai.active_model()
     if local:
         return {"kind": "local", "model": local}
+    if mode == "ollama":
+        return None
     if LLM_AVAILABLE:
-        return {"kind": "cloud", "model": config.GEN_MODEL}
+        return _cloud()
     return None
 
 
@@ -59,38 +74,16 @@ def llm_available() -> bool:
 def _complete_json(system: str, user: str, temperature: float,
                    provider: dict, judge: bool = False) -> str:
     """One JSON completion from the given provider. Raises on failure."""
+    schema = JUDGE_SCHEMA if judge else GEN_SCHEMA
     if provider["kind"] == "local":
         if not judge and system == GEN_SYSTEM_PROMPT:
             system = LOCAL_GEN_SYSTEM_PROMPT
-        content = local_ai.chat_json(system, user, temperature, model=provider["model"],
-                                     schema=JUDGE_SCHEMA if judge else GEN_SCHEMA)
+        content = local_ai.chat_json(system, user, temperature, model=provider["model"], schema=schema)
         if content is None:
             raise RuntimeError("local model call failed")
         return content
-    client = _get_client()
-    response = client.chat.completions.create(
-        model=config.JUDGE_MODEL if judge else config.GEN_MODEL,
-        messages=[{"role": "system", "content": system},
-                  {"role": "user", "content": user}],
-        temperature=temperature,
-        response_format={"type": "json_object"},
-    )
-    return response.choices[0].message.content or ""
-
-_client = None
-
-
-def _get_client():
-    global _client
-    if _client is None:
-        from openai import OpenAI
-
-        _client = OpenAI(
-            api_key=config.GROQ_API_KEY,
-            base_url=config.GROQ_BASE_URL,
-            timeout=config.LLM_TIMEOUT_SECONDS,
-        )
-    return _client
+    name = provider.get("provider") or config.LLM_PROVIDER_EFFECTIVE or "openai_compatible"
+    return providers.build(name).draft(system, user, temperature, schema, judge)
 
 
 GEN_SYSTEM_PROMPT = """You are GroundCheckHealth, a clinical information assistant operating under strict grounding rules.

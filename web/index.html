@@ -665,6 +665,29 @@
         <div class="answer-body" id="answer-body"></div>
         <p class="answer-summary" id="answer-summary" hidden></p>
         <ol class="claim-rows" id="claim-rows" aria-label="Claims in the answer" hidden></ol>
+        <div class="flag-row feedback-row" id="feedback-row" hidden>
+          <span class="feedback-label" id="feedback-label">Was this answer useful?</span>
+          <button type="button" class="btn btn-sm btn-ghost" id="feedback-up" aria-pressed="false" aria-describedby="feedback-label">Useful</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="feedback-down" aria-pressed="false" aria-describedby="feedback-label">Not useful</button>
+          <form class="case-form flag-form" id="feedback-form" hidden novalidate>
+            <label for="feedback-reason">What was the problem?</label>
+            <select id="feedback-reason">
+              <option value="">Choose a reason (optional)</option>
+              <option value="not_useful">Not useful</option>
+              <option value="incomplete">Incomplete</option>
+              <option value="wrong">Wrong</option>
+              <option value="too_slow">Too slow</option>
+            </select>
+            <label for="feedback-comment">Comment <span class="optional">optional; saved with names and numbers removed, so leave patient details out</span></label>
+            <textarea id="feedback-comment" rows="2" maxlength="500"></textarea>
+            <p class="auth-hint">Choosing “Wrong” also sends the answer to a reviewer.</p>
+            <div class="flag-actions">
+              <button type="submit" class="btn btn-sm btn-primary" id="feedback-send">Send feedback</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="feedback-cancel">Cancel</button>
+            </div>
+          </form>
+          <p class="modal-message" id="feedback-message" role="status" hidden></p>
+        </div>
         <div class="flag-row" id="flag-row" hidden>
           <button type="button" class="btn btn-sm btn-ghost" id="flag-open">Flag this answer for review</button>
           <button type="button" class="btn btn-sm btn-ghost" id="incident-from-answer">Report an incident</button>
@@ -901,6 +924,25 @@
               <div class="bars" id="usage-users"></div>
             </section>
           </div>
+          <section class="panel" id="adoption-panel" aria-labelledby="adoption-title" hidden>
+            <div class="review-toolbar">
+              <h2 class="panel-heading" id="adoption-title">Adoption and value</h2>
+              <a class="btn btn-sm btn-ghost" id="pilot-report-download" href="/api/governance/pilot-report?days=30" download>Download pilot report</a>
+            </div>
+            <p class="auth-hint">Counted in UTC days. Evaluation runs and demonstration records are left out. The pilot report prints no question text.</p>
+            <p class="modal-message" id="adoption-message" role="status" hidden></p>
+            <div class="stat-grid" id="adoption-stats"></div>
+            <div class="usage-grid">
+              <section>
+                <h3>Active clinicians by week</h3>
+                <div class="bars" id="adoption-weekly"></div>
+              </section>
+              <section>
+                <h3>Feedback</h3>
+                <div class="bars" id="adoption-feedback"></div>
+              </section>
+            </div>
+          </section>
         </section>
 
         <!-- Review -->
@@ -917,6 +959,7 @@
             <button type="button" role="tab" class="review-tab" id="tab-queue" aria-controls="review-queue" aria-selected="true">Queue</button>
             <button type="button" role="tab" class="review-tab" id="tab-hazards" aria-controls="review-hazards" aria-selected="false" tabindex="-1">Hazard log</button>
             <button type="button" role="tab" class="review-tab" id="tab-report" aria-controls="review-report" aria-selected="false" tabindex="-1">Report</button>
+            <button type="button" role="tab" class="review-tab" id="tab-controls" aria-controls="review-controls" aria-selected="false" tabindex="-1">Controls</button>
           </div>
           <p class="modal-message" id="review-message" role="status" hidden></p>
 
@@ -979,6 +1022,24 @@
               <p class="auth-hint" id="review-tests-summary"></p>
               <ul class="eval-cases" id="review-tests-list"></ul>
             </div>
+          </div>
+
+          <div role="tabpanel" id="review-controls" aria-labelledby="tab-controls" hidden>
+            <p class="controls-banner" id="controls-banner" role="note"></p>
+            <div class="review-toolbar">
+              <div class="review-filters">
+                <label for="controls-status">Show</label>
+                <select id="controls-status">
+                  <option value="">All controls</option>
+                  <option value="supported">Supported by product</option>
+                  <option value="customer">Customer responsibility</option>
+                  <option value="not_addressed">Not addressed</option>
+                </select>
+              </div>
+              <a class="btn btn-sm btn-ghost" id="controls-download" href="/api/governance/controls.csv" download>Download CSV</a>
+            </div>
+            <div class="report-grid" id="controls-totals"></div>
+            <div id="controls-frameworks"></div>
           </div>
 
         </div>
@@ -1627,6 +1688,19 @@
               <div class="verify-result" id="verify-result" hidden></div>
             </section>
             <div id="protection-admin" hidden>
+              <section class="protection-block" aria-labelledby="evidence-title">
+                <div class="review-toolbar">
+                  <h3 id="evidence-title">Evidence pack</h3>
+                  <a class="btn btn-sm btn-ghost" id="evidence-download" href="/api/governance/evidence-pack" download>Download evidence pack</a>
+                </div>
+                <p class="auth-hint">One zip for a clinical safety officer: the safety case, hazard log, evaluation results, audit-chain check, releases, incident register and a configuration snapshot with no secrets. Every file is listed with its SHA-256.</p>
+              </section>
+              <section class="protection-block" aria-labelledby="telemetry-title">
+                <h3 id="telemetry-title">Install telemetry</h3>
+                <p class="auth-hint" id="telemetry-summary"></p>
+                <dl class="protection-list" id="telemetry-fields"></dl>
+                <p class="auth-hint" id="telemetry-sample"></p>
+              </section>
               <section class="protection-block" aria-labelledby="protection-status-title">
                 <h3 id="protection-status-title">Stored data</h3>
                 <dl class="protection-list" id="protection-list"></dl>

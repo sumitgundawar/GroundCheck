@@ -247,7 +247,8 @@ def _questions(s, since: datetime, until: datetime | None = None):
     from .db import AuditRecord
 
     q = select(AuditRecord.decision, AuditRecord.total_ms, AuditRecord.top_score).where(
-        AuditRecord.created_at >= since, AuditRecord.test_run.is_(False))
+        AuditRecord.created_at >= since, AuditRecord.test_run.is_(False),
+        AuditRecord.decision != "event")
     if until is not None:
         q = q.where(AuditRecord.created_at < until)
     return s.execute(q).all()

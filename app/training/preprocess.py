@@ -9,7 +9,12 @@ import numpy as np
 from PIL import Image, ImageOps
 
 
-def open_image(source: Path | bytes) -> Image.Image:
+def open_image(source) -> Image.Image:
+    from ..imaging import nifti
+
+    ref = source if isinstance(source, nifti.SliceRef) else (nifti.parse_ref(source) if isinstance(source, Path) else None)
+    if ref is not None:
+        return nifti.slice_image(ref)
     try:
         image = Image.open(io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else source)
         image.load()

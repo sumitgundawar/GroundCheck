@@ -1,0 +1,678 @@
+# Control mapping: product features and evidence against four frameworks.
+#
+# status: supported (the product implements a technical control that helps meet
+#   the requirement), customer (the organisation running the product must meet
+#   it), not_addressed (neither the product nor this mapping covers it).
+# evidence: file paths in this repository (checked to exist by the tests), or
+#   the word none.
+# "supported" never means certified or compliant: no certification is held.
+version: 1
+frameworks:
+  hipaa:
+    name: HIPAA Security Rule (45 CFR Part 164, Subpart C)
+    controls:
+    - id: 164.308(a)(1)(ii)(A)
+      title: Risk analysis
+      status: customer
+      how: The organisation's security risk analysis of its own deployment. The product supplies a hazard log for
+        clinical risk, not a security risk analysis.
+      evidence: none
+    - id: 164.308(a)(1)(ii)(B)
+      title: Risk management
+      status: customer
+      how: Measures that reduce the organisation's risks. The product ships dependency and web scans as inputs.
+      evidence:
+      - scripts/security_scan.sh
+    - id: 164.308(a)(1)(ii)(C)
+      title: Sanction policy
+      status: customer
+      how: A workforce policy.
+      evidence: none
+    - id: 164.308(a)(1)(ii)(D)
+      title: Information system activity review
+      status: supported
+      how: Every question and administrative event is recorded in a signed audit trail; usage, refusal and review
+        reports and alerts support regular review.
+      evidence:
+      - app/audit.py
+      - app/integrity.py
+      - tests/test_data_protection.py
+      - app/monitoring.py
+      - tests/test_monitoring.py
+    - id: 164.308(a)(2)
+      title: Assigned security responsibility
+      status: customer
+      how: Naming a security official is an organisational act.
+      evidence: none
+    - id: 164.308(a)(3)
+      title: Workforce security
+      status: supported
+      how: Accounts can be deactivated or deleted at once and sessions end; who may have access is the organisation's
+        decision.
+      evidence: &id001
+      - app/auth.py
+      - tests/test_accounts.py
+    - id: 164.308(a)(4)
+      title: Information access management
+      status: supported
+      how: Roles (clinician, reviewer, admin) and per-site isolation limit what each person sees; API keys carry
+        scopes.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/sites.py
+      - tests/test_sites.py
+      - app/apikeys.py
+      - tests/test_api_keys.py
+    - id: 164.308(a)(5)(ii)(A)
+      title: Security reminders and training
+      status: customer
+      how: Workforce training.
+      evidence: none
+    - id: 164.308(a)(5)(ii)(B)
+      title: Protection from malicious software
+      status: customer
+      how: Endpoint protection on the organisation's hosts. The product's own dependencies are scanned in CI.
+      evidence:
+      - .github/workflows/ci.yml
+    - id: 164.308(a)(5)(ii)(C)
+      title: Log-in monitoring
+      status: supported
+      how: Failed sign-ins are counted and the account is locked after repeated failures.
+      evidence: *id001
+    - id: 164.308(a)(5)(ii)(D)
+      title: Password management
+      status: supported
+      how: Passwords are hashed with Argon2id, have a minimum length and are never stored or logged in clear.
+      evidence: *id001
+    - id: 164.308(a)(6)
+      title: Security incident procedures
+      status: supported
+      how: An incident register grades harm and tracks the GDPR 72-hour and regulator-notification decisions; responding
+        is the organisation's job.
+      evidence: &id003
+      - app/incidents.py
+      - tests/test_incidents.py
+    - id: 164.308(a)(7)
+      title: Contingency plan
+      status: customer
+      how: Backup, disaster recovery and emergency mode planning. A backup and restore drill script is provided.
+      evidence:
+      - scripts/backup_restore_drill.sh
+    - id: 164.308(a)(8)
+      title: Evaluation
+      status: customer
+      how: Periodic evaluation of the organisation's security. The product's safety evaluation suites are not a
+        security evaluation.
+      evidence: none
+    - id: 164.308(b)(1)
+      title: Business associate contracts
+      status: customer
+      how: Contracts with any hosting or model vendor that handles ePHI.
+      evidence: none
+    - id: 164.310(a)
+      title: Facility access controls
+      status: customer
+      how: Physical security of the hosting site.
+      evidence: none
+    - id: 164.310(b)
+      title: Workstation use
+      status: customer
+      how: Rules for workstations that use the product.
+      evidence: none
+    - id: 164.310(c)
+      title: Workstation security
+      status: customer
+      how: Physical safeguards for workstations.
+      evidence: none
+    - id: 164.310(d)(2)(i)
+      title: Disposal
+      status: supported
+      how: Records past their retention period are deleted by the retention run; media disposal is the organisation's.
+      evidence: &id002
+      - app/retention.py
+      - tests/test_data_protection.py
+    - id: 164.312(a)(2)(i)
+      title: Unique user identification
+      status: supported
+      how: Every person has their own account and every action is attributed to it.
+      evidence: *id001
+    - id: 164.312(a)(2)(ii)
+      title: Emergency access procedure
+      status: not_addressed
+      how: There is no break-glass access mode.
+      evidence: none
+    - id: 164.312(a)(2)(iii)
+      title: Automatic logoff
+      status: supported
+      how: Sessions end after SESSION_HOURS. There is no separate idle timeout.
+      evidence: *id001
+    - id: 164.312(a)(2)(iv)
+      title: Encryption and decryption
+      status: supported
+      how: Question text, audit records, review text and imaging files are encrypted at rest with AES-256 under
+        keys the organisation holds.
+      evidence:
+      - app/encryption.py
+      - tests/test_data_protection.py
+    - id: 164.312(b)
+      title: Audit controls
+      status: supported
+      how: A hash-chained, optionally HMAC-signed audit trail with a verification command.
+      evidence: &id006
+      - app/audit.py
+      - app/integrity.py
+      - tests/test_data_protection.py
+    - id: 164.312(c)
+      title: Integrity
+      status: supported
+      how: The audit chain detects altered or removed records; knowledge changes are gated by safety tests.
+      evidence:
+      - app/audit.py
+      - app/integrity.py
+      - tests/test_data_protection.py
+      - app/releases.py
+      - tests/test_releases.py
+    - id: 164.312(d)
+      title: Person or entity authentication
+      status: supported
+      how: Passwords, TOTP second factor and OIDC single sign-on; service accounts use hashed API keys.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/sso.py
+      - tests/test_sso.py
+    - id: 164.312(e)(1)
+      title: Transmission security
+      status: supported
+      how: A Caddy configuration terminating TLS is provided and the session cookie is Secure by default; the organisation
+        runs and certifies its own TLS.
+      evidence: &id004
+      - docs/on-premises.md
+      - deploy/Caddyfile
+    - id: 164.316(a)
+      title: Policies and procedures
+      status: customer
+      how: Written policies are the organisation's.
+      evidence: none
+    - id: 164.316(b)(1)
+      title: Documentation
+      status: supported
+      how: An evidence pack, safety case and control matrix can be exported for the organisation's file.
+      evidence:
+      - app/evidence.py
+      - tests/test_evidence_pack.py
+  gdpr:
+    name: GDPR (Regulation (EU) 2016/679)
+    controls:
+    - id: Art. 5(1)(c)
+      title: Data minimisation
+      status: supported
+      how: Identifiers in questions are replaced with placeholders before anything is stored or sent to a model.
+      evidence: &id005
+      - app/deid.py
+      - tests/test_deid.py
+    - id: Art. 5(1)(e)
+      title: Storage limitation
+      status: supported
+      how: Retention periods delete old audit and review records.
+      evidence: *id002
+    - id: Art. 5(1)(f)
+      title: Integrity and confidentiality
+      status: supported
+      how: Encryption at rest, access control and a tamper-evident audit trail.
+      evidence:
+      - app/encryption.py
+      - tests/test_data_protection.py
+      - app/audit.py
+      - app/integrity.py
+      - tests/test_data_protection.py
+    - id: Art. 6
+      title: Lawful basis
+      status: customer
+      how: The organisation chooses and records its lawful basis.
+      evidence: none
+    - id: Art. 9
+      title: Special category data
+      status: customer
+      how: The organisation's condition for processing health data.
+      evidence: none
+    - id: Art. 12-14
+      title: Transparency to data subjects
+      status: customer
+      how: Privacy notices are the organisation's.
+      evidence: none
+    - id: Art. 15
+      title: Right of access
+      status: not_addressed
+      how: Questions are stored de-identified and there is no lookup by person.
+      evidence: none
+    - id: Art. 17
+      title: Right to erasure
+      status: not_addressed
+      how: No per-person erasure. Records leave by retention period only, and the audit chain is designed not to
+        lose records between them.
+      evidence: *id002
+    - id: Art. 20
+      title: Data portability
+      status: not_addressed
+      how: No export keyed to a person.
+      evidence: none
+    - id: Art. 22
+      title: Automated decision-making
+      status: customer
+      how: Answers support a clinician and decide nothing; keeping a person in the loop is the organisation's duty.
+      evidence: none
+    - id: Art. 24
+      title: Responsibility of the controller
+      status: customer
+      how: Controller accountability.
+      evidence: none
+    - id: Art. 25
+      title: Data protection by design and by default
+      status: supported
+      how: De-identification and encryption are on by default; a guard override is refused where accounts are required.
+      evidence:
+      - app/deid.py
+      - tests/test_deid.py
+      - app/encryption.py
+      - tests/test_data_protection.py
+    - id: Art. 28
+      title: Processor
+      status: customer
+      how: A processor agreement with any model or hosting vendor.
+      evidence: none
+    - id: Art. 30
+      title: Records of processing
+      status: customer
+      how: The organisation's register; the evidence pack describes what the product processes.
+      evidence: none
+    - id: Art. 32
+      title: Security of processing
+      status: supported
+      how: Encryption, access control, 2FA, audit chain, rate limiting, scans in CI.
+      evidence:
+      - app/encryption.py
+      - tests/test_data_protection.py
+      - app/auth.py
+      - tests/test_accounts.py
+      - .github/workflows/ci.yml
+      - scripts/security_scan.sh
+    - id: Art. 33
+      title: Notification to the authority
+      status: supported
+      how: Incidents carry a 72-hour clock and a decision gate for notifying the regulator; notifying is the organisation's.
+      evidence: *id003
+    - id: Art. 34
+      title: Communication to data subjects
+      status: customer
+      how: Telling people is the organisation's.
+      evidence: none
+    - id: Art. 35
+      title: Data protection impact assessment
+      status: customer
+      how: The organisation's assessment; the evidence pack and control matrix are inputs.
+      evidence: none
+    - id: Art. 37
+      title: Data protection officer
+      status: customer
+      how: Appointment is the organisation's.
+      evidence: none
+    - id: Art. 44-49
+      title: Transfers to third countries
+      status: customer
+      how: Local models keep data on site; a cloud model receives only de-identified text. The organisation decides
+        which to use.
+      evidence:
+      - docs/on-premises.md
+  soc2:
+    name: SOC 2 Trust Services Criteria
+    controls:
+    - id: CC1
+      title: Control environment
+      status: customer
+      how: Governance and ethics are the organisation's.
+      evidence: none
+    - id: CC2
+      title: Communication and information
+      status: customer
+      how: Internal and external communication of controls.
+      evidence: none
+    - id: CC3
+      title: Risk assessment
+      status: customer
+      how: Risk assessment for the organisation's service.
+      evidence: none
+    - id: CC4.1
+      title: Monitoring of controls
+      status: supported
+      how: Usage and quality monitoring, alert rules and audit-chain verification.
+      evidence:
+      - app/monitoring.py
+      - tests/test_monitoring.py
+      - app/audit.py
+      - app/integrity.py
+      - tests/test_data_protection.py
+    - id: CC5
+      title: Control activities
+      status: customer
+      how: The organisation selects and deploys its control activities.
+      evidence: none
+    - id: CC6.1
+      title: Logical access security
+      status: supported
+      how: Authenticated sessions or API keys on every route, roles, site isolation.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/sites.py
+      - tests/test_sites.py
+    - id: CC6.2
+      title: Registration and authorisation of users
+      status: supported
+      how: Admin-created accounts, first-admin setup, role assignment and deactivation.
+      evidence: *id001
+    - id: CC6.3
+      title: Role-based access
+      status: supported
+      how: Roles and scopes limit actions.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/apikeys.py
+    - id: CC6.6
+      title: Boundary protection
+      status: supported
+      how: Per-client and per-key rate limits, request size limits, a cross-site write check; network boundaries
+        are the organisation's.
+      evidence:
+      - app/api_v1.py
+      - tests/test_api_v1.py
+    - id: CC6.7
+      title: Transmission of data
+      status: supported
+      how: TLS termination configuration is provided; the organisation operates it.
+      evidence: *id004
+    - id: CC6.8
+      title: Malicious software
+      status: customer
+      how: Hosts and endpoints.
+      evidence: none
+    - id: CC7.1
+      title: Detection of vulnerabilities and changes
+      status: supported
+      how: Dependency audit and static analysis in CI; configuration snapshot in the evidence pack.
+      evidence:
+      - .github/workflows/ci.yml
+      - scripts/security_scan.sh
+      - app/evidence.py
+    - id: CC7.2
+      title: Monitoring for anomalies
+      status: supported
+      how: Alert rules for refusal-rate rises, latency, drift, overdue reviews and audit-chain breaks.
+      evidence: &id007
+      - app/monitoring.py
+      - tests/test_monitoring.py
+    - id: CC7.3
+      title: Evaluation of security events
+      status: supported
+      how: Incident register with harm grading.
+      evidence: *id003
+    - id: CC7.4
+      title: Incident response
+      status: supported
+      how: Incident workflow with owners, deadlines and a timeline; the response plan is the organisation's.
+      evidence: *id003
+    - id: CC7.5
+      title: Recovery
+      status: customer
+      how: Recovery from incidents and outages.
+      evidence:
+      - scripts/backup_restore_drill.sh
+    - id: CC8.1
+      title: Change management
+      status: supported
+      how: Knowledge releases are gated by safety tests and can be rolled back in one step; CI gates code changes.
+      evidence:
+      - app/releases.py
+      - tests/test_releases.py
+      - .github/workflows/ci.yml
+    - id: CC9
+      title: Risk mitigation
+      status: customer
+      how: Vendor and business-disruption risk.
+      evidence: none
+    - id: A1.1
+      title: Capacity
+      status: customer
+      how: Capacity planning for the organisation's load.
+      evidence: none
+    - id: A1.2
+      title: Backup and recovery infrastructure
+      status: customer
+      how: Backups are the organisation's; a drill script is provided.
+      evidence:
+      - scripts/backup_restore_drill.sh
+    - id: C1.1
+      title: Identification of confidential information
+      status: supported
+      how: Identifiers are detected and removed from questions.
+      evidence: *id005
+    - id: C1.2
+      title: Disposal of confidential information
+      status: supported
+      how: Retention deletes records past their period.
+      evidence: *id002
+    - id: PI1
+      title: Processing integrity
+      status: supported
+      how: Every answer passes grounding and dosage checks, the decision is deterministic and recorded.
+      evidence:
+      - app/pipeline.py
+      - tests/test_pipeline.py
+      - app/audit.py
+      - app/integrity.py
+      - tests/test_data_protection.py
+    - id: P3-P4
+      title: 'Privacy: collection and use'
+      status: supported
+      how: Only the de-identified question is stored; use is limited to answering and review.
+      evidence: *id005
+    - id: P1-P2, P5-P8
+      title: 'Privacy: notice, choice, access, disclosure, quality, complaints'
+      status: customer
+      how: Notice, consent and subject-rights processes.
+      evidence: none
+  iso27001:
+    name: ISO/IEC 27001:2022 Annex A
+    controls:
+    - id: A.5.1
+      title: Policies for information security
+      status: customer
+      how: The organisation's policies.
+      evidence: none
+    - id: A.5.15
+      title: Access control
+      status: supported
+      how: Roles, sites and scopes.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/sites.py
+      - tests/test_sites.py
+    - id: A.5.16
+      title: Identity management
+      status: supported
+      how: 'Account lifecycle: create, change role, deactivate, delete.'
+      evidence: *id001
+    - id: A.5.17
+      title: Authentication information
+      status: supported
+      how: Argon2id hashes, minimum length, TOTP, hashed API keys shown once.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/apikeys.py
+    - id: A.5.24-A.5.28
+      title: Incident management
+      status: supported
+      how: Incident register, grading, timeline and links to audit records.
+      evidence: *id003
+    - id: A.5.30
+      title: ICT readiness for business continuity
+      status: customer
+      how: Continuity planning.
+      evidence: none
+    - id: A.5.34
+      title: Privacy and protection of PII
+      status: supported
+      how: De-identification, encryption, retention.
+      evidence:
+      - app/deid.py
+      - tests/test_deid.py
+      - app/encryption.py
+      - tests/test_data_protection.py
+      - app/retention.py
+      - tests/test_data_protection.py
+    - id: A.5.36
+      title: Compliance with policies and standards
+      status: customer
+      how: Internal compliance review.
+      evidence: none
+    - id: A.6.3
+      title: Awareness, education and training
+      status: customer
+      how: Staff training.
+      evidence: none
+    - id: A.7
+      title: Physical controls
+      status: customer
+      how: Premises and equipment.
+      evidence: none
+    - id: A.8.2
+      title: Privileged access rights
+      status: supported
+      how: Admin role is separate; site admins are limited to a site.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/sites.py
+      - tests/test_sites.py
+    - id: A.8.3
+      title: Information access restriction
+      status: supported
+      how: Clinicians see their own questions; reviewers and admins see the site's.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/sites.py
+      - tests/test_sites.py
+    - id: A.8.5
+      title: Secure authentication
+      status: supported
+      how: Passwords with lockout, TOTP, OIDC SSO with optional MFA requirement.
+      evidence:
+      - app/auth.py
+      - tests/test_accounts.py
+      - app/sso.py
+      - tests/test_sso.py
+    - id: A.8.7
+      title: Protection against malware
+      status: customer
+      how: Hosts and endpoints.
+      evidence: none
+    - id: A.8.8
+      title: Management of technical vulnerabilities
+      status: supported
+      how: Dependencies are pinned and scanned in CI; applying updates is the organisation's.
+      evidence: &id008
+      - .github/workflows/ci.yml
+      - scripts/security_scan.sh
+    - id: A.8.9
+      title: Configuration management
+      status: supported
+      how: All settings are environment variables; a secret-free snapshot is in the evidence pack.
+      evidence:
+      - app/config.py
+      - app/evidence.py
+    - id: A.8.10
+      title: Information deletion
+      status: supported
+      how: Retention run.
+      evidence: *id002
+    - id: A.8.11
+      title: Data masking
+      status: supported
+      how: Identifiers replaced with placeholders.
+      evidence: *id005
+    - id: A.8.12
+      title: Data leakage prevention
+      status: supported
+      how: Questions are de-identified before reaching any model.
+      evidence: *id005
+    - id: A.8.13
+      title: Information backup
+      status: customer
+      how: Backups.
+      evidence:
+      - scripts/backup_restore_drill.sh
+    - id: A.8.14
+      title: Redundancy of information processing facilities
+      status: not_addressed
+      how: Replicas are supported by the Helm chart; redundancy design is not provided.
+      evidence: none
+    - id: A.8.15
+      title: Logging
+      status: supported
+      how: Signed audit trail, structured JSON logs available.
+      evidence: *id006
+    - id: A.8.16
+      title: Monitoring activities
+      status: supported
+      how: Metrics, alerts and drift monitoring.
+      evidence: *id007
+    - id: A.8.20
+      title: Network security
+      status: customer
+      how: Network design and firewalls.
+      evidence: none
+    - id: A.8.24
+      title: Use of cryptography
+      status: supported
+      how: AES-256 at rest, Argon2id, HMAC-SHA256 chain, Ed25519 pack signatures, key rotation with re-encryption.
+      evidence:
+      - app/encryption.py
+      - tests/test_data_protection.py
+      - app/rekey.py
+    - id: A.8.25
+      title: Secure development life cycle
+      status: supported
+      how: Tests, evaluation gates, static analysis and dependency audit in CI.
+      evidence: *id008
+    - id: A.8.28
+      title: Secure coding
+      status: supported
+      how: Static analysis in CI; untrusted text is never written as HTML.
+      evidence:
+      - .github/workflows/ci.yml
+      - tests/test_web_static.py
+    - id: A.8.29
+      title: Security testing in development and acceptance
+      status: supported
+      how: OWASP ZAP baseline and API scans, fuzzing and adversarial probes.
+      evidence:
+      - .github/workflows/ci.yml
+      - scripts/security_scan.sh
+      - tests/test_fuzz.py
+    - id: A.8.31
+      title: Separation of development, test and production
+      status: customer
+      how: Environments.
+      evidence: none
+    - id: A.8.32
+      title: Change management
+      status: supported
+      how: Knowledge releases are gated and reversible.
+      evidence:
+      - app/releases.py
+      - tests/test_releases.py

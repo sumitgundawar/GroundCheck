@@ -23,3 +23,7 @@ eval/*.sample.json
 # Launch and social copy. Personal material about shipping this project,
 # not part of the platform anyone installs.
 brag-output/
+
+# The held-out split and its secret seed live outside the repository.
+eval/heldout*
+*.seed

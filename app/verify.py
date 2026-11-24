@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 import time
+from collections import Counter
 import unicodedata
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -77,7 +78,7 @@ _HEDGES = re.compile(r"\b(?:" + "|".join([
     r"i (?:do not|don't) (?:know|remember)(?: for (?:certain|sure)| exactly)?",
     r"it (?:seems|appears)(?: that)?", r"according to (?:the |these |my |our |this )?"
     r"(?:sources?|guidance|guidelines?|label|labelling|documentation|formulary|information|documents?|text|passage)",
-    r"(?:please )?note(?: that)?", r"basically", r"generally(?: speaking)?", r"maybe", r"perhaps",
+    r"(?:please )?note(?: that)?", r"basically", r"generally(?: speaking)?", r"maybe", r"perhaps", r"probably", r"possibly", r"presumably",
     r"in general", r"overall",
     r"in short", r"in summary", r"sure", r"certainly", r"of course",
 ]) + r")\b", re.IGNORECASE)
@@ -153,6 +154,12 @@ def _tokens(text: str) -> tuple[list[str], set[str], set[str]]:
     pairs: set[str] = set()
     numbers: set[str] = set()
 
+    def strength(match: re.Match) -> str:
+        pairs.add(f"{guards_output._shown(guards_output.concentrations(match.group(0))[0])} mg/ml")
+        return " "
+
+    text = guards_output._CONC_RE.sub(lambda m: strength(m) if guards_output.concentrations(m.group(0)) else " ", text)
+
     def value(match: re.Match) -> str:
         unit = guards_output._UNIT_CANON.get(match.group(3).lower())
         for raw in (match.group(1), match.group(2)):
@@ -160,9 +167,10 @@ def _tokens(text: str) -> tuple[list[str], set[str], set[str]]:
                 continue
             number = guards_output._word_to_number(raw)
             if number is not None:
-                numbers.add(guards_output._fmt_num(number))
                 if unit:
                     pairs.add(f"{guards_output._fmt_num(number)} {unit}")
+                else:
+                    numbers.add(guards_output._fmt_num(number))
         return " "
 
     text = guards_output._VALUE_RE.sub(value, text)
@@ -175,6 +183,28 @@ def _tokens(text: str) -> tuple[list[str], set[str], set[str]]:
 
     text = _NUM_RE.sub(plain, text)
     return _WORD.findall(text), numbers, pairs
+
+
+_PLAIN_NEGATION = frozenset({"no", "not", "never", "cannot"})
+
+
+def _plain(token: str) -> str:
+    """The everyday negations count as one: "never" for "not" is a choice of
+    word. Any other negation ("without", "avoid") stands for itself."""
+    return "not" if token in _PLAIN_NEGATION else token
+
+
+def _negated(tokens) -> set[str]:
+    """The word each negation governs: the first word of substance after it
+    ("not be *used*", "without *specialist*")."""
+    found = set()
+    for i, token in enumerate(tokens):
+        if token in _NEGATIONS:
+            for later in tokens[i + 1: i + 6]:
+                if later not in _FUNCTION and later not in _NEGATIONS and len(later) > 1:
+                    found.add(later)
+                    break
+    return found
 
 
 def _critical_sequence(words) -> list[str]:
@@ -219,6 +249,7 @@ class _Window:
     stems: frozenset[str]
     numbers: frozenset[str]
     pairs: frozenset[str]
+    pairs_norm: frozenset[str]
     negations: tuple[str, ...]
     tokens: tuple[str, ...]
     numbers_seen: tuple[str, ...] = ()
@@ -240,6 +271,7 @@ def _windows(source_id: str, text: str) -> tuple[_Window, ...]:
                 stems |= guards_output._stems(w)
             out.append(_Window(source_id, start, end, piece, n, frozenset(words), frozenset(stems),
                                frozenset(numbers), frozenset(pairs),
+                               frozenset(guards_output.normalise_pair(p) for p in pairs),
                                tuple(w for w in words if w in _NEGATIONS), tuple(words)))
     return tuple(out)
 
@@ -282,6 +314,22 @@ def canonical_text(text: str) -> str:
         return f"{shown} {unit}"
 
     return guards_output._VALUE_RE.sub(value, text)
+
+
+def _align_units(text: str, window: _Window) -> str:
+    """The claim with each dose written the way the source writes it, when it
+    is the same quantity in another unit ("0.015 g" as "15 mg"), so the
+    checks that compare wording see the same thing."""
+    def swap(m: re.Match) -> str:
+        unit = guards_output._UNIT_CANON.get(m.group(3).lower())
+        a = guards_output._word_to_number(m.group(1))
+        if unit is None or a is None or m.group(2):
+            return m.group(0)
+        pair = f"{guards_output._fmt_num(a)} {unit}"
+        found = guards_output.matching_pair(pair, set(window.pairs), [window.text])
+        return found if found and found != pair else m.group(0)
+
+    return guards_output._VALUE_RE.sub(swap, text)
 
 
 def _cited(text: str) -> tuple[str, list[str]]:
@@ -341,17 +389,19 @@ def assess(text: str, candidates: list[dict], allowed: set[str] | None,
         return result
 
     content = list(dict.fromkeys(_meaningful(words)))
-    needed = len(content) + len(numbers)
+    pairs_norm = {guards_output.normalise_pair(p) for p in pairs}
+    needed = len(content) + len(numbers) + len(pairs_norm)
     best, best_key = None, None
     for record in pool:
         for window in _windows(record["id"], record["text"]):
-            hit = sum(1 for w in content if _has(w, window)) + len(numbers & window.numbers)
+            hit = (sum(1 for w in content if _has(w, window)) + len(numbers & window.numbers)
+                   + len(pairs_norm & window.pairs_norm))
             key = (hit / needed if needed else 0.0, _topic(record) in prefer, -window.sentences)
             if best_key is None or key > best_key:
                 best, best_key = window, key
     assert best is not None
     result.coverage = best_key[0]
-    result.clean = canonical_text(result.clean)
+    result.clean = _align_units(canonical_text(result.clean), best)
     if has_pii:
         result.clean = " ".join(w for w in result.clean.split() if re.sub(r"\W", "", w.lower()) not in _PII_FILLER)
     result.source_id = best.source_id
@@ -365,9 +415,10 @@ def assess(text: str, candidates: list[dict], allowed: set[str] | None,
     review: list[str] = []
     for n in sorted(numbers - best.numbers, key=float):
         fail.append(f"the number {n} is not stated by the source")
-    for pair in sorted(pairs - best.pairs):
-        fail.append(f"'{pair}' is not stated by the source")
-        result.dose_values.append(pair)
+    for pair in sorted(pairs):
+        if not guards_output.value_supported(pair, set(best.pairs), [best.text]):
+            fail.append(f"'{pair}' is not stated by the source")
+            result.dose_values.append(pair)
     novel = [w for w in content if not _has(w, best)]
     for w in novel:
         if w in _CRITICAL or w in _NEGATIONS:
@@ -390,17 +441,22 @@ def assess(text: str, candidates: list[dict], allowed: set[str] | None,
         fail.append(f"it says '{claim_neg[0]}', which the source does not")
     elif claim_neg and not set(claim_neg) & set(win_neg) and not set(claim_neg) <= {"no", "not", "never", "cannot"} | set(win_neg):
         fail.append(f"its negation '{claim_neg[0]}' differs from the source's")
-    if win_neg and not claim_neg:
+    missing = Counter(_plain(t) for t in win_neg) - Counter(_plain(t) for t in claim_neg)
+    if missing:
         claim_set = set(content)
         for i, tok in enumerate(best.tokens):
-            if tok in _NEGATIONS:
+            if _plain(tok) in missing:
                 near = {t for t in best.tokens[max(0, i - 3): i + 5] if t not in _FUNCTION and t not in _NEGATIONS}
                 if any(t in claim_set or any(guards_output._stems(t) & guards_output._stems(c) for c in claim_set)
                        for t in near):
                     fail.append(f"the source says '{tok}' here, and the claim leaves it out")
                     break
-    first = re.findall(r"[a-z']+", flat.lower())[:1]
-    if first and first[0] in _AFFIRMATION and not fail:
+    if not fail and claim_neg and win_neg:
+        theirs, ours = _negated(best.tokens), _negated(list(words))
+        if ours and theirs and not any(_same(a, b) for a in ours for b in theirs):
+            review.append("its negation applies to a different word than the source's")
+    bare = re.match(r"(?:" + "|".join(sorted(_AFFIRMATION)) + r")\b\s*(?:[,.:;!\u2014-]|$)", flat.lower())
+    if bare and not fail:
         review.append("a bare yes/no cannot be checked against a source")
     if fail:
         result.status, result.issues = "unsupported", fail + review
@@ -457,6 +513,54 @@ _EXPLAIN = {
     "no_checkable_claims": "The answer makes no claim that can be checked, so nothing was verified.",
     "no_relevant_source": "No trusted source is relevant to this question, so the answer cannot be verified.",
 }
+
+
+def _aspects(question: str) -> list[tuple[str, set[str], re.Pattern]]:
+    """What the question asks for (a dose, side effects, an interaction...),
+    from the same classifier that picks the sentences of an answer."""
+    from . import llm
+
+    found = [(name, sections, cue) for name, pattern, sections, cue in llm._INTENTS if pattern.search(question)]
+    if re.search(r"\bnot (?:take|taken|use|used|given|be given)\b", question, re.IGNORECASE):
+        found = [f for f in found if f[0] != "dose"]      # "who should not take" asks about contraindications
+    return found
+
+
+@lru_cache(maxsize=4096)
+def _mixed_text(text: str) -> bool:
+    from . import llm
+
+    return sum(bool(cue.search(text)) for *_, cue in llm._INTENTS) >= 3
+
+
+def _mixed(record: dict) -> bool:
+    """A passage that covers several aspects at once (dose, side effects,
+    contraindications...), so the section it is filed under says little about
+    which one a sentence from it is about."""
+    return _mixed_text(record.get("text", ""))
+
+
+def _addresses(question: str, claims: list[VerifiedClaim]) -> bool | None:
+    """Whether any claim is about what the question asks: it states a source
+    in a section that answers it, or it reads like such an answer and comes
+    from a passage that is not about some other aspect. None when the question
+    does not say what it asks for. Needs only one claim, so an answer that
+    also says more is not penalised."""
+    from . import llm
+
+    aspects = _aspects(question)
+    if not aspects:
+        return None
+    specific = set().union(*(sections for _, _, sections, _ in llm._INTENTS))
+    for claim in claims:
+        record = _record(claim.source_id) if claim.source_id else None
+        section = (record or {}).get("section", "")
+        body = _cited(claim.text)[0]
+        mixed = record is not None and _mixed(record)
+        for _, sections, cue in aspects:
+            if section in sections or ((section not in specific or mixed) and cue.search(body)):
+                return True
+    return False
 
 
 def verify(question: str, answer: str, sources: list[str] | None = None, patient: PatientContext | None = None,
@@ -561,7 +665,8 @@ def verify(question: str, answer: str, sources: list[str] | None = None, patient
         asked = {r["id"] for r, _ in retrieval.search(q.text, cfg.top_k)}
         if not asked & {c.source_id for c in out if c.source_id}:
             return resolve("review", "no_relevant_source")
-    if max(c.relevance for c in out) < MIN_RELEVANCE:
+    addressed = _addresses(q.text, out)
+    if addressed is False or (addressed is None and max(c.relevance for c in out) < MIN_RELEVANCE):
         return resolve("review", "answer_off_topic")
     if any(x.status == "review" for x in assessed):
         return resolve("review", "claim_unverified")

@@ -145,7 +145,8 @@ class AuditStore:
             return self._records[audit_id]
         if self.backend() == "database":
             with db.session() as s:
-                row = s.scalar(select(db.AuditRecord).where(db.AuditRecord.audit_id == audit_id))
+                row = s.scalar(select(db.AuditRecord).where(db.AuditRecord.audit_id == audit_id,
+                                                            db.AuditRecord.decision != "event"))
                 return row.record if row else None
         return None
 
@@ -154,7 +155,7 @@ class AuditStore:
         only that user's records; with site_id, only that site's."""
         if self.backend() == "database":
             with db.session() as s:
-                q = select(db.AuditRecord).order_by(db.AuditRecord.created_at.desc(), db.AuditRecord.id.desc())
+                q = select(db.AuditRecord).where(db.AuditRecord.decision != "event").order_by(db.AuditRecord.created_at.desc(), db.AuditRecord.id.desc())
                 if user_id is not None:
                     q = q.where(db.AuditRecord.user_id == user_id)
                 if site_id is not None:
@@ -179,7 +180,7 @@ class AuditStore:
     def count(self) -> int:
         if self.backend() == "database":
             with db.session() as s:
-                return s.scalar(select(func.count(db.AuditRecord.id))) or 0
+                return s.scalar(select(func.count(db.AuditRecord.id)).where(db.AuditRecord.decision != "event")) or 0
         return len(self._records)
 
 

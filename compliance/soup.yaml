@@ -1,0 +1,46 @@
+# Notes on the direct third-party dependencies (SOUP, IEC 62304 section 8): what each is used
+# for and what happens if it misbehaves. scripts/soup_list.py combines this with requirements.txt
+# and the CycloneDX SBOM (or the installed environment) into the SOUP list, and fails if a
+# dependency has no licence or a direct dependency has no entry here.
+#
+# Known anomalies are reviewed by `pip-audit` on every CI run and weekly; the SOUP list says
+# which version was in use, not that it is free of defects.
+
+direct:
+  fastapi: {use: "HTTP routing and request validation for the API.", failure: "The API misroutes or rejects requests; no answer is produced. The decision logic is not in it."}
+  starlette: {use: "ASGI toolkit under FastAPI: requests, cookies, test client.", failure: "As FastAPI."}
+  uvicorn: {use: "ASGI server.", failure: "The service stops or restarts; nothing is answered."}
+  pydantic: {use: "Schema validation of requests, patient context and model output.", failure: "Malformed data is accepted or valid data rejected; response schemas and tests catch drift."}
+  sentence-transformers: {use: "Loads the embedding model used for passage retrieval.", failure: "Retrieval degrades; the retrieval gate and coverage guard refuse rather than guess."}
+  transformers: {use: "Model loading for sentence-transformers.", failure: "As sentence-transformers."}
+  qdrant-client: {use: "Optional vector store client.", failure: "Retrieval fails; the service refuses everything it can't ground."}
+  numpy: {use: "Numerical arrays: scores, imaging volumes, NIfTI and DICOM pixels.", failure: "Wrong scores or pixel values; evaluation suites and imaging tests would fail."}
+  openai: {use: "Client for OpenAI-compatible endpoints (Groq by default).", failure: "Generation fails; extractive mode and refusals are unaffected."}
+  httpx: {use: "HTTP client for FHIR, SMART, CDS Hooks JWKS, DICOMweb and model endpoints.", failure: "An integration call fails and is reported; no silent success."}
+  python-dotenv: {use: "Loads configuration from a .env file.", failure: "Settings are not applied; defaults are safe (guards on)."}
+  pytest: {use: "Test runner (development and CI).", failure: "Tests mis-report; not used at run time."}
+  hypothesis: {use: "Property-based tests (development and CI).", failure: "Fuzz tests mis-report; not used at run time."}
+  sqlalchemy: {use: "Database access for accounts, audit, reviews and documents.", failure: "Records are not saved or read; the audit hash chain detects altered rows."}
+  alembic: {use: "Database schema migrations.", failure: "A migration fails and the service refuses to start on an out-of-date schema."}
+  argon2-cffi: {use: "Argon2id password hashing.", failure: "Sign-in fails or hashes are weak; the account tests check parameters."}
+  cryptography: {use: "AES-256-GCM encryption at rest, signing keys, JWT key handling.", failure: "Data can't be decrypted or signatures fail; the chain and encryption tests would fail."}
+  pyjwt: {use: "Validates JWTs for SSO and CDS Hooks.", failure: "A token is wrongly accepted or rejected; the conformance suites cover expiry, audience, issuer and algorithm."}
+  pyotp: {use: "Time-based one-time passwords for two-factor sign-in.", failure: "Two-factor sign-in fails or accepts wrong codes."}
+  segno: {use: "Draws the two-factor enrolment QR code.", failure: "No QR code; the secret can be typed instead."}
+  pypdf: {use: "Reads text from imported PDF documents.", failure: "A document is imported incorrectly; it stays pending until a reviewer approves it."}
+  python-docx: {use: "Reads text from imported Word documents.", failure: "As pypdf."}
+  python-multipart: {use: "Parses file uploads.", failure: "An upload is refused or misread."}
+  pillow: {use: "Image decoding and encoding for the training studio and slice previews.", failure: "An image can't be read or shown; training reports the file."}
+  torchvision: {use: "Network architectures for the training studio (ResNet-18).", failure: "Training or inference fails or is wrong; test-set metrics and abstention checks report it."}
+  pydicom: {use: "Reads, de-identifies and writes DICOM.", failure: "A file is misread or an identifier is left in; the de-identification tests check tags and pixel data."}
+  highdicom: {use: "Writes DICOM Structured Reports.", failure: "A report can't be produced or is malformed; it is validated on export."}
+
+# Licences the package metadata doesn't state in a form the script can read.
+licence_overrides: {}
+
+# Copyleft or restricted licences that were reviewed, with the reason it is acceptable.
+reviewed_licences:
+  hypothesis: "MPL-2.0: test-only, not part of the runtime image."
+  tqdm: "MPL-2.0 AND MIT: progress bars pulled in by model downloading, unmodified."
+  psycopg: "LGPL-3.0: optional PostgreSQL driver used unmodified through its Python API."
+  certifi: "MPL-2.0: CA bundle, unmodified."

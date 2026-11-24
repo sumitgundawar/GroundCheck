@@ -71,3 +71,28 @@ def remote_headers() -> dict:
 # on the same host looks like, and what uvicorn --forwarded-allow-ips makes a
 # remote request look like.
 LOOPBACK_PEER = ("127.0.0.1", 50001)
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "req(id, ...): the requirement(s) in compliance/requirements.yaml this test verifies")
+
+
+def _requirement_ids() -> set[str] | None:
+    try:
+        import yaml
+
+        data = yaml.safe_load((Path(__file__).resolve().parent.parent / "compliance" / "requirements.yaml").read_text(encoding="utf-8"))
+        return {str(r["id"]) for r in data["requirements"]}
+    except Exception:  # noqa: BLE001 - no register (or no PyYAML): nothing to check against
+        return None
+
+
+def pytest_collection_modifyitems(config, items):
+    """A test that names a requirement that doesn't exist is an error, not a silent gap in the trace matrix."""
+    known = _requirement_ids()
+    if known is None:
+        return
+    unknown = [f"{item.nodeid}: unknown requirement {a!r}" for item in items for m in item.iter_markers("req") for a in m.args
+               if a not in known]
+    if unknown:
+        raise pytest.UsageError("Tests refer to requirements missing from compliance/requirements.yaml:\n  " + "\n  ".join(unknown))

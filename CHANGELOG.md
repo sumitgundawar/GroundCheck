@@ -3,6 +3,24 @@
 Dates are when the work landed on `main`. Versions follow the app's
 `config.VERSION`.
 
+## 3.0.0 — unreleased (branch v3)
+
+### Service API
+
+- **API keys.** `gck_` keys with scopes (`ask`, `verify`, `usage`, `audit:read`), site binding, expiry,
+  revocation, per-key rate limit and monthly quota. Administered at `/api/keys`; creation and revocation
+  are chained into the audit trail without the secret.
+- **`/api/v1`** (`ask`, `verify`, `usage`, `audit/{id}`, `health`): one error envelope, `X-Request-Id`,
+  `X-RateLimit-*` and `Retry-After`, exact metering of successes and failures, usage by key, day, site,
+  endpoint or decision with CSV, and a committed contract (`openapi/v1.json`) with a compatibility test.
+- **Verify an answer from any model.** `POST /api/v1/verify` checks claims, doses, negations, frequencies,
+  routes, populations, citations and the patient against the approved sources, and says whether the
+  answer addresses the question. Doses in another unit are compared as quantities; millilitres convert
+  only when a source states the strength. `scripts/verify_eval.py` gates CI on zero wrong answers passed;
+  `scripts/build_verify_holdout.py` adds mutation families that are never tuned on.
+- A knowledge pack's evaluation cases now gate a release: any case decided differently blocks it.
+- Administrative events in the audit chain are skipped by every report, monitor, list and lookup.
+
 ## 2.0.0 — unreleased
 
 ### Refusals say what happened

@@ -442,13 +442,13 @@ def list_hazards() -> list[dict]:
 
 # --- Reports -----------------------------------------------------------------
 
-def report(days: int = 30, site_id: int | None = None) -> dict:
+def report(days: int = 30, site_id: int | None = None, now: datetime | None = None) -> dict:
     """Usage, refusals, overrides, review performance and documents for a period."""
     if not 1 <= days <= 3660:
         raise GovernanceError("Choose a period of 1 to 3,660 days.")
-    now = utcnow()
+    now = now or utcnow()
     since = now - timedelta(days=days)
-    audit_q = select(AuditRecord).where(AuditRecord.created_at >= since)
+    audit_q = select(AuditRecord).where(AuditRecord.created_at >= since, AuditRecord.decision != "event")
     if site_id is not None:
         audit_q = audit_q.where(AuditRecord.site_id == site_id)
     with db.session() as s:
@@ -528,7 +528,7 @@ def usage(days: int = 30, site_id: int | None = None) -> dict:
     deidentified = 0
     reasons: dict[str, int] = {}
     with db.session() as s:
-        usage_q = select(AuditRecord).where(AuditRecord.created_at >= since)
+        usage_q = select(AuditRecord).where(AuditRecord.created_at >= since, AuditRecord.decision != "event")
         if site_id is not None:
             usage_q = usage_q.where(AuditRecord.site_id == site_id)
         records = [r for r in s.scalars(usage_q) if not r.record.get("test_run")]
@@ -710,16 +710,16 @@ def surveillance_markdown(days: int = 90, site_id: int | None = None) -> str:
     return "\n".join(lines)
 
 
-def safety_case_markdown(days: int = 30, site_id: int | None = None) -> str:
+def safety_case_markdown(days: int = 30, site_id: int | None = None, now: datetime | None = None) -> str:
     """A clinical safety case summary for this release, as Markdown."""
-    r = report(days, site_id)
+    r = report(days, site_id, now=now)
     hazards = list_hazards()
     try:
         evaluation = json.loads(config.EVAL_SUMMARY_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         evaluation = None
     review_tests = run_eval_cases() if db.ready() else None
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     # A document shaped like a deliverable gets filed like one. If the evidence
     # underneath it is invented, that has to be the first thing on the page and
@@ -800,3 +800,16 @@ def safety_case_markdown(days: int = 30, site_id: int | None = None) -> str:
               if synthetic else
               ["Clinical safety officer: ____________________  Date: __________", ""])
     return "\n".join(lines)
+
+
+def adoption_metrics(days: int = 30, site_id: int | None = None, **kwargs) -> dict:
+    """Adoption and value numbers for a period (see app/analytics.py)."""
+    from . import analytics
+
+    return analytics.adoption_metrics(days, site_id, **kwargs)
+
+
+def pilot_report_markdown(days: int = 30, site_id: int | None = None, **kwargs) -> str:
+    from . import analytics
+
+    return analytics.pilot_report_markdown(days, site_id, **kwargs)

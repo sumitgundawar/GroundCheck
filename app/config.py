@@ -37,11 +37,27 @@ def _get_int(name: str, default: int) -> int:
         return default
 
 
-# --- LLM provider (Groq, OpenAI-compatible) -------------------------------
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
-GROQ_BASE_URL = _get("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+# --- LLM provider (see app/providers.py) -------------------------------------
+# LLM_PROVIDER: openai_compatible | anthropic | azure_openai | ollama | none.
+# Unset keeps the earlier behaviour: a model selected in the dashboard (Ollama)
+# first, then the OpenAI-compatible endpoint if a key is set, else extractive.
+# A provider named here is used on its own. "none" always answers extractively.
+LLM_PROVIDER = _get("LLM_PROVIDER", "").lower().replace("-", "_")
+# The Groq names still work as aliases of the generic ones.
+LLM_API_KEY = (os.environ.get("LLM_API_KEY") or os.environ.get("GROQ_API_KEY") or "").strip()
+GROQ_API_KEY = LLM_API_KEY
+LLM_BASE_URL = _get("LLM_BASE_URL", _get("GROQ_BASE_URL", "https://api.groq.com/openai/v1"))
+GROQ_BASE_URL = LLM_BASE_URL
+GEN_MODEL_EXPLICIT = os.environ.get("GEN_MODEL", "").strip()
+JUDGE_MODEL_EXPLICIT = os.environ.get("JUDGE_MODEL", "").strip()
 GEN_MODEL = _get("GEN_MODEL", "llama-3.3-70b-versatile")
 JUDGE_MODEL = _get("JUDGE_MODEL", "llama-3.1-8b-instant")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+ANTHROPIC_BASE_URL = _get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
+AZURE_OPENAI_ENDPOINT = _get("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
+AZURE_OPENAI_DEPLOYMENT = _get("AZURE_OPENAI_DEPLOYMENT", "")
+AZURE_OPENAI_API_VERSION = _get("AZURE_OPENAI_API_VERSION", "2024-10-21")
 LLM_TIMEOUT_SECONDS = _get_float("LLM_TIMEOUT_SECONDS", 8.0)
 USE_LLM_JUDGE = _get("USE_LLM_JUDGE", "true").lower() in ("1", "true", "yes")
 
@@ -314,12 +330,28 @@ DICOMWEB_AUTHORIZATION = _get("DICOMWEB_AUTHORIZATION", "")
 # Largest upload, in megabytes.
 IMAGING_MAX_UPLOAD_MB = _get_int("IMAGING_MAX_UPLOAD_MB", 1024)
 
+# --- Anonymous install telemetry (see app/telemetry.py) ---
+# Off unless TELEMETRY=on, and then it sends nothing unless TELEMETRY_URL is
+# also set. Once a week it posts the fields listed in README.md, none of which
+# is clinical data.
+TELEMETRY = "on" if _get("TELEMETRY", "off").lower() in ("on", "1", "true", "yes") else "off"
+TELEMETRY_URL = _get("TELEMETRY_URL", "")
+TELEMETRY_INTERVAL_DAYS = _get_int("TELEMETRY_INTERVAL_DAYS", 7)
+
 # --- Retention (see app/retention.py). 0 keeps records for ever. ---
 AUDIT_RETENTION_DAYS = _get_int("AUDIT_RETENTION_DAYS", 0)
 REVIEW_RETENTION_DAYS = _get_int("REVIEW_RETENTION_DAYS", 0)
 
 
+# The cloud provider that will draft answers, or "" for none: the one named,
+# else the OpenAI-compatible endpoint when a key is set.
+LLM_PROVIDER_EFFECTIVE = (LLM_PROVIDER if LLM_PROVIDER in ("openai_compatible", "anthropic", "azure_openai")
+                          else "openai_compatible" if (not LLM_PROVIDER and LLM_API_KEY) else "")
+
+
 def llm_configured() -> bool:
-    """True if a live LLM should be used: a key is present and extractive mode
-    is not being forced. The app runs fully either way."""
-    return bool(GROQ_API_KEY) and not FORCE_EXTRACTIVE
+    """True if a live cloud LLM should be used: its credentials are present and
+    extractive mode is not being forced. The app runs fully either way."""
+    from . import providers
+
+    return bool(LLM_PROVIDER_EFFECTIVE) and providers.configured(LLM_PROVIDER_EFFECTIVE) and not FORCE_EXTRACTIVE

@@ -80,6 +80,7 @@ class PatientContext(BaseModel):
     def clean_list(cls, values: list[str]) -> list[str]:
         cleaned = []
         for value in values:
+            _encodable(value, "each entry")
             value = " ".join(str(value).split())
             if len(value) > 80:
                 raise ValueError("each entry can be up to 80 characters")
@@ -221,7 +222,19 @@ VerifyReason = Literal[
 ]
 
 
+class TooLong(ValueError):
+    """Text over its limit. The API answers 413 for it rather than 422."""
+
+
+def _encodable(value: str, what: str) -> None:
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ValueError(f"{what} is not valid Unicode text") from None
+
+
 def _clean_text(value: str, what: str) -> str:
+    _encodable(value, what)
     if any(ord(c) < 32 and c not in "\t\n\r" or ord(c) == 127 for c in value):
         raise ValueError(f"{what} contains control characters")
     if not value.strip():
@@ -232,7 +245,7 @@ def _clean_text(value: str, what: str) -> str:
 class V1AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: StrictStr
-    site: StrictStr | None = Field(default=None, max_length=64)
+    site: StrictStr | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{1,62}$")
     patient: PatientContext | None = None
 
     @field_validator("question")
@@ -240,7 +253,7 @@ class V1AskRequest(BaseModel):
     def _question(cls, value: str) -> str:
         value = _clean_text(value, "question")
         if len(value.strip()) > config.MAX_QUERY_CHARS:
-            raise ValueError(f"question is longer than {config.MAX_QUERY_CHARS} characters")
+            raise TooLong(f"question is longer than {config.MAX_QUERY_CHARS} characters")
         return value
 
 
@@ -248,7 +261,7 @@ class V1VerifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: StrictStr
     answer: StrictStr
-    site: StrictStr | None = Field(default=None, max_length=64)
+    site: StrictStr | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{1,62}$")
     sources: list[StrictStr] | None = Field(default=None, max_length=config.API_MAX_SOURCES)
     patient: PatientContext | None = None
 
@@ -257,7 +270,7 @@ class V1VerifyRequest(BaseModel):
     def _question(cls, value: str) -> str:
         value = _clean_text(value, "question")
         if len(value.strip()) > config.MAX_QUERY_CHARS:
-            raise ValueError(f"question is longer than {config.MAX_QUERY_CHARS} characters")
+            raise TooLong(f"question is longer than {config.MAX_QUERY_CHARS} characters")
         return value
 
     @field_validator("answer")
@@ -265,7 +278,7 @@ class V1VerifyRequest(BaseModel):
     def _answer(cls, value: str) -> str:
         value = _clean_text(value, "answer")
         if len(value) > config.API_MAX_ANSWER_CHARS:
-            raise ValueError(f"answer is longer than {config.API_MAX_ANSWER_CHARS} characters")
+            raise TooLong(f"answer is longer than {config.API_MAX_ANSWER_CHARS} characters")
         return value
 
     @field_validator("sources")
