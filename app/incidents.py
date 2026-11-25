@@ -28,7 +28,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 
-from . import db
+from . import db, guards_input
 from .db import Alert, Hazard, ImagingSeries, Incident, IncidentEvent, ReviewCase, User
 
 CATEGORIES = {
@@ -107,7 +107,7 @@ def _text(value, name: str, limit: int, required: bool = False) -> str:
         raise IncidentError(f"Add {name}.")
     if len(text) > limit:
         raise IncidentError(f"The {name} is too long: up to {limit:,} characters.")
-    return text
+    return guards_input.deidentify(text).text if text else text
 
 
 def _when(value, name: str) -> datetime | None:

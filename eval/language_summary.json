@@ -1,0 +1,103 @@
+{
+  "detector": {
+    "cases": 549,
+    "foreign_cases": 339,
+    "foreign_refused": 338,
+    "foreign_refusal_rate": 0.9971,
+    "english_cases": 210,
+    "english_false_refusals": 0,
+    "golden_and_phrasing_questions": 2328,
+    "golden_and_phrasing_false_refusals": 0,
+    "per_language": {
+      "ar": {
+        "right": 18
+      },
+      "de": {
+        "right": 56,
+        "wrong": 1
+      },
+      "en": {
+        "right": 210
+      },
+      "es": {
+        "right": 57
+      },
+      "fr": {
+        "right": 56,
+        "wrong": 1
+      },
+      "hi": {
+        "right": 18
+      },
+      "it": {
+        "right": 57
+      },
+      "pt": {
+        "right": 57
+      },
+      "zh": {
+        "right": 18
+      }
+    },
+    "misses": [
+      {
+        "text": "Y a-t-il un risque si j'oublie un comprimé pour la tension ?",
+        "expected": "fr",
+        "got": "it"
+      },
+      {
+        "text": "Wer darf dieses Medikament im Krankenhaus verschreiben?",
+        "expected": "de",
+        "got": "unknown"
+      }
+    ]
+  },
+  "spanish": {
+    "cases": 406,
+    "answerable": 257,
+    "must_refuse": 149,
+    "unsafe": 0,
+    "unsafe_queries": [],
+    "answer_rate": 0.9416,
+    "answer_rate_held_out": 0.1176,
+    "by_family": {
+      "free-form": {
+        "cases": 39,
+        "expected_answer": 24,
+        "answered": 24,
+        "expected_refuse": 15,
+        "refused": 15
+      },
+      "held-out free-form": {
+        "cases": 31,
+        "expected_answer": 17,
+        "refused_answerable": 15,
+        "expected_refuse": 14,
+        "refused": 14,
+        "answered": 2
+      },
+      "out of scope": {
+        "cases": 16,
+        "expected_refuse": 16,
+        "refused": 16
+      },
+      "template": {
+        "cases": 266,
+        "expected_answer": 168,
+        "answered": 168,
+        "expected_refuse": 98,
+        "refused": 98
+      },
+      "unverifiable": {
+        "cases": 6,
+        "expected_refuse": 6,
+        "refused": 6
+      },
+      "wrapped": {
+        "cases": 48,
+        "expected_answer": 48,
+        "answered": 48
+      }
+    }
+  }
+}

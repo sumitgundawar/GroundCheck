@@ -26,6 +26,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Optional packages the tracing tests use
+        run: pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http opentelemetry-exporter-otlp-proto-grpc
+
       - name: Build the search index from the synthetic corpus
         run: python scripts/build_index.py
 
@@ -34,6 +37,22 @@ jobs:
 
       - name: Run the test suite (no network)
         run: pytest -q
+        env:
+          REQUIRE_OTEL: "1"
+
+      - name: Requirements traceability (fails on a requirement without a passing test)
+        run: |
+          mkdir -p build
+          python scripts/trace_matrix.py --strict --markdown build/trace.md
+
+      - name: Controls matrix (fails on a control that points at nothing)
+        run: python scripts/controls_report.py --check
+
+      - name: Languages (unsupported languages refused, English never, Spanish subset 0 unsafe)
+        run: python scripts/language_eval.py
+
+      - name: Interface strings are in step with the page
+        run: python scripts/i18n_extract.py --check
 
       - name: Guards, against claims that are wrong
         run: python scripts/guard_eval.py
@@ -58,6 +77,13 @@ jobs:
         with:
           name: stress-summary
           path: eval/stress_summary.json
+
+      - name: Upload the traceability matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: traceability
+          path: build/trace.md
 
   sdk-typescript:
     name: TypeScript SDK
@@ -107,6 +133,11 @@ jobs:
           cyclonedx-py environment -o sbom.json --output-format json
           pip-licenses --format=csv --with-urls > third-party-licences.csv
 
+      - name: Software of unknown provenance list and model register
+        run: |
+          pip install pyyaml
+          python scripts/soup_list.py --sbom sbom.json --markdown soup.md
+
       - name: Upload the bill of materials
         uses: actions/upload-artifact@v4
         with:
@@ -114,6 +145,58 @@ jobs:
           path: |
             sbom.json
             third-party-licences.csv
+            soup.md
+
+  restore-drill:
+    name: Backup and restore drill (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: groundcheck
+          POSTGRES_PASSWORD: groundcheck
+          POSTGRES_DB: drill
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U groundcheck -d drill"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://groundcheck:groundcheck@127.0.0.1:5432/drill
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies and the PostgreSQL client
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt "psycopg[binary]==3.*"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Build the search index
+        run: python scripts/build_index.py
+
+      # Create the database, seed accounts, audit records and review cases,
+      # back up with pg_dump, drop everything, restore with psql. Fails if any
+      # table's row count differs, the audit chain head differs, or
+      # verify-audit does not pass; then edits a record to prove a changed
+      # trail is caught and that restoring repairs it.
+      - name: Back up, wipe, restore, verify
+        run: python scripts/db_restore_drill.py --tamper-check
+
+      - name: The drill's own tests, against PostgreSQL too
+        run: pytest -q tests/test_restore_drill.py
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg://groundcheck:groundcheck@127.0.0.1:5432/drill
 
   container:
     name: Container image

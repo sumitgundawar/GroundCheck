@@ -16,7 +16,7 @@ import time
 
 from sqlalchemy import delete, select
 
-from . import db
+from . import config, db
 from .db import Site, User
 
 _KEY = re.compile(r"^[a-z0-9][a-z0-9-]{1,62}$")
@@ -78,7 +78,7 @@ def check(s, site_id: int | None) -> int | None:
 # remembered briefly rather than fetched each time. A move between sites takes
 # effect within a minute.
 _OF_USER_SECONDS = 60
-_of_user_cache: dict[int, tuple[float, int | None]] = {}
+_of_user_cache: dict[tuple[str, int], tuple[float, int | None]] = {}
 _of_user_lock = threading.Lock()
 
 
@@ -87,8 +87,9 @@ def of_user(user_id: int | None) -> int | None:
     if not user_id or not db.ready():
         return None
     now = time.monotonic()
+    key = (str(config.DATABASE_URL), user_id)       # another database has other people and other sites
     with _of_user_lock:
-        found = _of_user_cache.get(user_id)
+        found = _of_user_cache.get(key)
         if found and now - found[0] < _OF_USER_SECONDS:
             return found[1]
     with db.session() as s:
@@ -96,14 +97,18 @@ def of_user(user_id: int | None) -> int | None:
     with _of_user_lock:
         if len(_of_user_cache) > 10000:
             _of_user_cache.clear()
-        _of_user_cache[user_id] = (now, site_id)
+        _of_user_cache[key] = (now, site_id)
     return site_id
 
 
 def forget_user(user_id: int | None = None) -> None:
     """Drop what was remembered, after a change of site."""
     with _of_user_lock:
-        _of_user_cache.pop(user_id, None) if user_id else _of_user_cache.clear()
+        if user_id:
+            for key in [k for k in _of_user_cache if k[1] == user_id]:
+                del _of_user_cache[key]
+        else:
+            _of_user_cache.clear()
 
 
 def visible(row_site_id: int | None, scope: int | None) -> bool:

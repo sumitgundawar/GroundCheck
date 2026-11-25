@@ -82,8 +82,23 @@ LOCAL_AI_STATE_PATH = ROOT_DIR / _get("LOCAL_AI_STATE_PATH", "local_ai.json")
 # request arrived on unless a proxy in front is named here.
 TRUSTED_PROXIES = [v.strip() for v in _get("TRUSTED_PROXIES", "").split(",") if v.strip()]
 
+# --- Tracing (OpenTelemetry, optional) ---------------------------------------
+# Set the endpoint of an OTLP collector to export one span per pipeline stage.
+# Needs opentelemetry-sdk and an OTLP exporter installed; off when unset. Span
+# attributes never carry question text or identifiers.
+OTEL_EXPORTER_OTLP_ENDPOINT = _get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+OTEL_EXPORTER_OTLP_PROTOCOL = _get("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf").lower()
+OTEL_SERVICE_NAME = _get("OTEL_SERVICE_NAME", "groundcheck")
+
 # --- Embeddings + retrieval ------------------------------------------------
-EMBED_MODEL = _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+# EMBEDDING_MODEL is the documented name; EMBED_MODEL still works. A multilingual
+# model (for example paraphrase-multilingual-MiniLM-L12-v2) is needed to search
+# an index across languages; the index must be rebuilt after changing it.
+EMBED_MODEL = _get("EMBEDDING_MODEL", _get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2"))
+EMBEDDING_MODEL = EMBED_MODEL
+# Languages a question may be asked in, from the packs under app/data/<lang>/.
+# A question in any other language is refused (unsupported_language).
+SUPPORTED_LANGUAGES = _get("SUPPORTED_LANGUAGES", "en").lower()
 # Where query embeddings run. The CPU by default: a question is embedded in a
 # few milliseconds there, and it's safe for concurrent requests. On Apple
 # silicon, the GPU (mps) aborts the process when requests embed at once.
@@ -299,7 +314,7 @@ RELEASES_KEEP = _get_int("RELEASES_KEEP", 10)
 LOG_LEVEL = _get("LOG_LEVEL", "INFO")
 LOG_FORMAT = _get("LOG_FORMAT", "plain")
 
-VERSION = "1.0.0"
+VERSION = "3.0.0"
 # A name for this instance, included in alert notifications.
 INSTANCE_NAME = _get("INSTANCE_NAME", "") or __import__("socket").gethostname()
 # Bearer token Prometheus sends to /metrics. Without it, /metrics answers only

@@ -3,7 +3,7 @@ name: groundcheck
 description: GroundCheckHealth, a clinical assistant that answers from approved sources or refuses.
 type: application
 version: 0.1.0
-appVersion: "1.0.0"
+appVersion: "3.0.0"
 home: https://groundcheckhealth.com
 sources:
   - https://github.com/sumitgundawar/GroundCheck

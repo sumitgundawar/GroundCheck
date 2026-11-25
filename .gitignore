@@ -27,3 +27,8 @@ brag-output/
 # The held-out split and its secret seed live outside the repository.
 eval/heldout*
 *.seed
+
+# CI outputs
+build/
+sbom.json
+soup.md

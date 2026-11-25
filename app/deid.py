@@ -261,11 +261,15 @@ _CARD_WORDS = frozenset("card visa mastercard amex credit debit payment cvv expi
 _SSN_WORDS = frozenset("ssn ss social security".split())
 _NPI_WORDS = frozenset("npi provider prescriber".split())
 
-_WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*")
+_WORD = re.compile(r"[^\W\d_](?:[^\W\d_]|['’-])*")
 
 # --- Structured patterns ----------------------------------------------------
 
-_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+_AT = r"(?:@|\[at\]|\(at\))"
+_DOT = r"(?:\.|\[dot\]|\(dot\))"
+_EMAIL = re.compile(rf"\b[A-Za-z0-9._%+-]+(?:\s*{_AT}\s*)[A-Za-z0-9-]+(?:\s*{_DOT}\s*[A-Za-z0-9-]+)*\s*{_DOT}\s*[A-Za-z]{{2,}}\b")
+_DIGIT_WORDS = "zero|oh|one|two|three|four|five|six|seven|eight|nine"
+_SPOKEN_NUMBER = re.compile(rf"\b(?:(?:{_DIGIT_WORDS})[\s-]+){{8,}}(?:{_DIGIT_WORDS})\b", re.IGNORECASE)
 _URL = re.compile(r"\b(?:https?://|www\.)[^\s<>\"]+", re.IGNORECASE)
 _IPV4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _IPV6 = re.compile(r"(?<![\w:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{1,4}(?![\w:])")
@@ -450,6 +454,17 @@ class _Names:
                 score += 0.25
             if score >= THRESHOLD:
                 out.append(_Candidate(s, e, "name", score, "given"))
+        # "john smith" in lower case, and "J. Smith": both halves must be known name words.
+        for k, (s, e, w) in enumerate(toks[:-1]):
+            nxt = toks[k + 1]
+            gap = text[e:nxt[0]]
+            sur = nxt[2].lower()
+            if sur not in _SURNAMES or self.blocked(nxt[2], after_name=True):
+                continue
+            lower_given = w.islower() and self.is_given(w) and not self.ambiguous(w) and gap == " "
+            initial = len(w) == 1 and w.isupper() and gap in (". ", " ") and nxt[2][0].isupper()
+            if lower_given or initial:
+                out.append(_Candidate(s, nxt[1], "name", 0.75, "given-surname-loose"))
         return out
 
 
@@ -545,6 +560,7 @@ def _scan(text: str, is_known_term: Callable[[str], bool]) -> list[_Candidate]:
     near = lambda m, cues, amount=0.1: _boost(0.0, text, m.start(), m.end(), cues, amount) > 0  # noqa: E731
 
     add(_EMAIL, "email address", 0.99, "email")
+    add(_SPOKEN_NUMBER, "long number", 0.9, "spoken-digits")
     add(_URL, "web address", 0.95, "url")
     add(_IPV4, "IP address", 0.9, "ip", check=lambda m: 0.9 if _valid_ip(m.group(0)) else None)
     add(_IPV6, "IP address", 0.9, "ip", check=lambda m: 0.9 if _valid_ip(m.group(0)) else None)

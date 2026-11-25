@@ -172,3 +172,12 @@ def test_telemetry_is_shown_read_only_with_every_field_before_anything_is_enable
     assert 'id="telemetry-fields"' in INDEX and 'id="evidence-download"' in INDEX
     assert not re.search(r'id="telemetry[^"]*"[^>]*type="checkbox"', INDEX)       # no toggle: the environment decides
     assert "loadTelemetry();" in _function_source("loadProtection")
+
+
+def test_group_admins_get_a_site_picker_on_document_upload():
+    assert 'id="upload-site"' in INDEX and 'id="upload-site-field"' in INDEX
+    assert "fillUploadSites" in APP_JS
+    assert 'body.append("site_id"' in APP_JS
+    # Only an admin with no site gets it.
+    assert 'u.role !== "admin"' in APP_JS and "u.site_id !== null" in APP_JS
+    assert '"/api/sites"' in APP_JS

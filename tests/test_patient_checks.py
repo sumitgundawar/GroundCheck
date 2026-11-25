@@ -316,3 +316,79 @@ def test_a_thousands_separator_in_a_dose_is_not_truncated():
                patient_checks._VALUE.findall("Alphamed is given as 2,500 mg once daily.")]
     assert amounts == [(2500.0, "mg")]
     assert patient_checks._exceeds(amounts, 500.0, "mg") == 2500.0
+
+
+# --- Rule ordering ---------------------------------------------------------------------
+
+def test_a_child_gets_the_not_covered_refusal_before_missing_data():
+    # No eGFR given: the old order said "needs kidney function" for a child who can never be dosed.
+    assert codes("What dose of Caloradine?", [], age_years=5, weight_kg=18) == {"paediatric_not_covered": "block"}
+    assert codes("What dose of Vorantil?", [], age_years=5) == {"high_alert": "warn", "paediatric_not_covered": "block"}
+
+
+def test_an_adult_with_missing_data_is_still_asked_for_it():
+    assert codes("What dose of Caloradine?", [], age_years=50) == {"missing_data": "block"}
+
+
+def test_an_unknown_age_is_still_missing_data_not_a_dose():
+    found = codes("What dose of Caloradine?", [], egfr=90)
+    assert found == {"missing_data": "block"}
+
+
+def test_the_reordered_check_never_turns_a_child_refusal_into_an_answer():
+    for age in (0.5, 1, 5, 12, 17):
+        response = pipeline.run("What is the dose of Caloradine?", review=False,
+                                patient=PatientContext(age_years=age, weight_kg=20, egfr=100))
+        assert response.decision == "refuse", age
+        codes_ = {f.code for f in response.patient_findings}
+        assert "paediatric_not_covered" in codes_ and "missing_data" not in codes_
+
+
+def _every_medicine():
+    return list(formulary.load().medicines)
+
+
+def test_for_every_medicine_a_child_the_formulary_does_not_cover_is_refused_for_that_reason():
+    """Whatever else is missing (kidney function, liver class, weight, sex), the
+    reason is the child rule, never a request for more data that could not help."""
+    checked = 0
+    for med in _every_medicine():
+        for age in (0.25, 1, 5, 11, 17):
+            uncovered = age < med.adult_min_age and (
+                med.paediatric_dose is None or (med.paediatric_min_age is not None and age < med.paediatric_min_age))
+            if not uncovered:
+                continue
+            found = codes(f"What dose of {med.name}?", [], age_years=age)
+            assert found.get("paediatric_not_covered") == "block", (med.name, age, found)
+            assert "missing_data" not in found, (med.name, age, found)
+            checked += 1
+    assert checked > 20
+
+
+def test_the_order_never_turns_a_refusal_into_an_answer():
+    """Adding data a patient lacks can change the reason for a refusal, never an
+    unsafe refusal into a pass for a child the formulary does not cover."""
+    for med in _every_medicine():
+        for age in (1, 5, 11, 17):
+            if not (age < med.adult_min_age and (
+                    med.paediatric_dose is None or (med.paediatric_min_age is not None and age < med.paediatric_min_age))):
+                continue
+            for extra in ({}, {"weight_kg": 20}, {"weight_kg": 20, "egfr": 100}, {"weight_kg": 20, "egfr": 100, "child_pugh": "A", "sex": "female"}):
+                review = patient_checks.review(f"What dose of {med.name}?", [], PatientContext(age_years=age, **extra))
+                assert review.blocking is not None, (med.name, age, extra)
+
+
+def test_missing_data_is_asked_for_in_the_same_order_across_the_adult_rules():
+    for med in _every_medicine():
+        if not med.requires:
+            continue
+        found = codes(f"What dose of {med.name}?", [], age_years=50)
+        assert found.get("missing_data") == "block", (med.name, found)
+        found_full = codes(f"What dose of {med.name}?", [], age_years=50, weight_kg=70, egfr=90, sex="female", child_pugh="A")
+        assert "missing_data" not in found_full, (med.name, found_full)
+
+
+def test_an_adult_is_never_given_the_child_refusal():
+    for med in _every_medicine():
+        found = codes(f"What dose of {med.name}?", [], age_years=max(med.adult_min_age, 18) + 30, weight_kg=70, egfr=90, sex="male", child_pugh="A")
+        assert "paediatric_not_covered" not in found, (med.name, found)

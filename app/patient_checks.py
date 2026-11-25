@@ -244,6 +244,13 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             missing.append("sex (the creatinine calculation differs, and no eGFR was given)")
         if "child_pugh" in needed and patient.child_pugh is None:
             missing.append("liver function (Child-Pugh class)")
+        # A child the formulary does not cover is refused for that reason, whatever else is missing.
+        if patient.age_years is not None and patient.age_years < med.adult_min_age and (
+                med.paediatric_dose is None or (med.paediatric_min_age is not None
+                                                and patient.age_years < med.paediatric_min_age)):
+            result.add("block", "paediatric_not_covered", med,
+                       f"The formulary has no dosing for {med.name} in a patient aged {_fmt(patient.age_years)}.")
+            continue
         if missing:
             result.add("block", "missing_data", med,
                        f"To check a dose of {med.name} for this patient, GroundCheckHealth needs their {', '.join(missing)}.")

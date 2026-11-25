@@ -429,6 +429,12 @@ def read_json(raw: bytes) -> dict:
     return body
 
 
+def _token(value, limit: int) -> str:
+    """An identifier or code from the EHR, logged only if it looks like one: free text here could hold a patient's name."""
+    text = str(value if value is not None else "")[:limit]
+    return text if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]*", text) else ("" if not text else "other")
+
+
 def feedback_items(body, limit: int = 50) -> list[dict]:
     """The usable entries of a feedback body: (card, outcome, override reason code), clipped for logging."""
     entries = body.get("feedback") if isinstance(body, dict) else None
@@ -438,6 +444,6 @@ def feedback_items(body, limit: int = 50) -> list[dict]:
             continue
         reason = item.get("overrideReason") if isinstance(item.get("overrideReason"), dict) else {}
         code = reason.get("reason") if isinstance(reason.get("reason"), dict) else {}
-        out.append({"card": str(item.get("card", ""))[:64], "outcome": str(item.get("outcome", ""))[:20],
-                    "reason": str(code.get("code", ""))[:40]})
+        out.append({"card": _token(item.get("card"), 64), "outcome": _token(item.get("outcome"), 20),
+                    "reason": _token(code.get("code"), 40)})
     return out

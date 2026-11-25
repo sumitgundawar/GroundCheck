@@ -18,6 +18,7 @@ direct:
   openai: {use: "Client for OpenAI-compatible endpoints (Groq by default).", failure: "Generation fails; extractive mode and refusals are unaffected."}
   httpx: {use: "HTTP client for FHIR, SMART, CDS Hooks JWKS, DICOMweb and model endpoints.", failure: "An integration call fails and is reported; no silent success."}
   python-dotenv: {use: "Loads configuration from a .env file.", failure: "Settings are not applied; defaults are safe (guards on)."}
+  pyyaml: {use: "Reads the compliance registers (requirements, controls, SOUP and model lists) for the trace matrix and reports.", failure: "A register is misread; the matrix and report checks fail rather than pass silently."}
   pytest: {use: "Test runner (development and CI).", failure: "Tests mis-report; not used at run time."}
   hypothesis: {use: "Property-based tests (development and CI).", failure: "Fuzz tests mis-report; not used at run time."}
   sqlalchemy: {use: "Database access for accounts, audit, reviews and documents.", failure: "Records are not saved or read; the audit hash chain detects altered rows."}

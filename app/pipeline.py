@@ -12,10 +12,10 @@ import json
 import re
 import threading
 import time
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
 
-from . import audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, retrieval
+from . import audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, retrieval, tracing
 from .schemas import (AskResponse, Claim, ClaimSupport, Explanation, PatientContext, PatientFinding, Redaction, Review, Settings,
                       Source, TraceStep)
 
@@ -161,6 +161,9 @@ def _finish(
         saved["test_run"] = True  # kept in the audit trail, left out of usage reports
     audit.store.save(audit_id, response, saved, user_id=extras.get("user_id"), site_id=site_id,
                      api_key_id=extras.get("api_key_id"))
+    if tracing.active():
+        tracing.record(trace, decision=decision, outcome=outcome, reason_code=reason_code, llm_used=llm_used,
+                       total_ms=response.total_ms, audit_id=audit_id, language=extras.get("language"))
     if not saved.get("test_run"):
         kind = (extras.get("provider") or {}).get("kind") if llm_used else None
         monitoring.observe_answer(decision, response.total_ms,
@@ -197,6 +200,7 @@ _EXPLAIN_SUMMARY = {
     "claim_ungrounded": "A drafted statement could not be traced back to the sources.",
     "dose_unsupported": "The drafted answer contained a dose the sources do not support.",
     "patient_unsafe": "The patient's details make the answer unsafe to give.",
+    "unsupported_language": "The question is in a language this installation cannot check against its sources.",
 }
 _EXPLAIN_SUGGESTION = {
     "term_not_covered": ["Check the spelling of the name.", "Ask about the medicine or condition by its listed name."],
@@ -207,6 +211,7 @@ _EXPLAIN_SUGGESTION = {
     "no_relevant_source": ["Name the medicine or condition and what you want to know about it."],
     "insufficient_context": ["Ask one thing at a time, naming the medicine or condition."],
     "input_blocked": ["Rephrase the question as a plain clinical question."],
+    "unsupported_language": ["Ask the question in English, or in a language this installation supports."],
 }
 
 
@@ -451,6 +456,18 @@ class Verification:
     dose_detail: str = ""
 
 
+def _regimen_kept(claim) -> bool:
+    """Similarity cannot tell "once daily" from "twice daily". Where the claim matches a cited passage closely
+    enough to be about it, the passage's frequency, duration, numbers and negations must also be the claim's."""
+    from . import verify
+
+    records = [r for r in (retrieval.record_for(i) for i in claim.source_ids) if r]
+    if not records:
+        return True
+    found = verify.assess(claim.text, records, None)
+    return found is None or bool(found.dose_values) or not (found.status == "unsupported" and found.coverage >= 0.35)
+
+
 def verify_claims(question: str, claims, sources: list[dict], patient: PatientContext | None,
                   cfg: "Settings", timer: "_Timer | None" = None) -> Verification:
     """Check claims that something else drafted: each must be grounded in its
@@ -482,6 +499,8 @@ def verify_claims(question: str, claims, sources: list[dict], patient: PatientCo
                     judge_supported += 1 if verdict["supported"] else 0
                     judge_verdict = verdict
                 break
+        if grounded and not _regimen_kept(llm_claim):
+            grounded = False
         support = llm_claim.support
         relevance = llm_claim.relevance
         if support is None and llm_claim.source_ids:
@@ -647,10 +666,11 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                            detail=pii_detail, ms=timer.lap_ms()))
 
     scope = guards_input.check_scope_and_injection(redacted, cfg.enable_injection_guard)
+    gate = guards_input.check_language(redacted, cfg.enable_injection_guard) if scope.ok else None
     trace.append(TraceStep(
         name="scope check",
-        status="pass" if scope.ok else "fail",
-        detail=scope.detail,
+        status="pass" if scope.ok and gate.ok else "fail",
+        detail=scope.detail if not (gate and gate.detail) else f"{scope.detail}; {gate.detail}",
         ms=timer.lap_ms(),
     ))
     if not scope.ok:
@@ -659,6 +679,33 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                        answer_text=REFUSAL_PREFIX + scope.reason,
                        refused_reason=scope.reason, reason_code="input_blocked", claims=[], sources=[],
                        trace=trace, llm_used=False, timer=timer, extras=extras)
+    if not gate.ok:
+        # Names and dates in another language are not found by the English
+        # de-identifier, so the wording is not kept anywhere.
+        kept = f"[question in {gate.lang} not stored]"
+        extras["redacted_query"] = kept
+        extras["redaction"] = Redaction(kinds=extras["redaction"].kinds, redacted_query=kept)
+        _skip_after(trace, "scope check")
+        return _finish(decision="refuse",
+                       answer_text=REFUSAL_PREFIX + gate.reason,
+                       refused_reason=gate.reason, reason_code=gate.code, claims=[], sources=[],
+                       trace=trace, llm_used=False, timer=timer, extras=extras)
+    if gate.english is not None:
+        # Only the English reading goes on: it is de-identified again, and it,
+        # not the original wording, is what the audit trail keeps.
+        again = guards_input.deidentify(gate.english)
+        redacted = again.text
+        extras["redacted_query"] = redacted
+        extras["language"] = gate.lang
+        if cfg.enable_pii_redaction:
+            found = Counter(cleaned.found)
+            found.update(again.found)
+            extras["redaction"] = Redaction(kinds=dict(found), redacted_query=redacted)
+            if again.changed:
+                trace[0] = TraceStep(name="pii redaction", status="warn", detail=again.summary(),
+                                     ms=trace[0].ms)
+        else:
+            extras["redaction"] = Redaction()
 
     if check_only:
         rate = guards_input.GuardResult(True, detail="not applied to release checks")

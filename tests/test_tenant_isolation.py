@@ -119,7 +119,6 @@ CALLER = "caller"            # only about the signed-in person
 DEPLOYMENT = "deployment"    # deployment-wide content shared by every site: settings, formulary, models, releases, controls
 SCOPED = "scoped"            # tenant data: each site sees only its own
 MINE = "mine"                # only what the signed-in person submitted themselves, looked up by record id
-GAP = "gap"                  # tenant data that is NOT yet scoped: see KNOWN_GAPS
 
 POLICY: dict[str, str] = {
     "/": PUBLIC, "/docs": PUBLIC, "/docs/oauth2-redirect": PUBLIC, "/openapi.json": PUBLIC, "/redoc": PUBLIC,
@@ -143,21 +142,7 @@ POLICY: dict[str, str] = {
     "/api/incidents": SCOPED, "/api/incidents/export.csv": SCOPED, "/api/incidents/{incident_id}": SCOPED,
     "/api/imaging": SCOPED, "/api/imaging/series/{series_id}": SCOPED, "/api/imaging/series/{series_id}/slices/{index}.png": SCOPED,
     "/api/imaging/reports/{report_id}/sr.dcm": SCOPED, "/api/keys": SCOPED,
-    "/api/users": SCOPED,
-    "/api/sites": GAP, "/api/sources": GAP, "/api/sources/{source_id}": GAP,
-}
-
-# Tenant data that is still visible across sites, with who owns the fix. Each has a strict xfail below, so
-# fixing one turns its test red until the entry here is removed.
-# Parts of a response that are known gaps, left out of the scoped route test and covered by KNOWN_GAPS instead.
-STRIP = {"/api/users": ("sites",)}
-
-KNOWN_GAPS = {
-    "/api/users": "The response's `sites` list names every site to a site admin (app/main.py: users_list).",
-    "/api/sites": "A site admin can list every site's key and name (app/main.py: sites_list should pass the admin's site to sites.list_sites).",
-    "/api/sources": "Documents are shared by the group, so another site's pending uploads (titles, owners) are listed "
-                    "(app/knowledge.py and the Source table have no site).",
-    "/api/sources/{source_id}": "As /api/sources: another site's document can be read by id.",
+    "/api/users": SCOPED, "/api/sites": SCOPED, "/api/sources": SCOPED, "/api/sources/{source_id}": SCOPED,
 }
 
 
@@ -178,22 +163,14 @@ def test_every_get_route_is_classified_for_tenant_isolation():
     assert not stale, f"Routes were removed; delete them from POLICY: {stale}"
 
 
-def test_every_known_gap_is_a_route_that_exists():
-    assert set(KNOWN_GAPS) - set(STRIP) == {p for p, k in POLICY.items() if k == GAP}
-
-
 def tokens_of(other: dict) -> list[str]:
     """Strings that must never appear in what the other tenant is shown."""
     key = other["marker"].lower().replace("zol", "")
     return [other["marker"], other["audit"], f"{key}-admin@", f"{key}-rev@", f"{key}-clin@", f"{key}-admin", f"{key}-rev", f"{key}-clin",
-            other["key"]["key"], other["key"]["prefix"], f"{other['marker'].lower()}-key"]
+            other["key"]["key"], other["key"]["prefix"], f"{other['marker'].lower()}-key", f'"key":"{key}"', f'"id":{other["site"]},"key"']
 
 
 def visible_text(path: str, response) -> str:
-    """The response text without the parts of it that are tracked as known gaps."""
-    if path in STRIP and response.status_code == 200:
-        body = response.json()
-        return json.dumps({k: v for k, v in body.items() if k not in STRIP[path]})
     return response.text
 
 
@@ -288,18 +265,36 @@ def test_deployment_wide_routes_hold_no_tenant_data(world):
     assert not problems, "\n".join(problems)
 
 
-@pytest.mark.parametrize("path", sorted(KNOWN_GAPS))
-def test_known_gaps_are_still_gaps(world, path):
-    """When one of these is fixed this test fails: delete its KNOWN_GAPS entry and move it to SCOPED."""
+@pytest.mark.parametrize("viewer", sorted(TENANTS))
+def test_sites_and_the_site_list_of_users_name_only_the_admins_own_site(world, viewer):
     data, client = world
-    own, other = data["alpha"], data["beta"]
-    who = client("alpha-admin")
-    response = who.get(render(path, other) if "{" in path else path)
-    leaked = response.status_code == 200 and any(t in response.text for t in (other["marker"], "beta-admin@", '"beta"'))
-    if path in STRIP:
-        leaked = leaked and any(t in json.dumps(response.json()[k]) for k in STRIP[path] for t in (other["marker"], '"beta"'))
-    assert leaked, f"{path} no longer shows the other tenant's data ({response.status_code}); it can move to SCOPED"
-    assert own["marker"]
+    admin = client(f"{viewer}-admin")
+    own = data[viewer]["site"]
+    assert [x["id"] for x in admin.get("/api/sites").json()["sites"]] == [own]
+    assert [x["id"] for x in admin.get("/api/users").json()["sites"]] == [own]
+    assert OTHER[viewer] not in admin.get("/api/sites").text and TENANTS[OTHER[viewer]] not in admin.get("/api/users").text
+
+
+def test_a_group_admin_sees_every_site(world):
+    data, client = world
+    auth.create_user("group@example.org", PASSWORD, role="admin", name="group")
+    group = client("group")
+    assert {x["id"] for x in group.get("/api/sites").json()["sites"]} == {data[t]["site"] for t in data}
+    assert {x["id"] for x in group.get("/api/users").json()["sites"]} == {data[t]["site"] for t in data}
+
+
+def test_only_reviewers_and_admins_reach_the_document_queue_and_each_sees_only_their_sites(world):
+    data, client = world
+    for viewer in TENANTS:
+        other = data[OTHER[viewer]]
+        assert data[viewer]["document"], "the fixture must have uploaded a document"
+        for role in ("admin", "rev"):
+            listed = client(f"{viewer}-{role}").get("/api/sources")
+            assert listed.status_code == 200 and [x["id"] for x in listed.json()["sources"]] == [data[viewer]["document"]]
+            assert other["marker"] not in listed.text and f"{OTHER[viewer]}-rev" not in listed.text
+            assert client(f"{viewer}-{role}").get(f"/api/sources/{other['document']}").status_code == 400
+        assert client(f"{viewer}-clin").get("/api/sources").status_code == 403
+        assert client(f"{viewer}-clin").get(f"/api/sources/{data[viewer]['document']}").status_code == 403
 
 
 # --- Writes and functions ---------------------------------------------------------------------------------------

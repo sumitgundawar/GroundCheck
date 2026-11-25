@@ -9,6 +9,8 @@ numpy==2.*
 openai==1.*
 httpx==0.27.*
 python-dotenv==1.*
+# The compliance registers (requirements, controls, SOUP, model list) and the trace matrix.
+PyYAML==6.*
 pytest==9.*
 hypothesis==6.*
 sqlalchemy==2.0.*

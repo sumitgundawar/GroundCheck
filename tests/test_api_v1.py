@@ -215,7 +215,7 @@ def test_ask_with_a_patient_blocks_an_unsafe_dose(api, keys):
                     headers=h).json()
     assert fine["decision"] == "answer" and fine["patient_findings"] == []
     child = api.post("/api/v1/ask", json={"question": Q, "patient": {"age_years": 5}}, headers=h).json()
-    assert child["decision"] == "refuse" and child["patient_findings"][0]["code"] == "missing_data"
+    assert child["decision"] == "refuse" and child["patient_findings"][0]["code"] == "paediatric_not_covered"
 
 
 def test_verify_checks_the_patient_too(api, keys):

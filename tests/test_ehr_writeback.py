@@ -471,3 +471,22 @@ def test_good_resources_pass_untouched():
     before = copy.deepcopy(good_event())
     fp.validate_r4(before)
     assert before == good_event()
+
+
+def test_the_notes_route_reports_how_provenance_and_the_audit_event_went(database, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+    audit_id = client.post("/api/ask", json={"query": "What is the standard dose of Caloradine?"}).json()["audit_id"]
+    outcomes = [
+        {"reference": "DocumentReference/doc-1"},
+        {"reference": "DocumentReference/doc-1", "provenance": {"status": "written", "reference": "Provenance/pro-1"}},
+        {"reference": "DocumentReference/doc-1", "provenance": {"status": "written", "reference": "Provenance/pro-1"},
+         "audit_event": {"status": "failed", "detail": "the EHR answered 403"}},
+    ]
+    for result in outcomes:
+        monkeypatch.setattr(smart, "write_note", lambda *a, _r=result, **k: dict(_r, text="note"))
+        saved = client.post("/api/ehr/notes", json={"audit_id": audit_id})
+        assert saved.status_code == 200 and saved.json() == result

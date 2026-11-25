@@ -21,6 +21,99 @@ Dates are when the work landed on `main`. Versions follow the app's
 - A knowledge pack's evaluation cases now gate a release: any case decided differently blocks it.
 - Administrative events in the audit chain are skipped by every report, monitor, list and lookup.
 
+### Tenants and sites
+
+- **Tenant isolation.** A site's admins and staff no longer see other sites through `GET /api/sites`, the
+  sites list in `GET /api/users`, `GET /api/sources` and `/api/sources/{id}`, `GET /api/releases`
+  (other sites' documents, who promoted a release, reasons that name a document) or the index status.
+  Documents carry a site (migration 0014; documents that already existed are shared by the group). Retrieval,
+  the vocabulary the coverage guard uses, the answer cache key, document versions, duplicate checks and the
+  replacement of older versions are all per site; shared documents stay visible to every site. A person with no
+  site is answered from shared documents only. Approving, rejecting, retiring or evaluating a document is limited
+  to its own site (shared documents to the group), and only an admin with no site promotes or rolls back a release,
+  runs retention, edits the hazard log or manages local models and training. Saving an answer to the record checks
+  the site. `tests/test_tenant_isolation.py` (every GET route classified, every role) and
+  `tests/test_tenant_documents.py` cover it.
+- **`tenant create`** (`python -m app.cli tenant create`): a site, its admin, an API key and a quota in one step, undone
+  entirely if any part fails, audited without the secret.
+- **Fixed:** a person's site was remembered by user id alone, so after the database changed a stale site id could
+  fail the audit record's foreign key and lose the record. It is now remembered per database.
+
+### Knowledge
+
+- **Signed knowledge packs** (`app/packs.py`): install, verify and uninstall a publisher's documents with their
+  evaluation cases; every case must pass before the pack can go live, and overrides are audited.
+- **DailyMed SPL importer** and **formulary adapters** for loading drug labels and medicine rules from published
+  sources, with fixtures and tests for malformed and hostile input.
+- **Model providers** (`LLM_PROVIDER`): OpenAI-compatible, Anthropic, Azure OpenAI, Ollama or none, with the
+  `GROQ_*` variables kept as aliases. 429, 5xx, timeouts, malformed and cut-off replies all fall back safely.
+
+### Clinical integration
+
+- **EHR write-back.** Optional FHIR `Provenance` (`SMART_WRITE_PROVENANCE`) and `AuditEvent`
+  (`SMART_WRITE_AUDITEVENT`) next to a saved note; both off by default, validated as FHIR R4, and a failed write
+  never costs the note. `POST /api/ehr/notes` reports `provenance` and `audit_event` status.
+- **CDS Hooks conformance.** hookInstance UUIDs, JWT checks including `jti` replay, `fhirServer` fallback, service id
+  matched to the hook, and malformed, deeply nested or odd feedback bodies answered as 400 or 200, never 500.
+- **FHIR profile validation** of what is read and written (`app/fhir_profiles.py`).
+
+### Imaging
+
+- **Burned-in text.** Every image's pixels are searched for text whatever its tags say; text is blacked out
+  (`IMAGING_BURNED_IN_ACTION=redact`, default) or the image refused (`block`), then searched again. OCR is used when
+  installed (`IMAGING_OCR=auto|off`). On a synthetic set recall is 0.991 and precision 0.994; "no text found" is never
+  called clean.
+- **NIfTI volumes** can be imported, viewed, analysed and used for training, with volume-level splits.
+
+### Evidence for buyers
+
+- **Feedback** on answers (`/api/audit/{id}/feedback`): one rating per person, a "wrong" opens a review case, identifiers
+  removed from comments, the signed audit record unchanged.
+- **Adoption metrics** and a **pilot report** (`/api/metrics/adoption`, `/api/governance/pilot-report`), and a signed
+  **evidence pack** (`/api/governance/evidence-pack`) with per-file hashes, a secret scan and the SBOM when present.
+- **Compliance registers:** 104 controls across HIPAA, GDPR, SOC 2 and ISO 27001 (`scripts/controls_report.py --check`), 49
+  requirements and 12 hazards traced to tests (`scripts/trace_matrix.py --strict`, pytest marker `req`), and the list
+  of third-party software and models (`scripts/soup_list.py`).
+- **Install telemetry** (`TELEMETRY`, off by default): weekly bucketed counts only, fields documented and tested against
+  the README.
+- **Held-out evaluation split** (`scripts/eval_split.py`) by entity with a secret seed kept outside the repository, and a
+  `heldout` block in `run_eval.py`. The committed golden set is not split until the owner applies it.
+- **Model benchmark** (`scripts/benchmark.py run|report|verify-report`): suites with guards on and off, unsafe-answer and
+  over-refusal rates, cost, and a signed HTML report whose caveats cannot be switched off.
+
+### Languages, tracing and recovery
+
+- **Languages.** Questions are language-checked first; a language with no pack is refused as `unsupported_language`
+  (`SUPPORTED_LANGUAGES`, default `en`). Spanish is supported by closed-vocabulary translation (`app/langpack.py`): an
+  unknown word, unit or ambiguous number refuses. Answers stay English source text. On the Spanish test set (406 cases)
+  nothing unsafe was answered; on wording the pack was not built from about 12% is answered and the rest refused.
+  `EMBEDDING_MODEL` names the embedding model (`EMBED_MODEL` still works).
+- **Interface translation.** Every visible string in the dashboard goes through `t()` with `web/i18n/en.json` and a Spanish
+  `es.json`, a locale selector and a pseudo-locale for layout tests; tests fail on any visible literal that is not keyed.
+- **Tracing.** Optional OpenTelemetry export (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`,
+  `OTEL_SERVICE_NAME`): one span per pipeline stage, fixed attributes, never the question or who asked.
+- **Restore drill.** `scripts/db_restore_drill.py [--tamper-check]` backs up, wipes and restores a PostgreSQL or SQLite
+  database and fails unless row counts, the audit chain head and audit verification match; CI runs it against PostgreSQL.
+
+### Quality assurance fixes
+
+- `/api/v1/verify` no longer passes an answer whose overdose is a sentence of only a quantity ("Also 15 g."), and reads
+  `b.i.d.`, `t.i.d.`, `q.i.d.`, `bd`, `tds` and `qds` as frequencies.
+- Answers written by a language model are also checked for frequency, duration, numbers and negation against the source,
+  not only for word overlap.
+- A path id beyond the database's integer range is 404, not 500; NaN or Infinity in a body is 422 without echoing the input.
+- Free text is de-identified before it is stored or exported: CDS feedback override reasons, patient allergies, medicines and
+  conditions in the audit record, incident and review-case text, and uploaded file names.
+- De-identification now finds lower-case and initial-style names, e-mail written `[at]`/`[dot]`, digits spoken in words,
+  and accented names.
+- A child the formulary does not cover is refused as `paediatric_not_covered` even when other patient data is also
+  missing, instead of being asked for that data first.
+
+### SDKs
+
+- `sdk/python` and `sdk/typescript` (ESM and CommonJS), each tested against a mock server, with the Python client also
+  run against the real server.
+
 ## 2.0.0 — unreleased
 
 ### Refusals say what happened

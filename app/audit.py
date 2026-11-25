@@ -39,6 +39,14 @@ def _top_score(extras: dict[str, Any]) -> float | None:
     return max(scores) if scores else None
 
 
+def _without_identifiers(patient: dict) -> dict:
+    """The patient's own words (allergies, medicines, conditions) can carry a name or number; record them cleaned."""
+    from . import guards_input
+
+    return {k: ([guards_input.deidentify(str(v)).text for v in value] if k in ("allergies", "medicines", "conditions")
+                and isinstance(value, list) else value) for k, value in patient.items()}
+
+
 class AuditStore:
     def __init__(self, capacity: int, log_path: Path | None = None, persist: bool = True):
         self.capacity = capacity
@@ -104,6 +112,8 @@ class AuditStore:
         total_ms = getattr(response, "total_ms", None)
         if total_ms is None:
             total_ms = getattr(response, "latency_ms", 0)
+        if isinstance(extras.get("patient"), dict):
+            extras = {**extras, "patient": _without_identifiers(extras["patient"])}
         record = {
             "audit_id": audit_id,
             "user_id": user_id,

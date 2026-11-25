@@ -1,0 +1,13 @@
+# Whole-segment reorderings Spanish word order cannot get from a word-for-word
+# mapping. {e} is the (untranslated) name the question is about.
+# Format: regex<TAB>english template
+^cómo se trata (?P<e>.+)$	how is {e} treated
+^cómo se monitoriza (?P<e>.+)$	how is {e} monitored
+^cómo se controla (?P<e>.+)$	how is {e} monitored
+^con qué frecuencia se revisa (?P<e>.+)$	how often is {e} reviewed
+^cuánto (?P<e>.+?) se administra$	how much {e} is given
+^para qué se usa (?P<e>.+)$	what is {e} used for
+^cuándo no se debe usar (?P<e>.+)$	when should {e} not be used
+^qué no se debe tomar con (?P<e>.+)$	what should not be taken with {e}
+^cómo se administra (?P<e>.+?) (?P<q>(?:para|durante|en) .+)$	how is {e} given {q}
+^es seguro (?P<e>.+?) (?P<q>(?:para|durante|en) .+)$	is {e} safe {q}

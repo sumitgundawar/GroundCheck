@@ -915,8 +915,10 @@ details[open] > .j-summary::before { content: "▾"; }
 .control-not_addressed { font-weight: 600; }
 #adoption-panel { margin-top: var(--space-4); }
 #telemetry-sample, #telemetry-fields dd { overflow-wrap: anywhere; }
+@media (max-width: 900px), (pointer: coarse) {
+  .feedback-row .btn { min-height: 44px; min-width: 44px; }
+}
 @media (max-width: 640px) {
-  .feedback-row .btn { min-height: 44px; }
   .feedback-row .flag-actions .btn { flex: 1; }
 }
 
@@ -1680,3 +1682,10 @@ summary:focus-visible, .switch input:focus-visible + .switch-track { outline: 2p
 @media (prefers-reduced-motion: reduce) {
   .source-card.flash { animation: none; }
 }
+
+/* Longer words and translations wrap instead of pushing the page sideways. */
+.page-head > *, .main > *, .panel > *, .card > * { min-width: 0; }
+.page-title, .page-sub, .page-stat, .panel-title, .panel-sub, .eyebrow, label, summary, dt, dd, li, .auth-hint, .field > span,
+.empty-state, .protection-list > * { overflow-wrap: anywhere; }
+input[type="file"] { max-width: 100%; min-width: 0; }
+.users-table-wrap { max-width: 100%; }

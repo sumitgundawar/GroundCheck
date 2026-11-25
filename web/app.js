@@ -1,6 +1,7 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
+const uiLocale = () => { const l = window.gcI18n ? gcI18n.locale() : "en"; return l === "pseudo" ? "en" : l; };
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let DEFAULTS = null;
@@ -10,20 +11,35 @@ let lastRetrievedIds = [];
 // Static stage list for the "How it works" panel. The authoritative,
 // per-run descriptions come from the trace itself; this mirrors them for the
 // explainer shown before any question is asked.
-const PIPELINE_STAGES = [
-  ["input guards", "Redact PII, reject injection and out-of-scope input, rate limit."],
-  ["embed + retrieve", "Embed the query and rank passages by a blend of embedding similarity and keyword match, with similarity scores."],
-  ["retrieval gate", "If the best passage is below threshold, refuse now, before any generation."],
-  ["source coverage", "Check the question's entities actually appear in the retrieved sources."],
-  ["generate", "LLM returns structured, cited claims. Extractive fallback if no LLM is available."],
-  ["schema validate", "Validate the output against a strict schema. Retry once, then fall back."],
-  ["grounding check", "Deterministic claim-to-source similarity, with an LLM judge as corroboration."],
-  ["dosage guard", "Every dose in the answer must be stated by a source about that medicine, or refuse."],
-  ["decision", "Answer with citations, or refuse with a specific reason and route for review."],
-];
+const PIPELINE_STAGES = () => ([
+  [t("js.input_guards", "input guards"), t("js.redact_pii_reject_injection_and", "Redact PII, reject injection and out-of-scope input, rate limit.")],
+  [t("js.embed_retrieve", "embed + retrieve"), t("js.embed_the_query_and_rank", "Embed the query and rank passages by a blend of embedding similarity and keyword match, with similarity scores.")],
+  [t("js.retrieval_gate", "retrieval gate"), t("js.if_the_best_passage_is", "If the best passage is below threshold, refuse now, before any generation.")],
+  [t("js.source_coverage", "source coverage"), t("js.check_the_question_s_entities", "Check the question's entities actually appear in the retrieved sources.")],
+  [t("js.stage_generate", "generate"), t("js.llm_returns_structured_cited_claims", "LLM returns structured, cited claims. Extractive fallback if no LLM is available.")],
+  [t("js.schema_validate", "schema validate"), t("js.validate_the_output_against_a", "Validate the output against a strict schema. Retry once, then fall back.")],
+  [t("js.grounding_check", "grounding check"), t("js.deterministic_claim_to_source_similarity", "Deterministic claim-to-source similarity, with an LLM judge as corroboration.")],
+  [t("js.dosage_guard", "dosage guard"), t("js.every_dose_in_the_answer", "Every dose in the answer must be stated by a source about that medicine, or refuse.")],
+  [t("js.stage_decision", "decision"), t("js.answer_with_citations_or_refuse", "Answer with citations, or refuse with a specific reason and route for review.")],
+]);
 
 // Display names for pipeline stages whose internal names read awkwardly.
-const STAGE_LABELS = { "pii redaction": "De-identification" };
+const STAGE_LABELS = () => ({
+  "pii redaction": t("js.de_identification", "De-identification"),
+  "decision": t("js.stage_decision", "decision"),
+  "generate": t("js.stage_generate", "generate"),
+  "retrieve": t("js.stage_retrieve", "retrieve"),
+  "remembered answer": t("js.remembered_answer", "remembered answer"),
+  "patient checks": t("js.patient_checks", "patient checks"),
+  "scope check": t("js.scope_check", "scope check"),
+  "rate limit": t("js.rate_limit", "rate limit"),
+  "dosage guard": t("js.dosage_guard", "dosage guard"),
+  "grounding check": t("js.grounding_check", "grounding check"),
+  "source coverage": t("js.source_coverage", "source coverage"),
+  "retrieval gate": t("js.retrieval_gate", "retrieval gate"),
+  "schema validate": t("js.schema_validate", "schema validate"),
+  "input guards": t("js.input_guards", "input guards"),
+});
 
 // Plain-language explanation shown in the refusal callout, keyed by the
 // stable reason code. refusalExplanation() is the fallback for responses and
@@ -42,25 +58,27 @@ const REASON_EXPLAIN = {
   claim_ungrounded: "A statement in the draft answer was not sufficiently supported by its cited source.",
   dose_unsupported: "The draft answer contained a dose that no source about this medicine states.",
   patient_unsafe: "The answer from the sources doesn't fit the patient you described. The check above names the rule.",
+  unsupported_language: "The question is in a language this installation cannot check against its sources, so it was refused rather than answered from English text by accident.",
 };
 const REASON_FALLBACK = "The pipeline could not produce a fully grounded answer, so it declined.";
+const reasonFallback = () => t("reason.fallback", REASON_FALLBACK);
 
 function refusalExplanation(reason) {
   const r = (reason || "").toLowerCase();
   const has = (...needles) => needles.some((n) => r.includes(n));
-  if (has("is not stated by any source", "in the question does not appear")) return REASON_EXPLAIN.stated_value_unsupported;
-  if (has("describes a '")) return REASON_EXPLAIN.form_unsupported;
-  if (has("no trusted source covers")) return REASON_EXPLAIN.population_not_covered;
-  if (has("states a maximum", "states a minimum", "no trusted source states a")) return REASON_EXPLAIN.limit_not_stated;
-  if (has("must not be combined")) return REASON_EXPLAIN.combination_forbidden;
-  if (has("not supported by a source about", "not supported by any source")) return REASON_EXPLAIN.dose_unsupported;
-  if (has("does not appear in any", "do not cover")) return REASON_EXPLAIN.term_not_covered;
-  if (has("no sufficiently relevant source")) return REASON_EXPLAIN.no_relevant_source;
-  if (has("could not be grounded")) return REASON_EXPLAIN.claim_ungrounded;
-  if (has("enough information")) return REASON_EXPLAIN.insufficient_context;
-  if (has("input guard", "blocked")) return REASON_EXPLAIN.input_blocked;
-  if (has("rate limit")) return REASON_EXPLAIN.rate_limited;
-  return REASON_FALLBACK;
+  if (has("is not stated by any source", "in the question does not appear")) return t("reason.stated_value_unsupported", REASON_EXPLAIN.stated_value_unsupported);
+  if (has("describes a '")) return t("reason.form_unsupported", REASON_EXPLAIN.form_unsupported);
+  if (has("no trusted source covers")) return t("reason.population_not_covered", REASON_EXPLAIN.population_not_covered);
+  if (has("states a maximum", "states a minimum", "no trusted source states a")) return t("reason.limit_not_stated", REASON_EXPLAIN.limit_not_stated);
+  if (has("must not be combined")) return t("reason.combination_forbidden", REASON_EXPLAIN.combination_forbidden);
+  if (has("not supported by a source about", "not supported by any source")) return t("reason.dose_unsupported", REASON_EXPLAIN.dose_unsupported);
+  if (has("does not appear in any", "do not cover")) return t("reason.term_not_covered", REASON_EXPLAIN.term_not_covered);
+  if (has("no sufficiently relevant source")) return t("reason.no_relevant_source", REASON_EXPLAIN.no_relevant_source);
+  if (has("could not be grounded")) return t("reason.claim_ungrounded", REASON_EXPLAIN.claim_ungrounded);
+  if (has("enough information")) return t("reason.insufficient_context", REASON_EXPLAIN.insufficient_context);
+  if (has("input guard", "blocked")) return t("reason.input_blocked", REASON_EXPLAIN.input_blocked);
+  if (has("rate limit")) return t("reason.rate_limited", REASON_EXPLAIN.rate_limited);
+  return reasonFallback();
 }
 
 // ---------- Boot ----------
@@ -109,16 +127,16 @@ async function api(path, options = {}) {
   let data = null;
   try { data = await res.json(); } catch (_) { /* empty body */ }
   if (res.status === 401 && account.authRequired && !path.startsWith("/api/auth/")) {
-    showAuthScreen("login", "Your session ended. Sign in again.");
+    showAuthScreen("login", t("js.your_session_ended_sign_in", "Your session ended. Sign in again."));
   }
   if (!res.ok) {
     // The server's own message is usually specific and actionable. When there
     // isn't one, say what to do rather than only what went wrong: a dead end
     // in clinical tooling turns into a phone call to IT.
     const fallback = res.status >= 500
-      ? "GroundCheckHealth couldn't complete that. Try again — if it keeps happening, tell your administrator, "
-        + `and quote the time and error ${res.status}.`
-      : `That request wasn't accepted (error ${res.status}). Check what you entered and try again.`;
+      ? t("js.groundcheckhealth_couldn_t_complete_that", "GroundCheckHealth couldn't complete that. Try again — if it keeps happening, tell your administrator, ")
+        + t("js.and_quote_the_time_and", "and quote the time and error {status}.", { status: res.status })
+      : t("js.that_request_wasn_t_accepted", "That request wasn't accepted (error {status}). Check what you entered and try again.", { status: res.status });
     const detail = data && typeof data.detail === "string" ? data.detail : fallback;
     throw new Error(detail);
   }
@@ -147,9 +165,9 @@ async function checkSession() {
 
 function showAuthScreen(mode, message) {
   const titles = {
-    login: ["Sign in", "Sign in to ask questions and review answers."],
-    mfa: ["Two-factor authentication", "Enter the code from your authenticator app to finish signing in."],
-    "first-admin": ["Create the first admin", "No accounts exist yet. The first account is an admin, who can add everyone else."],
+    login: [t("js.sign_in", "Sign in"), t("js.sign_in_to_ask_questions", "Sign in to ask questions and review answers.")],
+    mfa: [t("js.two_factor_authentication", "Two-factor authentication"), t("js.enter_the_code_from_your", "Enter the code from your authenticator app to finish signing in.")],
+    "first-admin": [t("js.create_the_first_admin", "Create the first admin"), t("js.no_accounts_exist_yet_the", "No accounts exist yet. The first account is an admin, who can add everyone else.")],
   };
   $("dashboard").hidden = true;
   $("auth-screen").hidden = false;
@@ -158,7 +176,7 @@ function showAuthScreen(mode, message) {
   const ssoOn = mode === "login" && account.sso && account.sso.enabled;
   $("sso-block").hidden = !ssoOn;
   if (ssoOn) {
-    $("sso-button").textContent = `Sign in with ${account.sso.provider}`;
+    $("sso-button").textContent = t("js.sign_in_with", "Sign in with {provider}", { provider: account.sso.provider });
     $("sso-button").href = `/api/auth/sso/start?next=${encodeURIComponent("/" + location.hash)}`;
   }
   $("sso-divider").hidden = !account.passwordSignIn;
@@ -305,7 +323,7 @@ function wireAccounts() {
     try {
       await api("/api/auth/password", { method: "POST", body: { current_password: $("current-password").value, new_password: $("new-password").value } });
       form.reset();
-      showMessage("account-message", "Password changed. Other sessions were signed out.");
+      showMessage("account-message", t("js.password_changed_other_sessions_were", "Password changed. Other sessions were signed out."));
     } catch (err) { showMessage("account-message", err.message, true); }
     formBusy(form, false);
   });
@@ -329,7 +347,7 @@ function wireAccounts() {
       account.user = { ...account.user, mfa_enabled: true };
       form.reset();
       renderTwoFactor();
-      showMessage("account-message", "Two-factor authentication is on.");
+      showMessage("account-message", t("js.two_factor_authentication_is_on", "Two-factor authentication is on."));
     } catch (err) { showMessage("account-message", err.message, true); }
   });
 
@@ -341,7 +359,7 @@ function wireAccounts() {
       account.user = { ...account.user, mfa_enabled: false };
       form.reset();
       renderTwoFactor();
-      showMessage("account-message", "Two-factor authentication is off.");
+      showMessage("account-message", t("js.two_factor_authentication_is_off", "Two-factor authentication is off."));
     } catch (err) { showMessage("account-message", err.message, true); }
   });
 
@@ -357,7 +375,7 @@ function wireAccounts() {
       } });
       form.reset();
       await loadUsers();
-      showMessage("users-message", "User added. Share the temporary password with them securely.");
+      showMessage("users-message", t("js.user_added_share_the_temporary", "User added. Share the temporary password with them securely."));
     } catch (err) { showMessage("users-message", err.message, true); }
     formBusy(form, false);
   });
@@ -371,7 +389,7 @@ function wireAccounts() {
       await api("/api/sites", { method: "POST", body: { name, key } });
       form.reset();
       await loadUsers();
-      showMessage("users-message", `Added ${name}. Choose a site for each person below.`);
+      showMessage("users-message", t("js.added_choose_a_site_for", "Added {name}. Choose a site for each person below.", { name }));
     } catch (err) { showMessage("users-message", err.message, true); }
     formBusy(form, false);
   });
@@ -386,7 +404,7 @@ function showMessage(id, text, isError = false) {
 
 function renderTwoFactor() {
   const on = !!account.user?.mfa_enabled;
-  $("twofa-status").textContent = on ? "On. You’ll be asked for a code when you sign in." : "Off.";
+  $("twofa-status").textContent = on ? t("js.on_you_ll_be_asked", "On. You’ll be asked for a code when you sign in.") : t("js.off", "Off.");
   $("twofa-start").hidden = on;
   $("twofa-setup").hidden = true;
   $("twofa-disable-form").hidden = !on;
@@ -414,7 +432,7 @@ async function loadUsers() {
   const siteSelect = $("new-user-site");
   const keep = siteSelect.value;
   siteSelect.textContent = "";
-  [["", "Every site"], ...data.sites.map((x) => [String(x.id), x.name])].forEach(([v, l]) => {
+  [["", t("js.every_site", "Every site")], ...data.sites.map((x) => [String(x.id), x.name])].forEach(([v, l]) => {
     const o = document.createElement("option"); o.value = v; o.textContent = l; siteSelect.appendChild(o);
   });
   siteSelect.value = keep;
@@ -441,10 +459,10 @@ async function loadUsers() {
 
     const roleCell = document.createElement("td");
     const select = document.createElement("select");
-    select.setAttribute("aria-label", `Role for ${u.email}`);
+    select.setAttribute("aria-label", t("js.role_for", "Role for {email}", { email: u.email }));
     ["clinician", "reviewer", "admin"].forEach((r) => {
       const opt = document.createElement("option");
-      opt.value = r; opt.textContent = r; opt.selected = r === u.role;
+      opt.value = r; opt.textContent = t("js.role_" + r, r); opt.selected = r === u.role;
       select.appendChild(opt);
     });
     select.addEventListener("change", () => updateUser(u.id, { role: select.value }, () => { select.value = u.role; }));
@@ -454,39 +472,39 @@ async function loadUsers() {
     siteCell.hidden = !showSites;
     if (groupAdmin && !u.email.endsWith("@deleted.invalid")) {
       const pick = document.createElement("select");
-      pick.setAttribute("aria-label", `Site for ${u.email}`);
-      [["", "Every site"], ...data.sites.map((x) => [String(x.id), x.name])].forEach(([v, l]) => {
+      pick.setAttribute("aria-label", t("js.site_for", "Site for {email}", { email: u.email }));
+      [["", t("js.every_site", "Every site")], ...data.sites.map((x) => [String(x.id), x.name])].forEach(([v, l]) => {
         const o = document.createElement("option"); o.value = v; o.textContent = l; pick.appendChild(o);
       });
       pick.value = u.site_id === null ? "" : String(u.site_id);
       pick.addEventListener("change", () => updateUser(u.id, { site_id: pick.value ? Number(pick.value) : null }));
       siteCell.appendChild(pick);
     } else {
-      siteCell.textContent = u.site_id === null ? "Every site" : (siteNames[u.site_id] || "");
+      siteCell.textContent = u.site_id === null ? t("js.every_site", "Every site") : (siteNames[u.site_id] || "");
     }
 
     const mfa = document.createElement("td");
-    mfa.textContent = u.mfa_enabled ? "On" : "Off";
+    mfa.textContent = u.mfa_enabled ? t("js.on", "On") : t("js.off_2", "Off");
 
     const last = document.createElement("td");
     last.className = "mono";
-    last.textContent = u.last_login_at ? dateTime(u.last_login_at) : "Never";
+    last.textContent = u.last_login_at ? dateTime(u.last_login_at) : t("js.never", "Never");
 
     const status = document.createElement("td");
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "btn btn-sm btn-ghost";
-    toggle.textContent = u.is_active ? "Deactivate" : "Reactivate";
+    toggle.textContent = u.is_active ? t("js.deactivate", "Deactivate") : t("js.reactivate", "Reactivate");
     toggle.disabled = account.user && u.id === account.user.id;
     toggle.addEventListener("click", () => updateUser(u.id, { is_active: !u.is_active }));
     const deleted = u.email.endsWith("@deleted.invalid");
-    status.append(document.createTextNode(deleted ? "Deleted " : u.is_active ? "Active " : "Inactive "));
+    status.append(document.createTextNode(deleted ? t("js.deleted", "Deleted ") : u.is_active ? t("js.active", "Active ") : t("js.inactive", "Inactive ")));
     if (!deleted) {
       status.appendChild(toggle);
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "btn btn-sm btn-ghost";
-      remove.textContent = "Delete";
+      remove.textContent = t("js.delete", "Delete");
       remove.disabled = account.user && u.id === account.user.id;
       remove.addEventListener("click", () => deleteUser(u));
       status.append(" ", remove);
@@ -500,10 +518,10 @@ async function loadUsers() {
 }
 
 async function deleteUser(u) {
-  if (!window.confirm(`Delete ${u.email}? Their name, email and sign-in details are removed. Their audit records stay, under an anonymous account number.`)) return;
+  if (!window.confirm(t("js.delete_their_name_email_and", "Delete {email}? Their name, email and sign-in details are removed. Their audit records stay, under an anonymous account number.", { email: u.email }))) return;
   try {
     await api(`/api/users/${u.id}`, { method: "DELETE" });
-    showMessage("users-message", "Deleted.");
+    showMessage("users-message", t("js.deleted_2", "Deleted."));
   } catch (err) { showMessage("users-message", err.message, true); }
   await loadUsers();
 }
@@ -511,7 +529,7 @@ async function deleteUser(u) {
 async function updateUser(id, changes, revert) {
   try {
     await api(`/api/users/${id}`, { method: "PATCH", body: changes });
-    showMessage("users-message", "Saved.");
+    showMessage("users-message", t("js.saved", "Saved."));
   } catch (err) {
     if (revert) revert();
     showMessage("users-message", err.message, true);
@@ -530,11 +548,11 @@ async function loadHealth() {
     const data = await (await fetch("/api/health")).json();
     llmAvailable = !!data.llm;
     const provider = data.provider;
-    if (provider && provider.kind === "local") { dot.className = "dot ok"; label.textContent = `Local model, ${provider.model}`; }
-    else if (provider) { dot.className = "dot ok"; label.textContent = `Cloud model, ${provider.model}`; }
-    else { dot.className = "dot warn"; label.textContent = "Extractive, no model"; }
+    if (provider && provider.kind === "local") { dot.className = "dot ok"; label.textContent = t("js.local_model", "Local model, {model}", { model: provider.model }); }
+    else if (provider) { dot.className = "dot ok"; label.textContent = t("js.cloud_model", "Cloud model, {model}", { model: provider.model }); }
+    else { dot.className = "dot warn"; label.textContent = t("js.extractive_no_model", "Extractive, no model"); }
     if (typeof data.corpus === "number") $("corpus-count").textContent = data.corpus.toLocaleString();
-  } catch (_) { dot.className = "dot warn"; label.textContent = "Extractive, no model"; }
+  } catch (_) { dot.className = "dot warn"; label.textContent = t("js.extractive_no_model", "Extractive, no model"); }
 }
 
 // ---------- Examples (grouped) ----------
@@ -546,7 +564,7 @@ async function loadExamples() {
     const groups = [];
     const byGroup = {};
     examples.forEach((ex) => {
-      const g = ex.group || "Examples";
+      const g = ex.group || t("js.examples", "Examples");
       if (!byGroup[g]) { byGroup[g] = []; groups.push(g); }
       byGroup[g].push(ex);
     });
@@ -579,7 +597,7 @@ async function loadExamples() {
     });
     if (groups.length > 1) {
       const hidden = groups.slice(1).reduce((n, g) => n + byGroup[g].length, 0);
-      moreSummary.textContent = `More examples (${hidden})`;
+      moreSummary.textContent = t("js.more_examples", "More examples ({hidden})", { hidden });
       wrap.appendChild(more);
     }
   } catch (_) {}
@@ -623,7 +641,7 @@ async function loadSettings() {
     if (!llmAvailable) {
       const sw = $("judge-switch");
       sw.classList.add("disabled");
-      sw.title = "Available only when a live LLM provider is configured.";
+      sw.title = t("js.available_only_when_a_live", "Available only when a live LLM provider is configured.");
       $("set-judge").checked = false;
       $("set-judge").disabled = true;
     }
@@ -655,8 +673,8 @@ function isDefault() {
 
 function updateTuningStatus() {
   const el = $("tuning-status");
-  if (isDefault()) { el.textContent = "defaults"; el.classList.remove("modified"); }
-  else { el.textContent = "modified"; el.classList.add("modified"); }
+  if (isDefault()) { el.textContent = t("js.defaults", "defaults"); el.classList.remove("modified"); }
+  else { el.textContent = t("js.modified", "modified"); el.classList.add("modified"); }
 }
 
 function resetSettings() {
@@ -696,21 +714,21 @@ async function submitQuery(query) {
     if (res.status === 422) {
       const problem = Array.isArray(data.detail) ? data.detail.map((d) => d.msg.replace(/^Value error, /, "")).join("; ") : data.detail;
       $("patient-box").open = true;
-      $("pt-error").textContent = `Check the patient details: ${problem}`;
+      $("pt-error").textContent = t("js.check_the_patient_details", "Check the patient details: {problem}", { problem });
       return;
     }
     render({ ...data, patient_given: Boolean(patient) });
     refreshReviewCount();
   } catch (_) {
-    render({ decision: "refuse", answer_text: "The service is unreachable. Please try again.",
-      refused_reason: "network error", claims: [], sources: [], trace: [], audit_id: "", total_ms: 0, llm_used: false });
+    render({ decision: "refuse", answer_text: t("js.the_service_is_unreachable_please", "The service is unreachable. Please try again."),
+      refused_reason: t("js.network_error", "network error"), claims: [], sources: [], trace: [], audit_id: "", total_ms: 0, llm_used: false });
   } finally { setLoading(false); inflight = false; }
 }
 
 function setLoading(on) {
   $("ask-btn").disabled = on;
   $("spinner").hidden = !on;
-  $("ask-btn").querySelector(".btn-label").textContent = on ? "Asking" : "Ask";
+  $("ask-btn").querySelector(".btn-label").textContent = on ? t("js.asking", "Asking") : t("js.ask", "Ask");
 }
 
 // ---------- Render ----------
@@ -725,8 +743,8 @@ function render(data) {
   $("ehr-save").dataset.auditId = data.audit_id || "";
   const block = (data.patient_findings || []).find((f) => f.severity === "block");
   if (data.decision === "refuse" && block && data.refused_reason && data.refused_reason.startsWith(block.message.charAt(0).toLowerCase() + block.message.slice(1, 20))) {
-    $("decision-reason").textContent = `Not safe for this patient: ${block.medicine}`;
-    $("refuse-explain").textContent = "The answer from the sources doesn't fit the patient you described. The check above names the rule, and what the formulary gives instead where it can.";
+    $("decision-reason").textContent = t("js.not_safe_patient", "Not safe for this patient: {medicine}").replace("{medicine}", block.medicine);
+    $("refuse-explain").textContent = t("js.patient_refusal", "The answer from the sources doesn't fit the patient you described. The check above names the rule, and what the formulary gives instead where it can.");
   }
   lastQueryTerms = termsFrom((data.redaction && data.redaction.redacted_query) || $("query").value);
   renderSources(data);
@@ -745,20 +763,20 @@ function renderDecision(data) {
   body.innerHTML = "";
   if (data.decision === "answer") {
     chip.className = "status-chip answer";
-    chip.textContent = "ANSWER";
+    chip.textContent = t("js.answer", "ANSWER");
     const ids = citedIds(data);
-    reason.textContent = ids.length ? `Grounded in ${ids.join(", ")}.` : "Grounded in cited sources.";
+    reason.textContent = ids.length ? t("js.grounded_in", "Grounded in {ids}.").replace("{ids}", ids.join(", ")) : t("js.grounded_cited", "Grounded in cited sources.");
     body.appendChild(renderAnswerWithCitations(data.answer_text, data));
     callout.hidden = true;
     renderClaimRows(data);
     resetFlag(data.audit_id);
   } else {
     chip.className = "status-chip refuse";
-    chip.textContent = "REFUSED";
+    chip.textContent = t("js.refused", "REFUSED");
     resetFlag(null);
     reason.textContent = data.refused_reason ? capitalize(data.refused_reason) : "";
     callout.hidden = false;
-    $("refuse-detail").textContent = data.refused_reason || "No grounded answer available.";
+    $("refuse-detail").textContent = data.refused_reason || t("js.no_grounded", "No grounded answer available.");
     renderRefusalExplanation(data);
     renderRoutedLine(data);
     renderClaimRows(null);
@@ -769,9 +787,10 @@ function renderDecision(data) {
 function renderRefusalExplanation(data) {
   const explain = $("refuse-explain");
   const ex = data.explanation || {};
-  const generic = REASON_EXPLAIN[data.reason_code] || refusalExplanation(data.refused_reason);
+  const generic = REASON_EXPLAIN[data.reason_code] ? t("reason." + data.reason_code, REASON_EXPLAIN[data.reason_code]) : refusalExplanation(data.refused_reason);
   explain.textContent = "";
-  appendHighlighted(explain, ex.summary || generic, ex.missing_terms || []);
+  const localised = window.gcI18n && gcI18n.locale() !== "en" && REASON_EXPLAIN[data.reason_code];
+  appendHighlighted(explain, (localised && generic) || ex.summary || generic, ex.missing_terms || []);
   const box = $("refuse-suggestions");
   box.textContent = "";
   const tips = (ex.suggestions || []).filter(Boolean);
@@ -779,7 +798,7 @@ function renderRefusalExplanation(data) {
   if (!tips.length) return;
   const label = document.createElement("span");
   label.className = "eyebrow";
-  label.textContent = "Try instead";
+  label.textContent = t("js.try_instead", "Try instead");
   const row = document.createElement("div");
   row.className = "suggestion-chips";
   tips.forEach((text) => {
@@ -795,9 +814,9 @@ function renderRefusalExplanation(data) {
 
 // Text with each term wrapped in <mark>, built from text nodes only.
 function appendHighlighted(parent, text, terms, cls = "term-miss") {
-  const list = (terms || []).map((t) => String(t).trim()).filter((t) => t.length > 1);
+  const list = (terms || []).map((tt) => String(tt).trim()).filter((tt) => tt.length > 1);
   if (!list.length) { parent.appendChild(document.createTextNode(text)); return; }
-  const esc = list.sort((a, b) => b.length - a.length).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const esc = list.sort((a, b) => b.length - a.length).map((tt) => tt.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const re = new RegExp(`(${esc.join("|")})`, "gi");
   text.split(re).forEach((part, i) => {
     if (i % 2) { const m = document.createElement("mark"); m.className = cls; m.textContent = part; parent.appendChild(m); }
@@ -812,29 +831,29 @@ function renderRoutedLine(data) {
   line.hidden = !review;
   if (!review) return;
   if (review.routed) {
-    line.append("No answer is shown. Routed for review");
+    line.append(t("js.no_answer_is_shown_routed", "No answer is shown. Routed for review"));
     if (review.case_id != null) {
       line.append(" as ");
       if (canSee("review")) {
         const link = document.createElement("a");
         link.href = "#/review";
         link.className = "case-link";
-        link.textContent = `case #${review.case_id}`;
+        link.textContent = t("js.case", "case #{case_id}", { case_id: review.case_id });
         link.addEventListener("click", () => { setTimeout(() => openCase(review.case_id), 150); });
         line.appendChild(link);
-      } else line.append(`case #${review.case_id}`);
+      } else line.append(t("js.case", "case #{case_id}", { case_id: review.case_id }));
     }
     line.append(".");
   } else {
-    line.textContent = review.note || "Not routed for review.";
+    line.textContent = review.note || t("js.not_routed_for_review", "Not routed for review.");
   }
 }
 
-const REDACTION_LABEL = {
-  NAME: ["name", "names"], DATE: ["date", "dates"], CARD: ["card number", "card numbers"],
-  EMAIL: ["email address", "email addresses"], PHONE: ["phone number", "phone numbers"],
-  ID: ["identifier", "identifiers"], SSN: ["national ID", "national IDs"], ADDRESS: ["address", "addresses"],
-};
+const REDACTION_LABEL = () => ({
+  NAME: [t("js.redact_name", "name"), t("js.redact_names", "names")], DATE: [t("js.redact_date", "date"), t("js.redact_dates", "dates")], CARD: [t("js.card_number", "card number"), t("js.card_numbers", "card numbers")],
+  EMAIL: [t("js.email_address", "email address"), t("js.email_addresses", "email addresses")], PHONE: [t("js.phone_number", "phone number"), t("js.phone_numbers", "phone numbers")],
+  ID: [t("js.redact_identifier", "identifier"), t("js.redact_identifiers", "identifiers")], SSN: [t("js.national_id", "national ID"), t("js.national_ids", "national IDs")], ADDRESS: [t("js.redact_address", "address"), t("js.redact_addresses", "addresses")],
+});
 
 function renderRedaction(red) {
   const box = $("redaction-line");
@@ -845,7 +864,7 @@ function renderRedaction(red) {
   if (box.hidden) return;
   const label = document.createElement("span");
   label.className = "eyebrow";
-  label.textContent = "De-identified before checking";
+  label.textContent = t("js.deidentified", "De-identified before checking");
   const q = document.createElement("span");
   q.className = "redacted-query";
   red.redacted_query.split(/(\[[A-Z_]+\])/).forEach((part) => {
@@ -857,12 +876,12 @@ function renderRedaction(red) {
     } else if (part) q.appendChild(document.createTextNode(part));
   });
   const counts = Object.entries(kinds).map(([k, n]) => {
-    const names = REDACTION_LABEL[k.toUpperCase()] || [k.toLowerCase(), `${k.toLowerCase()}s`];
+    const names = REDACTION_LABEL()[k.toUpperCase()] || [k.toLowerCase(), `${k.toLowerCase()}s`];
     return `${n} ${n === 1 ? names[0] : names[1]}`;
   });
   const note = document.createElement("span");
   note.className = "redaction-count";
-  note.textContent = `${counts.join(", ")} removed`;
+  note.textContent = t("js.removed", "{counts} removed", { counts: counts.join(", ") });
   box.append(label, q, note);
 }
 
@@ -958,10 +977,10 @@ function renderClaimRows(data) {
   if (!claims.length) return;
   const sources = new Set(claims.flatMap((c) => c.source_ids || []));
   const grounded = claims.every((c) => c.grounded);
-  const dosed = (data.trace || []).find((t) => t.name === "dosage guard");
-  const parts = [`${claims.length} ${claims.length === 1 ? "claim" : "claims"} from ${sources.size} ${sources.size === 1 ? "source" : "sources"}`];
-  if (grounded) parts.push("all grounded");
-  if (dosed && dosed.status === "pass") parts.push("doses verified");
+  const dosed = (data.trace || []).find((tt) => tt.name === "dosage guard");
+  const parts = [t("js.claims_from_sources", "{claims} from {sources}", { claims: plural(claims.length, "claim"), sources: plural(sources.size, "source") })];
+  if (grounded) parts.push(t("js.all_grounded", "all grounded"));
+  if (dosed && dosed.status === "pass") parts.push(t("js.doses_verified", "doses verified"));
   summary.textContent = parts.join(" · ");
   claims.forEach((c) => {
     const li = document.createElement("li");
@@ -987,11 +1006,11 @@ function renderClaimRows(data) {
     if (typeof c.relevance === "number") {
       const rel = document.createElement("span");
       rel.className = "relevance";
-      rel.title = `Relevance to the question: ${c.relevance.toFixed(2)}`;
+      rel.title = t("js.relevance_to_the_question", "Relevance to the question: {relevance}", { relevance: c.relevance.toFixed(2) });
       const bar = document.createElement("span");
       bar.className = "relevance-bar";
       bar.setAttribute("role", "img");
-      bar.setAttribute("aria-label", `Relevance ${Math.round(c.relevance * 100)} percent`);
+      bar.setAttribute("aria-label", t("js.relevance_percent", "Relevance {value} percent", { value: Math.round(c.relevance * 100) }));
       const fill = document.createElement("span");
       fill.style.width = `${Math.round(Math.max(0, Math.min(1, c.relevance)) * 100)}%`;
       bar.appendChild(fill);
@@ -1007,7 +1026,7 @@ function renderClaimRows(data) {
 
 function flash(el) { el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 800); }
 
-const KIND_LABEL = { condition: "condition", drug: "drug", reference: "reference" };
+const KIND_LABEL = () => ({ condition: t("js.kind_condition", "condition"), drug: t("js.kind_drug", "drug"), reference: t("js.kind_reference", "reference") });
 
 function renderSources(data) {
   const wrap = $("sources");
@@ -1017,7 +1036,7 @@ function renderSources(data) {
   if (!sources.length) {
     const p = document.createElement("p");
     p.className = "source-snippet";
-    p.textContent = "No sources retrieved for this question.";
+    p.textContent = t("js.no_sources", "No sources retrieved for this question.");
     wrap.appendChild(p);
     return;
   }
@@ -1040,13 +1059,13 @@ function renderSources(data) {
     if (cited.has(s.id)) {
       const badge = document.createElement("span");
       badge.className = "src-badge cited-badge";
-      badge.textContent = "cited";
+      badge.textContent = t("js.cited", "cited");
       left.appendChild(badge);
     }
     if (s.above_gate === false) {
       const badge = document.createElement("span");
       badge.className = "src-badge below-gate";
-      badge.textContent = "below gate";
+      badge.textContent = t("js.below_gate", "below gate");
       left.appendChild(badge);
     }
     const score = document.createElement("span");
@@ -1060,7 +1079,7 @@ function renderSources(data) {
 
     const meta = document.createElement("div");
     meta.className = "source-meta";
-    if (s.kind) meta.appendChild(tag(KIND_LABEL[s.kind] || s.kind, "tag-kind"));
+    if (s.kind) meta.appendChild(tag(KIND_LABEL()[s.kind] || s.kind, "tag-kind"));
     if (s.section) meta.appendChild(tag(s.section, "tag-section"));
     if (s.topic) meta.appendChild(tag(s.topic, "tag-topic"));
 
@@ -1079,7 +1098,7 @@ function renderSources(data) {
     bar.appendChild(fill);
     const num = document.createElement("span");
     num.className = "score-num";
-    num.textContent = "similarity";
+    num.textContent = t("js.similarity", "similarity");
     scoreRow.append(bar, num);
 
     card.append(head, title, meta, snippet, scoreRow);
@@ -1114,7 +1133,7 @@ function renderTrace(steps) {
     main.className = "trace-main";
     const name = document.createElement("div");
     name.className = "trace-name";
-    name.textContent = STAGE_LABELS[step.name] || step.name;
+    name.textContent = STAGE_LABELS()[step.name] || step.name;
     const detail = document.createElement("div");
     detail.className = "trace-detail";
     detail.textContent = step.detail;
@@ -1184,7 +1203,7 @@ function kvDetail(obj, depth = 0) {
     } else {
       const val = document.createElement("span");
       val.className = "data-muted";
-      val.textContent = Array.isArray(v) ? (v.length ? v.join(", ") : "(none)") : v === null || v === undefined ? "(none)" : String(v);
+      val.textContent = Array.isArray(v) ? (v.length ? v.join(", ") : t("js.none", "(none)")) : v === null || v === undefined ? t("js.none", "(none)") : String(v);
       row.appendChild(val);
     }
     wrap.appendChild(row);
@@ -1202,11 +1221,11 @@ function termChips(label, terms, cls) {
   chips.className = "term-chips";
   if (!terms || !terms.length) {
     chips.className += " data-muted";
-    chips.textContent = "(none)";
-  } else terms.forEach((t) => {
+    chips.textContent = t("js.none", "(none)");
+  } else terms.forEach((tt) => {
     const chip = document.createElement("span");
     chip.className = `term-chip ${cls}`;
-    chip.textContent = t;
+    chip.textContent = tt;
     chips.appendChild(chip);
   });
   row.append(key, chips);
@@ -1220,42 +1239,42 @@ function coverageDetail(d) {
   table.className = "coverage-table";
   const head = document.createElement("thead");
   const hr = document.createElement("tr");
-  ["Term in the question", "Found in sources"].forEach((t) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = t; hr.appendChild(th); });
+  [t("js.term_in_the_question", "Term in the question"), t("js.found_in_sources", "Found in sources")].forEach((tt) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = tt; hr.appendChild(th); });
   head.appendChild(hr);
   const body = document.createElement("tbody");
   const covered = new Set(d.covered || []);
-  (d.checked_terms || []).forEach((t) => {
+  (d.checked_terms || []).forEach((tt) => {
     const tr = document.createElement("tr");
     const term = document.createElement("td");
     term.className = "mono";
-    term.textContent = t;
+    term.textContent = tt;
     const state = document.createElement("td");
-    const ok = covered.has(t);
+    const ok = covered.has(tt);
     const chip = document.createElement("span");
     chip.className = `term-chip ${ok ? "covered" : "uncovered"}`;
-    chip.textContent = ok ? "covered" : "not covered";
+    chip.textContent = ok ? t("js.covered", "covered") : t("js.not_covered", "not covered");
     state.appendChild(chip);
     tr.append(term, state);
     body.appendChild(tr);
   });
   table.append(head, body);
   wrap.appendChild(d.checked_terms.length ? table : Object.assign(document.createElement("p"), { className: "data-muted", textContent: "No distinctive terms in the question to check." }));
-  if (d.question_values && d.question_values.length) wrap.appendChild(termChips("values stated", d.question_values, "neutral"));
-  if (d.unsupported_values && d.unsupported_values.length) wrap.appendChild(termChips("unsupported values", d.unsupported_values, "uncovered"));
-  if (d.unsupported_forms && d.unsupported_forms.length) wrap.appendChild(termChips("unsupported forms", d.unsupported_forms, "uncovered"));
+  if (d.question_values && d.question_values.length) wrap.appendChild(termChips(t("js.values_stated", "values stated"), d.question_values, "neutral"));
+  if (d.unsupported_values && d.unsupported_values.length) wrap.appendChild(termChips(t("js.unsupported_values", "unsupported values"), d.unsupported_values, "uncovered"));
+  if (d.unsupported_forms && d.unsupported_forms.length) wrap.appendChild(termChips(t("js.unsupported_forms", "unsupported forms"), d.unsupported_forms, "uncovered"));
   const age = d.age;
   if (age && typeof age === "object") {
     const row = document.createElement("div");
     row.className = "data-line";
     const key = document.createElement("span");
     key.className = "mono strong";
-    key.textContent = "age";
+    key.textContent = t("js.age", "age");
     const val = document.createElement("span");
     val.className = "data-muted";
     val.textContent = `${age.phrase || age.years} (${age.group})`;
     const chip = document.createElement("span");
     chip.className = `term-chip ${age.covered ? "covered" : "uncovered"}`;
-    chip.textContent = age.covered ? "sources cover this group" : "no source covers this group";
+    chip.textContent = age.covered ? t("js.sources_cover_this_group", "sources cover this group") : t("js.no_source_covers_this_group", "no source covers this group");
     row.append(key, val, chip);
     wrap.appendChild(row);
   }
@@ -1271,13 +1290,13 @@ function retrieveDetail(results) {
     const id = document.createElement("span");
     id.className = "mono strong";
     id.textContent = r.id;
-    const t = document.createElement("span");
-    t.className = "data-muted";
-    t.textContent = r.title;
+    const tt = document.createElement("span");
+    tt.className = "data-muted";
+    tt.textContent = r.title;
     const sc = document.createElement("span");
     sc.className = "mono data-score";
     sc.textContent = (r.score ?? 0).toFixed(3);
-    row.append(id, t, sc);
+    row.append(id, tt, sc);
     wrap.appendChild(row);
   });
   return wrap;
@@ -1289,7 +1308,7 @@ function groundingDetail(d) {
 
   const method = document.createElement("p");
   method.className = "data-note";
-  method.textContent = `Method: ${d.method}. Judge: ${d.judge_summary}` +
+  method.textContent = t("js.method_judge", "Method: {method}. Judge: {judge_summary}", { method: d.method, judge_summary: d.judge_summary }) +
     (d.judge_model ? ` (${d.judge_model}).` : ".");
   wrap.appendChild(method);
 
@@ -1304,10 +1323,10 @@ function groundingDetail(d) {
 
     const meta = document.createElement("div");
     meta.className = "claim-meta";
-    meta.appendChild(tag(`cites ${c.source_ids.join(", ") || "nothing"}`, "tag-topic"));
+    meta.appendChild(tag(t("js.cites", "cites {source_ids}", { source_ids: c.source_ids.join(", ") || t("js.nothing", "nothing") }), "tag-topic"));
     const det = document.createElement("span");
     det.className = "claim-stat " + (c.grounded ? "ok" : "bad");
-    det.textContent = `similarity ${c.deterministic_score.toFixed(2)} vs ${c.threshold.toFixed(2)} ${c.grounded ? "PASS" : "FAIL"}`;
+    det.textContent = t("js.similarity_vs", "similarity {deterministic_score} vs {threshold} {grounded}", { deterministic_score: c.deterministic_score.toFixed(2), threshold: c.threshold.toFixed(2), grounded: c.grounded ? t("js.pass", "PASS") : t("js.fail", "FAIL") });
     meta.appendChild(det);
     box.appendChild(meta);
 
@@ -1316,7 +1335,7 @@ function groundingDetail(d) {
       judge.className = "judge-row";
       const verdict = document.createElement("span");
       verdict.className = "judge-verdict " + (c.judge.supported ? "ok" : "bad");
-      verdict.textContent = c.judge.supported ? "judge: supported" : "judge: not supported";
+      verdict.textContent = c.judge.supported ? t("js.judge_supported", "judge: supported") : t("js.judge_not_supported", "judge: not supported");
       judge.appendChild(verdict);
       if (c.judge.reason) {
         const reason = document.createElement("span");
@@ -1328,7 +1347,7 @@ function groundingDetail(d) {
     } else {
       const none = document.createElement("p");
       none.className = "data-muted small";
-      none.textContent = "LLM judge not run (no live provider, or judge disabled). Deterministic check is authoritative.";
+      none.textContent = t("js.llm_judge_not_run_no", "LLM judge not run (no live provider, or judge disabled). Deterministic check is authoritative.");
       box.appendChild(none);
     }
     wrap.appendChild(box);
@@ -1341,13 +1360,13 @@ function dosageDetail(d) {
   wrap.className = "stage-data";
   const rule = document.createElement("p");
   rule.className = "data-note";
-  rule.textContent = d.rule ? `Rule: ${d.rule}.` : "Dosage guard disabled.";
+  rule.textContent = d.rule ? t("js.rule", "Rule: {rule}.", { rule: d.rule }) : t("js.dosage_guard_disabled", "Dosage guard disabled.");
   wrap.appendChild(rule);
 
   if (!d.detected_values.length) {
     const none = document.createElement("p");
     none.className = "data-muted";
-    none.textContent = "No values with clinical units were present in the answer, so nothing to verify.";
+    none.textContent = t("js.no_values_with_clinical_units", "No values with clinical units were present in the answer, so nothing to verify.");
     wrap.appendChild(none);
     return wrap;
   }
@@ -1360,7 +1379,7 @@ function dosageDetail(d) {
     const verified = (d.verified || []).includes(v);
     const status = document.createElement("span");
     status.className = "claim-stat " + (verified ? "ok" : "bad");
-    status.textContent = verified ? "stated by a source" : "NOT stated by any source";
+    status.textContent = verified ? t("js.stated_by_a_source", "stated by a source") : t("js.not_stated_by_any_source", "NOT stated by any source");
     row.append(val, status);
     wrap.appendChild(row);
   });
@@ -1387,7 +1406,7 @@ async function fetchAudit() {
     wrap.innerHTML = "";
     wrap.appendChild(jsonNode(currentAuditData, null, true));
     $("audit-controls").hidden = false;
-  } catch (_) { wrap.textContent = "Audit record unavailable."; }
+  } catch (_) { wrap.textContent = t("js.audit_record_unavailable", "Audit record unavailable."); }
 }
 
 // Render a JSON value as a collapsible tree. Objects/arrays use <details> so
@@ -1439,20 +1458,20 @@ function renderHowStages() {
   const list = $("how-stages");
   if (!list) return;
   list.innerHTML = "";
-  PIPELINE_STAGES.forEach(([name, desc], i) => {
+  PIPELINE_STAGES().forEach(([name, desc], i) => {
     const li = document.createElement("li");
     li.className = "how-stage";
     const n = document.createElement("span");
     n.className = "how-stage-num mono";
     n.textContent = String(i + 1).padStart(2, "0");
     const body = document.createElement("div");
-    const t = document.createElement("div");
-    t.className = "how-stage-name mono";
-    t.textContent = name;
+    const tt = document.createElement("div");
+    tt.className = "how-stage-name mono";
+    tt.textContent = name;
     const d = document.createElement("div");
     d.className = "how-stage-desc";
     d.textContent = desc;
-    body.append(t, d);
+    body.append(tt, d);
     li.append(n, body);
     list.appendChild(li);
   });
@@ -1494,8 +1513,8 @@ async function loadCorpus() {
     renderCorpusLegend(data.stats);
     renderSectionBars(data.stats);
     $("corpus-summary").textContent =
-      `${data.stats.total.toLocaleString()} passages, ${data.stats.topics} topics`;
-  } catch (_) { $("corpus-summary").textContent = "unavailable"; }
+      t("js.passages_topics", "{total} passages, {topics} topics", { total: data.stats.total.toLocaleString(), topics: data.stats.topics });
+  } catch (_) { $("corpus-summary").textContent = t("js.unavailable", "unavailable"); }
 }
 
 let corpusTopicList = [];
@@ -1505,30 +1524,30 @@ function renderCorpusTiles(stats) {
   wrap.innerHTML = "";
   corpusTopicList = stats.topic_list || [];
   const tiles = [
-    ["documents", stats.total, false],
-    ["conditions", stats.by_kind.condition || 0, false],
-    ["drug labels", stats.by_kind.drug || 0, false],
-    ["lab markers", stats.by_kind.marker || 0, false],
-    ["procedures", stats.by_kind.procedure || 0, false],
-    ["topics", stats.topics, true],   // clickable: reveals the topic list
+    [t("js.tile_documents", "documents"), stats.total, false],
+    [t("js.tile_conditions", "conditions"), stats.by_kind.condition || 0, false],
+    [t("js.drug_labels", "drug labels"), stats.by_kind.drug || 0, false],
+    [t("js.lab_markers", "lab markers"), stats.by_kind.marker || 0, false],
+    [t("js.tile_procedures", "procedures"), stats.by_kind.procedure || 0, false],
+    [t("js.tile_topics", "topics"), stats.topics, true],   // clickable: reveals the topic list
   ];
   tiles.forEach(([label, value, clickable]) => {
-    const t = document.createElement("div");
-    t.className = "corpus-tile" + (clickable ? " clickable" : "");
+    const tt = document.createElement("div");
+    tt.className = "corpus-tile" + (clickable ? " clickable" : "");
     const v = document.createElement("div");
     v.className = "tile-value mono";
     v.textContent = Number(value).toLocaleString();
     const l = document.createElement("div");
     l.className = "tile-label";
-    l.textContent = clickable ? `${label} (click to view)` : label;
-    t.append(v, l);
+    l.textContent = clickable ? t("js.click_to_view", "{label} (click to view)", { label }) : label;
+    tt.append(v, l);
     if (clickable) {
-      t.setAttribute("role", "button");
-      t.setAttribute("tabindex", "0");
-      t.addEventListener("click", toggleTopicList);
-      t.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleTopicList(); } });
+      tt.setAttribute("role", "button");
+      tt.setAttribute("tabindex", "0");
+      tt.addEventListener("click", toggleTopicList);
+      tt.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleTopicList(); } });
     }
-    wrap.appendChild(t);
+    wrap.appendChild(tt);
   });
 }
 
@@ -1540,22 +1559,22 @@ function toggleTopicList() {
   panel.className = "topic-list-panel";
   const head = document.createElement("div");
   head.className = "topic-list-head eyebrow";
-  head.textContent = `${corpusTopicList.length} topics (each topic is one fictional entity, with several documents)`;
+  head.textContent = t("js.topics_each_topic_is_one", "{corpusTopicList} topics (each topic is one fictional entity, with several documents)", { corpusTopicList: corpusTopicList.length });
   panel.appendChild(head);
   const grid = document.createElement("div");
   grid.className = "topic-list-grid";
-  corpusTopicList.forEach((t) => {
+  corpusTopicList.forEach((tt) => {
     const item = document.createElement("div");
     item.className = "topic-item";
     const dot = document.createElement("span");
     dot.className = "topic-dot";
-    dot.style.background = KIND_COLOR[t.kind] || "#8f8f8f";
+    dot.style.background = KIND_COLOR[tt.kind] || "#8f8f8f";
     const name = document.createElement("span");
     name.className = "topic-name";
-    name.textContent = t.topic;
+    name.textContent = tt.topic;
     const count = document.createElement("span");
     count.className = "topic-count mono";
-    count.textContent = `${t.count}`;
+    count.textContent = `${tt.count}`;
     item.append(dot, name, count);
     grid.appendChild(item);
   });
@@ -1626,8 +1645,8 @@ function setupCorpusCanvas(points) {
     const tt = $("corpus-tooltip"); if (tt) tt.hidden = true;
     drawCorpus();
   });
-  canvas.addEventListener("touchstart", (e) => { const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
-  canvas.addEventListener("touchmove", (e) => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
+  canvas.addEventListener("touchstart", (e) => { const tt = e.touches[0]; start(tt.clientX, tt.clientY); }, { passive: true });
+  canvas.addEventListener("touchmove", (e) => { const tt = e.touches[0]; move(tt.clientX, tt.clientY); }, { passive: true });
   canvas.addEventListener("touchend", end);
 
   // Scroll to zoom; double-click to reset the view.
@@ -1738,7 +1757,7 @@ function drawCorpus() {
     ctx.globalAlpha = 1;
     ctx.font = "600 11px ui-monospace, monospace";
     ctx.fillStyle = HIT_HEX;
-    ctx.fillText(`${hitCount} sources retrieved (highlighted)`, 8, size - 8);
+    ctx.fillText(t("js.sources_retrieved_highlighted", "{hitCount} sources retrieved (highlighted)", { hitCount }), 8, size - 8);
   }
   // Hovered point: a ring in its category colour, drawn last so it is visible.
   const hp = map3d.hoverId && proj.find((q) => q.id === map3d.hoverId);
@@ -1769,7 +1788,7 @@ function showCorpusTooltip(point, mx, my, rect) {
   kind.style.color = KIND_HEX[point.kind] || "#8f8f8f";
   const title = document.createElement("div");
   title.className = "tt-title";
-  title.textContent = point.title || "(document)";
+  title.textContent = point.title || t("js.document", "(document)");
   const head = document.createElement("div");
   head.className = "tt-head";
   head.append(id, kind);
@@ -1777,13 +1796,13 @@ function showCorpusTooltip(point, mx, my, rect) {
   if (point.section) {
     const sec = document.createElement("div");
     sec.className = "tt-section";
-    sec.textContent = "section: " + point.section;
+    sec.textContent = t("js.section", "section: ") + point.section;
     tt.append(sec);
   }
   if (map3d.hits.has(point.id)) {
     const ret = document.createElement("div");
     ret.className = "tt-retrieved";
-    ret.textContent = "● retrieved for this answer";
+    ret.textContent = t("js.retrieved_for_this_answer", "● retrieved for this answer");
     tt.append(ret);
   }
   // Position near the cursor, clamped inside the canvas.
@@ -1805,12 +1824,12 @@ function renderCorpusLegend(stats) {
   const wrap = $("corpus-legend");
   wrap.innerHTML = "";
   const items = [
-    ["condition pages (illnesses)", KIND_COLOR.condition, stats.by_kind.condition || 0],
-    ["drug label pages (medications)", KIND_COLOR.drug, stats.by_kind.drug || 0],
-    ["lab marker pages", KIND_COLOR.marker, stats.by_kind.marker || 0],
-    ["diagnostic procedure pages", KIND_COLOR.procedure, stats.by_kind.procedure || 0],
-    ["general reference notes", KIND_COLOR.reference, stats.by_kind.reference || 0],
-    ["retrieved for your question", "var(--map-hit)", null],
+    [t("js.condition_pages_illnesses", "condition pages (illnesses)"), KIND_COLOR.condition, stats.by_kind.condition || 0],
+    [t("js.drug_label_pages_medications", "drug label pages (medications)"), KIND_COLOR.drug, stats.by_kind.drug || 0],
+    [t("js.lab_marker_pages", "lab marker pages"), KIND_COLOR.marker, stats.by_kind.marker || 0],
+    [t("js.diagnostic_procedure_pages", "diagnostic procedure pages"), KIND_COLOR.procedure, stats.by_kind.procedure || 0],
+    [t("js.general_reference_notes", "general reference notes"), KIND_COLOR.reference, stats.by_kind.reference || 0],
+    [t("js.retrieved_for_your_question", "retrieved for your question"), "var(--map-hit)", null],
   ];
   items.forEach(([label, color, count]) => {
     const el = document.createElement("span");
@@ -1834,7 +1853,7 @@ function renderSectionBars(stats) {
   const max = Math.max(...entries.map(([, v]) => v));
   const title = document.createElement("div");
   title.className = "eyebrow section-bars-title";
-  title.textContent = "Documents by section";
+  title.textContent = t("js.documents_by_section", "Documents by section");
   wrap.appendChild(title);
   entries.forEach(([name, count]) => {
     const row = document.createElement("div");
@@ -1881,20 +1900,20 @@ function renderLocalAI() {
   list.textContent = "";
   msg.hidden = true;
 
-  if (!s) { summary.textContent = "unavailable"; return; }
+  if (!s) { summary.textContent = t("js.unavailable", "unavailable"); return; }
 
   const active = s.models.find((m) => m.name === s.active);
-  summary.textContent = active ? `using ${active.label}`
-    : s.ollama.running ? "no model selected" : "Ollama not running";
+  summary.textContent = active ? t("js.using", "using {label}", { label: active.label })
+    : s.ollama.running ? t("js.no_model_selected", "no model selected") : t("js.ollama_not_running", "Ollama not running");
 
   const h = s.hardware;
-  const accel = { "apple-silicon": "Apple silicon GPU", nvidia: "NVIDIA GPU", cpu: "CPU only" }[h.accelerator] || h.accelerator;
+  const accel = { "apple-silicon": t("js.apple_silicon_gpu", "Apple silicon GPU"), nvidia: t("js.nvidia_gpu", "NVIDIA GPU"), cpu: t("js.cpu_only", "CPU only") }[h.accelerator] || h.accelerator;
   const facts = [
     h.cpu,
-    `${formatGb(h.memory_gb)} memory`,
+    t("js.memory", "{memory_gb} memory", { memory_gb: formatGb(h.memory_gb) }),
     ...h.gpus.map((g) => `${g.name}, ${formatGb(g.memory_gb)}`),
     accel,
-    `${formatGb(h.model_memory_gb)} available for a model`,
+    t("js.available_for_a_model", "{model_memory_gb} available for a model", { model_memory_gb: formatGb(h.model_memory_gb) }),
   ];
   facts.forEach((text) => {
     const pill = document.createElement("span");
@@ -1906,12 +1925,12 @@ function renderLocalAI() {
   if (!s.ollama.running) {
     msg.hidden = false;
     msg.textContent = "";
-    msg.append("Ollama isn't running at ", Object.assign(document.createElement("code"), { textContent: s.ollama.host }),
-      ". Install it from ", Object.assign(document.createElement("a"), { href: "https://ollama.com/download", textContent: "ollama.com", target: "_blank", rel: "noopener" }),
-      ", start it, then reopen this panel.");
+    msg.append(t("js.ollama_isn_t_running_at", "Ollama isn't running at "), Object.assign(document.createElement("code"), { textContent: s.ollama.host }),
+      t("js.install_it_from", ". Install it from "), Object.assign(document.createElement("a"), { href: "https://ollama.com/download", textContent: "ollama.com", target: "_blank", rel: "noopener" }),
+      t("js.start_it_then_reopen_this", ", start it, then reopen this panel."));
   } else if (!s.can_manage) {
     msg.hidden = false;
-    msg.textContent = "Models can only be downloaded or switched from the machine running GroundCheckHealth.";
+    msg.textContent = t("js.models_can_only_be_downloaded", "Models can only be downloaded or switched from the machine running GroundCheckHealth.");
   }
 
   s.models.forEach((m) => list.appendChild(renderModelRow(m, s)));
@@ -1927,12 +1946,12 @@ function renderModelRow(m, s) {
   name.className = "local-ai-model-name";
   name.textContent = m.label;
   main.appendChild(name);
-  if (m.recommended) main.appendChild(badge("Recommended", "recommended"));
-  main.appendChild(badge({ good: "Good fit", tight: "Tight fit", "too-large": "Too large" }[m.fit], `fit ${m.fit}`));
+  if (m.recommended) main.appendChild(badge(t("js.recommended", "Recommended"), "recommended"));
+  main.appendChild(badge({ good: t("js.good_fit", "Good fit"), tight: t("js.tight_fit", "Tight fit"), "too-large": t("js.too_large", "Too large") }[m.fit], `fit ${m.fit}`));
 
   const meta = document.createElement("div");
   meta.className = "local-ai-model-meta mono";
-  meta.textContent = `${m.name}  ${m.parameters}  download ${formatGb(m.download_gb)}  needs ${formatGb(m.memory_needed_gb)}`;
+  meta.textContent = t("js.download_needs", "{name}  {parameters}  download {download_gb}  needs {memory_needed_gb}", { name: m.name, parameters: m.parameters, download_gb: formatGb(m.download_gb), memory_needed_gb: formatGb(m.memory_needed_gb) });
   const licence = document.createElement("div");
   licence.className = "local-ai-model-licence";
   licence.textContent = m.licence;
@@ -1949,7 +1968,7 @@ function renderModelRow(m, s) {
     bar.setAttribute("aria-valuemin", "0");
     bar.setAttribute("aria-valuemax", "100");
     bar.setAttribute("aria-valuenow", String(progress.percent));
-    bar.setAttribute("aria-label", `Downloading ${m.label}`);
+    bar.setAttribute("aria-label", t("js.downloading", "Downloading {label}", { label: m.label }));
     const fill = document.createElement("span");
     fill.style.width = `${progress.percent}%`;
     bar.appendChild(fill);
@@ -1958,13 +1977,13 @@ function renderModelRow(m, s) {
     label.textContent = progress.label;
     actions.append(bar, label);
   } else if (!m.installed) {
-    actions.appendChild(button(`Download ${formatGb(m.download_gb)}`, "btn-ghost",
+    actions.appendChild(button(t("js.download", "Download {download_gb}", { download_gb: formatGb(m.download_gb) }), "btn-ghost",
       disabled || m.fit === "too-large", () => downloadModel(m)));
   } else if (s.selected === m.name) {
-    const inUse = badge(localAI.busy === m.name ? "Loading…" : "In use", "in-use");
-    actions.append(inUse, button("Stop using", "btn-ghost", disabled, () => selectModel(null)));
+    const inUse = badge(localAI.busy === m.name ? t("js.loading", "Loading…") : t("js.in_use", "In use"), "in-use");
+    actions.append(inUse, button(t("js.stop_using", "Stop using"), "btn-ghost", disabled, () => selectModel(null)));
   } else {
-    actions.appendChild(button(localAI.busy === m.name ? "Loading…" : "Use this model", "btn-primary",
+    actions.appendChild(button(localAI.busy === m.name ? t("js.loading", "Loading…") : t("js.use_this_model", "Use this model"), "btn-primary",
       disabled, () => selectModel(m.name)));
   }
 
@@ -1990,14 +2009,14 @@ function button(text, style, disabled, onClick) {
 }
 
 async function downloadModel(m) {
-  localAI.downloading.set(m.name, { percent: 0, label: "starting…" });
+  localAI.downloading.set(m.name, { percent: 0, label: t("js.starting_lower", "starting…") });
   renderLocalAI();
   let error = null;
   try {
     const res = await fetch("/api/local-ai/pull", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: m.name }),
     });
-    if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
+    if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).detail || t("js.http", "HTTP {status}", { status: res.status }));
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -2012,7 +2031,7 @@ async function downloadModel(m) {
         const event = JSON.parse(line);
         if (event.status === "error") { error = event.error; continue; }
         const percent = event.total ? Math.round((event.completed / event.total) * 100) : 0;
-        const label = event.total ? `${percent}%  ${formatGb(event.completed / 1e9)} of ${formatGb(event.total / 1e9)}` : event.status;
+        const label = event.total ? t("js.of", "{percent}%  {completed} of {total}", { percent, completed: formatGb(event.completed / 1e9), total: formatGb(event.total / 1e9) }) : event.status;
         localAI.downloading.set(m.name, { percent, label });
         renderLocalAI();
       }
@@ -2022,7 +2041,7 @@ async function downloadModel(m) {
   }
   localAI.downloading.delete(m.name);
   await loadLocalAI();
-  if (error) showLocalAIError(`Download failed: ${error}`);
+  if (error) showLocalAIError(t("js.download_failed", "Download failed: {error}", { error }));
 }
 
 async function selectModel(name) {
@@ -2033,7 +2052,7 @@ async function selectModel(name) {
     const res = await fetch("/api/local-ai/select", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: name }),
     });
-    if (!res.ok) error = (await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`;
+    if (!res.ok) error = (await res.json().catch(() => ({}))).detail || t("js.http", "HTTP {status}", { status: res.status });
   } catch (err) {
     error = err.message;
   }
@@ -2050,14 +2069,34 @@ function showLocalAIError(text) {
 }
 
 // ---------- Documents ----------
-const STATUS_LABELS = { pending: "Pending review", approved: "Approved", rejected: "Rejected", retired: "Retired" };
+const STATUS_LABELS = () => ({ pending: t("js.pending_review", "Pending review"), approved: t("js.approved", "Approved"), rejected: t("js.rejected", "Rejected"), retired: t("js.retired", "Retired") });
 let indexPoll = null;
 
 function isoDateToIso(value) { return value ? `${value}T00:00:00` : ""; }
 // A date on its own, spelled so it cannot be read the wrong way round:
 // "18 Sep 2026", never 9/18/2026 or 18/09/2026.
 function shortDate(iso) {
-  return iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
+  return iso ? new Date(iso).toLocaleDateString(uiLocale(), { day: "numeric", month: "short", year: "numeric" }) : "";
+}
+
+// A group admin (an admin with no site) chooses which site an upload belongs to.
+async function fillUploadSites() {
+  const field = $("upload-site-field");
+  const u = account.user;
+  field.hidden = true;
+  if (!u || u.role !== "admin" || (u.site_id !== null && u.site_id !== undefined)) return;
+  try {
+    const { sites } = await api("/api/sites");
+    if (!sites || !sites.length) return;
+    const select = $("upload-site");
+    const keep = select.value;
+    select.textContent = "";
+    [["", t("js.every_site", "Every site")], ...sites.map((x) => [String(x.id), x.name])].forEach(([v, l]) => {
+      const o = document.createElement("option"); o.value = v; o.textContent = l; select.appendChild(o);
+    });
+    select.value = keep;
+    field.hidden = false;
+  } catch (_) { /* not a group admin, or no sites */ }
 }
 
 async function loadDocuments() {
@@ -2069,13 +2108,14 @@ async function loadDocuments() {
     return;
   }
   $("upload-form").hidden = false;
+  fillUploadSites();
   renderIndexStatus(data.index);
   const rows = $("documents-body-rows");
   rows.textContent = "";
   $("documents-empty").hidden = data.sources.length > 0;
   const approved = data.sources.filter((d) => d.status === "approved").length;
   const pending = data.sources.filter((d) => d.status === "pending").length;
-  $("documents-summary").textContent = `${approved} approved, ${pending} pending review`;
+  $("documents-summary").textContent = t("js.approved_pending_review", "{approved} approved, {pending} pending review", { approved, pending });
 
   data.sources.forEach((d) => {
     const tr = document.createElement("tr");
@@ -2091,15 +2131,15 @@ async function loadDocuments() {
     const status = document.createElement("td");
     const chip = document.createElement("span");
     chip.className = `status-pill status-${d.status}`;
-    chip.textContent = STATUS_LABELS[d.status] || d.status;
+    chip.textContent = STATUS_LABELS()[d.status] || d.status;
     status.appendChild(chip);
 
     const owner = document.createElement("td");
     owner.textContent = d.owner || "";
 
     const force = document.createElement("td");
-    const range = [d.effective_from ? `from ${shortDate(d.effective_from)}` : "", d.expires_on ? `until ${shortDate(d.expires_on)}` : ""].filter(Boolean).join(" ");
-    force.textContent = d.status === "approved" ? `${d.in_force ? "Yes" : "No"}${range ? `, ${range}` : ""}` : (range || "");
+    const range = [d.effective_from ? t("js.from_2", "from {effective_from}", { effective_from: shortDate(d.effective_from) }) : "", d.expires_on ? t("js.until", "until {expires_on}", { expires_on: shortDate(d.expires_on) }) : ""].filter(Boolean).join(" ");
+    force.textContent = d.status === "approved" ? `${d.in_force ? t("js.yes", "Yes") : t("js.no", "No")}${range ? `, ${range}` : ""}` : (range || "");
 
     const sections = document.createElement("td");
     sections.className = "mono";
@@ -2109,14 +2149,14 @@ async function loadDocuments() {
     const actions = document.createElement("div");
     actions.className = "document-actions";
     actionsCell.appendChild(actions);
-    actions.appendChild(button("View", "btn-ghost", false, () => openDocument(d.id)));
+    actions.appendChild(button(t("js.view", "View"), "btn-ghost", false, () => openDocument(d.id)));
     if (d.status === "pending") {
-      actions.appendChild(button("Approve", "btn-primary", false, () => reviewDocument(d, "approve")));
-      actions.appendChild(button("Reject", "btn-ghost", false, () => reviewDocument(d, "reject")));
+      actions.appendChild(button(t("js.approve", "Approve"), "btn-primary", false, () => reviewDocument(d, "approve")));
+      actions.appendChild(button(t("js.reject", "Reject"), "btn-ghost", false, () => reviewDocument(d, "reject")));
     }
     if (d.status === "approved") {
-      if (d.in_force) actions.appendChild(button("Evaluate", "btn-ghost", false, (e) => evaluateDocument(d, e.currentTarget)));
-      actions.appendChild(button("Retire", "btn-ghost", false, () => reviewDocument(d, "retire")));
+      if (d.in_force) actions.appendChild(button(t("js.evaluate", "Evaluate"), "btn-ghost", false, (e) => evaluateDocument(d, e.currentTarget)));
+      actions.appendChild(button(t("js.retire", "Retire"), "btn-ghost", false, () => reviewDocument(d, "retire")));
     }
     tr.append(doc, status, owner, force, sections, actionsCell);
     rows.appendChild(tr);
@@ -2125,10 +2165,10 @@ async function loadDocuments() {
 
 function renderIndexStatus(index) {
   const text = $("index-status-text");
-  if (index.state === "running") text.textContent = "Rebuilding the index…";
-  else if (index.state === "failed") text.textContent = `Index rebuild failed: ${index.error}`;
-  else if (index.finished_at) text.textContent = `Index rebuilt ${dateTime(index.finished_at)}: ${index.documents.toLocaleString()} passages (${index.embedded} newly embedded).`;
-  else text.textContent = "The index was built when the app started.";
+  if (index.state === "running") text.textContent = t("js.rebuilding_the_index", "Rebuilding the index…");
+  else if (index.state === "failed") text.textContent = t("js.index_rebuild_failed", "Index rebuild failed: {error}", { error: index.error });
+  else if (index.finished_at) text.textContent = t("js.index_rebuilt_passages_newly_embedded", "Index rebuilt {finished_at}: {documents} passages ({embedded} newly embedded).", { finished_at: dateTime(index.finished_at), documents: index.documents.toLocaleString(), embedded: index.embedded });
+  else text.textContent = t("js.the_index_was_built_when", "The index was built when the app started.");
   $("index-status").classList.toggle("failed", index.state === "failed");
   $("index-rebuild").disabled = index.state === "running";
   if (index.state === "running" && !indexPoll) {
@@ -2148,11 +2188,15 @@ function renderIndexStatus(index) {
 }
 
 async function reviewDocument(d, decision) {
-  const verbs = { approve: "Approve", reject: "Reject", retire: "Retire" };
+  const doneMessages = {
+    approve: (v) => t("js.approved_title", "Approved “{title}”.", v),
+    reject: (v) => t("js.rejected_title", "Rejected “{title}”.", v),
+    retire: (v) => t("js.retired_title", "Retired “{title}”.", v),
+  };
   const prompts = {
-    approve: `Approve “${d.title}” version ${d.version}? It will be cited in answers.`,
-    reject: `Reject “${d.title}” version ${d.version}? Add a note for the uploader (optional):`,
-    retire: `Retire “${d.title}” version ${d.version}? It will stop being cited.`,
+    approve: t("js.approve_version_it_will_be", "Approve “{title}” version {version}? It will be cited in answers.", { title: d.title, version: d.version }),
+    reject: t("js.reject_version_add_a_note", "Reject “{title}” version {version}? Add a note for the uploader (optional):", { title: d.title, version: d.version }),
+    retire: t("js.retire_version_it_will_stop", "Retire “{title}” version {version}? It will stop being cited.", { title: d.title, version: d.version }),
   };
   let note = "";
   if (decision === "reject") {
@@ -2164,7 +2208,7 @@ async function reviewDocument(d, decision) {
   }
   try {
     const data = await api(`/api/sources/${d.id}/${decision}`, { method: "POST", body: { note } });
-    showMessage("documents-message", `${verbs[decision]}d “${d.title}”.${decision !== "reject" ? " Rebuilding the index." : ""}`);
+    showMessage("documents-message", doneMessages[decision]({ title: d.title }) + (decision !== "reject" ? t("js.rebuilding_the_index_2", " Rebuilding the index.") : ""));
     renderIndexStatus(data.index);
   } catch (err) { showMessage("documents-message", err.message, true); }
   await loadDocuments();
@@ -2172,11 +2216,11 @@ async function reviewDocument(d, decision) {
 
 async function evaluateDocument(d, trigger) {
   trigger.disabled = true;
-  trigger.textContent = "Evaluating…";
+  trigger.textContent = t("js.evaluating", "Evaluating…");
   try {
     const data = await api(`/api/sources/${d.id}/evaluate`, { method: "POST" });
     const e = data.evaluation;
-    showMessage("documents-message", `“${d.title}”: ${e.passed} of ${e.total} test questions behaved as intended, ${e.unsafe_answers} unsafe answers.`, e.unsafe_answers > 0);
+    showMessage("documents-message", t("js.of_test_questions_behaved_as", "“{title}”: {passed} of {total} test questions behaved as intended, {unsafe_answers} unsafe answers.", { title: d.title, passed: e.passed, total: e.total, unsafe_answers: e.unsafe_answers }), e.unsafe_answers > 0);
     await openDocument(d.id);
   } catch (err) { showMessage("documents-message", err.message, true); }
   await loadDocuments();
@@ -2187,9 +2231,9 @@ async function openDocument(id) {
   try { data = await api(`/api/sources/${id}`); }
   catch (err) { showMessage("documents-message", err.message, true); return; }
   const d = data.source;
-  $("document-dialog-title").textContent = `${d.title}, version ${d.version}`;
-  const bits = [STATUS_LABELS[d.status] || d.status, d.owner && `Owner: ${d.owner}`, d.filename,
-    d.review_note && `Note: ${d.review_note}`].filter(Boolean);
+  $("document-dialog-title").textContent = t("js.version", "{title}, version {version}", { title: d.title, version: d.version });
+  const bits = [STATUS_LABELS()[d.status] || d.status, d.owner && t("js.owner", "Owner: {owner}", { owner: d.owner }), d.filename,
+    d.review_note && t("js.note", "Note: {review_note}", { review_note: d.review_note })].filter(Boolean);
   $("document-meta").textContent = bits.join(". ") + ".";
 
   const list = $("document-sections");
@@ -2213,7 +2257,7 @@ async function openDocument(id) {
   evalSection.hidden = !d.evaluation;
   if (d.evaluation) {
     const e = d.evaluation;
-    $("document-eval-summary").textContent = `${e.passed} of ${e.total} behaved as intended, ${e.unsafe_answers} unsafe answers, run ${dateTime(e.ran_at)}.`;
+    $("document-eval-summary").textContent = t("js.of_behaved_as_intended_unsafe", "{passed} of {total} behaved as intended, {unsafe_answers} unsafe answers, run {ran_at}.", { passed: e.passed, total: e.total, unsafe_answers: e.unsafe_answers, ran_at: dateTime(e.ran_at) });
     const cases = $("document-eval-cases");
     cases.textContent = "";
     e.cases.forEach((c) => {
@@ -2226,7 +2270,7 @@ async function openDocument(id) {
       q.textContent = c.query;
       const r = document.createElement("span");
       r.className = "eval-r mono";
-      r.textContent = `expect ${c.expect} / got ${c.got}`;
+      r.textContent = t("js.expect_got", "expect {expect} / got {got}", { expect: c.expect, got: c.got });
       li.append(glyph, q, r);
       cases.appendChild(li);
     });
@@ -2245,37 +2289,38 @@ function wireDocuments() {
     e.preventDefault();
     const form = e.currentTarget;
     const file = $("upload-file").files[0];
-    if (!file) { showMessage("documents-message", "Choose a file to upload.", true); return; }
+    if (!file) { showMessage("documents-message", t("js.choose_a_file_to_upload", "Choose a file to upload."), true); return; }
     const body = new FormData();
     body.append("file", file);
     body.append("title", $("upload-title").value);
     body.append("owner", $("upload-owner").value);
     body.append("effective_from", isoDateToIso($("upload-effective").value));
     body.append("expires_on", isoDateToIso($("upload-expires").value));
+    if (!$("upload-site-field").hidden && $("upload-site").value) body.append("site_id", $("upload-site").value);
     formBusy(form, true);
-    $("upload-button").textContent = "Uploading…";
+    $("upload-button").textContent = t("js.uploading", "Uploading…");
     try {
       const res = await fetch("/api/sources", { method: "POST", body });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || `Upload failed (${res.status}).`);
+      if (!res.ok) throw new Error(data.detail || t("js.upload_failed", "Upload failed ({status}).", { status: res.status }));
       form.reset();
-      showMessage("documents-message", `Uploaded “${data.source.title}” as version ${data.source.version}, with ${data.source.chunks} sections. It needs approval before it’s cited.`);
+      showMessage("documents-message", t("js.uploaded_as_version_with_sections", "Uploaded “{title}” as version {version}, with {chunks} sections. It needs approval before it’s cited.", { title: data.source.title, version: data.source.version, chunks: data.source.chunks }));
       await loadDocuments();
     } catch (err) { showMessage("documents-message", err.message, true); }
     formBusy(form, false);
-    $("upload-button").textContent = "Upload for review";
+    $("upload-button").textContent = t("js.upload_for_review", "Upload for review");
   });
 }
 
 // ---------- Review ----------
-const KIND_LABELS = { refusal: "Refusal", flagged: "Flagged answer" };
-const SEVERITY = ["", "Minor", "Significant", "Considerable", "Major", "Catastrophic"];
-const LIKELIHOOD = ["", "Very low", "Low", "Medium", "High", "Very high"];
+const KIND_LABELS = () => ({ refusal: t("js.refusal", "Refusal"), flagged: t("js.flagged_answer", "Flagged answer") });
+const SEVERITY = () => (["", t("js.minor", "Minor"), t("js.significant", "Significant"), t("js.considerable", "Considerable"), t("js.major", "Major"), t("js.catastrophic", "Catastrophic")]);
+const LIKELIHOOD = () => (["", t("js.very_low", "Very low"), t("js.low", "Low"), t("js.medium", "Medium"), t("js.high", "High"), t("js.very_high", "Very high")]);
 const review = { tab: "queue", data: null, caseId: null, hazards: [], hazardId: null };
 
 function relativeTime(iso) {
   const minutes = Math.round((new Date(iso) - Date.now()) / 60000);
-  const fmt = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const fmt = new Intl.RelativeTimeFormat(uiLocale(), { numeric: "auto" });
   const abs = Math.abs(minutes);
   if (abs < 60) return fmt.format(minutes, "minute");
   if (abs < 48 * 60) return fmt.format(Math.round(minutes / 60), "hour");
@@ -2287,7 +2332,11 @@ function labelCells(cells, labels) {
   cells.forEach((td, i) => { if (labels[i]) td.dataset.label = labels[i]; });
 }
 
-const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+const coded = (prefix, code, fallback) => t(`${prefix}.${String(code).replace(/[^a-z0-9]+/gi, "_")}`, fallback);
+const plural = (n, word) => {
+  const key = "plural." + word.replace(/ /g, "_") + (n === 1 ? ".one" : ".other");
+  return `${n.toLocaleString()} ${t(key, n === 1 ? word : word + "s")}`;
+};
 
 function selectTab(name) {
   review.tab = name;
@@ -2317,10 +2366,10 @@ async function loadReviews() {
   catch (err) { showMessage("review-message", err.message, true); return; }
   review.data = data;
   const c = data.counts;
-  $("review-summary").textContent = `${c.open} open${c.overdue ? `, ${c.overdue} overdue` : ""}`;
+  $("review-summary").textContent = t("js.open", "{open} open{overdue}", { open: c.open, overdue: c.overdue ? t("js.overdue", ", {overdue} overdue", { overdue: c.overdue }) : "" });
   const counts = $("review-counts");
   counts.textContent = "";
-  [["Open", c.open, ""], ["Overdue", c.overdue, c.overdue ? "bad" : ""], ["Resolved", c.resolved, ""]].forEach(([label, n, cls]) => {
+  [[t("js.open_2", "Open"), c.open, ""], [t("js.overdue_2", "Overdue"), c.overdue, c.overdue ? "bad" : ""], [t("js.resolved", "Resolved"), c.resolved, ""]].forEach(([label, n, cls]) => {
     const item = document.createElement("span");
     item.className = `review-count ${cls}`;
     const num = document.createElement("strong");
@@ -2342,7 +2391,7 @@ async function loadReviews() {
     text.textContent = k.query;
     const why = document.createElement("div");
     why.className = "user-email";
-    why.textContent = k.kind === "flagged" ? `Flagged: ${k.reason}` : k.reason_category;
+    why.textContent = k.kind === "flagged" ? t("js.flagged", "Flagged: {reason}", { reason: k.reason }) : k.reason_category;
     q.append(text, why);
 
     const type = document.createElement("td");
@@ -2351,38 +2400,38 @@ async function loadReviews() {
     type.appendChild(pills);
     const pill = document.createElement("span");
     pill.className = `status-pill kind-${k.kind}${k.priority === "high" ? " priority-high" : ""}`;
-    pill.textContent = KIND_LABELS[k.kind] || k.kind;
+    pill.textContent = KIND_LABELS()[k.kind] || k.kind;
     pills.appendChild(pill);
     if (k.status !== "open") {
       const st = document.createElement("span");
       st.className = "status-pill status-retired";
-      st.textContent = "Resolved";
+      st.textContent = t("js.resolved", "Resolved");
       pills.appendChild(st);
     }
 
     const asked = document.createElement("td");
-    asked.textContent = k.occurrences === 1 ? "once" : `${k.occurrences} times`;
-    asked.title = `First ${dateTime(k.created_at)}, last ${dateTime(k.last_seen_at)}`;
+    asked.textContent = k.occurrences === 1 ? t("js.once", "once") : t("js.times", "{occurrences} times", { occurrences: k.occurrences });
+    asked.title = t("js.first_last", "First {created_at}, last {last_seen_at}", { created_at: dateTime(k.created_at), last_seen_at: dateTime(k.last_seen_at) });
 
     const due = document.createElement("td");
     if (k.status === "open") {
-      due.textContent = k.overdue ? `Overdue, ${relativeTime(k.due_at)}` : relativeTime(k.due_at);
+      due.textContent = k.overdue ? t("js.overdue_3", "Overdue, {due_at}", { due_at: relativeTime(k.due_at) }) : relativeTime(k.due_at);
       due.className = k.overdue ? "due-overdue" : "";
     } else {
-      due.textContent = k.outcome_label;
+      due.textContent = coded("outcome", k.outcome, k.outcome_label);
     }
 
     const who = document.createElement("td");
-    who.textContent = k.assigned_to_name || "Unassigned";
+    who.textContent = k.assigned_to_name || t("js.unassigned", "Unassigned");
     if (!k.assigned_to_name) who.className = "muted";
 
     const actionsCell = document.createElement("td");
     const actions = document.createElement("div");
     actions.className = "document-actions";
-    actions.appendChild(button(k.status === "open" ? "Review" : "View", k.status === "open" ? "btn-primary" : "btn-ghost", false, () => openCase(k.id)));
+    actions.appendChild(button(k.status === "open" ? t("js.review", "Review") : t("js.view", "View"), k.status === "open" ? "btn-primary" : "btn-ghost", false, () => openCase(k.id)));
     actionsCell.appendChild(actions);
 
-    labelCells([q, type, asked, due, who, actionsCell], ["", "Type", "Asked", k.status === "open" ? "Due" : "Outcome", "Assigned", ""]);
+    labelCells([q, type, asked, due, who, actionsCell], ["", t("js.type", "Type"), t("js.asked", "Asked"), k.status === "open" ? t("js.due", "Due") : t("js.outcome", "Outcome"), t("js.assigned", "Assigned"), ""]);
     tr.append(q, type, asked, due, who, actionsCell);
     rows.appendChild(tr);
   });
@@ -2399,20 +2448,20 @@ async function openCase(id) {
 }
 
 function renderCase(k) {
-  $("case-dialog-title").textContent = `${KIND_LABELS[k.kind] || "Case"} #${k.id}`;
+  $("case-dialog-title").textContent = `${KIND_LABELS()[k.kind] || t("js.case_2", "Case")} #${k.id}`;
   $("case-query").textContent = k.query;
   const meta = [
-    k.kind === "flagged" ? `Flagged${k.flagged_by_name ? ` by ${k.flagged_by_name}` : ""}: ${k.reason}` : `Refused: ${k.reason}`,
-    `Asked ${k.occurrences === 1 ? "once" : `${k.occurrences} times`}, first ${dateTime(k.created_at)}`,
-    k.status === "open" ? `Due ${relativeTime(k.due_at)}${k.escalated ? ", escalated" : ""}` : "",
-    `Audit record ${k.last_audit_id}`,
+    k.kind === "flagged" ? t("js.flagged_2", "Flagged{flagged_by_name}: {reason}", { flagged_by_name: k.flagged_by_name ? t("js.by", " by {flagged_by_name}", { flagged_by_name: k.flagged_by_name }) : "", reason: k.reason }) : t("js.refused_2", "Refused: {reason}", { reason: k.reason }),
+    t("js.asked_first", "Asked {occurrences}, first {created_at}", { occurrences: k.occurrences === 1 ? t("js.once", "once") : t("js.times", "{occurrences} times", { occurrences: k.occurrences }), created_at: dateTime(k.created_at) }),
+    k.status === "open" ? t("js.due_2", "Due {due_at}{escalated}", { due_at: relativeTime(k.due_at), escalated: k.escalated ? t("js.escalated", ", escalated") : "" }) : "",
+    t("js.audit_record", "Audit record {last_audit_id}", { last_audit_id: k.last_audit_id }),
   ].filter(Boolean).map((part) => part.replace(/[.\s]+$/, ""));
   $("case-meta").textContent = meta.join(". ") + ".";
 
   $("case-answer-section").hidden = !k.answer_text;
   $("case-answer").textContent = k.answer_text || "";
   $("case-sources").textContent = (k.sources || []).length
-    ? `Sources retrieved: ${k.sources.map((x) => x.id).join(", ")}.` : "";
+    ? t("js.sources_retrieved", "Sources retrieved: {sources}.", { sources: k.sources.map((x) => x.id).join(", ") }) : "";
 
   const open = k.status === "open";
   $("case-work").hidden = !open;
@@ -2420,17 +2469,17 @@ function renderCase(k) {
   if (open) {
     const select = $("case-assignee");
     select.textContent = "";
-    const none = new Option("Unassigned", "");
+    const none = new Option(t("js.unassigned", "Unassigned"), "");
     select.appendChild(none);
     (review.data?.reviewers || []).forEach((r) => select.appendChild(new Option(r.name, r.id)));
     if (review.data?.me && !(review.data.reviewers || []).some((r) => r.id === review.data.me)) {
-      select.appendChild(new Option("Me", review.data.me));
+      select.appendChild(new Option(t("js.me", "Me"), review.data.me));
     }
     select.value = k.assigned_to ?? "";
     const outcome = $("case-outcome");
     if (!outcome.options.length) {
-      outcome.appendChild(new Option("Choose…", ""));
-      Object.entries(review.data?.outcomes || {}).forEach(([key, label]) => outcome.appendChild(new Option(label, key)));
+      outcome.appendChild(new Option(t("js.choose", "Choose…"), ""));
+      Object.entries(review.data?.outcomes || {}).forEach(([key, label]) => outcome.appendChild(new Option(coded("outcome", key, label), key)));
     }
     outcome.value = "";
     $("case-expected").value = k.kind === "refusal" ? "refuse" : "";
@@ -2438,7 +2487,7 @@ function renderCase(k) {
     $("case-note").value = "";
     $("case-comment").value = "";
   } else {
-    $("case-outcome-text").textContent = `Resolved${k.resolved_by_name ? ` by ${k.resolved_by_name}` : ""} ${dateTime(k.resolved_at)}: ${k.outcome_label}.${k.outcome_note ? ` ${k.outcome_note}` : ""}`;
+    $("case-outcome-text").textContent = t("js.resolved_2", "Resolved{resolved_by_name} {resolved_at}: {outcome_label}.{outcome_note}", { resolved_by_name: k.resolved_by_name ? t("js.by_2", " by {resolved_by_name}", { resolved_by_name: k.resolved_by_name }) : "", resolved_at: dateTime(k.resolved_at), outcome_label: coded("outcome", k.outcome, k.outcome_label), outcome_note: k.outcome_note ? ` ${k.outcome_note}` : "" });
     $("case-reopen-note").value = "";
   }
 
@@ -2449,7 +2498,7 @@ function renderCase(k) {
     const head = document.createElement("div");
     head.className = "timeline-head";
     const action = document.createElement("strong");
-    action.textContent = capitalize(e.action);
+    action.textContent = coded("case_event", e.action, capitalize(e.action));
     const when = document.createElement("span");
     when.className = "muted";
     when.textContent = `${e.user ? `${e.user}, ` : ""}${dateTime(e.at)}`;
@@ -2489,7 +2538,7 @@ async function loadHazards() {
     const pill = document.createElement("span");
     pill.className = `risk-pill risk-${r.level.replace(" ", "-")}`;
     pill.textContent = `${r.score} ${r.level}`;
-    pill.title = `Severity ${s} (${SEVERITY[s]}) × likelihood ${l} (${LIKELIHOOD[l]})`;
+    pill.title = t("js.severity_likelihood", "Severity {s} ({s2}) × likelihood {l} ({l2})", { s, s2: SEVERITY()[s], l, l2: LIKELIHOOD()[l] });
     td.appendChild(pill);
     return td;
   };
@@ -2504,20 +2553,20 @@ async function loadHazards() {
     name.textContent = h.title;
     const controls = document.createElement("div");
     controls.className = "user-email";
-    controls.textContent = h.controls ? `Controls: ${h.controls}` : "No controls recorded";
+    controls.textContent = h.controls ? t("js.controls", "Controls: {controls}", { controls: h.controls }) : t("js.no_controls_recorded", "No controls recorded");
     title.append(name, controls);
     const status = document.createElement("td");
-    status.textContent = capitalize(h.status);
+    status.textContent = coded("hazard_status", h.status, capitalize(h.status));
     const owner = document.createElement("td");
     owner.textContent = h.owner;
     const actionsCell = document.createElement("td");
     const actions = document.createElement("div");
     actions.className = "document-actions";
-    actions.appendChild(button(canEditHazards() ? "Edit" : "View", "btn-ghost", false, () => openHazard(h)));
+    actions.appendChild(button(canEditHazards() ? t("js.edit", "Edit") : t("js.view", "View"), "btn-ghost", false, () => openHazard(h)));
     actionsCell.appendChild(actions);
     const cells = [id, title, riskCell(h.initial_risk, h.severity, h.likelihood),
       riskCell(h.residual_risk, h.residual_severity, h.residual_likelihood), status, owner, actionsCell];
-    labelCells(cells, ["ID", "", "Before controls", "After controls", "Status", "Owner", ""]);
+    labelCells(cells, [t("js.id", "ID"), "", t("js.before_controls", "Before controls"), t("js.after_controls", "After controls"), t("js.status", "Status"), t("js.owner_2", "Owner"), ""]);
     tr.append(...cells);
     rows.appendChild(tr);
   });
@@ -2525,8 +2574,8 @@ async function loadHazards() {
 
 function riskLabel(s, l) {
   const score = s * l;
-  const level = score <= 4 ? "low" : score <= 9 ? "medium" : score <= 16 ? "high" : "very high";
-  return `Risk ${score}, ${level}`;
+  const level = score <= 4 ? t("js.level_low", "low") : score <= 9 ? t("js.level_medium", "medium") : score <= 16 ? t("js.level_high", "high") : t("js.very_high_2", "very high");
+  return t("js.risk", "Risk {score}, {level}", { score, level });
 }
 
 function updateHazardRisk() {
@@ -2536,7 +2585,7 @@ function updateHazardRisk() {
 
 function openHazard(h) {
   review.hazardId = h ? h.id : null;
-  $("hazard-dialog-title").textContent = h ? `Hazard H${h.id}` : "Add hazard";
+  $("hazard-dialog-title").textContent = h ? t("js.hazard_h", "Hazard H{id}", { id: h.id }) : t("js.add_hazard", "Add hazard");
   $("hazard-title").value = h?.title || "";
   $("hazard-cause").value = h?.cause || "";
   $("hazard-effect").value = h?.effect || "";
@@ -2545,7 +2594,7 @@ function openHazard(h) {
   $("hazard-likelihood").value = h?.likelihood || 3;
   $("hazard-residual-severity").value = h?.residual_severity || 3;
   $("hazard-residual-likelihood").value = h?.residual_likelihood || 2;
-  $("hazard-status").value = h?.status || "open";
+  $("hazard-status").value = h?.status || t("js.open_3", "open");
   $("hazard-owner").value = h?.owner || "";
   updateHazardRisk();
   const editable = canEditHazards();
@@ -2575,7 +2624,7 @@ async function loadControls() {
     tile.append(l, v);
     totals.appendChild(tile);
   });
-  if (data.problems.length) showMessage("review-message", `The mapping has ${plural(data.problems.length, "problem")}: ${data.problems[0]}`, true);
+  if (data.problems.length) showMessage("review-message", t("js.the_mapping_has", "The mapping has {problems}: {problems2}", { problems: plural(data.problems.length, "problem"), problems2: data.problems[0] }), true);
   renderControls(data);
 }
 
@@ -2595,14 +2644,14 @@ function renderControls(data) {
     table.className = "users-table controls-table";
     const head = document.createElement("thead");
     const hr = document.createElement("tr");
-    ["Control", "Title", "Status", "How the product helps", "Evidence"].forEach((t) => {
-      const th = document.createElement("th"); th.scope = "col"; th.textContent = t; hr.appendChild(th);
+    [t("js.control", "Control"), t("js.title", "Title"), t("js.status", "Status"), t("js.how_the_product_helps", "How the product helps"), t("js.evidence", "Evidence")].forEach((tt) => {
+      const th = document.createElement("th"); th.scope = "col"; th.textContent = tt; hr.appendChild(th);
     });
     head.appendChild(hr);
     const body = document.createElement("tbody");
     rows.forEach((c) => {
       const tr = document.createElement("tr");
-      const cells = [c.id, c.title, c.status_label, c.how, c.evidence.length ? c.evidence.join(", ") : "none"];
+      const cells = [c.id, c.title, coded("control_status", c.status, c.status_label), c.how, c.evidence.length ? c.evidence.join(", ") : t("js.none_lower", "none")];
       cells.forEach((text, i) => {
         const td = document.createElement("td");
         td.textContent = text;
@@ -2628,12 +2677,12 @@ async function loadReport() {
   const q = r.questions, rv = r.reviews;
   const pct = (n) => n === null ? "–" : `${Math.round(n * 100)}%`;
   const tiles = [
-    ["Questions", q.total.toLocaleString(), `${q.answered.toLocaleString()} answered`],
-    ["Refusal rate", pct(q.refusal_rate), `${q.refused.toLocaleString()} refused`],
-    ["Review cases", rv.opened.toLocaleString(), plural(rv.flagged_answers, "flagged answer")],
-    ["Resolved on time", rv.resolved ? `${rv.resolved_on_time} of ${rv.resolved}` : "–", rv.median_hours_to_resolve === null ? "none resolved" : rv.median_hours_to_resolve < 1 ? "median under an hour" : `median ${rv.median_hours_to_resolve} hours`],
-    ["Open now", rv.open_now.toLocaleString(), `${rv.overdue_now} overdue`],
-    ["Checks switched off", q.with_a_check_switched_off.toLocaleString(), "questions asked with a check off"],
+    [t("js.questions", "Questions"), q.total.toLocaleString(), t("js.answered", "{answered} answered", { answered: q.answered.toLocaleString() })],
+    [t("js.refusal_rate", "Refusal rate"), pct(q.refusal_rate), t("js.refused_3", "{refused} refused", { refused: q.refused.toLocaleString() })],
+    [t("js.review_cases", "Review cases"), rv.opened.toLocaleString(), plural(rv.flagged_answers, "flagged answer")],
+    [t("js.resolved_on_time", "Resolved on time"), rv.resolved ? t("js.of_2", "{resolved_on_time} of {resolved}", { resolved_on_time: rv.resolved_on_time, resolved: rv.resolved }) : "–", rv.median_hours_to_resolve === null ? t("js.none_resolved", "none resolved") : rv.median_hours_to_resolve < 1 ? t("js.median_under_an_hour", "median under an hour") : t("js.median_hours", "median {median_hours_to_resolve} hours", { median_hours_to_resolve: rv.median_hours_to_resolve })],
+    [t("js.open_now", "Open now"), rv.open_now.toLocaleString(), t("js.overdue_4", "{overdue_now} overdue", { overdue_now: rv.overdue_now })],
+    [t("js.checks_switched_off", "Checks switched off"), q.with_a_check_switched_off.toLocaleString(), t("js.questions_asked_with_a_check", "questions asked with a check off")],
   ];
   const grid = $("report-grid");
   grid.textContent = "";
@@ -2652,14 +2701,14 @@ async function loadReport() {
   const entries = Object.entries(q.refusal_reasons);
   if (entries.length) {
     const h = document.createElement("h3");
-    h.textContent = "Why questions were refused";
+    h.textContent = t("js.why_questions_were_refused", "Why questions were refused");
     reasons.appendChild(h);
     const max = Math.max(...entries.map(([, n]) => n));
     entries.forEach(([reason, n]) => {
       const row = document.createElement("div");
       row.className = "reason-row";
       const label = document.createElement("span");
-      label.textContent = capitalize(reason);
+      label.textContent = coded("refusal_category", reason, capitalize(reason));
       const track = document.createElement("span");
       track.className = "reason-track";
       const bar = document.createElement("span");
@@ -2689,7 +2738,7 @@ function renderReviewTestCases(cases) {
     q.textContent = c.query;
     const r = document.createElement("span");
     r.className = "eval-r mono";
-    r.textContent = c.got ? `expect ${c.expect} / got ${c.got}` : `expect ${c.expect}`;
+    r.textContent = c.got ? t("js.expect_got", "expect {expect} / got {got}", { expect: c.expect, got: c.got }) : t("js.expect", "expect {expect}", { expect: c.expect });
     li.append(glyph, q, r);
     list.appendChild(li);
   });
@@ -2699,8 +2748,8 @@ async function loadReviewTests() {
   try {
     const data = await api("/api/review-tests");
     $("review-tests-summary").textContent = data.cases.length
-      ? `${data.cases.length} question${data.cases.length === 1 ? "" : "s"} added from resolved cases.`
-      : "None yet. Resolve a case as “Added as a permanent test question” to add one.";
+      ? t("js.question_added_from_resolved_cases", "{cases} question{s} added from resolved cases.", { cases: data.cases.length, s: data.cases.length === 1 ? "" : "s" })
+      : t("js.none_yet_resolve_a_case", "None yet. Resolve a case as “Added as a permanent test question” to add one.");
     $("review-tests-run").hidden = !data.cases.length;
     renderReviewTestCases(data.cases);
   } catch (_) { /* shown by the report */ }
@@ -2710,19 +2759,19 @@ async function verifyAudit() {
   const trigger = $("audit-verify");
   const out = $("verify-result");
   trigger.disabled = true;
-  trigger.textContent = "Verifying…";
+  trigger.textContent = t("js.verifying", "Verifying…");
   try {
     const r = await api("/api/audit/verify", { method: "POST" });
     out.hidden = false;
     out.className = `verify-result ${r.ok ? "ok" : "bad"}`;
     out.textContent = "";
     const head = document.createElement("strong");
-    head.textContent = !r.complete ? "Couldn’t check the whole audit trail"
-      : r.ok ? "Intact" : `${plural(r.problem_count, "problem")} found`;
+    head.textContent = !r.complete ? t("js.couldn_t_check_the_whole", "Couldn’t check the whole audit trail")
+      : r.ok ? t("js.intact", "Intact") : t("js.found", "{problem_count} found", { problem_count: plural(r.problem_count, "problem") });
     const detail = document.createElement("p");
-    detail.textContent = `${plural(r.checked, "record")} checked${r.anchor_seq ? ` from number ${r.anchor_seq + 1}` : ""}, `
-      + `${r.signed ? "signed with a key held outside the database" : "not signed with a key"}. `
-      + `Chain head ${r.head.seq}: ${r.head.hash.slice(0, 16)}…`;
+    detail.textContent = t("js.checked", "{checked} checked{anchor_seq}, ", { checked: plural(r.checked, "record"), anchor_seq: r.anchor_seq ? t("js.from_number", " from number {anchor_seq}", { anchor_seq: r.anchor_seq + 1 }) : "" })
+      + `${r.signed ? t("js.signed_with_a_key_held", "signed with a key held outside the database") : t("js.not_signed_with_a_key", "not signed with a key")}. `
+      + t("js.chain_head", "Chain head {seq}: {hash}…", { seq: r.head.seq, hash: r.head.hash.slice(0, 16) });
     out.append(head, detail);
     if (r.error) {
       const e = document.createElement("p");
@@ -2733,31 +2782,31 @@ async function verifyAudit() {
       const list = document.createElement("ul");
       r.problems.forEach((p) => {
         const li = document.createElement("li");
-        li.textContent = `Record ${p.seq}${p.audit_id ? ` (${p.audit_id})` : ""}: ${p.problem}`;
+        li.textContent = t("js.record", "Record {seq}{audit_id}: {problem}", { seq: p.seq, audit_id: p.audit_id ? ` (${p.audit_id})` : "", problem: p.problem });
         list.appendChild(li);
       });
       out.appendChild(list);
     }
   } catch (err) { showMessage("protection-message", err.message, true); }
   trigger.disabled = false;
-  trigger.textContent = "Verify audit trail";
+  trigger.textContent = t("js.verify_audit_trail", "Verify audit trail");
 }
 
 async function loadTelemetry() {
-  let t;
-  try { t = await api("/api/telemetry"); }
+  let tt;
+  try { tt = await api("/api/telemetry"); }
   catch (_) { return; }
-  $("telemetry-summary").textContent = t.enabled
-    ? `On. Once a week this install sends the fields below to ${t.url || "no address (TELEMETRY_URL is not set, so nothing is sent)"}. Nothing else is sent.`
-    : `Off. Nothing is sent. ${t.how_to_enable} If you turn it on, once a week it sends only the fields below.`;
+  $("telemetry-summary").textContent = tt.enabled
+    ? t("js.on_once_a_week_this", "On. Once a week this install sends the fields below to {url}. Nothing else is sent.", { url: tt.url || t("js.no_address_telemetry_url_is", "no address (TELEMETRY_URL is not set, so nothing is sent)") })
+    : t("js.off_nothing_is_sent_if", "Off. Nothing is sent. {how_to_enable} If you turn it on, once a week it sends only the fields below.", { how_to_enable: tt.how_to_enable });
   const list = $("telemetry-fields");
   list.textContent = "";
-  Object.entries(t.fields).forEach(([name, meaning]) => {
+  Object.entries(tt.fields).forEach(([name, meaning]) => {
     const dt = document.createElement("dt"); dt.className = "mono"; dt.textContent = name;
     const dd = document.createElement("dd"); dd.textContent = meaning;
     list.append(dt, dd);
   });
-  $("telemetry-sample").textContent = `Example of what would be sent: ${JSON.stringify(t.sample)}`;
+  $("telemetry-sample").textContent = t("js.example_of_what_would_be", "Example of what would be sent: {stringify}", { stringify: JSON.stringify(tt.sample) });
 }
 
 async function loadProtection() {
@@ -2768,18 +2817,19 @@ async function loadProtection() {
   loadTelemetry();
   const e = data.encryption, sig = data.audit_signing, ret = data.retention;
   const rows = [
-    ["Encryption at rest", e.enabled
-      ? `On, AES-256-GCM with key ${e.primary_key_id}${e.decrypt_key_ids.length ? `. Older keys still readable: ${e.decrypt_key_ids.join(", ")}` : ""}`
-      : "Off. Set DATA_ENCRYPTION_KEYS to encrypt questions, answers and review notes."],
-    ["Audit signing", sig.enabled ? `On, HMAC-SHA256 with key ${sig.primary_key_id}` : "Off. Set AUDIT_SIGNING_KEYS so the chain can't be rewritten from inside the database."],
-    ["Audit chain head", `${data.audit_chain.seq.toLocaleString()} records written. Last hash ${data.audit_chain.hash.slice(0, 16)}…`],
+    [t("js.encryption_at_rest", "Encryption at rest"), e.enabled
+      ? t("js.on_aes_256_gcm_with", "On, AES-256-GCM with key {primary_key_id}{decrypt_key_ids}", { primary_key_id: e.primary_key_id, decrypt_key_ids: e.decrypt_key_ids.length ? t("js.older_keys_still_readable", ". Older keys still readable: {decrypt_key_ids}", { decrypt_key_ids: e.decrypt_key_ids.join(", ") }) : "" })
+      : t("js.off_set_data_encryption_keys", "Off. Set DATA_ENCRYPTION_KEYS to encrypt questions, answers and review notes.")],
+    [t("js.audit_signing", "Audit signing"), sig.enabled ? t("js.on_hmac_sha256_with_key", "On, HMAC-SHA256 with key {primary_key_id}", { primary_key_id: sig.primary_key_id }) : t("js.off_set_audit_signing_keys", "Off. Set AUDIT_SIGNING_KEYS so the chain can't be rewritten from inside the database.")],
+    [t("js.audit_chain_head", "Audit chain head"), t("js.records_written_last_hash", "{seq} records written. Last hash {hash}…", { seq: data.audit_chain.seq.toLocaleString(), hash: data.audit_chain.hash.slice(0, 16) })],
   ];
   const list = $("protection-list");
   list.textContent = "";
-  rows.forEach(([term, value]) => {
+  const offRows = [!e.enabled, !sig.enabled, false];
+  rows.forEach(([term, value], i) => {
     const dt = document.createElement("dt"); dt.textContent = term;
     const dd = document.createElement("dd"); dd.textContent = value;
-    if (value.startsWith("Off")) dd.className = "muted";
+    if (offRows[i]) dd.className = "muted";
     list.append(dt, dd);
   });
   renderRetention(ret);
@@ -2787,22 +2837,22 @@ async function loadProtection() {
 
 function renderRetention(ret) {
   const periods = [
-    ret.audit_retention_days ? `audit records for ${plural(ret.audit_retention_days, "day")}` : "audit records for ever",
-    ret.review_retention_days ? `resolved reviews for ${plural(ret.review_retention_days, "day")}` : "resolved reviews for ever",
+    ret.audit_retention_days ? t("js.audit_records_for", "audit records for {audit_retention_days}", { audit_retention_days: plural(ret.audit_retention_days, "day") }) : t("js.audit_records_for_ever", "audit records for ever"),
+    ret.review_retention_days ? t("js.resolved_reviews_for", "resolved reviews for {review_retention_days}", { review_retention_days: plural(ret.review_retention_days, "day") }) : t("js.resolved_reviews_for_ever", "resolved reviews for ever"),
   ];
   const due = ret.audit_records_to_delete + ret.review_cases_to_delete;
-  const last = ret.last_run ? ` Last run ${dateTime(ret.last_run.ran_at)}: ${plural(ret.last_run.audit_deleted, "audit record")} and ${plural(ret.last_run.reviews_deleted, "review")} deleted.` : "";
-  $("retention-summary").textContent = `Keeping ${periods.join(" and ")}. `
-    + (due ? `${plural(ret.audit_records_to_delete, "audit record")} and ${plural(ret.review_cases_to_delete, "resolved review")} are past their period.` : "Nothing is past its retention period.")
+  const last = ret.last_run ? t("js.last_run_and_deleted", " Last run {ran_at}: {audit_deleted} and {reviews_deleted} deleted.", { ran_at: dateTime(ret.last_run.ran_at), audit_deleted: plural(ret.last_run.audit_deleted, "audit record"), reviews_deleted: plural(ret.last_run.reviews_deleted, "review") }) : "";
+  $("retention-summary").textContent = t("js.keeping", "Keeping {periods}. ", { periods: periods.join(t("js.and", " and ")) })
+    + (due ? t("js.and_are_past_their_period", "{audit_records_to_delete} and {review_cases_to_delete} are past their period.", { audit_records_to_delete: plural(ret.audit_records_to_delete, "audit record"), review_cases_to_delete: plural(ret.review_cases_to_delete, "resolved review") }) : t("js.nothing_is_past_its_retention", "Nothing is past its retention period."))
     + last;
   $("retention-run").disabled = due === 0;
 }
 
 async function runRetention() {
-  if (!window.confirm("Permanently delete every record past its retention period? This can’t be undone.")) return;
+  if (!window.confirm(t("js.permanently_delete_every_record_past", "Permanently delete every record past its retention period? This can’t be undone."))) return;
   try {
     const data = await api("/api/retention/run", { method: "POST" });
-    showMessage("protection-message", `Deleted ${plural(data.run.audit_deleted, "audit record")} and ${plural(data.run.reviews_deleted, "review case")}.`);
+    showMessage("protection-message", t("js.deleted_and", "Deleted {audit_deleted} and {reviews_deleted}.", { audit_deleted: plural(data.run.audit_deleted, "audit record"), reviews_deleted: plural(data.run.reviews_deleted, "review case") }));
     renderRetention(data.retention);
   } catch (err) { showMessage("protection-message", err.message, true); }
 }
@@ -2834,8 +2884,8 @@ async function sendFeedback(body) {
   setRated(sent.feedback.rating);
   $("feedback-form").hidden = true;
   showMessage("feedback-message", sent.feedback.case_id
-    ? "Thank you. This answer has been sent to a reviewer."
-    : "Thank you. Your feedback was saved.");
+    ? t("js.thank_you_this_answer_has", "Thank you. This answer has been sent to a reviewer.")
+    : t("js.thank_you_your_feedback_was", "Thank you. Your feedback was saved."));
   if (sent.feedback.case_id) refreshReviewCount();
 }
 
@@ -2891,11 +2941,11 @@ function wireReview() {
 
   $("case-assign").addEventListener("click", () => {
     const value = $("case-assignee").value;
-    caseAction("assign", { user_id: value ? Number(value) : null }, null, value ? "Assigned." : "Unassigned.");
+    caseAction("assign", { user_id: value ? Number(value) : null }, null, value ? t("js.assigned_2", "Assigned.") : t("js.unassigned_2", "Unassigned."));
   });
   $("case-comment-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    caseAction("comment", { note: $("case-comment").value }, e.currentTarget, "Comment added.");
+    caseAction("comment", { note: $("case-comment").value }, e.currentTarget, t("js.comment_added", "Comment added."));
   });
   $("case-outcome").addEventListener("change", () => {
     $("case-expected-field").hidden = $("case-outcome").value !== "add_test";
@@ -2906,15 +2956,15 @@ function wireReview() {
     caseAction("resolve", {
       outcome, note: $("case-note").value,
       expected_decision: outcome === "add_test" ? ($("case-expected").value || null) : null,
-    }, e.currentTarget, outcome === "add_test" ? "Resolved. The question is now a permanent test." : "Resolved.");
+    }, e.currentTarget, outcome === "add_test" ? t("js.resolved_the_question_is_now", "Resolved. The question is now a permanent test.") : t("js.resolved_3", "Resolved."));
   });
   $("case-reopen-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    caseAction("reopen", { note: $("case-reopen-note").value }, e.currentTarget, "Reopened.");
+    caseAction("reopen", { note: $("case-reopen-note").value }, e.currentTarget, t("js.reopened", "Reopened."));
   });
 
   document.querySelectorAll("#hazard-form select[data-scale]").forEach((select) => {
-    const labels = select.dataset.scale === "severity" ? SEVERITY : LIKELIHOOD;
+    const labels = select.dataset.scale === "severity" ? SEVERITY() : LIKELIHOOD();
     for (let n = 1; n <= 5; n++) select.appendChild(new Option(`${n}  ${labels[n]}`, n));
     select.addEventListener("change", updateHazardRisk);
   });
@@ -2934,7 +2984,7 @@ function wireReview() {
       const path = review.hazardId ? `/api/hazards/${review.hazardId}` : "/api/hazards";
       await api(path, { method: review.hazardId ? "PUT" : "POST", body });
       $("hazard-dialog").close();
-      showMessage("review-message", review.hazardId ? "Hazard updated." : "Hazard added.");
+      showMessage("review-message", review.hazardId ? t("js.hazard_updated", "Hazard updated.") : t("js.hazard_added", "Hazard added."));
       loadHazards();
     } catch (err) { showMessage("hazard-message", err.message, true); }
     formBusy(form, false);
@@ -2943,15 +2993,15 @@ function wireReview() {
   $("review-tests-run").addEventListener("click", async (e) => {
     const trigger = e.currentTarget;
     trigger.disabled = true;
-    trigger.textContent = "Running…";
+    trigger.textContent = t("js.running", "Running…");
     try {
       const r = await api("/api/review-tests/run", { method: "POST" });
-      $("review-tests-summary").textContent = `${r.passed} of ${r.total} behaved as intended, ${r.unsafe_answers} unsafe answers.`;
+      $("review-tests-summary").textContent = t("js.of_behaved_as_intended_unsafe_2", "{passed} of {total} behaved as intended, {unsafe_answers} unsafe answers.", { passed: r.passed, total: r.total, unsafe_answers: r.unsafe_answers });
       $("review-tests-summary").classList.toggle("bad", r.passed < r.total);
       renderReviewTestCases(r.cases);
     } catch (err) { showMessage("review-message", err.message, true); }
     trigger.disabled = false;
-    trigger.textContent = "Run tests";
+    trigger.textContent = t("js.run_tests", "Run tests");
   });
 
   $("audit-verify").addEventListener("click", verifyAudit);
@@ -2972,7 +3022,7 @@ function wireReview() {
     try {
       await api(`/api/audit/${$("flag-row").dataset.auditId}/flag`, { method: "POST", body: { note: $("flag-note").value } });
       form.hidden = true;
-      showMessage("flag-message", "Sent for review. A reviewer will check this answer.");
+      showMessage("flag-message", t("js.sent_for_review_a_reviewer", "Sent for review. A reviewer will check this answer."));
       refreshReviewCount();
     } catch (err) { showMessage("flag-message", err.message, true); }
     formBusy(form, false);
@@ -3030,7 +3080,7 @@ function renderDailyChart(container, daily) {
   if (!total) {
     const empty = document.createElement("div");
     empty.className = "chart-empty";
-    empty.textContent = "No questions in this period yet. Ask one and it appears here.";
+    empty.textContent = t("js.no_questions_in_this_period", "No questions in this period yet. Ask one and it appears here.");
     container.appendChild(empty);
     return;
   }
@@ -3045,15 +3095,15 @@ function renderDailyChart(container, daily) {
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", `Questions per day: ${total} in ${daily.length} days`);
+  svg.setAttribute("aria-label", t("js.questions_per_day_in_days", "Questions per day: {total} in {daily} days", { total, daily: daily.length }));
   const el = (name, attrs) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
 
   for (let i = 0; i <= 4; i++) {
     const v = (top / 4) * i;
     svg.appendChild(el("line", { class: "grid-line", x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v) }));
-    const t = el("text", { class: "axis-label", x: pad.left - 6, y: y(v) + 4, "text-anchor": "end" });
-    t.textContent = Number.isInteger(v) ? v : v.toFixed(1);
-    svg.appendChild(t);
+    const tt = el("text", { class: "axis-label", x: pad.left - 6, y: y(v) + 4, "text-anchor": "end" });
+    tt.textContent = Number.isInteger(v) ? v : v.toFixed(1);
+    svg.appendChild(tt);
   }
   // Date labels at a regular interval, always including today. A regular
   // label too close to today's is dropped so they never overlap.
@@ -3079,9 +3129,9 @@ function renderDailyChart(container, daily) {
     svg.appendChild(g);
     const date = new Date(`${d.date}T00:00:00`);
     if (labelled.has(i)) {
-      const t = el("text", { class: "axis-label", x: cx, y: height - 6, "text-anchor": "middle" });
-      t.textContent = date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-      svg.appendChild(t);
+      const tt = el("text", { class: "axis-label", x: cx, y: height - 6, "text-anchor": "middle" });
+      tt.textContent = date.toLocaleDateString(uiLocale(), { day: "numeric", month: "short" });
+      svg.appendChild(tt);
     }
     const hit = el("rect", { class: "bar-hit", x: pad.left + slot * i, y: pad.top, width: slot, height: innerH });
     hit.addEventListener("mouseenter", () => {
@@ -3089,8 +3139,8 @@ function renderDailyChart(container, daily) {
       tooltip.hidden = false;
       tooltip.innerHTML = "";
       const strong = document.createElement("strong");
-      strong.textContent = date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-      tooltip.append(strong, `${d.answered} answered, ${d.refused} refused`);
+      strong.textContent = date.toLocaleDateString(uiLocale(), { weekday: "short", day: "numeric", month: "short" });
+      tooltip.append(strong, t("js.answered_refused", "{answered} answered, {refused} refused", { answered: d.answered, refused: d.refused }));
       tooltip.style.left = `${(cx / width) * 100}%`;
       tooltip.style.top = `${(y(d.answered + d.refused) / height) * 100}%`;
     });
@@ -3105,24 +3155,24 @@ async function loadUsage() {
   try { data = await api(`/api/usage?days=${$("usage-days").value}`); }
   catch (err) { showMessage("usage-message", err.message, true); return; }
   $("usage-message").hidden = true;
-  const t = data.totals;
+  const tt = data.totals;
   const stats = $("usage-stats");
   stats.textContent = "";
-  const pct = t.refusal_rate === null ? "–" : `${Math.round(t.refusal_rate * 100)}%`;
+  const pct = tt.refusal_rate === null ? "–" : `${Math.round(tt.refusal_rate * 100)}%`;
   stats.append(
-    statTile("Questions", t.questions.toLocaleString(), `${t.answered.toLocaleString()} answered`),
-    statTile("Refused", pct, `${plural(t.refused, "question")}`),
-    statTile("Median response", formatMs(t.median_ms), t.p95_ms === null ? "" : `95% within ${formatMs(t.p95_ms)}`),
-    draftedTile(data.drafted_by, t.questions),
-    statTile("Identifiers removed", t.deidentified.toLocaleString(), "questions with names, dates or numbers"),
-    statTile("Open reviews", t.open_reviews.toLocaleString(), t.overdue_reviews ? `${t.overdue_reviews} overdue` : "none overdue", { attention: t.overdue_reviews > 0 }),
+    statTile(t("js.questions", "Questions"), tt.questions.toLocaleString(), t("js.answered", "{answered} answered", { answered: tt.answered.toLocaleString() })),
+    statTile(t("js.refused_4", "Refused"), pct, `${plural(tt.refused, "question")}`),
+    statTile(t("js.median_response", "Median response"), formatMs(tt.median_ms), tt.p95_ms === null ? "" : t("js.95_within", "95% within {p95_ms}", { p95_ms: formatMs(tt.p95_ms) })),
+    draftedTile(data.drafted_by, tt.questions),
+    statTile(t("js.identifiers_removed", "Identifiers removed"), tt.deidentified.toLocaleString(), t("js.questions_with_names_dates_or", "questions with names, dates or numbers")),
+    statTile(t("js.open_reviews", "Open reviews"), tt.open_reviews.toLocaleString(), tt.overdue_reviews ? t("js.overdue_5", "{overdue_reviews} overdue", { overdue_reviews: tt.overdue_reviews }) : t("js.none_overdue", "none overdue"), { attention: tt.overdue_reviews > 0 }),
   );
   usageState.daily = data.daily;
   renderDailyChart($("usage-chart"), data.daily);
-  renderBars($("usage-reasons"), Object.entries(data.refusal_reasons).map(([k, v]) => ({ label: capitalize(k), value: v })), "No refusals in this period.");
-  renderBars($("usage-sources"), data.top_sources.map((x) => ({ label: `${x.title} (${x.id})`, value: x.citations })), "No answers cited a source in this period.");
+  renderBars($("usage-reasons"), Object.entries(data.refusal_reasons).map(([k, v]) => ({ label: coded("refusal_category", k, capitalize(k)), value: v })), t("js.no_refusals_in_this_period", "No refusals in this period."));
+  renderBars($("usage-sources"), data.top_sources.map((x) => ({ label: `${x.title} (${x.id})`, value: x.citations })), t("js.no_answers_cited_a_source", "No answers cited a source in this period."));
   $("usage-users-panel").hidden = !account.authRequired;
-  renderBars($("usage-users"), data.by_user.map((x) => ({ label: x.name, value: x.questions })), "No signed-in questions in this period.");
+  renderBars($("usage-users"), data.by_user.map((x) => ({ label: x.name, value: x.questions })), t("js.no_signed_in_questions_in", "No signed-in questions in this period."));
   loadAdoption();
 }
 
@@ -3140,26 +3190,26 @@ async function loadAdoption() {
   const stats = $("adoption-stats");
   stats.textContent = "";
   stats.append(
-    statTile("Active clinicians", c.active_in_period.toLocaleString(), `${c.weekly_active.toLocaleString()} in the last 7 days`),
-    statTile("Questions per clinician", c.questions_per_active_clinician === null ? "–" : String(c.questions_per_active_clinician), "signed-in questions only"),
-    statTile("Answer rate", pct(q.answer_rate), `${q.answered.toLocaleString()} of ${q.total.toLocaleString()} answered`),
-    statTile("Feedback", f.total ? pct(f.positive_rate) : "–", f.total ? `${f.up} useful, ${f.down} not` : "none yet"),
-    statTile("Time to close a review", r.median_hours_to_close === null ? "–" : `${r.median_hours_to_close} h`, `${r.resolved} closed, ${r.open_now} open now`),
-    statTile("Added to the test set", String(m.tests_added), `${plural(m.documents_approved, "document")} approved`),
+    statTile(t("js.active_clinicians", "Active clinicians"), c.active_in_period.toLocaleString(), t("js.in_the_last_7_days", "{weekly_active} in the last 7 days", { weekly_active: c.weekly_active.toLocaleString() })),
+    statTile(t("js.questions_per_clinician", "Questions per clinician"), c.questions_per_active_clinician === null ? "–" : String(c.questions_per_active_clinician), t("js.signed_in_questions_only", "signed-in questions only")),
+    statTile(t("js.answer_rate", "Answer rate"), pct(q.answer_rate), t("js.of_answered", "{answered} of {total} answered", { answered: q.answered.toLocaleString(), total: q.total.toLocaleString() })),
+    statTile(t("js.feedback", "Feedback"), f.total ? pct(f.positive_rate) : "–", f.total ? t("js.useful_not", "{up} useful, {down} not", { up: f.up, down: f.down }) : t("js.none_yet", "none yet")),
+    statTile(t("js.time_to_close_a_review", "Time to close a review"), r.median_hours_to_close === null ? "–" : `${r.median_hours_to_close} h`, t("js.closed_open_now", "{resolved} closed, {open_now} open now", { resolved: r.resolved, open_now: r.open_now })),
+    statTile(t("js.added_to_the_test_set", "Added to the test set"), String(m.tests_added), t("js.approved_2", "{documents_approved} approved", { documents_approved: plural(m.documents_approved, "document") })),
   );
-  renderBars($("adoption-weekly"), c.weekly.map((w) => ({ label: `Week of ${w.week_start}`, value: w.active_clinicians })), "No activity in this period.");
-  renderBars($("adoption-feedback"), Object.entries(f.by_reason).map(([k, v]) => ({ label: capitalize(k.replace("_", " ")), value: v })), "No thumbs down in this period.");
+  renderBars($("adoption-weekly"), c.weekly.map((w) => ({ label: t("js.week_of", "Week of {week_start}", { week_start: w.week_start }), value: w.active_clinicians })), t("js.no_activity_in_this_period", "No activity in this period."));
+  renderBars($("adoption-feedback"), Object.entries(f.by_reason).map(([k, v]) => ({ label: coded("feedback_reason", k, capitalize(k.replace("_", " "))), value: v })), t("js.no_thumbs_down_in_this", "No thumbs down in this period."));
 }
 const usageState = { daily: null };
 
 function draftedTile(drafted, total) {
   const models = drafted["Local model"] + drafted["Cloud model"];
   const note = total ? [
-    drafted["Local model"] && `${drafted["Local model"]} local`,
-    drafted["Cloud model"] && `${drafted["Cloud model"]} cloud`,
-    `${drafted.Extractive} extractive`,
+    drafted["Local model"] && t("js.local", "{drafted} local", { drafted: drafted["Local model"] }),
+    drafted["Cloud model"] && t("js.cloud", "{drafted} cloud", { drafted: drafted["Cloud model"] }),
+    t("js.extractive", "{Extractive} extractive", { Extractive: drafted.Extractive }),
   ].filter(Boolean).join(", ") : "";
-  return statTile("Drafted by a model", total ? `${Math.round((models / total) * 100)}%` : "–", note);
+  return statTile(t("js.drafted_by_a_model", "Drafted by a model"), total ? `${Math.round((models / total) * 100)}%` : "–", note);
 }
 
 // ---------- Embeddings ----------
@@ -3170,25 +3220,25 @@ async function loadEmbeddings() {
   const stats = $("embed-stats");
   stats.textContent = "";
   const idx = data.index || {};
-  const rebuilt = idx.finished_at ? `rebuilt ${dateTime(idx.finished_at)}` : "built when the app started";
+  const rebuilt = idx.finished_at ? t("js.rebuilt", "rebuilt {finished_at}", { finished_at: dateTime(idx.finished_at) }) : t("js.built_when_the_app_started", "built when the app started");
   stats.append(
-    statTile("Passages indexed", data.passages.toLocaleString(), `${data.from_your_documents.toLocaleString()} from your documents`),
-    statTile("Embedding model", data.model.replace(/^sentence-transformers\//, ""), data.model.startsWith("sentence-transformers/") ? "sentence-transformers" : "", { small: true }),
-    statTile("Dimensions", data.dimensions.toLocaleString(), "per passage vector"),
-    statTile("Vector store", data.vector_store === "qdrant" ? "Qdrant" : "Local (NumPy)", data.vector_store === "qdrant" ? "server or embedded" : "exact cosine search", { small: true }),
-    statTile("Keyword vocabulary", data.vocabulary.toLocaleString(), "terms for keyword ranking"),
-    statTile("Index", idx.state === "running" ? "Rebuilding…" : idx.state === "failed" ? "Failed" : "Ready", idx.state === "failed" ? idx.error : rebuilt, { small: true, attention: idx.state === "failed" }),
+    statTile(t("js.passages_indexed", "Passages indexed"), data.passages.toLocaleString(), t("js.from_your_documents", "{from_your_documents} from your documents", { from_your_documents: data.from_your_documents.toLocaleString() })),
+    statTile(t("js.embedding_model", "Embedding model"), data.model.replace(/^sentence-transformers\//, ""), data.model.startsWith("sentence-transformers/") ? "sentence-transformers" : "", { small: true }),
+    statTile(t("js.dimensions", "Dimensions"), data.dimensions.toLocaleString(), t("js.per_passage_vector", "per passage vector")),
+    statTile(t("js.vector_store", "Vector store"), data.vector_store === "qdrant" ? "Qdrant" : t("js.local_numpy", "Local (NumPy)"), data.vector_store === "qdrant" ? t("js.server_or_embedded", "server or embedded") : t("js.exact_cosine_search", "exact cosine search"), { small: true }),
+    statTile(t("js.keyword_vocabulary", "Keyword vocabulary"), data.vocabulary.toLocaleString(), t("js.terms_for_keyword_ranking", "terms for keyword ranking")),
+    statTile(t("js.index", "Index"), idx.state === "running" ? t("js.rebuilding", "Rebuilding…") : idx.state === "failed" ? t("js.failed", "Failed") : t("js.ready", "Ready"), idx.state === "failed" ? idx.error : rebuilt, { small: true, attention: idx.state === "failed" }),
   );
   const rows = [
-    ["Ranking", data.hybrid.enabled ? `Hybrid: ${Math.round(data.hybrid.embedding_weight * 100)}% embedding similarity, ${Math.round(data.hybrid.keyword_weight * 100)}% keyword (BM25)` : "Embedding similarity only"],
-    ["Similarity", "Cosine, on normalised vectors"],
-    ["Passages retrieved", `${data.top_k} per question`],
-    ["Relevance threshold", `${data.min_score} cosine. Below this, GroundCheckHealth refuses before drafting anything.`],
-    ["Sources", data.include_demo_corpus ? `Your approved documents and the synthetic demo corpus (${data.from_demo_corpus.toLocaleString()} passages)` : "Your approved documents only"],
+    [t("js.ranking", "Ranking"), data.hybrid.enabled ? t("js.hybrid_embedding_similarity_keyword_bm25", "Hybrid: {embedding}% embedding similarity, {keyword}% keyword (BM25)", { embedding: Math.round(data.hybrid.embedding_weight * 100), keyword: Math.round(data.hybrid.keyword_weight * 100) }) : t("js.embedding_similarity_only", "Embedding similarity only")],
+    [t("js.similarity_2", "Similarity"), t("js.cosine_on_normalised_vectors", "Cosine, on normalised vectors")],
+    [t("js.passages_retrieved", "Passages retrieved"), t("js.per_question", "{top_k} per question", { top_k: data.top_k })],
+    [t("js.relevance_threshold", "Relevance threshold"), t("js.cosine_below_this_groundcheckhealth_refuses", "{min_score} cosine. Below this, GroundCheckHealth refuses before drafting anything.", { min_score: data.min_score })],
+    [t("js.sources", "Sources"), data.include_demo_corpus ? t("js.your_approved_documents_and_the", "Your approved documents and the synthetic demo corpus ({from_demo_corpus} passages)", { from_demo_corpus: data.from_demo_corpus.toLocaleString() }) : t("js.your_approved_documents_only", "Your approved documents only")],
   ];
   const list = $("embed-settings");
   list.textContent = "";
-  rows.forEach(([term, value]) => {
+  rows.forEach(([term, value], i) => {
     const dt = document.createElement("dt"); dt.textContent = term;
     const dd = document.createElement("dd"); dd.textContent = value;
     list.append(dt, dd);
@@ -3202,8 +3252,8 @@ const pct = (v, digits = 0) => (v === null || v === undefined ? "–" : `${(v * 
 function formatDuration(seconds) {
   if (seconds === null || seconds === undefined) return "–";
   if (seconds < 60) return `${Math.round(seconds)} s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ${Math.round(seconds % 60)} s`;
-  return `${Math.floor(seconds / 3600)} h ${Math.round((seconds % 3600) / 60)} min`;
+  if (seconds < 3600) return t("js.duration_min_s", "{minutes} min {seconds} s", { minutes: Math.floor(seconds / 60), seconds: Math.round(seconds % 60) });
+  return t("js.duration_h_min", "{hours} h {minutes} min", { hours: Math.floor(seconds / 3600), minutes: Math.round((seconds % 3600) / 60) });
 }
 
 async function loadTraining() {
@@ -3222,10 +3272,10 @@ function renderDevices(hw) {
   const gpus = hw.devices.filter((d) => d.kind === "gpu");
   if (!training.device || !hw.devices.some((d) => d.id === training.device)) training.device = hw.recommended;
   $("hw-sub").textContent = gpus.length === 0
-    ? "No GPU found, so training will use the CPU. It works, but more slowly."
+    ? t("js.no_gpu_found_so_training", "No GPU found, so training will use the CPU. It works, but more slowly.")
     : gpus.length === 1
-      ? `Training will use ${gpus[0].name}. You can choose the CPU instead, which is slower.`
-      : `This machine has ${gpus.length} GPUs. Choose one to train on.`;
+      ? t("js.training_will_use_you_can", "Training will use {name}. You can choose the CPU instead, which is slower.", { name: gpus[0].name })
+      : t("js.this_machine_has_gpus_choose", "This machine has {gpus} GPUs. Choose one to train on.", { gpus: gpus.length });
   hw.devices.forEach((d) => {
     const label = document.createElement("label");
     label.className = "device-card";
@@ -3239,13 +3289,13 @@ function renderDevices(hw) {
     const meta = document.createElement("span");
     meta.className = "device-meta";
     meta.textContent = d.kind === "gpu"
-      ? `${d.vendor} GPU, ${d.memory_gb} GB${d.shared_memory ? " shared memory" : ""}`
-      : `CPU, ${d.cores} cores, ${d.memory_gb} GB memory`;
+      ? t("js.gpu_gb", "{vendor} GPU, {memory_gb} GB{shared_memory}", { vendor: d.vendor, memory_gb: d.memory_gb, shared_memory: d.shared_memory ? t("js.shared_memory", " shared memory") : "" })
+      : t("js.cpu_cores_gb_memory", "CPU, {cores} cores, {memory_gb} GB memory", { cores: d.cores, memory_gb: d.memory_gb });
     body.append(name, meta);
     if (d.id === hw.recommended) {
       const badge = document.createElement("span");
       badge.className = "local-ai-badge recommended";
-      badge.textContent = "Recommended";
+      badge.textContent = t("js.recommended", "Recommended");
       body.appendChild(badge);
     }
     label.append(input, body);
@@ -3272,7 +3322,7 @@ function renderArchitectures(archs, sizes) {
     list.appendChild(label);
   });
   const select = $("train-size");
-  if (!select.options.length) sizes.forEach((n) => select.appendChild(new Option(`${n} × ${n} px`, n)));
+  if (!select.options.length) sizes.forEach((n) => select.appendChild(new Option(t("js.px", "{n} × {n2} px", { n, n2: n }), n)));
   applyArchitecture(archs.find((a) => a.id === training.architecture) || archs[0]);
 }
 
@@ -3288,16 +3338,16 @@ function applyArchitecture(a) {
 async function scanDataset() {
   const path = $("train-dataset").value.trim();
   const box = $("dataset-summary");
-  if (!path) { showMessage("training-message", "Choose a folder of images first.", true); return; }
+  if (!path) { showMessage("training-message", t("js.choose_a_folder_of_images", "Choose a folder of images first."), true); return; }
   box.hidden = false;
-  box.textContent = "Reading the folder…";
+  box.textContent = t("js.reading_the_folder", "Reading the folder…");
   box.classList.remove("invalid");
   try {
     const summary = await api(`/api/training/dataset?path=${encodeURIComponent(path)}`);
     training.dataset = summary;
     $("train-dataset").value = summary.path;
     renderDatasetSummary(summary);
-    if (!$("train-name").value.trim()) $("train-name").value = `${summary.name} classifier`;
+    if (!$("train-name").value.trim()) $("train-name").value = t("js.classifier", "{name} classifier", { name: summary.name });
   } catch (err) {
     training.dataset = null;
     box.textContent = err.message;
@@ -3310,11 +3360,11 @@ function renderDatasetSummary(d) {
   box.textContent = "";
   const head = document.createElement("p");
   head.className = "dataset-head";
-  const splits = d.layout === "split-folders" ? "using the folder’s own train, validation and test split" : "split into training, validation and test sets for you";
+  const splits = d.layout === "split-folders" ? t("js.using_the_folder_s_own", "using the folder’s own train, validation and test split") : t("js.split_into_training_validation_and", "split into training, validation and test sets for you");
   head.innerHTML = "";
   const strong = document.createElement("strong");
-  strong.textContent = `${d.total.toLocaleString()} images in ${d.classes.length} classes`;
-  head.append(strong, `, ${splits}: ${d.splits.train.toLocaleString()} training, ${d.splits.val.toLocaleString()} validation, ${d.splits.test.toLocaleString()} test.`);
+  strong.textContent = t("js.images_in_classes", "{total} images in {classes} classes", { total: d.total.toLocaleString(), classes: d.classes.length });
+  head.append(strong, t("js.training_validation_test", ", {splits}: {train} training, {val} validation, {test} test.", { splits, train: d.splits.train.toLocaleString(), val: d.splits.val.toLocaleString(), test: d.splits.test.toLocaleString() }));
   box.appendChild(head);
 
   const grid = document.createElement("div");
@@ -3327,7 +3377,7 @@ function renderDatasetSummary(d) {
     if (sample) {
       const img = document.createElement("img");
       img.loading = "lazy";
-      img.alt = `Example image of ${c.name}`;
+      img.alt = t("js.example_image_of", "Example image of {name}", { name: c.name });
       img.src = `/api/training/image?dataset=${encodeURIComponent(d.path)}&file=${encodeURIComponent(sample.file)}`;
       card.appendChild(img);
     }
@@ -3352,7 +3402,7 @@ async function openBrowser(path) {
   try { data = await api(`/api/training/browse?path=${encodeURIComponent(path || "")}`); }
   catch (err) { showMessage("browse-message", err.message, true); if (!dialog.open) dialog.showModal(); return; }
   training.browsePath = data.path;
-  $("browse-path").textContent = data.path || "Folders you can train from";
+  $("browse-path").textContent = data.path || t("js.folders_you_can_train_from", "Folders you can train from");
   $("browse-use").disabled = !data.path;
   const list = $("browse-list");
   list.textContent = "";
@@ -3372,10 +3422,10 @@ async function openBrowser(path) {
     li.appendChild(btn);
     list.appendChild(li);
   };
-  if (data.path) addRow(data.parent ? "Up one folder" : "All folders", data.parent || "", null, "browse-up");
-  data.folders.forEach((f) => addRow(f.name, f.path, f.looks_like_dataset ? "Looks like a dataset" : null));
+  if (data.path) addRow(data.parent ? t("js.up_one_folder", "Up one folder") : t("js.all_folders", "All folders"), data.parent || "", null, "browse-up");
+  data.folders.forEach((f) => addRow(f.name, f.path, f.looks_like_dataset ? t("js.looks_like_a_dataset", "Looks like a dataset") : null));
   if (!data.folders.length) {
-    const li = document.createElement("li"); li.className = "auth-hint"; li.textContent = "No subfolders here."; list.appendChild(li);
+    const li = document.createElement("li"); li.className = "auth-hint"; li.textContent = t("js.no_subfolders_here", "No subfolders here."); list.appendChild(li);
   }
   if (!dialog.open) dialog.showModal();
 }
@@ -3393,7 +3443,7 @@ async function startTraining(e) {
   };
   const button = $("train-start");
   button.disabled = true;
-  button.textContent = "Starting…";
+  button.textContent = t("js.starting", "Starting…");
   try {
     const data = await api("/api/training/runs", { method: "POST", body });
     $("training-message").hidden = true;
@@ -3402,7 +3452,7 @@ async function startTraining(e) {
     $("run-live").scrollIntoView({ behavior: REDUCED_MOTION ? "auto" : "smooth", block: "start" });
   } catch (err) { showMessage("training-message", err.message, true); }
   button.disabled = false;
-  button.textContent = "Start training";
+  button.textContent = t("js.start_training", "Start training");
 }
 
 function followRun(runId) {
@@ -3429,7 +3479,7 @@ function renderLiveRun(run) {
   const live = p.state === "running" || p.state === "queued";
   $("run-cancel").hidden = !live;
   $("run-resume").hidden = !run.can_resume;
-  $("run-live-status").textContent = `${p.message || ""}${live && p.eta_seconds ? `, about ${formatDuration(p.eta_seconds)} left` : ""}`;
+  $("run-live-status").textContent = `${p.message || ""}${live && p.eta_seconds ? t("js.about_left", ", about {eta_seconds} left", { eta_seconds: formatDuration(p.eta_seconds) }) : ""}`;
   const percent = p.state === "completed" ? 100 : (p.percent || 0);
   $("run-progress-fill").style.width = `${percent}%`;
   $("run-progressbar").setAttribute("aria-valuenow", String(Math.round(percent)));
@@ -3441,9 +3491,9 @@ function renderLiveRun(run) {
   const stats = $("run-stats");
   stats.textContent = "";
   stats.append(
-    statTile("Epoch", p.epoch ? `${p.epoch} of ${p.epochs}` : "–", p.best_epoch ? `best so far: ${p.best_epoch}` : ""),
-    statTile("Validation accuracy", last ? pct(last.val_accuracy, 1) : "–", bestVal !== null ? `best ${pct(bestVal, 1)}` : ""),
-    statTile("Hardware", run.device_name, `${run.architecture === "resnet18" ? "ResNet-18" : "Small CNN"}, ${run.image_size} px`, { small: true }),
+    statTile(t("js.epoch", "Epoch"), p.epoch ? t("js.of_3", "{epoch} of {epochs}", { epoch: p.epoch, epochs: p.epochs }) : "–", p.best_epoch ? t("js.best_so_far", "best so far: {best_epoch}", { best_epoch: p.best_epoch }) : ""),
+    statTile(t("js.validation_accuracy", "Validation accuracy"), last ? pct(last.val_accuracy, 1) : "–", bestVal !== null ? t("js.best", "best {bestVal}", { bestVal: pct(bestVal, 1) }) : ""),
+    statTile(t("js.hardware", "Hardware"), run.device_name, t("js.px_2", "{architecture}, {image_size} px", { architecture: run.architecture === "resnet18" ? "ResNet-18" : "Small CNN", image_size: run.image_size }), { small: true }),
   );
   renderLineChart($("chart-loss"), history, [["train_loss", "line-train"], ["val_loss", "line-val"]], (v) => v.toFixed(2));
   renderLineChart($("chart-accuracy"), history, [["train_accuracy", "line-train"], ["val_accuracy", "line-val"]], (v) => `${Math.round(v * 100)}%`, [0, 1]);
@@ -3454,15 +3504,15 @@ function renderLiveRun(run) {
   result.textContent = "";
   if (p.state === "completed") {
     const sm = p.summary || {};
-    result.append(`Saved to the model library. On held-out test images: ${pct(sm.test_accuracy, 1)} accurate; it answers ${pct(sm.coverage)} of images and is ${pct(sm.answered_accuracy, 1)} correct when it does. `);
+    result.append(t("js.saved_to_the_model_library", "Saved to the model library. On held-out test images: {test_accuracy} accurate; it answers {coverage} of images and is {answered_accuracy} correct when it does. ", { test_accuracy: pct(sm.test_accuracy, 1), coverage: pct(sm.coverage), answered_accuracy: pct(sm.answered_accuracy, 1) }));
     const link = document.createElement("a");
     link.href = "#/models";
-    link.textContent = "Open the model library";
+    link.textContent = t("js.open_the_model_library", "Open the model library");
     link.addEventListener("click", () => { models.openAfterLoad = p.model_id; });
     result.appendChild(link);
   } else if (p.state === "failed" || p.state === "cancelled") {
     result.textContent = run.can_resume
-      ? `${p.message}. It stopped after epoch ${(p.history || []).length} and can resume from there.`
+      ? t("js.it_stopped_after_epoch_and", "{message}. It stopped after epoch {history} and can resume from there.", { message: p.message, history: (p.history || []).length })
       : p.message;
   }
 }
@@ -3471,7 +3521,7 @@ function renderLiveRun(run) {
 function renderLineChart(container, history, series, format, fixedRange) {
   container.textContent = "";
   if (history.length === 0) {
-    const empty = document.createElement("div"); empty.className = "chart-empty"; empty.textContent = "Appears after the first epoch";
+    const empty = document.createElement("div"); empty.className = "chart-empty"; empty.textContent = t("js.appears_after_the_first_epoch", "Appears after the first epoch");
     container.appendChild(empty);
     return;
   }
@@ -3486,20 +3536,20 @@ function renderLineChart(container, history, series, format, fixedRange) {
   const y = (v) => pad.top + (1 - (v - lo) / (hi - lo)) * (height - pad.top - pad.bottom);
   const NS = "http://www.w3.org/2000/svg";
   const el = (name, attrs) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-  const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": `${series.map(([k]) => k).join(" and ")} by epoch` });
+  const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": t("js.by_epoch", "{series} by epoch", { series: series.map(([k]) => k).join(t("js.and", " and ")) }) });
   for (let i = 0; i <= 3; i++) {
     const v = lo + ((hi - lo) / 3) * i;
     svg.appendChild(el("line", { class: "grid-line", x1: pad.left, x2: width - pad.right, y1: y(v), y2: y(v) }));
-    const t = el("text", { class: "axis-label", x: pad.left - 6, y: y(v) + 4, "text-anchor": "end" });
-    t.textContent = format(v);
-    svg.appendChild(t);
+    const tt = el("text", { class: "axis-label", x: pad.left - 6, y: y(v) + 4, "text-anchor": "end" });
+    tt.textContent = format(v);
+    svg.appendChild(tt);
   }
   const every = Math.ceil(history.length / 8);
   history.forEach((h, i) => {
     if (i % every === 0 || i === history.length - 1) {
-      const t = el("text", { class: "axis-label", x: x(i), y: height - 6, "text-anchor": "middle" });
-      t.textContent = h.epoch;
-      svg.appendChild(t);
+      const tt = el("text", { class: "axis-label", x: x(i), y: height - 6, "text-anchor": "middle" });
+      tt.textContent = h.epoch;
+      svg.appendChild(tt);
     }
   });
   series.forEach(([key, cls]) => {
@@ -3522,14 +3572,14 @@ async function loadRuns() {
   rows.textContent = "";
   $("runs-empty").hidden = data.runs.length > 0;
   rows.closest(".users-table-wrap").hidden = data.runs.length === 0;
-  const labels = { queued: "Starting", running: "Training", completed: "Saved", failed: "Failed", cancelled: "Cancelled" };
+  const labels = { queued: t("js.starting_2", "Starting"), running: t("js.training", "Training"), completed: t("js.saved_2", "Saved"), failed: t("js.failed", "Failed"), cancelled: t("js.cancelled", "Cancelled") };
   const pills = { queued: "status-pending", running: "status-pending", completed: "status-approved", failed: "status-rejected", cancelled: "status-retired" };
   data.runs.forEach((run) => {
     const p = run.progress;
     const tr = document.createElement("tr");
     const name = document.createElement("td");
     const n = document.createElement("div"); n.className = "user-name"; n.textContent = run.name;
-    const dsn = document.createElement("div"); dsn.className = "user-email"; dsn.textContent = `${run.dataset_summary.name}, ${run.dataset_summary.total.toLocaleString()} images`;
+    const dsn = document.createElement("div"); dsn.className = "user-email"; dsn.textContent = t("js.images", "{name}, {total} images", { name: run.dataset_summary.name, total: run.dataset_summary.total.toLocaleString() });
     name.append(n, dsn);
     const status = document.createElement("td");
     const pill = document.createElement("span"); pill.className = `status-pill ${pills[p.state] || ""}`; pill.textContent = labels[p.state] || p.state;
@@ -3538,15 +3588,15 @@ async function loadRuns() {
     const hwCell = document.createElement("td"); hwCell.textContent = run.device_name;
     const started = document.createElement("td"); started.textContent = dateTime(run.created_at);
     const result = document.createElement("td");
-    if (p.state === "completed" && p.summary) result.textContent = `${pct(p.summary.test_accuracy, 1)} accurate`;
+    if (p.state === "completed" && p.summary) result.textContent = t("js.accurate", "{test_accuracy} accurate", { test_accuracy: pct(p.summary.test_accuracy, 1) });
     else if (p.state === "failed") result.textContent = p.message;
     const actions = document.createElement("div"); actions.className = "document-actions";
     if (p.state === "running" || p.state === "queued" || run.id !== training.runId) {
-      actions.appendChild(button("View", "btn-ghost", false, () => { followRun(run.id); $("run-live").scrollIntoView({ block: "start" }); }));
+      actions.appendChild(button(t("js.view", "View"), "btn-ghost", false, () => { followRun(run.id); $("run-live").scrollIntoView({ block: "start" }); }));
     }
-    if (run.can_resume) actions.appendChild(button("Resume", "btn-primary", false, () => resumeRun(run.id)));
+    if (run.can_resume) actions.appendChild(button(t("js.resume", "Resume"), "btn-primary", false, () => resumeRun(run.id)));
     result.appendChild(actions);
-    labelCells([name, status, hwCell, started, result], ["", "Status", "Hardware", "Started", "Result"]);
+    labelCells([name, status, hwCell, started, result], ["", t("js.status", "Status"), t("js.hardware", "Hardware"), t("js.started", "Started"), t("js.result", "Result")]);
     tr.append(name, status, hwCell, started, result);
     rows.appendChild(tr);
   });
@@ -3574,7 +3624,7 @@ function wireTraining() {
     scanDataset();
   });
   $("run-cancel").addEventListener("click", async () => {
-    if (!training.runId || !window.confirm("Stop training? Nothing is saved to the library.")) return;
+    if (!training.runId || !window.confirm(t("js.stop_training_nothing_is_saved", "Stop training? Nothing is saved to the library."))) return;
     try { await api(`/api/training/runs/${training.runId}/cancel`, { method: "POST" }); }
     catch (err) { showMessage("training-message", err.message, true); }
   });
@@ -3600,34 +3650,34 @@ async function loadModels() {
     const head = document.createElement("div"); head.className = "model-card-head";
     const title = document.createElement("h2"); title.textContent = m.name;
     const meta = document.createElement("p"); meta.className = "model-meta";
-    meta.textContent = `${m.architecture_label}, ${m.image_size} px. ${m.classes.length} classes from ${m.dataset}.`;
+    meta.textContent = t("js.px_classes_from", "{architecture_label}, {image_size} px. {classes} classes from {dataset}.", { architecture_label: m.architecture_label, image_size: m.image_size, classes: m.classes.length, dataset: m.dataset });
     head.append(title, meta);
     const classes = document.createElement("p"); classes.className = "model-classes";
-    classes.textContent = m.classes.slice(0, 8).join(", ") + (m.classes.length > 8 ? ` and ${m.classes.length - 8} more` : "");
+    classes.textContent = m.classes.slice(0, 8).join(", ") + (m.classes.length > 8 ? t("js.and_more", " and {classes} more", { classes: m.classes.length - 8 }) : "");
     const figures = document.createElement("dl"); figures.className = "model-figures";
-    [["Accuracy", pct(m.accuracy, 1)], ["Balanced accuracy", pct(m.balanced_accuracy, 1)], ["Answers", pct(m.coverage)], ["Correct when it answers", pct(m.answered_accuracy, 1)]]
+    [[t("js.accuracy", "Accuracy"), pct(m.accuracy, 1)], [t("js.balanced_accuracy", "Balanced accuracy"), pct(m.balanced_accuracy, 1)], [t("js.answers", "Answers"), pct(m.coverage)], [t("js.correct_when_it_answers", "Correct when it answers"), pct(m.answered_accuracy, 1)]]
       .forEach(([k, v]) => { const d = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; d.append(dt, dd); figures.appendChild(d); });
     const verdict = document.createElement("p");
     verdict.className = `model-verdict ${m.target_met === false ? "warn" : "ok"}`;
     verdict.textContent = m.target_met === false
-      ? `Below the ${pct(m.target_accuracy)} target on its ${m.evaluated_on} images when it answers. Treat as experimental.`
-      : `Met the ${pct(m.target_accuracy)} target on its ${m.evaluated_on} images when it answers.`;
+      ? t("js.below_the_target_on_its", "Below the {target_accuracy} target on its {evaluated_on} images when it answers. Treat as experimental.", { target_accuracy: pct(m.target_accuracy), evaluated_on: m.evaluated_on })
+      : t("js.met_the_target_on_its", "Met the {target_accuracy} target on its {evaluated_on} images when it answers.", { target_accuracy: pct(m.target_accuracy), evaluated_on: m.evaluated_on });
     const use = document.createElement("p"); use.className = "model-meta";
     use.textContent = m.imaging
-      ? `Used on ${m.imaging.modality} series${m.imaging.patch_mm ? `, ${Math.round(m.imaging.patch_mm)} mm regions` : ""}.`
-      : "Not set up for CT or MRI series.";
+      ? t("js.used_on_series", "Used on {modality} series{patch_mm}.", { modality: m.imaging.modality, patch_mm: m.imaging.patch_mm ? t("js.mm_regions", ", {value} mm regions", { value: Math.round(m.imaging.patch_mm) }) : "" })
+      : t("js.not_set_up_for_ct", "Not set up for CT or MRI series.");
     const foot = document.createElement("p"); foot.className = "model-meta";
-    foot.textContent = `Trained ${new Date(m.created_at).toLocaleDateString()} on ${m.device_name} in ${formatDuration(m.training_seconds)}${m.created_by ? ` by ${m.created_by}` : ""}. ${m.size_mb} MB.`;
+    foot.textContent = t("js.trained_on_in_mb", "Trained {created_at} on {device_name} in {training_seconds}{created_by}. {size_mb} MB.", { created_at: new Date(m.created_at).toLocaleDateString(uiLocale()), device_name: m.device_name, training_seconds: formatDuration(m.training_seconds), created_by: m.created_by ? t("js.by_3", " by {created_by}", { created_by: m.created_by }) : "", size_mb: m.size_mb });
     const actions = document.createElement("div"); actions.className = "model-actions";
-    actions.appendChild(button("Try it", "btn-primary", false, () => openModel(m.id)));
+    actions.appendChild(button(t("js.try_it", "Try it"), "btn-primary", false, () => openModel(m.id)));
     if (canSee("training")) {
       const dl = document.createElement("a");
-      dl.className = "btn btn-sm btn-ghost"; dl.href = `/api/models/${encodeURIComponent(m.id)}/download`; dl.textContent = "Download";
+      dl.className = "btn btn-sm btn-ghost"; dl.href = `/api/models/${encodeURIComponent(m.id)}/download`; dl.textContent = t("js.download_2", "Download");
       actions.appendChild(dl);
-      actions.appendChild(button("CT and MRI use", "btn-ghost", false, () => openModelImaging(m)));
-      actions.appendChild(button("Delete", "btn-ghost", false, async () => {
-        if (!window.confirm(`Delete “${m.name}” from the library? This can’t be undone.`)) return;
-        try { await api(`/api/models/${encodeURIComponent(m.id)}`, { method: "DELETE" }); showMessage("models-message", "Deleted."); }
+      actions.appendChild(button(t("js.ct_and_mri_use", "CT and MRI use"), "btn-ghost", false, () => openModelImaging(m)));
+      actions.appendChild(button(t("js.delete", "Delete"), "btn-ghost", false, async () => {
+        if (!window.confirm(t("js.delete_from_the_library_this", "Delete “{name}” from the library? This can’t be undone.", { name: m.name }))) return;
+        try { await api(`/api/models/${encodeURIComponent(m.id)}`, { method: "DELETE" }); showMessage("models-message", t("js.deleted_2", "Deleted.")); }
         catch (err) { showMessage("models-message", err.message, true); }
         loadModels();
       }));
@@ -3645,7 +3695,7 @@ function fillImagingWindows(modality, chosen) {
   select.textContent = "";
   IMAGING_WINDOWS[modality].forEach((w) => {
     const o = document.createElement("option");
-    o.value = w; o.textContent = w === "auto" ? "Automatic (1st to 99th percentile)" : w[0].toUpperCase() + w.slice(1);
+    o.value = w; o.textContent = w === "auto" ? t("js.automatic_1st_to_99th_percentile", "Automatic (1st to 99th percentile)") : w[0].toUpperCase() + w.slice(1);
     select.appendChild(o);
   });
   if (chosen && IMAGING_WINDOWS[modality].includes(chosen)) select.value = chosen;
@@ -3654,8 +3704,8 @@ function fillImagingWindows(modality, chosen) {
 function openModelImaging(m) {
   models.imagingFor = m;
   const s = m.imaging || {};
-  $("model-imaging-title").textContent = `Use ${m.name} on CT and MRI`;
-  $("mi-modality").value = s.modality || "CT";
+  $("model-imaging-title").textContent = t("js.use_on_ct_and_mri", "Use {name} on CT and MRI", { name: m.name });
+  $("mi-modality").value = s.modality || t("js.ct", "CT");
   fillImagingWindows($("mi-modality").value, s.window);
   $("mi-orientation").value = s.orientation || "identity";
   $("mi-patch").value = s.patch_mm ?? "";
@@ -3673,7 +3723,7 @@ async function saveModelImaging(remove) {
   try {
     await api(`/api/models/${encodeURIComponent(m.id)}/imaging`, remove ? { method: "DELETE" } : { method: "PUT", body });
     $("model-imaging-dialog").close();
-    showMessage("models-message", remove ? `${m.name} is no longer used on series.` : `Saved. ${m.name} can now be run on ${body.modality} series.`);
+    showMessage("models-message", remove ? t("js.is_no_longer_used_on", "{name} is no longer used on series.", { name: m.name }) : t("js.saved_can_now_be_run", "Saved. {name} can now be run on {modality} series.", { name: m.name, modality: body.modality }));
     loadModels();
   } catch (err) {
     showMessage("model-imaging-message", err.message, true);
@@ -3687,7 +3737,7 @@ async function openModel(id) {
   const m = data.model;
   models.current = m;
   $("model-dialog-title").textContent = m.name;
-  $("model-meta").textContent = `${m.intended_use} ${m.classes.length} classes: ${m.classes.join(", ")}.`;
+  $("model-meta").textContent = t("js.classes", "{intended_use} {classes} classes: {classes2}.", { intended_use: m.intended_use, classes: m.classes.length, classes2: m.classes.join(", ") });
   $("try-result").textContent = "";
   $("try-preview").hidden = true;
   $("try-hint").hidden = false;
@@ -3697,12 +3747,12 @@ async function openModel(id) {
   const stats = $("model-stats");
   stats.textContent = "";
   stats.append(
-    statTile("Accuracy", pct(r.accuracy, 1), `${r.images.toLocaleString()} ${where} images`),
-    statTile("Balanced accuracy", pct(r.balanced_accuracy, 1), "average sensitivity across classes"),
-    statTile("AUC", r.auc === null ? "–" : r.auc.toFixed(3), m.classes.length > 2 ? "average, one class against the rest" : ""),
-    statTile("Confidence threshold", pct(m.threshold.threshold), m.threshold.met ? `chosen for ${pct(m.threshold.target)} accuracy on validation images` : "no share of images met the target: it abstains on all", { attention: !m.threshold.met }),
-    statTile("Answers", pct(r.abstention.coverage), `${pct(r.abstention.answered_accuracy, 1)} correct when it does`, { attention: r.target_met === false }),
-    statTile("Calibration error", r.calibration_error === null ? "–" : pct(r.calibration_error, 1), "gap between confidence and accuracy"),
+    statTile(t("js.accuracy", "Accuracy"), pct(r.accuracy, 1), t("js.images_2", "{images} {where} images", { images: r.images.toLocaleString(), where })),
+    statTile(t("js.balanced_accuracy", "Balanced accuracy"), pct(r.balanced_accuracy, 1), t("js.average_sensitivity_across_classes", "average sensitivity across classes")),
+    statTile("AUC", r.auc === null ? "–" : r.auc.toFixed(3), m.classes.length > 2 ? t("js.average_one_class_against_the", "average, one class against the rest") : ""),
+    statTile(t("js.confidence_threshold", "Confidence threshold"), pct(m.threshold.threshold), m.threshold.met ? t("js.chosen_for_accuracy_on_validation", "chosen for {target} accuracy on validation images", { target: pct(m.threshold.target) }) : t("js.no_share_of_images_met", "no share of images met the target: it abstains on all"), { attention: !m.threshold.met }),
+    statTile(t("js.answers", "Answers"), pct(r.abstention.coverage), t("js.correct_when_it_does", "{answered_accuracy} correct when it does", { answered_accuracy: pct(r.abstention.answered_accuracy, 1) }), { attention: r.target_met === false }),
+    statTile(t("js.calibration_error", "Calibration error"), r.calibration_error === null ? "–" : pct(r.calibration_error, 1), t("js.gap_between_confidence_and_accuracy", "gap between confidence and accuracy")),
   );
   const rows = $("model-classes");
   rows.textContent = "";
@@ -3715,16 +3765,16 @@ async function openModel(id) {
   renderConfusion($("model-confusion"), m.classes, r.confusion);
   const tr = m.training;
   const items = [
-    ["Dataset", `${m.dataset.name}: ${m.dataset.total.toLocaleString()} images (${m.dataset.splits.train.toLocaleString()} training, ${m.dataset.splits.val.toLocaleString()} validation, ${m.dataset.splits.test.toLocaleString()} test). Fingerprint ${m.dataset.fingerprint}.`],
+    [t("js.dataset", "Dataset"), t("js.images_training_validation_test_fingerprint", "{name}: {total} images ({train} training, {val} validation, {test} test). Fingerprint {fingerprint}.", { name: m.dataset.name, total: m.dataset.total.toLocaleString(), train: m.dataset.splits.train.toLocaleString(), val: m.dataset.splits.val.toLocaleString(), test: m.dataset.splits.test.toLocaleString(), fingerprint: m.dataset.fingerprint })],
     ["Data checks", m.dataset.checks ? [
-      m.dataset.checks.duplicates.leaked ? `${m.dataset.checks.duplicates.leaked.toLocaleString()} ${m.dataset.checks.duplicates.leaked === 1 ? "copy" : "copies"} of training images left out of validation and test.` : "No training images copied into validation or test.",
+      m.dataset.checks.duplicates.leaked ? `${m.dataset.checks.duplicates.leaked.toLocaleString()} ${m.dataset.checks.duplicates.leaked === 1 ? t("js.copy_one", "copy") : t("js.copy_many", "copies")} ${t("js.of_training_images_left_out", "of training images left out of validation and test.")}` : t("js.no_training_images_copied", "No training images copied into validation or test."),
       m.dataset.checks.duplicates.conflicting_labels ? `${plural(m.dataset.checks.duplicates.conflicting_labels, "identical image")} filed under different classes.` : "",
       m.dataset.checks.identifiers.file_names || m.dataset.checks.identifiers.metadata_files ? "Possible patient details found in file names or metadata." : "No patient details found in file names or sampled metadata.",
-    ].filter(Boolean).join(" ") : "Not recorded for this model."],
-    ["Architecture", `${m.architecture === "resnet18" ? "ResNet-18" : "Small CNN"}${m.pretrained ? ", from ImageNet weights" : ", trained from scratch"}. Input ${m.input.image_size} × ${m.input.image_size} px, ${m.input.channels === 1 ? "grayscale" : "colour"}.`],
-    ["Training", `${m.history.length} of ${tr.epochs} epochs (best: ${m.best_epoch}), batch ${tr.batch_size}, learning rate ${tr.learning_rate}, on ${m.hardware.device_name} in ${formatDuration(m.training_seconds)}.`],
-    ["Unfamiliar images", m.novelty ? `Abstains on images far from anything it was trained on (1% of validation images would be flagged${m.test && m.test.novelty_flagged !== undefined ? `; ${pct(m.test.novelty_flagged, 1)} of test images were` : ""}).` : "No check recorded for this model."],
-    ["Created", `${dateTime(m.created_at)}${m.created_by ? ` by ${m.created_by}` : ""}. ID ${m.id}.`],
+    ].filter(Boolean).join(" ") : t("js.not_recorded_for_this_model", "Not recorded for this model.")],
+    [t("js.architecture", "Architecture"), t("js.input_px", "{architecture}{pretrained}. Input {image_size} × {image_size2} px, {channels}.", { architecture: m.architecture === "resnet18" ? "ResNet-18" : "Small CNN", pretrained: m.pretrained ? t("js.from_imagenet_weights", ", from ImageNet weights") : t("js.trained_from_scratch", ", trained from scratch"), image_size: m.input.image_size, image_size2: m.input.image_size, channels: m.input.channels === 1 ? "grayscale" : "colour" })],
+    [t("js.training", "Training"), t("js.of_epochs_best_batch_learning", "{history} of {epochs} epochs (best: {best_epoch}), batch {batch_size}, learning rate {learning_rate}, on {device_name} in {training_seconds}.", { history: m.history.length, epochs: tr.epochs, best_epoch: m.best_epoch, batch_size: tr.batch_size, learning_rate: tr.learning_rate, device_name: m.hardware.device_name, training_seconds: formatDuration(m.training_seconds) })],
+    [t("js.unfamiliar_images", "Unfamiliar images"), m.novelty ? t("js.abstains_on_images_far_from", "Abstains on images far from anything it was trained on (1% of validation images would be flagged{test}).", { test: m.test && m.test.novelty_flagged !== undefined ? t("js.of_test_images_were", "; {novelty_flagged} of test images were", { novelty_flagged: pct(m.test.novelty_flagged, 1) }) : "" }) : t("js.no_check_recorded_for_this", "No check recorded for this model.")],
+    [t("js.created", "Created"), `${dateTime(m.created_at)}${m.created_by ? t("js.by_3", " by {created_by}", { created_by: m.created_by }) : ""}${t("js.id_suffix", ". ID {id}.", { id: m.id })}`],
   ];
   const dl = $("model-training");
   dl.textContent = "";
@@ -3739,7 +3789,7 @@ function renderConfusion(container, classes, matrix) {
   const max = Math.max(1, ...matrix.flat());
   const head = document.createElement("tr");
   head.appendChild(document.createElement("th"));
-  classes.forEach((c) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = c; th.title = `Predicted ${c}`; head.appendChild(th); });
+  classes.forEach((c) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = c; th.title = t("js.predicted", "Predicted {c}", { c }); head.appendChild(th); });
   table.appendChild(head);
   matrix.forEach((row, i) => {
     const tr = document.createElement("tr");
@@ -3751,7 +3801,7 @@ function renderConfusion(container, classes, matrix) {
       const share = v / total;
       td.style.setProperty("--share", Math.sqrt(v / max).toFixed(3));
       td.className = i === j ? `diag${Math.sqrt(v / max) >= 0.5 ? " strong" : ""}` : v ? "off" : "zero";
-      td.title = `${classes[i]} predicted as ${classes[j]}: ${v} (${Math.round(share * 100)}% of ${classes[i]})`;
+      td.title = t("js.predicted_as_of", "{classes} predicted as {classes2}: {v} ({value}% of {classes3})", { classes: classes[i], classes2: classes[j], v, value: Math.round(share * 100), classes3: classes[i] });
       tr.appendChild(td);
     });
     table.appendChild(tr);
@@ -3766,19 +3816,19 @@ async function tryModel(file) {
   preview.hidden = false;
   $("try-hint").hidden = true;
   const out = $("try-result");
-  out.textContent = "Checking…";
+  out.textContent = t("js.checking", "Checking…");
   const body = new FormData();
   body.append("file", file);
   try {
     const res = await fetch(`/api/models/${encodeURIComponent(models.current.id)}/predict`, { method: "POST", body });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || `Request failed (${res.status}).`);
+    if (!res.ok) throw new Error(data.detail || t("js.request_failed", "Request failed ({status}).", { status: res.status }));
     out.textContent = "";
     const verdict = document.createElement("div");
     verdict.className = `try-verdict ${data.abstained ? "abstained" : "answered"}`;
     const chip = document.createElement("span");
     chip.className = `status-chip ${data.abstained ? "refuse" : "answer"}`;
-    chip.textContent = data.abstained ? (data.abstain_reason === "unfamiliar" ? "UNFAMILIAR IMAGE" : "NOT CONFIDENT") : data.prediction.toUpperCase();
+    chip.textContent = data.abstained ? (data.abstain_reason === "unfamiliar" ? t("js.unfamiliar_image", "UNFAMILIAR IMAGE") : t("js.not_confident", "NOT CONFIDENT")) : data.prediction.toUpperCase();
     const msg = document.createElement("p"); msg.textContent = data.message;
     verdict.append(chip, msg);
     out.appendChild(verdict);
@@ -3794,8 +3844,8 @@ async function tryModel(file) {
 function wireModels() {
   $("try-file").addEventListener("change", (e) => tryModel(e.target.files[0]));
   const drop = $("try-drop");
-  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("dragging"); }));
-  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("dragging"); }));
+  ["dragenter", "dragover"].forEach((tt) => drop.addEventListener(tt, (e) => { e.preventDefault(); drop.classList.add("dragging"); }));
+  ["dragleave", "drop"].forEach((tt) => drop.addEventListener(tt, (e) => { e.preventDefault(); drop.classList.remove("dragging"); }));
   drop.addEventListener("drop", (e) => tryModel(e.dataTransfer.files[0]));
 }
 
@@ -3837,20 +3887,20 @@ function readPatient({ quiet = false } = {}) {
 function updatePatientStatus() {
   const p = readPatient({ quiet: true });
   const status = $("patient-status");
-  if (!p) { status.textContent = "No patient details"; status.classList.remove("on"); return; }
+  if (!p) { status.textContent = t("js.no_patient_details", "No patient details"); status.classList.remove("on"); return; }
   const bits = [];
   if (p.age_years !== undefined) bits.push(`${p.age_years} y`);
   if (p.sex) bits.push(p.sex);
   if (p.weight_kg !== undefined) bits.push(`${p.weight_kg} kg`);
-  if (p.egfr !== undefined) bits.push(`eGFR ${p.egfr}`);
-  if (p.pregnant) bits.push("pregnant");
-  if (p.allergies) bits.push(`${p.allergies.length} ${p.allergies.length === 1 ? "allergy" : "allergies"}`);
+  if (p.egfr !== undefined) bits.push(t("js.egfr", "eGFR {egfr}", { egfr: p.egfr }));
+  if (p.pregnant) bits.push(t("js.pregnant_lower", "pregnant"));
+  if (p.allergies) bits.push(`${p.allergies.length} ${p.allergies.length === 1 ? t("js.allergy_one", "allergy") : t("js.allergy_many", "allergies")}`);
   if (p.medicines) bits.push(plural(p.medicines.length, "medicine"));
-  status.textContent = bits.join(", ") || "Details entered";
+  status.textContent = bits.join(", ") || t("js.details_entered", "Details entered");
   status.classList.add("on");
 }
 
-const FINDING_LABEL = { block: "Unsafe for this patient", warn: "Check", info: "Note" };
+const FINDING_LABEL = () => ({ block: t("js.unsafe_for_this_patient", "Unsafe for this patient"), warn: t("js.check", "Check"), info: t("js.note_2", "Note") });
 
 function renderPatientFindings(findings, given) {
   const box = $("patient-findings");
@@ -3861,7 +3911,7 @@ function renderPatientFindings(findings, given) {
   if (!findings.length) {
     const li = document.createElement("li");
     li.className = "finding pass";
-    li.textContent = "No problems found for this patient with the medicines in this answer.";
+    li.textContent = t("js.no_problems_found_for_this", "No problems found for this patient with the medicines in this answer.");
     list.appendChild(li);
     return;
   }
@@ -3871,7 +3921,7 @@ function renderPatientFindings(findings, given) {
     li.className = `finding ${f.severity}`;
     const tag = document.createElement("span");
     tag.className = "finding-tag";
-    tag.textContent = FINDING_LABEL[f.severity];
+    tag.textContent = FINDING_LABEL()[f.severity];
     const text = document.createElement("span");
     text.className = "finding-text";
     const med = document.createElement("strong");
@@ -3915,7 +3965,7 @@ async function loadMedicines() {
   try { data = await api(`/api/formulary?q=${encodeURIComponent($("medicine-search").value)}`); }
   catch (_) { return; }
   $("formulary-synthetic").hidden = !data.synthetic;
-  $("medicines-summary").textContent = `${data.total.toLocaleString()} medicines, ${data.name} ${data.version}`;
+  $("medicines-summary").textContent = t("js.medicines", "{total} medicines, {name} {version}", { total: data.total.toLocaleString(), name: data.name, version: data.version });
   const rows = $("medicine-rows");
   rows.textContent = "";
   $("medicines-empty").hidden = data.medicines.length > 0;
@@ -3923,23 +3973,23 @@ async function loadMedicines() {
     const tr = document.createElement("tr");
     const name = document.createElement("td");
     const n = document.createElement("div"); n.className = "user-name"; n.textContent = m.name;
-    if (m.high_alert) { const b = document.createElement("span"); b.className = "status-pill status-rejected"; b.textContent = "High alert"; n.append(" ", b); }
+    if (m.high_alert) { const b = document.createElement("span"); b.className = "status-pill status-rejected"; b.textContent = t("js.high_alert", "High alert"); n.append(" ", b); }
     const c = document.createElement("div"); c.className = "user-email"; c.textContent = m.classes.join(", ");
     name.append(n, c);
     const dose = document.createElement("td");
-    dose.textContent = m.adult_dose ? `${m.adult_dose.amount} ${m.adult_dose.unit} ${m.adult_dose.frequency}` : "By weight or not stated";
+    dose.textContent = m.adult_dose ? `${m.adult_dose.amount} ${m.adult_dose.unit} ${m.adult_dose.frequency}` : t("js.by_weight_or_not_stated", "By weight or not stated");
     const rules = document.createElement("td");
     const group = document.createElement("div"); group.className = "pill-group";
     const r = m.rules;
-    [[r.allergies, "Allergy"], [r.interactions, "Interactions"], [r.kidney, "Kidney"], [r.liver, "Liver"], [r.children, "Children"],
-     [r.weight, "Weight"], [r.labs, "Labs"], [r.pregnancy !== "no_data", `Pregnancy: ${r.pregnancy}`]]
+    [[r.allergies, t("js.allergy", "Allergy")], [r.interactions, t("js.interactions", "Interactions")], [r.kidney, t("js.kidney", "Kidney")], [r.liver, t("js.liver", "Liver")], [r.children, t("js.children", "Children")],
+     [r.weight, t("js.weight", "Weight")], [r.labs, t("js.labs", "Labs")], [r.pregnancy !== "no_data", t("js.pregnancy", "Pregnancy: {pregnancy}", { pregnancy: r.pregnancy })]]
       .filter(([on]) => on).forEach(([, label]) => { const s = document.createElement("span"); s.className = "status-pill"; s.textContent = label; group.appendChild(s); });
     rules.appendChild(group);
     const act = document.createElement("td");
     const actions = document.createElement("div"); actions.className = "document-actions";
-    actions.appendChild(button("View rules", "btn-ghost", false, () => openMedicine(m.name)));
+    actions.appendChild(button(t("js.view_rules", "View rules"), "btn-ghost", false, () => openMedicine(m.name)));
     act.appendChild(actions);
-    labelCells([name, dose, rules, act], ["", "Adult dose", "Rules", ""]);
+    labelCells([name, dose, rules, act], ["", t("js.adult_dose", "Adult dose"), t("js.rules", "Rules"), ""]);
     tr.append(name, dose, rules, act);
     rows.appendChild(tr);
   });
@@ -3950,25 +4000,25 @@ async function openMedicine(name) {
   try { data = await api(`/api/formulary/${encodeURIComponent(name)}`); } catch (_) { return; }
   const m = data.medicine;
   $("medicine-dialog-title").textContent = m.name;
-  const doseText = (d) => d ? `${d.amount} ${d.unit} ${d.frequency}${d.max_daily ? `, at most ${d.max_daily} ${d.unit} a day` : ""}` : "";
-  const weightText = (d) => d ? `${d.per_kg} ${d.unit}/kg ${d.frequency}${d.max_single ? `, at most ${d.max_single} ${d.unit} a dose` : ""}` : "";
+  const doseText = (d) => d ? `${d.amount} ${d.unit} ${d.frequency}${d.max_daily ? t("js.at_most_a_day", ", at most {max_daily} {unit} a day", { max_daily: d.max_daily, unit: d.unit }) : ""}` : "";
+  const weightText = (d) => d ? `${d.per_kg} ${d.unit}/kg ${d.frequency}${d.max_single ? t("js.at_most_a_dose", ", at most {max_single} {unit} a dose", { max_single: d.max_single, unit: d.unit }) : ""}` : "";
   const rows = [
-    ["Also called", m.aliases.join(", ")],
-    ["Classes", m.classes.join(", ")],
-    ["High alert", m.high_alert ? "Yes: use an independent double check" : ""],
-    ["Adult dose", doseText(m.adult_dose) + (m.adult_dose ? ` (from age ${m.adult_min_age})` : "")],
-    ["By weight", weightText(m.weight_dose)],
-    ["Children", m.paediatric_dose ? `${weightText(m.paediatric_dose)}${m.paediatric_min_age != null ? `, from age ${m.paediatric_min_age}` : ""}` : "No paediatric dosing: questions about children are refused"],
-    ["Allergies", m.allergy_groups.join(", ")],
-    ["Conditions", m.contraindicated_conditions.join(", ")],
-    ["Interactions", m.interactions.map((i) => `${i.with_medicine || i.with_class} (${i.severity})${i.note ? `: ${i.note}` : ""}`).join(" · ")],
-    ["Kidney", m.renal.map((r) => `eGFR below ${r.egfr_below}: ${r.action}${r.dose ? ` to ${doseText(r.dose)}` : ""}`).join(" · ")],
-    ["Liver", m.hepatic.map((r) => `Child-Pugh ${r.child_pugh}: ${r.action}`).join(" · ")],
-    ["Pregnancy", { avoid: "Avoid", no_data: "No safety information: refused", compatible: "Compatible" }[m.pregnancy]],
-    ["Breastfeeding", { avoid: "Avoid", no_data: "No safety information: warning", compatible: "Compatible" }[m.breastfeeding]],
-    ["Lab results", m.labs.map((l) => `${l.lab} ${l.above != null ? `above ${l.above}` : `below ${l.below}`}: ${l.action}`).join(" · ")],
-    ["Needs before dosing", m.requires.join(", ")],
-    ["Sources", m.source_ids.join(", ")],
+    [t("js.also_called", "Also called"), m.aliases.join(", ")],
+    [t("js.classes_2", "Classes"), m.classes.join(", ")],
+    [t("js.high_alert", "High alert"), m.high_alert ? t("js.yes_use_an_independent_double", "Yes: use an independent double check") : ""],
+    [t("js.adult_dose", "Adult dose"), doseText(m.adult_dose) + (m.adult_dose ? t("js.from_age", " (from age {adult_min_age})", { adult_min_age: m.adult_min_age }) : "")],
+    [t("js.by_weight", "By weight"), weightText(m.weight_dose)],
+    [t("js.children", "Children"), m.paediatric_dose ? `${weightText(m.paediatric_dose)}${m.paediatric_min_age != null ? t("js.from_age_2", ", from age {paediatric_min_age}", { paediatric_min_age: m.paediatric_min_age }) : ""}` : t("js.no_paediatric_dosing_questions_about", "No paediatric dosing: questions about children are refused")],
+    [t("js.allergies", "Allergies"), m.allergy_groups.join(", ")],
+    [t("js.conditions", "Conditions"), m.contraindicated_conditions.join(", ")],
+    [t("js.interactions", "Interactions"), m.interactions.map((i) => `${i.with_medicine || i.with_class} (${i.severity})${i.note ? `: ${i.note}` : ""}`).join(" · ")],
+    [t("js.kidney", "Kidney"), m.renal.map((r) => t("js.egfr_below", "eGFR below {egfr_below}: {action}{dose}", { egfr_below: r.egfr_below, action: r.action, dose: r.dose ? t("js.to", " to {dose}", { dose: doseText(r.dose) }) : "" })).join(" · ")],
+    [t("js.liver", "Liver"), m.hepatic.map((r) => t("js.child_pugh", "Child-Pugh {child_pugh}: {action}", { child_pugh: r.child_pugh, action: r.action })).join(" · ")],
+    [t("js.pregnancy_2", "Pregnancy"), { avoid: t("js.avoid", "Avoid"), no_data: t("js.no_safety_information_refused", "No safety information: refused"), compatible: t("js.compatible", "Compatible") }[m.pregnancy]],
+    [t("js.breastfeeding", "Breastfeeding"), { avoid: t("js.avoid", "Avoid"), no_data: t("js.no_safety_information_warning", "No safety information: warning"), compatible: t("js.compatible", "Compatible") }[m.breastfeeding]],
+    [t("js.lab_results", "Lab results"), m.labs.map((l) => `${l.lab} ${l.above != null ? t("js.above", "above {above}", { above: l.above }) : t("js.below", "below {below}", { below: l.below })}: ${l.action}`).join(" · ")],
+    [t("js.needs_before_dosing", "Needs before dosing"), m.requires.join(", ")],
+    [t("js.sources", "Sources"), m.source_ids.join(", ")],
   ].filter(([, v]) => v);
   const dl = $("medicine-rules");
   dl.textContent = "";
@@ -3982,16 +4032,16 @@ function renderPatientEval(p) {
   wrap.hidden = false;
   wrap.textContent = "";
   const head = document.createElement("div"); head.className = "adv-head";
-  const title = document.createElement("span"); title.className = "eyebrow"; title.textContent = "Patient scenarios";
+  const title = document.createElement("span"); title.className = "eyebrow"; title.textContent = t("js.patient_scenarios", "Patient scenarios");
   const score = document.createElement("span"); score.className = "adv-score";
-  score.textContent = `${p.passed.toLocaleString()} of ${p.total.toLocaleString()} correct, ${plural(p.unsafe_answers, "unsafe answer")}`;
+  score.textContent = t("js.of_correct", "{passed} of {total} correct, {unsafe_answers}", { passed: p.passed.toLocaleString(), total: p.total.toLocaleString(), unsafe_answers: plural(p.unsafe_answers, "unsafe answer") });
   head.append(title, score);
   const note = document.createElement("p"); note.className = "adv-note";
-  note.textContent = "The same questions asked for different patients: allergies, interactions, children, pregnancy, kidney and liver function, and missing details. Any unsafe answer fails the build.";
+  note.textContent = t("js.the_same_questions_asked_for", "The same questions asked for different patients: allergies, interactions, children, pregnancy, kidney and liver function, and missing details. Any unsafe answer fails the build.");
   wrap.append(head, note);
   if (p.failures && p.failures.length) {
     const list = document.createElement("ul"); list.className = "eval-cases";
-    p.failures.forEach((f) => { const li = document.createElement("li"); li.className = "eval-case"; li.textContent = `${f.query}: expected ${f.expect}, got ${f.got}`; list.appendChild(li); });
+    p.failures.forEach((f) => { const li = document.createElement("li"); li.className = "eval-case"; li.textContent = t("js.expected_got", "{query}: expected {expect}, got {got}", { query: f.query, expect: f.expect, got: f.got }); list.appendChild(li); });
     wrap.appendChild(list);
   }
 }
@@ -4041,9 +4091,9 @@ function applyEhrContext(context) {
   const source = context.source || {};
   let host = source.server || "";
   try { host = new URL(source.server).host; } catch (_) { /* keep as is */ }
-  $("ehr-source").textContent = `From ${source.system === "SMART on FHIR" ? "the EHR" : host}${source.patient ? `, ${source.patient}` : ""}`;
-  const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  $("ehr-meta").textContent = ` Loaded ${time(context.loaded_at)}, kept until ${time(context.expires_at)}. Check the details before asking.`;
+  $("ehr-source").textContent = t("js.from_3", "From {system}{patient}", { system: source.system === "SMART on FHIR" ? t("js.the_ehr", "the EHR") : host, patient: source.patient ? `, ${source.patient}` : "" });
+  const time = (iso) => new Date(iso).toLocaleTimeString(uiLocale(), { hour: "2-digit", minute: "2-digit" });
+  $("ehr-meta").textContent = t("js.loaded_kept_until_check_the", " Loaded {loaded_at}, kept until {expires_at}. Check the details before asking.", { loaded_at: time(context.loaded_at), expires_at: time(context.expires_at) });
   const warnings = $("ehr-warnings");
   warnings.textContent = "";
   (context.warnings || []).forEach((w) => { const li = document.createElement("li"); li.textContent = w; warnings.appendChild(li); });
@@ -4078,23 +4128,23 @@ async function loadEhrPage() {
     rows.forEach(([k, v]) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); });
   };
   $("smart-status").textContent = c.smart_enabled
-    ? "Set up. Register these addresses with your EHR."
-    : "Not set up yet. Whoever runs this server has to add the EHR's client ID and the EHRs it may be launched "
-      + "from (SMART_CLIENT_ID and SMART_ALLOWED_ISSUERS), and then these addresses get registered with the EHR.";
+    ? t("js.set_up_register_these_addresses", "Set up. Register these addresses with your EHR.")
+    : t("js.not_set_up_yet_whoever", "Not set up yet. Whoever runs this server has to add the EHR's client ID and the EHRs it may be launched ")
+      + t("js.from_smart_client_id_and", "from (SMART_CLIENT_ID and SMART_ALLOWED_ISSUERS), and then these addresses get registered with the EHR.");
   list("smart-settings", [
-    ["Launch URL", c.smart_launch_url], ["Redirect URL", c.smart_redirect_url],
-    ["Client ID", c.smart_client_id || "Not set"], ["Allowed EHRs", c.smart_allowed_issuers.join(", ") || "None"],
-    ["Scopes", c.smart_scopes], ["Open FHIR servers", c.open_servers.join(", ") || "None"],
-    ["Patient kept for", `${c.context_minutes} minutes`],
+    [t("js.launch_url", "Launch URL"), c.smart_launch_url], [t("js.redirect_url", "Redirect URL"), c.smart_redirect_url],
+    [t("js.client_id", "Client ID"), c.smart_client_id || t("js.not_set", "Not set")], [t("js.allowed_ehrs", "Allowed EHRs"), c.smart_allowed_issuers.join(", ") || t("js.none_2", "None")],
+    [t("js.scopes", "Scopes"), c.smart_scopes], [t("js.open_fhir_servers", "Open FHIR servers"), c.open_servers.join(", ") || t("js.none_2", "None")],
+    [t("js.patient_kept_for", "Patient kept for"), t("js.minutes", "{context_minutes} minutes", { context_minutes: c.context_minutes })],
   ]);
   $("cds-status").textContent = c.cds_trusted.length
-    ? "Accepting signed calls from the EHRs below."
-    : c.cds_unsigned ? "Accepting unsigned calls: for testing only."
-      : "No EHR is trusted yet. Whoever runs this server has to list each EHR that may call in, with the address its "
-        + "signing keys are published at (CDS_HOOKS_TRUSTED).";
+    ? t("js.accepting_signed_calls_from_the", "Accepting signed calls from the EHRs below.")
+    : c.cds_unsigned ? t("js.accepting_unsigned_calls_for_testing", "Accepting unsigned calls: for testing only.")
+      : t("js.no_ehr_is_trusted_yet", "No EHR is trusted yet. Whoever runs this server has to list each EHR that may call in, with the address its ")
+        + t("js.signing_keys_are_published_at", "signing keys are published at (CDS_HOOKS_TRUSTED).");
   list("cds-settings", [
-    ["Discovery URL", c.cds_discovery_url], ["Hooks", "order-select, order-sign"],
-    ["Trusted EHRs", c.cds_trusted.join(", ") || "None"], ["Unsigned calls", c.cds_unsigned ? "Allowed (testing)" : "Refused"],
+    [t("js.discovery_url", "Discovery URL"), c.cds_discovery_url], [t("js.hooks", "Hooks"), "order-select, order-sign"],
+    [t("js.trusted_ehrs", "Trusted EHRs"), c.cds_trusted.join(", ") || t("js.none_2", "None")], [t("js.unsigned_calls", "Unsigned calls"), c.cds_unsigned ? t("js.allowed_testing", "Allowed (testing)") : t("js.refused_4", "Refused")],
   ]);
   if (!$("cds-request").value) $("cds-request").value = JSON.stringify(CDS_EXAMPLE, null, 2);
 }
@@ -4103,7 +4153,7 @@ function renderCdsCards(cards) {
   const wrap = $("cds-cards");
   wrap.textContent = "";
   if (!cards.length) {
-    const p = document.createElement("p"); p.className = "auth-hint"; p.textContent = "No cards: nothing to flag for this order.";
+    const p = document.createElement("p"); p.className = "auth-hint"; p.textContent = t("js.no_cards_nothing_to_flag", "No cards: nothing to flag for this order.");
     wrap.appendChild(p);
     return;
   }
@@ -4111,19 +4161,19 @@ function renderCdsCards(cards) {
     const el = document.createElement("article");
     el.className = `cds-card ${card.indicator}`;
     const head = document.createElement("div"); head.className = "cds-card-head";
-    const tag = document.createElement("span"); tag.className = "finding-tag"; tag.textContent = { critical: "Critical", warning: "Warning", info: "Info" }[card.indicator];
+    const tag = document.createElement("span"); tag.className = "finding-tag"; tag.textContent = { critical: t("js.critical", "Critical"), warning: t("js.warning", "Warning"), info: t("js.info", "Info") }[card.indicator];
     const summary = document.createElement("strong"); summary.textContent = card.summary;
     head.append(tag, summary);
     // The detail repeats the summary after naming the order, for EHRs that
     // show only one of them. Here both are shown, so name the order once.
     const plain = card.detail.replace(/\*\*/g, "");
     const detail = document.createElement("p");
-    detail.textContent = plain.endsWith(card.summary) ? `Order: ${plain.slice(0, -card.summary.length).replace(/[:\s]+$/, "")}` : plain;
+    detail.textContent = plain.endsWith(card.summary) ? t("js.order", "Order: {plain}", { plain: plain.slice(0, -card.summary.length).replace(/[:\s]+$/, "") }) : plain;
     const source = document.createElement("p"); source.className = "finding-meta mono"; source.textContent = card.source.label;
     el.append(head, detail, source);
     if (card.overrideReasons && card.overrideReasons.length) {
       const reasons = document.createElement("p"); reasons.className = "auth-hint";
-      reasons.textContent = `Override reasons offered: ${card.overrideReasons.map((r) => r.display).join("; ")}`;
+      reasons.textContent = t("js.override_reasons_offered", "Override reasons offered: {overrideReasons}", { overrideReasons: card.overrideReasons.map((r) => r.display).join("; ") });
       el.appendChild(reasons);
     }
     wrap.appendChild(el);
@@ -4134,24 +4184,24 @@ function wireEhr() {
   $("ehr-load-button").addEventListener("click", async (e) => {
     const trigger = e.currentTarget;
     const patientId = $("ehr-patient-id").value.trim();
-    if (!patientId) { $("pt-error").textContent = "Enter the patient's FHIR ID."; $("ehr-patient-id").focus(); return; }
-    trigger.disabled = true; trigger.textContent = "Loading…";
+    if (!patientId) { $("pt-error").textContent = t("js.enter_the_patient_s_fhir", "Enter the patient's FHIR ID."); $("ehr-patient-id").focus(); return; }
+    trigger.disabled = true; trigger.textContent = t("js.loading", "Loading…");
     try {
       const data = await api("/api/ehr/load", { method: "POST", body: { server: $("ehr-server").value, patient_id: patientId } });
       $("pt-error").textContent = "";
       applyEhrContext(data.context);
     } catch (err) { $("pt-error").textContent = err.message; }
-    trigger.disabled = false; trigger.textContent = "Load from EHR";
+    trigger.disabled = false; trigger.textContent = t("js.load_from_ehr", "Load from EHR");
   });
   $("ehr-save-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
-    if (!window.confirm("Save this answer and the patient checks to the patient's record as a preliminary note?")) return;
+    if (!window.confirm(t("js.save_this_answer_and_the", "Save this answer and the patient checks to the patient's record as a preliminary note?"))) return;
     formBusy(form, true);
     try {
       const data = await api("/api/ehr/notes", { method: "POST", body: { audit_id: $("ehr-save").dataset.auditId, comment: $("ehr-save-comment").value } });
       form.hidden = true;
-      showMessage("ehr-save-message", `Saved to the record as a preliminary note${data.reference ? ` (${data.reference})` : ""}.`);
+      showMessage("ehr-save-message", t("js.saved_to_the_record_as", "Saved to the record as a preliminary note{reference}.", { reference: data.reference ? ` (${data.reference})` : "" }));
     } catch (err) { showMessage("ehr-save-message", err.message, true); }
     formBusy(form, false);
   });
@@ -4166,24 +4216,24 @@ function wireEhr() {
     $("cds-message").hidden = true;
     let body;
     try { body = JSON.parse($("cds-request").value); }
-    catch (_) { showMessage("cds-message", "The request isn't valid JSON.", true); return; }
+    catch (_) { showMessage("cds-message", t("js.the_request_isn_t_valid", "The request isn't valid JSON."), true); return; }
     const res = await fetch("/cds-services/groundcheck-medication-safety-order-sign", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) {
-      showMessage("cds-message", "This server only accepts calls signed by a trusted EHR. To try requests here, run a test server with CDS_HOOKS_ALLOW_UNSIGNED=true.", true);
+      showMessage("cds-message", t("js.this_server_only_accepts_calls", "This server only accepts calls signed by a trusted EHR. To try requests here, run a test server with CDS_HOOKS_ALLOW_UNSIGNED=true."), true);
       $("cds-cards").textContent = "";
       return;
     }
-    if (!res.ok) { showMessage("cds-message", data.detail || `The service returned ${res.status}.`, true); return; }
+    if (!res.ok) { showMessage("cds-message", data.detail || t("js.the_service_returned", "The service returned {status}.", { status: res.status }), true); return; }
     renderCdsCards(data.cards);
   });
 }
 
 // ---------- Releases ----------
-const RELEASE_STATUS = { live: ["Live", "status-live"], ready: ["Ready to go live", "status-ready"], checking: ["Checking", "status-checking"],
-  failed: ["Blocked", "status-failed"], retired: ["Earlier", "status-earlier"], rolled_back: ["Rolled back", "status-earlier"] };
+const RELEASE_STATUS = () => ({ live: [t("js.live", "Live"), "status-live"], ready: [t("js.ready_to_go_live", "Ready to go live"), "status-ready"], checking: [t("js.checking_2", "Checking"), "status-checking"],
+  failed: [t("js.blocked", "Blocked"), "status-failed"], retired: [t("js.earlier", "Earlier"), "status-earlier"], rolled_back: [t("js.rolled_back", "Rolled back"), "status-earlier"] });
 let releasePoll = null;
 
 function canAdmin() {
@@ -4191,26 +4241,26 @@ function canAdmin() {
 }
 
 function checkText(check) {
-  if (!check) return ["Not checked yet.", "skip"];
-  if (check.skipped) return ["Not checked: release checks are turned off, or this was the first release.", "skip"];
+  if (!check) return [t("js.not_checked_yet", "Not checked yet."), "skip"];
+  if (check.skipped) return [t("js.not_checked_release_checks_are", "Not checked: release checks are turned off, or this was the first release."), "skip"];
   if (check.error) return [check.error, "bad"];
   const g = check.groups || {};
   const parts = [];
-  if (g.golden) parts.push(`${g.golden.total.toLocaleString()} golden-set questions`);
-  if (g.patient) parts.push(`${g.patient.total.toLocaleString()} patient scenarios`);
-  if (g.review_tests) parts.push(`${g.review_tests.total.toLocaleString()} review test${g.review_tests.total === 1 ? "" : "s"}`);
-  const what = parts.length ? parts.join(", ") : "no questions";
-  if (!check.passed) return [`Blocked: answered ${check.unsafe} question${check.unsafe === 1 ? "" : "s"} that must be refused, of ${what}.`, "bad"];
-  return [`Passed: nothing that must be refused was answered, across ${what}, in ${check.seconds} s.`, ""];
+  if (g.golden) parts.push(t("js.golden_set_questions", "{total} golden-set questions", { total: g.golden.total.toLocaleString() }));
+  if (g.patient) parts.push(t("js.patient_scenarios_2", "{total} patient scenarios", { total: g.patient.total.toLocaleString() }));
+  if (g.review_tests) parts.push(t("js.review_test", "{total} review test{s}", { total: g.review_tests.total.toLocaleString(), s: g.review_tests.total === 1 ? "" : "s" }));
+  const what = parts.length ? parts.join(", ") : t("js.no_questions", "no questions");
+  if (!check.passed) return [t("js.blocked_answered_question_that_must", "Blocked: answered {unsafe} question{s} that must be refused, of {what}.", { unsafe: check.unsafe, s: check.unsafe === 1 ? "" : "s", what }), "bad"];
+  return [t("js.passed_nothing_that_must_be", "Passed: nothing that must be refused was answered, across {what}, in {seconds} s.", { what, seconds: check.seconds }), ""];
 }
 
 function changeText(r) {
   if (!r.changes) return "";
   const parts = [];
-  if (r.changes.added.length) parts.push(`adds ${r.changes.added.join(", ")}`);
-  if (r.changes.updated.length) parts.push(`updates ${r.changes.updated.join(", ")}`);
-  if (r.changes.removed.length) parts.push(`removes ${r.changes.removed.join(", ")}`);
-  return parts.length ? `Compared with live: ${parts.join("; ")}.` : "Same documents as live.";
+  if (r.changes.added.length) parts.push(t("js.adds", "adds {added}", { added: r.changes.added.join(", ") }));
+  if (r.changes.updated.length) parts.push(t("js.updates", "updates {updated}", { updated: r.changes.updated.join(", ") }));
+  if (r.changes.removed.length) parts.push(t("js.removes", "removes {removed}", { removed: r.changes.removed.join(", ") }));
+  return parts.length ? t("js.compared_with_live", "Compared with live: {parts}.", { parts: parts.join("; ") }) : t("js.same_documents_as_live", "Same documents as live.");
 }
 
 async function loadReleases() {
@@ -4223,7 +4273,7 @@ async function loadReleases() {
   const earlier = live && data.releases.find((r) => r.number < live.number && r.live_at && ["retired", "rolled_back"].includes(r.status) && r.snapshot);
   $("release-rebuild").hidden = !admin;
   $("release-rollback").hidden = !admin || !earlier;
-  if (earlier) $("release-rollback").textContent = `Roll back to R${earlier.number}`;
+  if (earlier) $("release-rollback").textContent = t("js.roll_back_to_r", "Roll back to R{number}", { number: earlier.number });
   const running = data.index.state === "running";
   $("release-rebuild").disabled = running;
 
@@ -4232,12 +4282,12 @@ async function loadReleases() {
   banner.className = `live-release${running ? " checking" : ""}`;
   if (live) {
     const body = document.createElement("div");
-    body.append(el("h2", "", running ? `Live: R${live.number}. A new release is being built and checked.` : `Live: R${live.number}`),
-      el("p", "", `${live.reason}. Live since ${dateTime(live.live_at)}${live.live_by ? `, by ${live.live_by}` : ""}.`));
+    body.append(el("h2", "", running ? t("js.live_r_a_new_release", "Live: R{number}. A new release is being built and checked.", { number: live.number }) : t("js.live_r", "Live: R{number}", { number: live.number })),
+      el("p", "", t("js.live_since", "{reason}. Live since {live_at}{live_by}.", { reason: live.reason, live_at: dateTime(live.live_at), live_by: live.live_by ? t("js.by_4", ", by {live_by}", { live_by: live.live_by }) : "" })));
     const figures = el("div", "figures");
-    figures.append(el("div", "", `${live.passages.toLocaleString()} passages`),
-      el("div", "", `${live.documents.length} of your document${live.documents.length === 1 ? "" : "s"}`),
-      el("div", "", live.demo_passages ? `${live.demo_passages.toLocaleString()} from the demo corpus` : "No demo corpus"));
+    figures.append(el("div", "", t("js.passages", "{passages} passages", { passages: live.passages.toLocaleString() })),
+      el("div", "", t("js.of_your_document", "{documents} of your document{s}", { documents: live.documents.length, s: live.documents.length === 1 ? "" : "s" })),
+      el("div", "", live.demo_passages ? t("js.from_the_demo_corpus", "{demo_passages} from the demo corpus", { demo_passages: live.demo_passages.toLocaleString() }) : t("js.no_demo_corpus", "No demo corpus")));
     banner.append(el("span", "release-badge", `R${live.number}`), body, figures);
   }
 
@@ -4246,33 +4296,33 @@ async function loadReleases() {
   data.releases.forEach((r) => {
     const li = el("li", "release-item");
     const body = el("div", "release-body");
-    const [label, cls] = RELEASE_STATUS[r.status] || [r.status, ""];
+    const [label, cls] = RELEASE_STATUS()[r.status] || [r.status, ""];
     const h = el("h3");
-    h.append(r.reason || "Index rebuilt", el("span", `status-pill ${cls}`, label));
-    body.append(h, el("p", "release-meta", `Built ${dateTime(r.created_at)} by ${r.created_by || "GroundCheckHealth"}. ${r.passages.toLocaleString()} passages, ${r.documents.length} document${r.documents.length === 1 ? "" : "s"}.${r.snapshot ? "" : " Snapshot removed."}`));
+    h.append(r.reason || t("js.index_rebuilt", "Index rebuilt"), el("span", `status-pill ${cls}`, label));
+    body.append(h, el("p", "release-meta", t("js.built_by_passages_document", "Built {created_at} by {created_by}. {passages} passages, {documents} document{s}.{snapshot}", { created_at: dateTime(r.created_at), created_by: r.created_by || "GroundCheckHealth", passages: r.passages.toLocaleString(), documents: r.documents.length, s: r.documents.length === 1 ? "" : "s", snapshot: r.snapshot ? "" : t("js.snapshot_removed", " Snapshot removed.") })));
     const changes = changeText(r);
     if (changes) body.appendChild(el("p", "", changes));
     const [text, state] = checkText(r.check);
     body.appendChild(el("p", `release-check ${state}`, text));
-    const examples = [...(r.check?.unsafe_examples || []).map((e) => `Answered, must refuse: ${e.query}`),
-      ...(r.check?.over_refused_examples || []).map((q) => `Now refused: ${q}`)];
+    const examples = [...(r.check?.unsafe_examples || []).map((e) => t("js.answered_must_refuse", "Answered, must refuse: {query}", { query: e.query })),
+      ...(r.check?.over_refused_examples || []).map((q) => t("js.now_refused", "Now refused: {q}", { q }))];
     if (examples.length) {
       const details = el("details", "release-details");
-      details.appendChild(el("summary", "", "Questions"));
+      details.appendChild(el("summary", "", t("js.questions", "Questions")));
       const ul = document.createElement("ul");
-      examples.forEach((t) => ul.appendChild(el("li", "", t)));
+      examples.forEach((tt) => ul.appendChild(el("li", "", tt)));
       details.appendChild(ul);
       body.appendChild(details);
     }
     const actions = el("div", "release-actions");
     if (admin && r.snapshot && ["ready", "retired", "rolled_back"].includes(r.status)) {
-      const verb = r.status === "ready" ? "Put live" : "Make live again";
+      const verb = r.status === "ready" ? t("js.put_live", "Put live") : t("js.make_live_again", "Make live again");
       actions.appendChild(button(verb, r.status === "ready" ? "btn-primary" : "btn-ghost", running, async (e) => {
-        if (!window.confirm(`Make R${r.number} live? Answers will come from its documents straight away.`)) return;
+        if (!window.confirm(t("js.make_r_live_answers_will", "Make R{number} live? Answers will come from its documents straight away.", { number: r.number }))) return;
         e.target.disabled = true;
         try {
           const { release } = await api(`/api/releases/${r.id}/promote`, { method: "POST" });
-          showMessage("releases-message", `R${release.number} is live.`);
+          showMessage("releases-message", t("js.r_is_live", "R{number} is live.", { number: release.number }));
         } catch (err) { showMessage("releases-message", err.message, true); }
         loadReleases();
       }));
@@ -4280,23 +4330,23 @@ async function loadReleases() {
     li.append(el("span", "release-name", `R${r.number}`), body, actions);
     list.appendChild(li);
   });
-  $("release-policy").textContent = `${data.checks ? "Checks are on." : "Checks are off (RELEASE_CHECKS=false)."} ${data.auto_promote ? "A release that passes goes live straight away." : "A release that passes waits for an admin to put it live."} The last ${data.keep} snapshots are kept.`;
+  $("release-policy").textContent = t("js.the_last_snapshots_are_kept", "{checks} {auto_promote} The last {keep} snapshots are kept.", { checks: data.checks ? t("js.checks_are_on", "Checks are on.") : t("js.checks_are_off_release_checks", "Checks are off (RELEASE_CHECKS=false)."), auto_promote: data.auto_promote ? t("js.a_release_that_passes_goes", "A release that passes goes live straight away.") : t("js.a_release_that_passes_waits", "A release that passes waits for an admin to put it live."), keep: data.keep });
   if (running && currentView() === "releases") releasePoll = setTimeout(loadReleases, 2000);
 }
 
 function wireReleases() {
   $("release-rebuild").addEventListener("click", async (e) => {
     e.target.disabled = true;
-    try { await api("/api/index/rebuild", { method: "POST" }); showMessage("releases-message", "Rebuilding and checking. This takes about a minute."); }
+    try { await api("/api/index/rebuild", { method: "POST" }); showMessage("releases-message", t("js.rebuilding_and_checking_this_takes", "Rebuilding and checking. This takes about a minute.")); }
     catch (err) { showMessage("releases-message", err.message, true); }
     loadReleases();
   });
   $("release-rollback").addEventListener("click", async (e) => {
-    if (!window.confirm("Go back to the previous release? Answers will come from its documents straight away.")) return;
+    if (!window.confirm(t("js.go_back_to_the_previous", "Go back to the previous release? Answers will come from its documents straight away."))) return;
     e.target.disabled = true;
     try {
       const { release } = await api("/api/releases/rollback", { method: "POST" });
-      showMessage("releases-message", `Rolled back. R${release.number} is live.`);
+      showMessage("releases-message", t("js.rolled_back_r_is_live", "Rolled back. R{number} is live.", { number: release.number }));
     } catch (err) { showMessage("releases-message", err.message, true); }
     e.target.disabled = false;
     loadReleases();
@@ -4305,10 +4355,10 @@ function wireReleases() {
 
 // ---------- Incidents ----------
 const incidentState = { labels: null, people: [], canManage: false, current: null, links: {} };
-const INCIDENT_CATEGORIES = { answer: "An answer or refusal", patient_check: "A patient safety check", imaging: "Imaging", ehr: "EHR integration",
-  data_protection: "Data protection or security", availability: "Outage or slowness", other: "Something else" };
-const INCIDENT_HARM = { none: "No harm or near miss", low: "Low harm", moderate: "Moderate harm", severe: "Severe harm", death: "Death" };
-const INCIDENT_STATUS = { open: "Open", investigating: "Investigating", closed: "Closed" };
+const INCIDENT_CATEGORIES = () => ({ answer: t("js.an_answer_or_refusal", "An answer or refusal"), patient_check: t("js.a_patient_safety_check", "A patient safety check"), imaging: t("js.imaging", "Imaging"), ehr: t("js.ehr_integration", "EHR integration"),
+  data_protection: t("js.data_protection_or_security", "Data protection or security"), availability: t("js.outage_or_slowness", "Outage or slowness"), other: t("js.something_else", "Something else") });
+const INCIDENT_HARM = () => ({ none: t("js.no_harm_or_near_miss", "No harm or near miss"), low: t("js.low_harm", "Low harm"), moderate: t("js.moderate_harm", "Moderate harm"), severe: t("js.severe_harm", "Severe harm"), death: t("js.death", "Death") });
+const INCIDENT_STATUS = () => ({ open: t("js.open_2", "Open"), investigating: t("js.investigating", "Investigating"), closed: t("js.closed", "Closed") });
 
 function fillSelect(select, options, chosen) {
   const keep = chosen ?? select.value;
@@ -4318,11 +4368,11 @@ function fillSelect(select, options, chosen) {
 }
 
 function harmPill(harm) {
-  return el("span", `harm harm-${harm}`, INCIDENT_HARM[harm]);
+  return el("span", `harm harm-${harm}`, INCIDENT_HARM()[harm]);
 }
 
 function statusPill(status) {
-  return el("span", `status-pill ${status === "closed" ? "status-retired" : status === "investigating" ? "status-investigating" : "status-pending"}`, INCIDENT_STATUS[status]);
+  return el("span", `status-pill ${status === "closed" ? "status-retired" : status === "investigating" ? "status-investigating" : "status-pending"}`, INCIDENT_STATUS()[status]);
 }
 
 async function loadIncidents() {
@@ -4334,15 +4384,15 @@ async function loadIncidents() {
   incidentState.people = data.people || [];
   $("incidents-export").hidden = !data.can_manage;
   $("incidents-sub").textContent = data.can_manage
-    ? "Report anything that went wrong, or nearly did. Investigate, record the root cause and the actions taken, and close it."
-    : "Report anything that went wrong, or nearly did. You can follow the incidents you reported here.";
+    ? t("js.report_anything_that_went_wrong", "Report anything that went wrong, or nearly did. Investigate, record the root cause and the actions taken, and close it.")
+    : t("js.report_anything_that_went_wrong_2", "Report anything that went wrong, or nearly did. You can follow the incidents you reported here.");
   const category = $("incident-category-filter");
-  if (category.options.length === 1) Object.entries(INCIDENT_CATEGORIES).forEach(([v, l]) => { const o = el("option", "", l); o.value = v; category.appendChild(o); });
+  if (category.options.length === 1) Object.entries(INCIDENT_CATEGORIES()).forEach(([v, l]) => { const o = el("option", "", l); o.value = v; category.appendChild(o); });
 
   const counts = $("incident-counts");
   counts.textContent = "";
   if (data.can_manage) {
-    [["Open", data.counts.open], ["Investigating", data.counts.investigating], ["Closed", data.counts.closed], ["Moderate harm or worse, not closed", data.serious_active]]
+    [[t("js.open_2", "Open"), data.counts.open], [t("js.investigating", "Investigating"), data.counts.investigating], [t("js.closed", "Closed"), data.counts.closed], [t("js.moderate_harm_or_worse_not", "Moderate harm or worse, not closed"), data.serious_active]]
       .forEach(([label, n], i) => {
         const c = el("span", `review-count${i === 3 && n ? " bad" : ""}`);
         c.append(el("strong", "", String(n)), ` ${label}`);
@@ -4359,11 +4409,11 @@ async function loadIncidents() {
     const open = el("button", "incident-open", i.title);
     open.type = "button";
     open.addEventListener("click", () => openIncident(i.id));
-    name.append(el("span", "incident-ref", `${i.reference}, ${i.category_label.toLowerCase()}`), open);
-    const harm = document.createElement("td"); harm.dataset.label = "Harm"; harm.appendChild(harmPill(i.harm));
-    const status = document.createElement("td"); status.dataset.label = "Status"; status.appendChild(statusPill(i.status));
-    const reported = el("td", "", `${dateTime(i.reported_at)}, ${i.reported_by}`); reported.dataset.label = "Reported";
-    const owner = el("td", i.owner ? "" : "muted", i.owner || "Nobody yet"); owner.dataset.label = "Owner";
+    name.append(el("span", "incident-ref", `${i.reference}, ${(INCIDENT_CATEGORIES()[i.category] || i.category_label).toLowerCase()}`), open);
+    const harm = document.createElement("td"); harm.dataset.label = t("js.harm", "Harm"); harm.appendChild(harmPill(i.harm));
+    const status = document.createElement("td"); status.dataset.label = t("js.status", "Status"); status.appendChild(statusPill(i.status));
+    const reported = el("td", "", `${dateTime(i.reported_at)}, ${i.reported_by}`); reported.dataset.label = t("js.reported", "Reported");
+    const owner = el("td", i.owner ? "" : "muted", i.owner || t("js.nobody_yet", "Nobody yet")); owner.dataset.label = t("js.owner_2", "Owner");
     tr.append(name, harm, status, reported, owner);
     rows.appendChild(tr);
   });
@@ -4373,13 +4423,13 @@ function openIncidentReport(links = {}) {
   incidentState.links = links;
   const form = $("incident-report-form");
   form.reset();
-  fillSelect($("ir-category"), INCIDENT_CATEGORIES, links.category || "answer");
-  fillSelect($("ir-harm"), INCIDENT_HARM, "none");
+  fillSelect($("ir-category"), INCIDENT_CATEGORIES(), links.category || "answer");
+  fillSelect($("ir-harm"), INCIDENT_HARM(), "none");
   $("ir-audit").value = links.audit_id || "";
-  const described = [links.alert_id && `alert: ${links.alert_title}`, links.imaging_series_id && `imaging series ${links.imaging_series_id}`,
-    links.review_case_id && `review case ${links.review_case_id}`].filter(Boolean);
+  const described = [links.alert_id && t("js.alert", "alert: {alert_title}", { alert_title: links.alert_title }), links.imaging_series_id && t("js.imaging_series", "imaging series {imaging_series_id}", { imaging_series_id: links.imaging_series_id }),
+    links.review_case_id && t("js.review_case", "review case {review_case_id}", { review_case_id: links.review_case_id })].filter(Boolean);
   $("ir-links").hidden = described.length === 0;
-  $("ir-links").textContent = described.length ? `Linked to the ${described.join(" and the ")}.` : "";
+  $("ir-links").textContent = described.length ? t("js.linked_to_the", "Linked to the {described}.", { described: described.join(t("js.and_the", " and the ")) }) : "";
   if (links.title) $("ir-title").value = links.title;
   $("ir-message").hidden = true;
   $("incident-report-dialog").showModal();
@@ -4390,8 +4440,8 @@ async function submitIncidentReport(event) {
   event.preventDefault();
   const title = $("ir-title").value.trim();
   const description = $("ir-description").value.trim();
-  if (!title) { showMessage("ir-message", "Add a short title.", true); $("ir-title").focus(); return; }
-  if (!description) { showMessage("ir-message", "Describe what happened.", true); $("ir-description").focus(); return; }
+  if (!title) { showMessage("ir-message", t("js.add_a_short_title", "Add a short title."), true); $("ir-title").focus(); return; }
+  if (!description) { showMessage("ir-message", t("js.describe_what_happened", "Describe what happened."), true); $("ir-description").focus(); return; }
   const occurred = $("ir-occurred").value;
   const body = {
     title, description, category: $("ir-category").value, harm: $("ir-harm").value,
@@ -4406,7 +4456,7 @@ async function submitIncidentReport(event) {
     const { incident } = await api("/api/incidents", { method: "POST", body });
     $("incident-report-dialog").close();
     if (currentView() === "incidents") loadIncidents();
-    const message = `Reported as ${incident.reference}.`;
+    const message = t("js.reported_as", "Reported as {reference}.", { reference: incident.reference });
     if (currentView() === "incidents") showMessage("incidents-message", message);
     else if (currentView() === "monitoring") showMessage("monitoring-message", message);
     else showMessage("flag-message", message);
@@ -4428,19 +4478,19 @@ async function openIncident(id) {
 function renderIncident(i, canManage) {
   incidentState.current = i;
   $("incident-dialog-title").textContent = `${i.reference}: ${i.title}`;
-  $("incident-meta").textContent = `${i.category_label}. ${i.harm_label}. ${INCIDENT_STATUS[i.status]}. Reported by ${i.reported_by} on ${dateTime(i.reported_at)}${i.occurred_at ? `; happened ${dateTime(i.occurred_at)}` : ""}.`;
+  $("incident-meta").textContent = t("js.reported_by_on", "{category_label}. {harm_label}. {status}. Reported by {reported_by} on {reported_at}{occurred_at}.", { category_label: INCIDENT_CATEGORIES()[i.category] || i.category_label, harm_label: INCIDENT_HARM()[i.harm] || i.harm_label, status: INCIDENT_STATUS()[i.status], reported_by: i.reported_by, reported_at: dateTime(i.reported_at), occurred_at: i.occurred_at ? t("js.happened", "; happened {occurred_at}", { occurred_at: dateTime(i.occurred_at) }) : "" });
   const deadlines = $("incident-deadlines");
   deadlines.textContent = "";
   i.deadlines.forEach((d) => {
     const p = el("p", `deadline${d.done ? " done" : ""}`);
-    p.append(el("strong", "", d.done ? "Recorded" : d.due_at ? `Due by ${dateTime(d.due_at)}` : "Decision needed"), d.text);
+    p.append(el("strong", "", d.done ? t("js.recorded", "Recorded") : d.due_at ? t("js.due_by", "Due by {due_at}", { due_at: dateTime(d.due_at) }) : t("js.decision_needed", "Decision needed")), d.text);
     deadlines.appendChild(p);
   });
   $("incident-description").textContent = i.description;
-  const links = [i.links.audit_id && `audit record ${i.links.audit_id}`, i.links.review_case_id && `review case ${i.links.review_case_id}`,
-    i.links.alert_id && `alert ${i.links.alert_id}`, i.links.imaging_series_id && `imaging series ${i.links.imaging_series_id}`,
-    i.links.hazard_id && `hazard ${i.links.hazard_id}`].filter(Boolean);
-  $("incident-links").textContent = links.length ? `Linked to ${links.join(", ")}.` : "";
+  const links = [i.links.audit_id && t("js.audit_record_2", "audit record {audit_id}", { audit_id: i.links.audit_id }), i.links.review_case_id && t("js.review_case", "review case {review_case_id}", { review_case_id: i.links.review_case_id }),
+    i.links.alert_id && t("js.alert_2", "alert {alert_id}", { alert_id: i.links.alert_id }), i.links.imaging_series_id && t("js.imaging_series", "imaging series {imaging_series_id}", { imaging_series_id: i.links.imaging_series_id }),
+    i.links.hazard_id && t("js.hazard", "hazard {hazard_id}", { hazard_id: i.links.hazard_id })].filter(Boolean);
+  $("incident-links").textContent = links.length ? t("js.linked_to", "Linked to {links}.", { links: links.join(", ") }) : "";
   $("incident-links").hidden = !links.length;
 
   $("incident-manage").hidden = !canManage;
@@ -4448,11 +4498,11 @@ function renderIncident(i, canManage) {
     $("if-status").value = i.status;
     const owner = $("if-owner");
     owner.textContent = "";
-    const none = el("option", "", "Nobody yet"); none.value = ""; owner.appendChild(none);
+    const none = el("option", "", t("js.nobody_yet", "Nobody yet")); none.value = ""; owner.appendChild(none);
     incidentState.people.forEach((p) => { const o = el("option", "", p.name); o.value = p.id; owner.appendChild(o); });
     owner.value = i.owner_id ?? "";
-    fillSelect($("if-harm"), INCIDENT_HARM, i.harm);
-    fillSelect($("if-category"), INCIDENT_CATEGORIES, i.category);
+    fillSelect($("if-harm"), INCIDENT_HARM(), i.harm);
+    fillSelect($("if-category"), INCIDENT_CATEGORIES(), i.category);
     $("if-root").value = i.root_cause;
     $("if-actions").value = i.actions;
     $("if-external").value = i.external_reference;
@@ -4464,7 +4514,7 @@ function renderIncident(i, canManage) {
   i.timeline.forEach((e) => {
     const li = document.createElement("li");
     const head = el("div", "timeline-head");
-    head.append(el("strong", "", { reported: "Reported", updated: "Updated", comment: "Comment" }[e.action] || e.action), el("span", "muted", `${e.by}, ${dateTime(e.at)}`));
+    head.append(el("strong", "", { reported: t("js.reported", "Reported"), updated: t("js.updated", "Updated"), comment: t("js.comment", "Comment") }[e.action] || e.action), el("span", "muted", `${e.by}, ${dateTime(e.at)}`));
     li.append(head, el("p", "", e.note));
     timeline.appendChild(li);
   });
@@ -4485,7 +4535,7 @@ async function saveIncident(event) {
   try {
     const { incident } = await api(`/api/incidents/${i.id}`, { method: "PATCH", body });
     renderIncident(incident, true);
-    showMessage("if-message", "Saved.");
+    showMessage("if-message", t("js.saved", "Saved."));
     loadIncidents();
   } catch (err) {
     showMessage("if-message", err.message, true);
@@ -4513,15 +4563,15 @@ function wireIncidents() {
 }
 
 // ---------- Monitoring ----------
-const RULE_NOW = { firing: "Firing", ok: "OK", off: "Off" };
+const RULE_NOW = () => ({ firing: t("js.firing", "Firing"), ok: t("js.ok_state", "OK"), off: t("js.off_2", "Off") });
 
 function sinceText(iso) {
   const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t("js.just_now", "just now");
+  if (minutes < 60) return t("js.min_ago", "{minutes} min ago", { minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours} h ago`;
-  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  if (hours < 48) return t("js.h_ago", "{hours} h ago", { hours });
+  return new Date(iso).toLocaleDateString(uiLocale(), { day: "numeric", month: "short" });
 }
 
 function updateAlertBadge(firing) {
@@ -4530,7 +4580,7 @@ function updateAlertBadge(firing) {
   badge.hidden = false;
   badge.textContent = String(firing.length);
   badge.classList.toggle("warning", !firing.some((a) => a.severity === "critical"));
-  badge.setAttribute("aria-label", `${firing.length} alert${firing.length === 1 ? "" : "s"} firing`);
+  badge.setAttribute("aria-label", t("js.alert_firing", "{firing} alert{s} firing", { firing: firing.length, s: firing.length === 1 ? "" : "s" }));
 }
 
 async function loadMonitoring(check = false) {
@@ -4543,10 +4593,10 @@ async function loadMonitoring(check = false) {
   if (check) {
     const c = data.changes || {};
     const parts = [];
-    if (c.fired?.length) parts.push(`${c.fired.length} started firing`);
-    if (c.resolved?.length) parts.push(`${c.resolved.length} resolved`);
-    if (c.errors?.length) parts.push(`${c.errors.length} check${c.errors.length === 1 ? "" : "s"} couldn’t run`);
-    showMessage("monitoring-message", `Checked. ${parts.length ? parts.join(", ") + "." : "No changes."}`, !!c.errors?.length);
+    if (c.fired?.length) parts.push(t("js.started_firing", "{fired} started firing", { fired: c.fired.length }));
+    if (c.resolved?.length) parts.push(t("js.resolved_4", "{resolved} resolved", { resolved: c.resolved.length }));
+    if (c.errors?.length) parts.push(t("js.check_couldn_t_run", "{errors} check{s} couldn’t run", { errors: c.errors.length, s: c.errors.length === 1 ? "" : "s" }));
+    showMessage("monitoring-message", t("js.checked_2", "Checked. {parts}", { parts: parts.length ? parts.join(", ") + "." : t("js.no_changes", "No changes.") }), !!c.errors?.length);
   }
 }
 
@@ -4557,20 +4607,20 @@ function renderMonitoring(data) {
   status.className = `monitor-status${critical ? " critical" : data.firing.length ? " warning" : ""}`;
   status.textContent = "";
   status.append(el("span", "pulse"), el("strong", "", data.firing.length
-    ? `${data.firing.length} alert${data.firing.length === 1 ? "" : "s"} firing${critical ? `, ${critical} critical` : ""}`
-    : "All checks are clear"), el("span", "when", `Checked every ${Math.round(data.interval_seconds / 60) || 1} min`));
+    ? t("js.alert_firing_2", "{firing} alert{s} firing{critical}", { firing: data.firing.length, s: data.firing.length === 1 ? "" : "s", critical: critical ? t("js.critical_2", ", {critical} critical", { critical }) : "" })
+    : t("js.all_checks_are_clear", "All checks are clear")), el("span", "when", t("js.checked_every_min", "Checked every {value} min", { value: Math.round(data.interval_seconds / 60) || 1 })));
 
   const n = data.now;
   const stats = $("monitor-stats");
   stats.textContent = "";
   const refusal = n.refusal_rate === null ? "–" : `${Math.round(n.refusal_rate * 100)}%`;
-  const baseline = n.baseline_refusal_rate === null ? "" : `Usually ${Math.round(n.baseline_refusal_rate * 100)}%, over the last week`;
+  const baseline = n.baseline_refusal_rate === null ? "" : t("js.usually_over_the_last_week", "Usually {value}%, over the last week", { value: Math.round(n.baseline_refusal_rate * 100) });
   stats.append(
-    statTile(`Questions, last ${n.window_minutes} min`, n.questions.toLocaleString()),
-    statTile(`Refused, last ${n.window_minutes} min`, refusal, baseline, { attention: data.firing.some((a) => a.rule === "refusal_rate") }),
-    statTile("95th percentile response", formatMs(n.p95_ms), null, { attention: data.firing.some((a) => a.rule === "latency") }),
-    statTile("Server errors, 15 min", n.server_error_rate_15m === null ? "–" : `${(n.server_error_rate_15m * 100).toFixed(1)}%`,
-      `${n.requests_15m.toLocaleString()} requests on this instance`, { attention: data.firing.some((a) => a.rule === "server_errors") }),
+    statTile(t("js.questions_last_min", "Questions, last {window_minutes} min", { window_minutes: n.window_minutes }), n.questions.toLocaleString()),
+    statTile(t("js.refused_last_min", "Refused, last {window_minutes} min", { window_minutes: n.window_minutes }), refusal, baseline, { attention: data.firing.some((a) => a.rule === "refusal_rate") }),
+    statTile(t("js.95th_percentile_response", "95th percentile response"), formatMs(n.p95_ms), null, { attention: data.firing.some((a) => a.rule === "latency") }),
+    statTile(t("js.server_errors_15_min", "Server errors, 15 min"), n.server_error_rate_15m === null ? "–" : `${(n.server_error_rate_15m * 100).toFixed(1)}%`,
+      t("js.requests_on_this_instance", "{requests_15m} requests on this instance", { requests_15m: n.requests_15m.toLocaleString() }), { attention: data.firing.some((a) => a.rule === "server_errors") }),
   );
 
   const list = $("alert-list");
@@ -4580,18 +4630,18 @@ function renderMonitoring(data) {
     const li = el("li", `alert-item ${a.severity}`);
     const body = document.createElement("div");
     const h = el("h3");
-    h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? "Critical" : "Warning"), a.title);
+    h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? t("js.critical", "Critical") : t("js.warning", "Warning")), a.title);
     body.append(h, el("p", "", a.detail), el("p", "alert-meta",
-      `Firing since ${sinceText(a.first_seen)}, last checked ${sinceText(a.last_seen)}.${a.acknowledged_by ? ` Acknowledged by ${a.acknowledged_by} ${sinceText(a.acknowledged_at)}.` : ""}`));
+      t("js.firing_since_last_checked", "Firing since {first_seen}, last checked {last_seen}.{acknowledged_by}", { first_seen: sinceText(a.first_seen), last_seen: sinceText(a.last_seen), acknowledged_by: a.acknowledged_by ? t("js.acknowledged_by", " Acknowledged by {acknowledged_by} {acknowledged_at}.", { acknowledged_by: a.acknowledged_by, acknowledged_at: sinceText(a.acknowledged_at) }) : "" })));
     const actions = el("div", "alert-actions");
     if (!a.acknowledged_at) {
-      actions.appendChild(button("Acknowledge", "btn-ghost", false, async (e) => {
+      actions.appendChild(button(t("js.acknowledge", "Acknowledge"), "btn-ghost", false, async (e) => {
         e.target.disabled = true;
         try { await api(`/api/alerts/${a.id}/acknowledge`, { method: "POST" }); loadMonitoring(); }
         catch (err) { showMessage("monitoring-message", err.message, true); e.target.disabled = false; }
       }));
     }
-    actions.appendChild(button("Report an incident", "btn-ghost", false, () => openIncidentReport({
+    actions.appendChild(button(t("js.report_an_incident", "Report an incident"), "btn-ghost", false, () => openIncidentReport({
       alert_id: a.id, alert_title: a.title, title: a.title,
       category: a.rule === "audit_chain" ? "data_protection" : a.rule === "imaging_failures" ? "imaging" : a.rule === "latency" || a.rule === "server_errors" ? "availability" : "answer",
     })));
@@ -4605,7 +4655,7 @@ function renderMonitoring(data) {
   data.rules.forEach((r) => {
     const tr = document.createElement("tr");
     const state = data.disabled.includes(r.rule) ? "off" : firingRules.has(r.rule) ? "firing" : "ok";
-    const pill = el("span", `status-pill rule-state ${state === "firing" ? "status-rejected" : state === "ok" ? "status-approved" : "status-retired"}`, RULE_NOW[state]);
+    const pill = el("span", `status-pill rule-state ${state === "firing" ? "status-rejected" : state === "ok" ? "status-approved" : "status-retired"}`, RULE_NOW()[state]);
     const cell = document.createElement("td"); cell.appendChild(pill);
     tr.append(el("td", "", r.name), el("td", "", r.limit), cell);
     rows.appendChild(tr);
@@ -4613,27 +4663,27 @@ function renderMonitoring(data) {
   const instance = data.instance || {};
   const details = $("instance-details");
   details.textContent = "";
-  const gpu = { cpu: "None, using the processor", mps: "Apple GPU", cuda: "NVIDIA GPU" }[instance.accelerator] || instance.accelerator;
-  [["Name", `${instance.name} (version ${instance.version})`],
-   ["Hardware", `${instance.cpus} cores, ${instance.memory_gb} GB memory`],
-   ["Accelerator", `${gpu}${instance.accelerator !== "cpu" ? `, ${instance.accelerator_memory_gb} GB` : ""}`],
-   ["Batch sizes", `${instance.embed_batch} passages, ${instance.imaging_batch} image regions`],
-   ["Workers this machine fits", String(instance.web_workers)],
-   ["Answers remembered", instance.answer_cache_seconds ? `${instance.answers_cached} for ${instance.answer_cache_seconds} s` : "Cache off"],
-   ["Embeddings remembered", `${instance.questions_cached.toLocaleString()} questions, ${instance.passages_cached.toLocaleString()} passages`],
-   ["Running for", formatDuration(data.now.uptime_seconds)]]
+  const gpu = { cpu: t("js.none_using_the_processor", "None, using the processor"), mps: t("js.apple_gpu", "Apple GPU"), cuda: t("js.nvidia_gpu", "NVIDIA GPU") }[instance.accelerator] || instance.accelerator;
+  [[t("js.name", "Name"), t("js.version_2", "{name} (version {version})", { name: instance.name, version: instance.version })],
+   [t("js.hardware", "Hardware"), t("js.cores_gb_memory", "{cpus} cores, {memory_gb} GB memory", { cpus: instance.cpus, memory_gb: instance.memory_gb })],
+   [t("js.accelerator", "Accelerator"), `${gpu}${instance.accelerator !== "cpu" ? `, ${instance.accelerator_memory_gb} GB` : ""}`],
+   [t("js.batch_sizes", "Batch sizes"), t("js.passages_image_regions", "{embed_batch} passages, {imaging_batch} image regions", { embed_batch: instance.embed_batch, imaging_batch: instance.imaging_batch })],
+   [t("js.workers_this_machine_fits", "Workers this machine fits"), String(instance.web_workers)],
+   [t("js.answers_remembered", "Answers remembered"), instance.answer_cache_seconds ? t("js.for_s", "{answers_cached} for {answer_cache_seconds} s", { answers_cached: instance.answers_cached, answer_cache_seconds: instance.answer_cache_seconds }) : t("js.cache_off", "Cache off")],
+   [t("js.embeddings_remembered", "Embeddings remembered"), t("js.questions_passages", "{questions_cached} questions, {passages_cached} passages", { questions_cached: instance.questions_cached.toLocaleString(), passages_cached: instance.passages_cached.toLocaleString() })],
+   [t("js.running_for", "Running for"), formatDuration(data.now.uptime_seconds)]]
     .forEach(([k, v]) => { details.append(el("dt", "", k), el("dd", "", v)); });
   $("monitor-notify").textContent = data.webhook
-    ? "Alerts are also posted to the configured webhook when they fire and resolve."
-    : "Set ALERT_WEBHOOK_URL to post alerts to Slack, Teams or a paging service.";
+    ? t("js.alerts_are_also_posted_to", "Alerts are also posted to the configured webhook when they fire and resolve.")
+    : t("js.set_alert_webhook_url_to", "Set ALERT_WEBHOOK_URL to post alerts to Slack, Teams or a paging service.");
 
   const resolved = $("resolved-list");
   resolved.textContent = "";
   $("resolved-empty").hidden = data.resolved.length > 0;
   data.resolved.slice(0, 8).forEach((a) => {
     const li = el("li", "alert-item");
-    const h = el("h3"); h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? "Critical" : "Warning"), a.title);
-    li.append(h, el("p", "alert-meta", `Fired ${dateTime(a.first_seen)}, resolved ${sinceText(a.resolved_at)}.`));
+    const h = el("h3"); h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? t("js.critical", "Critical") : t("js.warning", "Warning")), a.title);
+    li.append(h, el("p", "alert-meta", t("js.fired_resolved", "Fired {first_seen}, resolved {resolved_at}.", { first_seen: dateTime(a.first_seen), resolved_at: sinceText(a.resolved_at) })));
     resolved.appendChild(li);
   });
 }
@@ -4646,7 +4696,7 @@ const LABEL_COLOURS = 8;
 const ORIENTATION = {
   axial: ["A", "P", "R", "L"], coronal: ["S", "I", "R", "L"], sagittal: ["S", "I", "A", "P"],
 };
-const AGREEMENT_LABELS = { agree: "Agrees with the model", partly: "Partly agrees with the model", disagree: "Disagrees with the model", not_used: "Model not used" };
+const AGREEMENT_LABELS = () => ({ agree: t("js.agrees_with_the_model", "Agrees with the model"), partly: t("js.partly_agrees_with_the_model", "Partly agrees with the model"), disagree: t("js.disagrees_with_the_model", "Disagrees with the model"), not_used: t("js.model_not_used", "Model not used") });
 
 function canDeleteSeries() {
   return !account.authRequired || ["reviewer", "admin"].includes(account.user?.role);
@@ -4676,17 +4726,17 @@ function el(tag, className, text) {
 }
 
 function dateTime(iso) {
-  return iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
+  return iso ? new Date(iso).toLocaleString(uiLocale(), { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
 }
 
 function seriesTitle(s) {
-  return s.label || s.description || `${s.modality} series ${s.id}`;
+  return s.label || s.description || t("js.series", "{modality} series {id}", { modality: s.modality, id: s.id });
 }
 
 function renderImagingList() {
   const { series, pacs } = imaging.home;
-  document.title = "CT and MRI · GroundCheckHealth";
-  $("imaging-summary").textContent = series.length ? plural(series.length, "series").replace(/seriess$/, "series") : "";
+  document.title = t("js.ct_and_mri_groundcheckhealth", "CT and MRI · GroundCheckHealth");
+  $("imaging-summary").textContent = series.length ? plural(series.length, "series") : "";
   $("pacs-off").hidden = pacs;
   $("pacs-search").hidden = !pacs;
   const rows = $("imaging-rows");
@@ -4699,31 +4749,31 @@ function renderImagingList() {
     link.href = `#/imaging/${s.id}`;
     link.append(el("span", "modality", s.modality), seriesTitle(s));
     name.appendChild(link);
-    const sub = [s.label && s.description ? s.description : "", s.plane && s.plane !== "unknown" ? s.plane : "", s.source === "pacs" ? "from the PACS" : ""].filter(Boolean).join(", ");
+    const sub = [s.label && s.description ? s.description : "", s.plane && s.plane !== "unknown" ? s.plane : "", s.source === "pacs" ? t("js.from_the_pacs", "from the PACS") : ""].filter(Boolean).join(", ");
     if (sub) name.appendChild(el("span", "series-sub", sub));
     const images = el("td", "mono", `${s.slices} × ${s.columns}×${s.rows}`);
-    images.dataset.label = "Images";
+    images.dataset.label = t("js.images_3", "Images");
     const when = el("td", "", dateTime(s.created_at));
-    when.dataset.label = "Imported";
+    when.dataset.label = t("js.imported", "Imported");
     const model = document.createElement("td");
-    model.dataset.label = "Model";
+    model.dataset.label = t("js.model", "Model");
     model.appendChild(analysisPill(s.analysis));
     const report = document.createElement("td");
-    report.dataset.label = "Report";
-    report.appendChild(s.report === "signed" ? el("span", "status-pill status-approved", "Signed")
-      : s.report === "draft" ? el("span", "status-pill status-pending", "Draft") : el("span", "muted", "None"));
+    report.dataset.label = t("js.report", "Report");
+    report.appendChild(s.report === "signed" ? el("span", "status-pill status-approved", t("js.signed", "Signed"))
+      : s.report === "draft" ? el("span", "status-pill status-pending", t("js.draft", "Draft")) : el("span", "muted", t("js.none_2", "None")));
     tr.append(name, images, when, model, report);
     rows.appendChild(tr);
   });
 }
 
 function analysisPill(a) {
-  if (!a) return el("span", "muted", "Not run");
-  if (a.status === "queued" || a.status === "running") return el("span", "status-pill status-running", "Running");
-  if (a.status === "refused") return el("span", "status-pill status-rejected", "Refused");
-  if (a.status === "failed") return el("span", "status-pill status-rejected", "Failed");
-  if (a.abstained) return el("span", "status-pill status-abstained", "Abstained");
-  return el("span", "status-pill status-approved", "Done");
+  if (!a) return el("span", "muted", t("js.not_run", "Not run"));
+  if (a.status === "queued" || a.status === "running") return el("span", "status-pill status-running", t("js.running_2", "Running"));
+  if (a.status === "refused") return el("span", "status-pill status-rejected", t("js.refused_4", "Refused"));
+  if (a.status === "failed") return el("span", "status-pill status-rejected", t("js.failed", "Failed"));
+  if (a.abstained) return el("span", "status-pill status-abstained", t("js.abstained", "Abstained"));
+  return el("span", "status-pill status-approved", t("js.done", "Done"));
 }
 
 // --- Import ---
@@ -4744,8 +4794,8 @@ function chooseDicomFiles(files) {
   drop.classList.toggle("chosen", imaging.files.length > 0);
   const bytes = imaging.files.reduce((n, f) => n + f.size, 0);
   $("dicom-drop-sub").textContent = imaging.files.length
-    ? `${plural(imaging.files.length, "file")} chosen, ${(bytes / 1024 ** 2).toFixed(1)} MB`
-    : "CT and MR image storage. Up to 3,000 files.";
+    ? t("js.chosen_mb", "{files} chosen, {bytes} MB", { files: plural(imaging.files.length, "file"), bytes: (bytes / 1024 ** 2).toFixed(1) })
+    : t("js.ct_and_mr_image_storage", "CT and MR image storage. Up to 3,000 files.");
   $("dicom-upload").disabled = imaging.files.length === 0;
 }
 
@@ -4776,8 +4826,8 @@ function uploadDicom(event) {
   if (!imaging.files.length) return;
   const limit = imaging.home?.max_upload_mb || 1024;
   const bytes = imaging.files.reduce((n, f) => n + f.size, 0);
-  if (imaging.files.length > 3000) { showMessage("imaging-message", "Choose up to 3,000 files, or upload a zip.", true); return; }
-  if (bytes > limit * 1024 ** 2) { showMessage("imaging-message", `Uploads can be up to ${limit} MB.`, true); return; }
+  if (imaging.files.length > 3000) { showMessage("imaging-message", t("js.choose_up_to_3_000", "Choose up to 3,000 files, or upload a zip."), true); return; }
+  if (bytes > limit * 1024 ** 2) { showMessage("imaging-message", t("js.uploads_can_be_up_to", "Uploads can be up to {limit} MB.", { limit }), true); return; }
   const form = new FormData();
   imaging.files.forEach((f) => form.append("files", f, f.webkitRelativePath || f.name));
   form.append("label", $("dicom-label").value.trim());
@@ -4790,7 +4840,7 @@ function uploadDicom(event) {
     if (!e.lengthComputable) return;
     const share = e.loaded / e.total;
     $("dicom-progress-fill").style.width = `${Math.round(share * 100)}%`;
-    $("dicom-progress-text").textContent = share < 1 ? `Uploading, ${Math.round(share * 100)}%` : "De-identifying and reading the images";
+    $("dicom-progress-text").textContent = share < 1 ? t("js.uploading_2", "Uploading, {value}%", { value: Math.round(share * 100) }) : t("js.de_identifying_and_reading_the", "De-identifying and reading the images");
   };
   xhr.onloadend = () => {
     $("dicom-progress").hidden = true;
@@ -4799,7 +4849,7 @@ function uploadDicom(event) {
     try { data = JSON.parse(xhr.responseText); } catch (_) { /* not JSON */ }
     if (xhr.status !== 200) {
       $("dicom-upload").disabled = false;
-      showMessage("imaging-message", (data && typeof data.detail === "string") ? data.detail : `The upload failed (${xhr.status || "network error"}).`, true);
+      showMessage("imaging-message", (data && typeof data.detail === "string") ? data.detail : t("js.the_upload_failed", "The upload failed ({status}).", { status: xhr.status || t("js.network_error", "network error") }), true);
       return;
     }
     chooseDicomFiles([]);
@@ -4814,8 +4864,8 @@ function importFinished(data) {
   const added = data.added || [];
   const existing = data.existing || [];
   const parts = [];
-  if (added.length) parts.push(`Imported ${plural(added.length, "series").replace(/seriess$/, "series")}, ${plural(added.reduce((n, s) => n + s.slices, 0), "image")}.`);
-  if (existing.length) parts.push(`${existing.length === 1 ? "One series was" : `${existing.length} series were`} already imported.`);
+  if (added.length) parts.push(t("js.imported_2", "Imported {added}, {reduce}.", { added: plural(added.length, "series"), reduce: plural(added.reduce((n, s) => n + s.slices, 0), "image") }));
+  if (existing.length) parts.push(t("js.already_imported", "{existing} already imported.", { existing: existing.length === 1 ? t("js.one_series_was", "One series was") : t("js.series_were", "{existing} series were", { existing: existing.length }) }));
   const warnings = added.flatMap((s) => s.warnings || []);
   showMessage("imaging-message", [...parts, ...warnings].join(" "));
   const only = added.length + existing.length === 1 ? (added[0] || existing[0]) : null;
@@ -4834,7 +4884,7 @@ async function searchPacs(event) {
   $("pacs-go").disabled = true;
   try {
     const { studies } = await api(`/api/imaging/pacs/studies?${params}`);
-    if (!studies.length) out.appendChild(el("p", "auth-hint", "No studies match."));
+    if (!studies.length) out.appendChild(el("p", "auth-hint", t("js.no_studies_match", "No studies match.")));
     studies.forEach((study) => out.appendChild(pacsStudy(study)));
   } catch (err) {
     out.appendChild(el("p", "modal-message error", err.message));
@@ -4846,11 +4896,11 @@ async function searchPacs(event) {
 function pacsStudy(study) {
   const card = el("article", "pacs-study");
   const head = el("div", "pacs-study-head");
-  head.append(el("strong", "", study.patient_name || "Unnamed patient"),
+  head.append(el("strong", "", study.patient_name || t("js.unnamed_patient", "Unnamed patient")),
     el("span", "pacs-study-meta mono", [study.patient_id, study.study_date, study.accession].filter(Boolean).join("  ")));
   const desc = el("p", "pacs-study-meta", [study.description, Array.isArray(study.modalities) ? study.modalities.join(", ") : study.modalities].filter(Boolean).join(". "));
   const list = el("ul", "pacs-series");
-  const show = button("Show series", "btn-ghost", false, async () => {
+  const show = button(t("js.show_series", "Show series"), "btn-ghost", false, async () => {
     show.disabled = true;
     try {
       const { series } = await api(`/api/imaging/pacs/studies/${encodeURIComponent(study.study_uid)}/series`);
@@ -4858,16 +4908,16 @@ function pacsStudy(study) {
       series.forEach((s) => {
         const li = document.createElement("li");
         const usable = ["CT", "MR"].includes(s.modality);
-        li.append(el("span", "", `${s.modality || "?"} ${s.description || "Series " + (s.number ?? "")}${s.instances ? `, ${plural(Number(s.instances), "image")}` : ""}`));
-        const importButton = button(usable ? "Import" : "Not CT or MR", usable ? "btn-primary" : "btn-ghost", !usable, async () => {
+        li.append(el("span", "", `${s.modality || "?"} ${s.description || t("js.series_2", "Series ") + (s.number ?? "")}${s.instances ? `, ${plural(Number(s.instances), "image")}` : ""}`));
+        const importButton = button(usable ? t("js.import", "Import") : t("js.not_ct_or_mr", "Not CT or MR"), usable ? "btn-primary" : "btn-ghost", !usable, async () => {
           importButton.disabled = true;
-          importButton.textContent = "Retrieving…";
+          importButton.textContent = t("js.retrieving", "Retrieving…");
           try {
             importFinished(await api("/api/imaging/pacs/retrieve", { method: "POST", body: { study_uid: study.study_uid, series_uid: s.series_uid } }));
           } catch (err) {
             showMessage("imaging-message", err.message, true);
             importButton.disabled = false;
-            importButton.textContent = "Import";
+            importButton.textContent = t("js.import", "Import");
           }
         });
         li.appendChild(importButton);
@@ -4903,13 +4953,13 @@ async function openSeries(id, keepPlace = false) {
   const title = seriesTitle(s);
   $("viewer-title").textContent = title;
   $("topbar-title").textContent = title;
-  document.title = `${title} · GroundCheckHealth`;
+  document.title = t("js.groundcheckhealth", "{title} · GroundCheckHealth", { title });
   $("viewer-sub").textContent = [s.modality, s.plane !== "unknown" ? s.plane : "", plural(s.slices, "image"), s.label && s.description ? s.description : ""].filter(Boolean).join(", ");
   $("viewer-delete").hidden = !canDeleteSeries();
 
   const windowSelect = $("viewer-window");
   windowSelect.textContent = "";
-  s.windows.forEach((w) => { const o = el("option", "", w === "auto" ? "Automatic" : w[0].toUpperCase() + w.slice(1)); o.value = w; windowSelect.appendChild(o); });
+  s.windows.forEach((w) => { const o = el("option", "", w === "auto" ? t("js.automatic", "Automatic") : w[0].toUpperCase() + w.slice(1)); o.value = w; windowSelect.appendChild(o); });
   windowSelect.value = imaging.window || "";
   windowSelect.disabled = s.windows.length < 2;
 
@@ -4954,12 +5004,12 @@ function renderSlice() {
   imaging.index = Math.max(0, Math.min(s.slices - 1, imaging.index));
   const i = imaging.index;
   $("viewer-image").src = sliceUrl(i);
-  $("viewer-image").alt = `${s.modality} slice ${i + 1} of ${s.slices}`;
+  $("viewer-image").alt = t("js.slice_of", "{modality} slice {i} of {slices}", { modality: s.modality, i: i + 1, slices: s.slices });
   $("viewer-slice").value = String(i);
-  $("viewer-slice").setAttribute("aria-valuetext", `Slice ${i + 1} of ${s.slices}`);
+  $("viewer-slice").setAttribute("aria-valuetext", t("js.slice_of_2", "Slice {i} of {slices}", { i: i + 1, slices: s.slices }));
   $("viewer-slice-label").textContent = `${i + 1} / ${s.slices}`;
   const spacing = s.pixel_spacing || [1, 1];
-  $("viewer-scale").textContent = `${(s.columns * spacing[1]).toFixed(0)}×${(s.rows * spacing[0]).toFixed(0)} mm${s.slice_thickness || s.slice_spacing ? `, ${s.slice_thickness || s.slice_spacing} mm slices` : ""}`;
+  $("viewer-scale").textContent = t("js.mm", "{columns}×{rows} mm{slice_thickness}", { columns: (s.columns * spacing[1]).toFixed(0), rows: (s.rows * spacing[0]).toFixed(0), slice_thickness: s.slice_thickness || s.slice_spacing ? t("js.mm_slices", ", {slice_thickness} mm slices", { slice_thickness: s.slice_thickness || s.slice_spacing }) : "" });
   for (const d of [1, -1, 2, -2, 3]) {
     const j = i + d;
     if (j >= 0 && j < s.slices) new Image().src = sliceUrl(j);
@@ -5000,21 +5050,21 @@ function renderSeriesDetails(s) {
   const spacing = s.pixel_spacing || [];
   const patient = s.patient || {};
   const deidParts = [
-    [s.deid.removed, "removed"], [s.deid.emptied, "emptied"], [s.deid.private_removed, "private tags removed"],
-    [s.deid.uids_replaced, "identifiers replaced"], [s.deid.descriptors_cleaned, "descriptions cleaned"],
+    [s.deid.removed, t("js.deid_removed", "removed")], [s.deid.emptied, t("js.deid_emptied", "emptied")], [s.deid.private_removed, t("js.private_tags_removed", "private tags removed")],
+    [s.deid.uids_replaced, t("js.identifiers_replaced", "identifiers replaced")], [s.deid.descriptors_cleaned, t("js.descriptions_cleaned", "descriptions cleaned")],
   ].filter(([n]) => n).map(([n, what]) => `${n.toLocaleString()} ${what}`);
   const rows = [
-    ["Modality", `${s.modality}${s.body_part ? `, ${s.body_part.toLowerCase()}` : ""}`],
-    ["Plane", s.plane === "unknown" ? "Unknown, shown as stored" : s.plane[0].toUpperCase() + s.plane.slice(1)],
-    ["Images", `${s.slices} slices, ${s.columns} × ${s.rows} pixels`],
-    ["Pixel spacing", spacing.length ? `${spacing.map((v) => v.toFixed(2)).join(" × ")} mm` : "Not recorded"],
-    ["Slice thickness", s.slice_thickness ? `${s.slice_thickness} mm` : "Not recorded"],
-    ["Slice spacing", s.slice_spacing ? `${s.slice_spacing} mm` : "Not recorded"],
-    ["Patient", [patient.PatientAge ? `age ${patient.PatientAge.replace(/^0+/, "").replace("Y", " years")}` : "", patient.PatientSex ? `sex ${patient.PatientSex}` : ""].filter(Boolean).join(", ") || "No characteristics recorded"],
-    ["Source", s.source === "pacs" ? "Retrieved from the PACS" : "Uploaded"],
-    ["De-identification", `DICOM PS3.15 basic profile. ${deidParts.join(", ") || "Nothing to remove"}.`],
+    [t("js.modality", "Modality"), `${s.modality}${s.body_part ? `, ${s.body_part.toLowerCase()}` : ""}`],
+    [t("js.plane", "Plane"), s.plane === "unknown" ? t("js.unknown_shown_as_stored", "Unknown, shown as stored") : s.plane[0].toUpperCase() + s.plane.slice(1)],
+    [t("js.images_3", "Images"), t("js.slices_pixels", "{slices} slices, {columns} × {rows} pixels", { slices: s.slices, columns: s.columns, rows: s.rows })],
+    [t("js.pixel_spacing", "Pixel spacing"), spacing.length ? `${spacing.map((v) => v.toFixed(2)).join(" × ")} mm` : t("js.not_recorded", "Not recorded")],
+    [t("js.slice_thickness", "Slice thickness"), s.slice_thickness ? `${s.slice_thickness} mm` : t("js.not_recorded", "Not recorded")],
+    [t("js.slice_spacing", "Slice spacing"), s.slice_spacing ? `${s.slice_spacing} mm` : t("js.not_recorded", "Not recorded")],
+    ["Patient", [patient.PatientAge ? t("js.age_2", "age {replace}", { replace: patient.PatientAge.replace(/^0+/, "").replace("Y", t("js.years_suffix", " years")) }) : "", patient.PatientSex ? t("js.sex", "sex {PatientSex}", { PatientSex: patient.PatientSex }) : ""].filter(Boolean).join(", ") || t("js.no_characteristics_recorded", "No characteristics recorded")],
+    [t("js.source", "Source"), s.source === "pacs" ? t("js.retrieved_from_the_pacs", "Retrieved from the PACS") : t("js.uploaded", "Uploaded")],
+    [t("js.de_identification", "De-identification"), t("js.dicom_ps3_15_basic_profile", "DICOM PS3.15 basic profile. {deidParts}.", { deidParts: deidParts.join(", ") || t("js.nothing_to_remove", "Nothing to remove") })],
   ];
-  (s.warnings || []).forEach((w) => rows.push(["Note", w]));
+  (s.warnings || []).forEach((w) => rows.push([t("js.note_2", "Note"), w]));
   rows.forEach(([k, v]) => { dl.append(el("dt", "", k), el("dd", "", v)); });
 }
 
@@ -5028,7 +5078,7 @@ function renderAnalysis(s) {
   const previous = select.value;
   select.textContent = "";
   models.forEach((m) => {
-    const o = el("option", "", m.modality && m.modality !== s.modality ? `${m.name} (trained on ${m.modality})` : m.name);
+    const o = el("option", "", m.modality && m.modality !== s.modality ? t("js.trained_on", "{name} (trained on {modality})", { name: m.name, modality: m.modality }) : m.name);
     o.value = m.id;
     o.disabled = !!m.modality && m.modality !== s.modality;
     select.appendChild(o);
@@ -5041,13 +5091,13 @@ function renderAnalysis(s) {
   $("analysis-run").disabled = running || usable.length === 0;
   $("analysis-model").disabled = running || models.length === 0;
   $("analysis-hint").textContent = !models.length
-    ? "No imaging models yet. An administrator can add imaging settings to a model in the Model library."
-    : !usable.length ? `None of the models were trained on ${s.modality}.` : "";
+    ? t("js.no_imaging_models_yet_an", "No imaging models yet. An administrator can add imaging settings to a model in the Model library.")
+    : !usable.length ? t("js.none_of_the_models_were", "None of the models were trained on {modality}.", { modality: s.modality }) : "";
   $("analysis-hint").hidden = !$("analysis-hint").textContent;
   $("analysis-progress").hidden = !running;
   if (running) {
     $("analysis-progress-fill").style.width = `${a.progress}%`;
-    $("analysis-progress-text").textContent = a.status === "queued" ? "Waiting to start" : `Analysing, ${a.progress}%`;
+    $("analysis-progress-text").textContent = a.status === "queued" ? t("js.waiting_to_start", "Waiting to start") : t("js.analysing", "Analysing, {progress}%", { progress: a.progress });
   }
 
   const out = $("analysis-result");
@@ -5058,17 +5108,17 @@ function renderAnalysis(s) {
   out.appendChild(el("p", "field-hint", `${a.model_name}, ${dateTime(a.finished_at || a.created_at)}`));
   if (a.status === "refused" || a.status === "failed") {
     const note = el("div", "analysis-note refused");
-    note.append(el("strong", "", a.status === "refused" ? "The model refused this series" : "The analysis didn’t finish"), el("span", "", a.error || ""));
+    note.append(el("strong", "", a.status === "refused" ? t("js.the_model_refused_this_series", "The model refused this series") : t("js.the_analysis_didn_t_finish", "The analysis didn’t finish")), el("span", "", a.error || ""));
     out.appendChild(note);
     return;
   }
   const sum = a.summary;
   if (sum.abstained) {
     const note = el("div", "analysis-note");
-    note.appendChild(el("strong", "", "The model abstained on this series"));
+    note.appendChild(el("strong", "", t("js.the_model_abstained_on_this", "The model abstained on this series")));
     note.appendChild(el("span", "", sum.unfamiliar_series
-      ? `${Math.round(sum.unfamiliar_share * 100)}% of the image regions it looked at were unlike its training images, so it reports nothing. Read the images without it.`
-      : "It wasn’t confident about any region, so it reports nothing."));
+      ? t("js.of_the_image_regions_it", "{value}% of the image regions it looked at were unlike its training images, so it reports nothing. Read the images without it.", { value: Math.round(sum.unfamiliar_share * 100) })
+      : t("js.it_wasn_t_confident_about", "It wasn’t confident about any region, so it reports nothing.")));
     out.appendChild(note);
   } else {
     const list = el("ul", "label-list");
@@ -5080,7 +5130,7 @@ function renderAnalysis(s) {
       const name = el("span", "label-name", l.label);
       name.appendChild(el("span", "label-where", `${plural(l.slices, "slice")}: ${rangesText(l.ranges)}`));
       b.append(el("span", "label-swatch"), name, el("span", "label-conf", `${Math.round(l.max_confidence * 100)}%`));
-      b.title = "Go to the first slice";
+      b.title = t("js.go_to_the_first_slice", "Go to the first slice");
       b.addEventListener("click", () => { imaging.index = l.ranges[0][0]; renderSlice(); $("viewer-stage").focus(); });
       li.appendChild(b);
       list.appendChild(li);
@@ -5090,7 +5140,7 @@ function renderAnalysis(s) {
       const bar = document.createElement("button");
       bar.type = "button";
       bar.className = "slice-bar";
-      bar.setAttribute("aria-label", `${l.label}: slices ${rangesText(l.ranges)}. Go to the first.`);
+      bar.setAttribute("aria-label", t("js.slices_go_to_the_first", "{label}: slices {ranges}. Go to the first.", { label: l.label, ranges: rangesText(l.ranges) }));
       l.ranges.forEach(([from, to]) => {
         const seg = document.createElement("i");
         seg.style.left = `${(from / s.slices) * 100}%`;
@@ -5108,15 +5158,15 @@ function renderAnalysis(s) {
     });
     out.appendChild(list);
   }
-  const t = sum.totals;
-  if (t.patches) {
+  const tt = sum.totals;
+  if (tt.patches) {
     const wrap = document.createElement("div");
-    wrap.appendChild(el("p", "field-label", `Image regions examined: ${t.patches.toLocaleString()}`));
+    wrap.appendChild(el("p", "field-label", t("js.image_regions_examined", "Image regions examined: {patches}", { patches: tt.patches.toLocaleString() })));
     const bar = el("div", "patch-bar");
     bar.setAttribute("role", "img");
-    bar.setAttribute("aria-label", `${t.answered} answered, ${t.low_confidence} not confident, ${t.unfamiliar} unfamiliar`);
+    bar.setAttribute("aria-label", t("js.answered_not_confident_unfamiliar", "{answered} answered, {low_confidence} not confident, {unfamiliar} unfamiliar", { answered: tt.answered, low_confidence: tt.low_confidence, unfamiliar: tt.unfamiliar }));
     const legend = el("ul", "patch-legend");
-    [["answered", t.answered, "Answered", "var(--ink)"], ["low", t.low_confidence, "Not confident", "var(--series-2)"], ["unfamiliar", t.unfamiliar, "Unlike its training images", "var(--warn)"]]
+    [["answered", tt.answered, t("js.answered_2", "Answered"), "var(--ink)"], ["low", tt.low_confidence, t("js.not_confident_2", "Not confident"), "var(--series-2)"], ["unfamiliar", tt.unfamiliar, t("js.unlike_its_training_images", "Unlike its training images"), "var(--warn)"]]
       .forEach(([cls, n, label, colour]) => {
         if (n) { const seg = el("span", cls); seg.style.flex = String(n); bar.appendChild(seg); }
         const li = el("li", "", `${label} ${n.toLocaleString()}`);
@@ -5126,7 +5176,7 @@ function renderAnalysis(s) {
     wrap.append(bar, legend);
     out.appendChild(wrap);
   }
-  out.appendChild(el("p", "research-note", "For research and evaluation. Not validated for clinical use; the reading clinician decides."));
+  out.appendChild(el("p", "research-note", t("js.for_research_and_evaluation_not", "For research and evaluation. Not validated for clinical use; the reading clinician decides.")));
 }
 
 function renderReport(s) {
@@ -5142,23 +5192,23 @@ function renderReport(s) {
 
   if (signed) {
     const card = el("article", "signed-report");
-    card.append(el("h3", "", signed.replaces_id ? "Signed amendment" : "Signed report"),
+    card.append(el("h3", "", signed.replaces_id ? t("js.signed_amendment", "Signed amendment") : t("js.signed_report", "Signed report")),
       el("p", "signed-impression", signed.impression));
     if (signed.findings) card.appendChild(el("p", "", signed.findings));
-    card.appendChild(el("p", "signed-meta", `${AGREEMENT_LABELS[signed.agreement]}. Signed by ${signed.author_name || "unknown"} on ${dateTime(signed.signed_at)}.${signed.sent_at ? ` Sent to the PACS on ${dateTime(signed.sent_at)}.` : ""}`));
+    card.appendChild(el("p", "signed-meta", t("js.signed_by_on", "{agreement}. Signed by {author_name} on {signed_at}.{sent_at}", { agreement: AGREEMENT_LABELS()[signed.agreement], author_name: signed.author_name || t("js.unknown", "unknown"), signed_at: dateTime(signed.signed_at), sent_at: signed.sent_at ? t("js.sent_to_the_pacs_on", " Sent to the PACS on {sent_at}.", { sent_at: dateTime(signed.sent_at) }) : "" })));
     const actions = el("div", "signed-actions");
-    const download = el("a", "btn btn-sm btn-ghost", "Download DICOM SR");
+    const download = el("a", "btn btn-sm btn-ghost", t("js.download_dicom_sr", "Download DICOM SR"));
     download.href = `/api/imaging/reports/${signed.id}/sr.dcm`;
     actions.appendChild(download);
     if (s.can_send_to_pacs) {
-      actions.appendChild(button(signed.sent_at ? "Send again" : "Send to the PACS", "btn-ghost", false, async (e) => {
+      actions.appendChild(button(signed.sent_at ? t("js.send_again", "Send again") : t("js.send_to_the_pacs", "Send to the PACS"), "btn-ghost", false, async (e) => {
         e.target.disabled = true;
-        try { await api(`/api/imaging/reports/${signed.id}/send`, { method: "POST" }); showMessage("report-message", "Sent to the PACS."); openSeries(s.id, true); }
+        try { await api(`/api/imaging/reports/${signed.id}/send`, { method: "POST" }); showMessage("report-message", t("js.sent_to_the_pacs", "Sent to the PACS.")); openSeries(s.id, true); }
         catch (err) { showMessage("viewer-message", err.message, true); e.target.disabled = false; }
       }));
     }
     if (!draft && imaging.editing !== signed.id) {
-      actions.appendChild(button("Amend", "btn-ghost", false, () => {
+      actions.appendChild(button(t("js.amend", "Amend"), "btn-ghost", false, () => {
         imaging.editing = signed.id;
         fillReportForm(signed, signed.id);
         $("report-form").hidden = false;
@@ -5172,7 +5222,7 @@ function renderReport(s) {
   if (draft) {
     form.hidden = false;
     if (imaging.editing !== `draft-${draft.id}`) { fillReportForm(draft, draft.id); imaging.editing = `draft-${draft.id}`; }
-    $("report-draft-note").textContent = `Draft saved ${dateTime(draft.updated_at)}.`;
+    $("report-draft-note").textContent = t("js.draft_saved", "Draft saved {updated_at}.", { updated_at: dateTime(draft.updated_at) });
   } else if (signed && imaging.editing !== signed.id) {
     form.hidden = true;
   } else if (!signed && imaging.editing === null) {
@@ -5180,15 +5230,15 @@ function renderReport(s) {
     fillReportForm(null, null);
     imaging.editing = "new";
   }
-  if (!draft) $("report-draft-note").textContent = imaging.editing === signed?.id ? "Signing creates an amendment. The signed report is kept." : "";
-  $("report-sign").textContent = imaging.editing === signed?.id || draft?.replaces_id ? "Sign amendment" : "Sign report";
+  if (!draft) $("report-draft-note").textContent = imaging.editing === signed?.id ? t("js.signing_creates_an_amendment_the", "Signing creates an amendment. The signed report is kept.") : "";
+  $("report-sign").textContent = imaging.editing === signed?.id || draft?.replaces_id ? t("js.sign_amendment", "Sign amendment") : t("js.sign_report", "Sign report");
 
   $("report-history").hidden = superseded.length === 0;
   const list = $("report-history-list");
   list.textContent = "";
   superseded.forEach((r) => {
     const li = document.createElement("li");
-    li.append(el("p", "", r.impression), el("p", "signed-meta", `Signed by ${r.author_name || "unknown"} on ${dateTime(r.signed_at)}. Replaced by an amendment.`));
+    li.append(el("p", "", r.impression), el("p", "signed-meta", t("js.signed_by_on_replaced_by", "Signed by {author_name} on {signed_at}. Replaced by an amendment.", { author_name: r.author_name || t("js.unknown", "unknown"), signed_at: dateTime(r.signed_at) })));
     list.appendChild(li);
   });
 }
@@ -5210,8 +5260,8 @@ async function saveReport(sign) {
   const agreement = form.querySelector('input[name="agreement"]:checked')?.value || "not_used";
   const done = [...s.analyses].reverse().find((a) => a.status === "done");
   if (sign) {
-    if (!$("report-impression").value.trim()) { showMessage("report-message", "Write an impression before signing.", true); $("report-impression").focus(); return; }
-    if (!window.confirm("Sign this report? A signed report can’t be edited. Later changes are made as an amendment.")) return;
+    if (!$("report-impression").value.trim()) { showMessage("report-message", t("js.write_an_impression_before_signing", "Write an impression before signing."), true); $("report-impression").focus(); return; }
+    if (!window.confirm(t("js.sign_this_report_a_signed", "Sign this report? A signed report can’t be edited. Later changes are made as an amendment."))) return;
   }
   const body = {
     findings: $("report-findings").value, impression: $("report-impression").value, agreement, sign,
@@ -5224,7 +5274,7 @@ async function saveReport(sign) {
     imaging.editing = sign ? null : `draft-${report.id}`;
     form.dataset.reportId = report.id;
     await openSeries(s.id, true);
-    showMessage("report-message", sign ? "Signed." : "Draft saved.");
+    showMessage("report-message", sign ? t("js.signed_2", "Signed.") : t("js.draft_saved_2", "Draft saved."));
     if (sign) $("report-message").hidden = true;
   } catch (err) {
     showMessage("report-message", err.message, true);
@@ -5247,8 +5297,8 @@ function wireImaging() {
   $("dicom-folder").addEventListener("click", () => $("dicom-folder-input").click());
   $("dicom-folder-input").addEventListener("change", (e) => chooseDicomFiles(e.target.files));
   const drop = $("dicom-drop");
-  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("dragging"); }));
-  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, () => drop.classList.remove("dragging")));
+  ["dragenter", "dragover"].forEach((tt) => drop.addEventListener(tt, (e) => { e.preventDefault(); drop.classList.add("dragging"); }));
+  ["dragleave", "drop"].forEach((tt) => drop.addEventListener(tt, () => drop.classList.remove("dragging")));
   drop.addEventListener("drop", async (e) => {
     e.preventDefault();
     const items = [...(e.dataTransfer.items || [])];
@@ -5298,12 +5348,12 @@ function wireImaging() {
   $("report-save").addEventListener("click", () => saveReport(false));
   $("viewer-delete").addEventListener("click", async () => {
     const s = imaging.series;
-    if (!window.confirm(`Delete “${seriesTitle(s)}”, its analyses and its reports? This can’t be undone.`)) return;
+    if (!window.confirm(t("js.delete_its_analyses_and_its", "Delete “{s}”, its analyses and its reports? This can’t be undone.", { s: seriesTitle(s) }))) return;
     try {
       await api(`/api/imaging/series/${s.id}`, { method: "DELETE" });
       imaging.series = null;
       location.hash = "#/imaging";
-      showMessage("imaging-message", "Deleted.");
+      showMessage("imaging-message", t("js.deleted_2", "Deleted."));
     } catch (err) { showMessage("viewer-message", err.message, true); }
   });
 }
@@ -5343,9 +5393,11 @@ function route() {
     if (l.dataset.view === name) l.setAttribute("aria-current", "page");
     else l.removeAttribute("aria-current");
   });
-  const title = $(`view-${name}`).dataset.title;
+  const link = document.querySelector(`.nav-link[data-view="${name}"]`);
+  const label = link && link.querySelector("[data-i18n]");
+  const title = (label && label.textContent.trim()) || $(`view-${name}`).dataset.title;
   $("topbar-title").textContent = title;
-  document.title = name === "ask" ? "GroundCheckHealth" : `${title} · GroundCheckHealth`;
+  document.title = name === "ask" ? "GroundCheckHealth" : t("js.groundcheckhealth", "{title} · GroundCheckHealth", { title });
   setNavOpen(false);
   VIEWS[name].load();
 }
@@ -5403,7 +5455,7 @@ async function refreshReviewCount() {
     badge.hidden = n === 0;
     badge.textContent = n > 99 ? "99+" : String(n);
     badge.classList.toggle("overdue", data.counts.overdue > 0);
-    badge.title = `${n} open${data.counts.overdue ? `, ${data.counts.overdue} overdue` : ""}`;
+    badge.title = t("js.open_4", "{n} open{overdue}", { n, overdue: data.counts.overdue ? t("js.overdue", ", {overdue} overdue", { overdue: data.counts.overdue }) : "" });
   } catch (_) { /* no database or no access */ }
 }
 
@@ -5458,7 +5510,7 @@ function wireCollapsibles() {
   $("audit-collapse").addEventListener("click", () => setAllAuditOpen(false));
   $("audit-copy").addEventListener("click", () => {
     if (currentAuditData) navigator.clipboard.writeText(JSON.stringify(currentAuditData, null, 2));
-    const b = $("audit-copy"); const t = b.textContent; b.textContent = "Copied"; setTimeout(() => b.textContent = t, 1200);
+    const b = $("audit-copy"); const tt = b.textContent; b.textContent = t("js.copied", "Copied"); setTimeout(() => b.textContent = tt, 1200);
   });
 }
 function wireToggle(toggleId, bodyId) {
@@ -5476,17 +5528,17 @@ async function loadEvalSummary() {
   try {
     const data = await (await fetch("/api/eval-summary")).json();
     const inline = $("eval-summary-inline");
-    if (!data.total) { inline.textContent = data.note || "not run yet"; return; }
+    if (!data.total) { inline.textContent = data.note || t("js.not_run_yet", "not run yet"); return; }
     const ansC = data.answerable_correct, ansT = data.answerable_total ?? ansC;
     const refC = data.must_refuse_correct, refT = data.must_refuse_total ?? refC;
-    inline.textContent = `${data.passed.toLocaleString()} of ${data.total.toLocaleString()} cases pass`;
+    inline.textContent = t("js.of_cases_pass", "{passed} of {total} cases pass", { passed: data.passed.toLocaleString(), total: data.total.toLocaleString() });
     const pct = Math.round((data.passed / data.total) * 100);
     $("eval-bar-fill").style.width = `${pct}%`;
     $("eval-bar-fill").style.background = pct === 100 ? "var(--ok)" : "var(--warn)";
     $("eval-caption").textContent =
-      `${ansC.toLocaleString()} of ${ansT.toLocaleString()} answerable correct, ` +
-      `${refC.toLocaleString()} of ${refT.toLocaleString()} must-refuse correct. ` +
-      `Run offline in extractive mode for reproducibility.`;
+      t("js.of_answerable_correct", "{ansC} of {ansT} answerable correct, ", { ansC: ansC.toLocaleString(), ansT: ansT.toLocaleString() }) +
+      t("js.of_must_refuse_correct", "{refC} of {refT} must-refuse correct. ", { refC: refC.toLocaleString(), refT: refT.toLocaleString() }) +
+      t("js.run_offline_in_extractive_mode", "Run offline in extractive mode for reproducibility.");
     const list = $("eval-cases");
     list.innerHTML = "";
     (data.cases || data.sample_cases || []).forEach((c) => {
@@ -5497,21 +5549,21 @@ async function loadEvalSummary() {
       const q = document.createElement("span");
       q.className = "q"; q.textContent = c.query;
       const v = document.createElement("span");
-      v.className = "verdict"; v.textContent = `expect ${c.expect} / got ${c.got}`;
+      v.className = "verdict"; v.textContent = t("js.expect_got", "expect {expect} / got {got}", { expect: c.expect, got: c.got });
       li.append(g, q, v);
       list.appendChild(li);
     });
     const shown = (data.cases || data.sample_cases || []).length;
     let foot = data.total > shown
-      ? `Showing a sample of ${shown}. Full suite of ${data.total.toLocaleString()} runs in the build.`
+      ? t("js.showing_a_sample_of_full", "Showing a sample of {shown}. Full suite of {total} runs in the build.", { shown, total: data.total.toLocaleString() })
       : "";
     renderAdversarial(data.adversarial);
     renderPatientEval(data.patient);
     renderPiiEval(data.pii);
-    renderMetricBlock("answer-quality-block", "Answer quality", "How well the answers read and how closely they follow their sources.", data.answer_quality);
-    renderMetricBlock("phrasing-block", "Phrasing robustness", "The same question worded differently should get the same decision.", data.phrasing);
+    renderMetricBlock("answer-quality-block", t("js.answer_quality", "Answer quality"), t("js.how_well_the_answers_read", "How well the answers read and how closely they follow their sources."), data.answer_quality);
+    renderMetricBlock("phrasing-block", t("js.phrasing_robustness", "Phrasing robustness"), t("js.the_same_question_worded_differently", "The same question worded differently should get the same decision."), data.phrasing);
     $("eval-foot").textContent = foot;
-  } catch (_) { $("eval-summary-inline").textContent = "unavailable"; }
+  } catch (_) { $("eval-summary-inline").textContent = t("js.unavailable", "unavailable"); }
 }
 
 function renderAdversarial(adv) {
@@ -5524,16 +5576,16 @@ function renderAdversarial(adv) {
   head.className = "adv-head";
   const title = document.createElement("span");
   title.className = "eyebrow";
-  title.textContent = "Adversarial probes";
+  title.textContent = t("js.adversarial_probes", "Adversarial probes");
   const score = document.createElement("span");
   score.className = "adv-score";
-  score.textContent = `${adv.passed} of ${adv.total} behaved as intended`;
+  score.textContent = t("js.of_behaved_as_intended", "{passed} of {total} behaved as intended", { passed: adv.passed, total: adv.total });
   head.append(title, score);
   const note = document.createElement("p");
   note.className = "adv-note";
-  note.textContent = "Hand-written traps: leading questions, prompt injection, " +
-    "near-miss spellings, and missing-context cases. Reported honestly and not " +
-    "used to gate the build, so a known limitation is shown rather than hidden.";
+  note.textContent = t("js.hand_written_traps_leading_questions", "Hand-written traps: leading questions, prompt injection, ") +
+    t("js.near_miss_spellings_and_missing", "near-miss spellings, and missing-context cases. Reported honestly and not ") +
+    t("js.used_to_gate_the_build", "used to gate the build, so a known limitation is shown rather than hidden.");
   wrap.append(head, note);
   const list = document.createElement("ul");
   list.className = "eval-cases";
@@ -5548,7 +5600,7 @@ function renderAdversarial(adv) {
     q.title = c.note || "";
     const v = document.createElement("span");
     v.className = "verdict";
-    v.textContent = c.ok ? `${c.got} ✓` : `want ${c.expect}, got ${c.got}`;
+    v.textContent = c.ok ? `${c.got} ✓` : t("js.want_got", "want {expect}, got {got}", { expect: c.expect, got: c.got });
     li.append(g, q, v);
     list.appendChild(li);
   });
@@ -5566,13 +5618,13 @@ function renderPiiEval(pii) {
   wrap.hidden = !rows.length;
   if (!rows.length) return;
   const head = document.createElement("div"); head.className = "adv-head";
-  const title = document.createElement("span"); title.className = "eyebrow"; title.textContent = "De-identification accuracy";
+  const title = document.createElement("span"); title.className = "eyebrow"; title.textContent = t("js.de_identification_accuracy", "De-identification accuracy");
   head.appendChild(title);
   const note = document.createElement("p"); note.className = "adv-note";
-  note.textContent = "Per kind of personal detail: precision is how much of what was removed really was that kind, recall is how much of that kind was removed.";
+  note.textContent = t("js.per_kind_of_personal_detail", "Per kind of personal detail: precision is how much of what was removed really was that kind, recall is how much of that kind was removed.");
   const table = document.createElement("table"); table.className = "coverage-table pii-table";
   const thead = document.createElement("thead"); const hr = document.createElement("tr");
-  ["Kind", "Precision", "Recall", "F1"].forEach((t) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = t; hr.appendChild(th); });
+  [t("js.kind", "Kind"), t("js.precision", "Precision"), t("js.recall", "Recall"), "F1"].forEach((tt) => { const th = document.createElement("th"); th.scope = "col"; th.textContent = tt; hr.appendChild(th); });
   thead.appendChild(hr);
   const tbody = document.createElement("tbody");
   rows.forEach(([kind, v]) => {

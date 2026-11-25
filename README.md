@@ -98,28 +98,33 @@ Full instructions, including configuration and Windows, are in
 10. [Local AI models](#local-ai-models)
 11. [Accounts and databases](#accounts-and-databases)
 12. [Using the API](#using-the-api)
-13. [Using your own documents](#using-your-own-documents)
-14. [Clinical review and governance](#clinical-review-and-governance)
-15. [Patient-aware checks](#patient-aware-checks)
-16. [EHR integration](#ehr-integration)
-17. [Training imaging models](#training-imaging-models)
-18. [CT and MRI](#ct-and-mri)
-19. [Knowledge releases and rollback](#knowledge-releases-and-rollback)
-20. [Monitoring and alerts](#monitoring-and-alerts)
-21. [Incident reporting](#incident-reporting)
-22. [Configuration](#configuration)
-23. [Local development](#local-development)
-24. [Running the checks](#running-the-checks)
-25. [Troubleshooting](#troubleshooting)
-26. [Deployment](#deployment)
-27. [Project layout](#project-layout)
-28. [Honest limitations](#honest-limitations)
-29. [Changes](#changes)
-30. [Reporting issues](#reporting-issues)
-31. [Contributing](#contributing)
-32. [Security](#security)
-33. [License](#license)
-34. [Credits](#credits)
+13. [Languages](#languages)
+14. [Tracing](#tracing)
+15. [Backup and restore drill](#backup-and-restore-drill)
+16. [Using your own documents](#using-your-own-documents)
+17. [Clinical review and governance](#clinical-review-and-governance)
+18. [Patient-aware checks](#patient-aware-checks)
+19. [EHR integration](#ehr-integration)
+20. [Training imaging models](#training-imaging-models)
+21. [CT and MRI](#ct-and-mri)
+22. [Speed, caching and hardware](#speed-caching-and-hardware)
+23. [Adoption, feedback and pilot reports](#adoption-feedback-and-pilot-reports)
+24. [Knowledge releases and rollback](#knowledge-releases-and-rollback)
+25. [Monitoring and alerts](#monitoring-and-alerts)
+26. [Incident reporting](#incident-reporting)
+27. [Configuration](#configuration)
+28. [Local development](#local-development)
+29. [Running the checks](#running-the-checks)
+30. [Troubleshooting](#troubleshooting)
+31. [Deployment](#deployment)
+32. [Project layout](#project-layout)
+33. [Honest limitations](#honest-limitations)
+34. [Changes](#changes)
+35. [Reporting issues](#reporting-issues)
+36. [Contributing](#contributing)
+37. [Security](#security)
+38. [License](#license)
+39. [Credits](#credits)
 
 ---
 
@@ -485,9 +490,20 @@ One installation can serve a group of hospitals or clinics. An admin adds
 **sites** on the Users page and chooses each person's site. People at a site
 see only their site's questions, audit records, review cases, usage reports,
 incidents and imaging series; people with no site ("Every site") see all of
-them. The same refused question at two sites opens a case at each. Approved
-documents, the formulary, trained models, releases and monitoring are shared
-by the group.
+them. The same refused question at two sites opens a case at each. The
+formulary, trained models and monitoring are shared by the group.
+
+**Documents belong to a site.** A document uploaded by someone at a site belongs
+to that site: only that site lists it, approves it or is answered from it, and
+its versions, duplicate check and replacement of older versions are per site.
+A document uploaded by someone with no site (a group admin may also pick a
+site) is shared: every site sees it and is answered from it, and only the
+group approves it. A person with no site is answered from shared documents
+only. Another site's document is indistinguishable from one that does not exist.
+Releases are the group's: a site's people see only their site's and the
+shared documents in them, and only an admin with no site promotes or rolls one
+back, runs retention, edits the hazard log, or manages local models and training.
+Documents uploaded before sites existed are shared.
 
 Admins at a site manage only their site's people and can't move anyone
 between sites or add sites. With single sign-on, set `OIDC_SITE_CLAIM` to a
@@ -585,6 +601,21 @@ object, for example `{"query": "...", "settings": {"top_k": 6,
 company's product. The dashboard keeps using `/api/*`, which is unchanged.
 Python and TypeScript clients are in `sdk/python` and `sdk/typescript`.
 
+**Quickstart.** Sign in as an administrator, make a key, and call the API with it:
+
+```bash
+curl -X POST http://localhost:8000/api/keys -H "Content-Type: application/json" \
+  -b cookies.txt -d '{"name": "my-service", "scopes": ["ask", "verify"]}'    # prints the gck_ secret once
+export GROUNDCHECK_API_KEY=gck_...
+
+curl -X POST http://localhost:8000/api/v1/ask \
+  -H "Authorization: Bearer $GROUNDCHECK_API_KEY" -H "Content-Type: application/json" \
+  -d '{"question": "What is the standard dose of Caloradine?"}'
+```
+
+When sign-in is not required, `ADMIN_ACCESS` (default `local`) decides where key management is allowed from, and no
+cookie is needed from there. Check the response's `decision` before using `answer_text`.
+
 **Keys.** An administrator makes a key with `POST /api/keys`
 (`{"name", "scopes", "site_id"?, "expires_in_days"?, "rpm_limit"?, "monthly_quota"?}`).
 The secret (`gck_...`) is in that one response and cannot be shown again; only a
@@ -599,6 +630,23 @@ whole group, and has scopes:
 | `verify` | `POST /api/v1/verify`: check an answer some other model wrote |
 | `usage` | `GET /api/v1/usage`: request counts |
 | `audit:read` | `GET /api/v1/audit/{id}`: one audit record from the key's own site |
+
+**Clients.** The Python client (`sdk/python`, standard library only) and the TypeScript client (`sdk/typescript`, no
+runtime dependencies) wrap `ask` and `verify` with retries, typed errors and a `passed` flag that is true only for an
+exact `pass`. They are installed from the repository folders (`pip install ./sdk/python`, `npm install ./sdk/typescript`):
+
+```python
+from groundcheck_client import Client
+client = Client("gck_your_key", base_url="https://groundcheck.example.org")
+result = client.verify(question="What is the usual adult dose of Zentrilex?", answer="Take 10 mg once daily.")
+print(result.passed, result.reason_code)
+```
+
+```ts
+import { GroundCheck } from "@groundcheck/client";
+const client = new GroundCheck({ apiKey: "gck_your_key", baseUrl: "https://groundcheck.example.org" });
+const result = await client.verify({ question: "...", answer: "..." });
+```
 
 `GET /api/v1/health` needs no key and reveals only status, version and the
 number of indexed passages. Send the key as `Authorization: Bearer gck_...` or
@@ -668,6 +716,53 @@ The contract is `openapi/v1.json`. `tests/test_api_contract.py` fails on any
 change that would break a client (a removed or retyped field, a tightened
 limit, a new required field) and passes on additions; regenerate it with
 `python scripts/export_openapi.py` when you add something.
+
+---
+
+## Languages
+
+A question is checked for its language before anything else. Only languages listed in `SUPPORTED_LANGUAGES` are
+answered, and each needs a pack under `app/data/<code>/`.
+
+- **No pack, no answer.** A question in a language with no pack (French, German, Hindi, Arabic and so on) is refused
+  with the reason code `unsupported_language`. It is not translated by guesswork and not stored.
+- **Spanish** (`SUPPORTED_LANGUAGES=en,es`) is handled by closed-vocabulary translation (`app/langpack.py`): the
+  question is turned into English only from words, units, frequencies and phrases the pack lists. An unknown word, an
+  unknown unit or an ambiguous number such as `1.500` refuses the question instead of guessing. Drug names and doses
+  pass through unchanged.
+- **Answers stay in English.** They are the approved source text. The dashboard's labels, reasons and buttons can be shown
+  in Spanish (the locale selector), but the clinical content of an answer is not translated.
+- **The honest limit.** On the Spanish test set (`eval/golden_es.json`, 406 cases) nothing unsafe was answered, and 94.2%
+  of cases were answered, but that set was written alongside the pack. On wording the pack was never shown, about 12%
+  of questions are answered and the rest are refused. Treat Spanish as a safe but narrow front door, not as Spanish
+  support for free-form clinical questions.
+
+`python scripts/language_eval.py` runs the Spanish evaluation and the language-detection cases.
+
+## Tracing
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` and every question exports one OpenTelemetry trace: a root span and one child span
+for each pipeline stage that ran, with its status and duration. It is off by default and needs the OpenTelemetry
+packages, which are not in `requirements.txt`:
+
+```bash
+pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318 OTEL_SERVICE_NAME=groundcheck uvicorn app.main:app
+```
+
+Spans carry only a fixed list of attributes (stage, status, duration, decision, reason code, language, audit id). The
+question text, the stage detail lines and who asked are never exported. An exporter failure is swallowed and never
+changes an answer.
+
+## Backup and restore drill
+
+`python scripts/db_restore_drill.py --tamper-check` runs against a throwaway SQLite database, or against
+`DATABASE_URL` for PostgreSQL (needs `pg_dump` and `psql`; it refuses a database that already holds data). It migrates,
+seeds users, audit records and review cases, takes a backup, wipes the database and restores it, then fails unless every
+table has the same row count, the audit chain head is the same and `python -m app.cli verify-audit` passes. With
+`--tamper-check` it also edits one restored audit record, confirms the edit is detected, and restores again to repair
+it. CI runs it against PostgreSQL on every push and weekly. It tests that your backup procedure works, not your own
+backup schedule.
 
 ---
 
@@ -807,6 +902,15 @@ question, the answer or reason, cited sources, the patient checks, their
 comment and the audit record ID. The EHR's access token is kept encrypted
 server-side and never sent to the browser.
 
+With `SMART_WRITE_PROVENANCE=true` a `Provenance` resource is written next to the
+note, and with `SMART_WRITE_AUDITEVENT=true` as well, an `AuditEvent`. They name
+GroundCheckHealth, the reviewing clinician, the note and the audit record, and
+carry no patient details or note text. Both are off by default. A failed
+write never costs the clinician the saved note: it is recorded in the audit
+trail, and the response of `POST /api/ehr/notes` says how each went, as
+`provenance` and `audit_event` (`{"status": "written", "reference": ...}` or
+`{"status": "failed", ...}`; absent when that write is off).
+
 ### CDS Hooks
 
 The discovery endpoint is `https://<your GroundCheckHealth>/cds-services`. The
@@ -926,7 +1030,10 @@ Characteristics and Clean Descriptors options:
 - the patient's own name and IDs are removed from descriptions, which then
   pass through text de-identification
 - age (over 89 becomes 90), sex, size and weight are kept
-- images marked as having patient details burned into the pixels are refused
+- every image's pixels are searched for burned-in text, whatever its tags say.
+  Text found is blacked out (`IMAGING_BURNED_IN_ACTION=redact`, the default) or
+  the image is refused (`block`); the result is searched again, and if text is
+  still found, or the search cannot run, the image is refused
 
 Slices are ordered head to feet (axial), front to back (coronal) or right to
 left (sagittal) and turned to standard radiological display from
@@ -1079,7 +1186,7 @@ before anything is enabled; enabling means setting the variable and restarting.
 | --- | --- |
 | `schema` | Version of this payload format (an integer). |
 | `install_id` | A random identifier generated on first send. Not derived from anything about the machine or organisation. |
-| `version` | The GroundCheckHealth version, for example 1.0.0. |
+| `version` | The GroundCheckHealth version, for example 3.0.0. |
 | `db_kind` | The database engine: sqlite, postgresql or mysql. |
 | `llm_provider_kind` | How answers are drafted: extractive (no model), local, or cloud. Not the provider, model or address. |
 | `week_start` | The Monday (UTC date) of the week the counts cover. |
@@ -1250,6 +1357,8 @@ The only ones you may want to set are `LLM_PROVIDER` and its key.
 | `SMART_CLIENT_SECRET` | _empty_ | The client secret, for confidential clients. |
 | `SMART_ALLOWED_ISSUERS` | _empty_ | FHIR base URLs of EHRs allowed to launch GroundCheckHealth, comma-separated. |
 | `SMART_WRITE_NOTES` | `false` | Ask for write permission and let clinicians save reviewed answers as notes. |
+| `SMART_WRITE_PROVENANCE` | `false` | Also write a FHIR `Provenance` (GroundCheckHealth, the reviewing clinician and the audit record) next to a saved note. Needs `SMART_WRITE_NOTES`. |
+| `SMART_WRITE_AUDITEVENT` | `false` | Also write a FHIR `AuditEvent` for the save. Needs `SMART_WRITE_PROVENANCE`. |
 | `EHR_CONTEXT_MINUTES` | `60` | How long a patient loaded from an EHR is kept. |
 | `FHIR_LAB_MAX_AGE_DAYS` | `90` | Lab results older than this are flagged as possibly out of date. |
 | `CDS_HOOKS_TRUSTED` | _empty_ | EHRs allowed to call the CDS services, as `issuer=JWKS URL` pairs. |
@@ -1277,6 +1386,8 @@ The only ones you may want to set are `LLM_PROVIDER` and its key.
 | `INSTANCE_NAME` | the host name | Named in alert notifications. |
 | `IMAGING_DIR` | `data/imaging` | Where imported CT and MRI series are stored, encrypted when `DATA_ENCRYPTION_KEYS` is set. |
 | `IMAGING_MAX_UPLOAD_MB` | `1024` | Largest imaging upload. |
+| `IMAGING_BURNED_IN_ACTION` | `redact` | What happens to an image with text in its pixels: `redact` blacks the text out and searches again, `block` refuses the image. No setting lets an image with text through. |
+| `IMAGING_OCR` | `auto` | `auto` also uses Tesseract (`pytesseract` and the program) to find burned-in text when installed; `off` uses only the built-in detector. |
 | `DICOMWEB_URL` | _empty_ | A PACS or VNA's DICOMweb root, to search, retrieve series and send signed reports. |
 | `DICOMWEB_AUTHORIZATION` | _empty_ | The `Authorization` header sent to the PACS, such as `Bearer <token>`. |
 | `ORGANISATION_NAME` | _empty_ | Recorded as the verifying organisation in signed imaging reports. |
@@ -1289,6 +1400,11 @@ The only ones you may want to set are `LLM_PROVIDER` and its key.
 | `REVIEW_QUEUE` | `true` | Open a review case for every refusal. |
 | `REVIEW_SLA_HOURS` | `72` | When a refusal case is due. |
 | `FLAGGED_SLA_HOURS` | `24` | When a flagged answer case is due. |
+| `SUPPORTED_LANGUAGES` | `en` | Languages a question may be asked in, comma-separated, each needing a pack under `app/data/<code>/` (only `es` ships). A question in any other language is refused as `unsupported_language`. See [Languages](#languages). |
+| `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | The embedding model for search. `EMBED_MODEL` still works. An English model does not search other languages well; rebuild the index after changing it. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _empty_ | An OpenTelemetry collector. Empty turns tracing off. See [Tracing](#tracing). |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` | `http/protobuf` or `grpc`. |
+| `OTEL_SERVICE_NAME` | `groundcheck` | The service name on exported spans. |
 | `AUDIT_LOG_PATH` | `audit/audit_log.jsonl` | Where the audit trail is written. |
 
 No secret is ever committed. The key is read from the environment only.
@@ -1344,7 +1460,7 @@ A local `.env` file (git-ignored) is also read on startup, so you can put
 
 ```bash
 python scripts/run_eval.py                  # 2,008 golden cases, 16 probes, 383 patient scenarios
-pytest -q                                   # 415 tests, including property-based fuzzing
+pytest -q                                   # about 3,000 tests, including property-based fuzzing
 python scripts/stress_eval.py --sample 5000 # a sample of the large evaluation
 python scripts/stress_eval.py               # all 265,778 cases (about an hour on 7 cores)
 python scripts/guard_eval.py                # the grounding and dosage guards, against wrong claims
@@ -1398,6 +1514,61 @@ sentences ("the dose is not increased without specialist input") were
 attributed to the wrong passage. That is the noise floor of a similarity check
 rather than a dosing error, and it is reported rather than gated on, because
 tuning until that number reads zero would be tuning the measurement.
+
+A second thing the large numbers cannot tell you is whether the system was
+tuned to them. The committed golden set, the thresholds and the guards were all
+written by the same people, so a pass proves the checks still hold, not that
+they hold on questions nobody has seen. `scripts/eval_split.py` makes that
+testable:
+
+```bash
+python scripts/eval_split.py gen-seed --out ~/secrets/groundcheck-heldout.seed
+python scripts/eval_split.py create --seed-file ~/secrets/groundcheck-heldout.seed \
+    --out ~/secrets/groundcheck-heldout.json            # add --apply to publish the public part
+python scripts/eval_split.py verify --seed-file ~/secrets/groundcheck-heldout.seed --manifest eval/split_manifest.json
+python scripts/run_eval.py --heldout ~/secrets/groundcheck-heldout.json   # or GC_HELDOUT_PATH
+```
+
+About a fifth of the cases are set aside by a secret seed that lives outside
+the repository. The split is by entity: every case naming a medicine or
+condition goes to the same side as every other case naming it, so a held-out
+case cannot be answered by a near-copy in the public set. The seed is only an
+HMAC key; the repository holds a SHA-256 commitment to it and the thresholds in
+force at the time of the split, never the seed, so the owner can later prove
+which cases were held back and that the thresholds did not move. `run_eval.py`
+reports the held-out result as its own `heldout` block. Until the owner runs
+`create --apply`, the committed `eval/golden.json` is the whole set and **no
+case is held out**; the two numbers should be read together, and a gap between
+them is the finding.
+
+### Benchmarking a model
+
+`scripts/benchmark.py` runs the golden, adversarial, patient (and, with
+`--heldout`, held-out) suites through the pipeline with a chosen model drafting,
+twice: with every guard on, and with them off (what the model alone would have
+said, given the same retrieved passages). It reports accuracy, the
+unsafe-answer rate (a must-refuse case that was answered) with and without the
+guards, the over-refusal rate, latency and a cost estimate.
+
+```bash
+python scripts/benchmark.py run --provider anthropic --model MODEL --out eval/benchmarks/NAME.json
+python scripts/benchmark.py run --provider openai_compatible --heldout PATH --report NAME.html
+python scripts/benchmark.py run ... --resume        # continue an interrupted run
+python scripts/benchmark.py report RESULT.json OUT.html
+python scripts/benchmark.py verify-report NAME.html
+```
+
+`--provider` is one of `openai_compatible`, `anthropic`, `azure_openai`,
+`ollama` or `none`. Keys come from the environment (`LLM_API_KEY`,
+`ANTHROPIC_API_KEY`, `AZURE_OPENAI_*`), never from arguments, and are not
+written to results. Sampling uses a fixed `--seed`, so the same seed gives the
+same cases and the same scores; `--suites`, `--golden-per-decision` and
+`--patient-sample` size the run, `--price-in` and `--price-out` (per million
+tokens) turn token counts into a cost, and `--stop-after N` pauses a run to
+`--resume` later. The HTML report carries a fixed caveat block that cannot be
+switched off, a SHA-256 of the page and, when `AUDIT_SIGNING_KEYS` is set, an
+HMAC; `verify-report` re-renders the page from its data, so any edit is found.
+A benchmark is not a certification, and neither is its report.
 
 ### The container smoke test
 
@@ -1576,8 +1747,11 @@ In the spirit of the demo, these are real and worth knowing:
   words are handled, but unusual phrasing can still cause a refusal.
 - De-identification of questions and DICOM text is rule-based. It catches
   common names, identifiers and dates, and a DICOM series' own patient name
-  and IDs, but it can miss unusual ones. Pixel data isn't scanned for
-  burned-in text; images that declare it are refused.
+  and IDs, but it can miss unusual ones. Pixels are searched for burned-in
+  text, but the detectors can miss very small, faint or unusual text (on a
+  synthetic set recall was 0.99, not 1.0) and flag things that are not text,
+  so "no text found" is never reported as clean. Images with text that cannot
+  be removed are refused.
 - The demonstration imaging models were trained on small public datasets and
   abstain on most real scans. They show the workflow, not diagnostic
   performance.

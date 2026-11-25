@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 
-from . import __version__, config, db, encryption
+from . import __version__, config, db, encryption, guards_input
 from .db import AuditRecord, EvalCase, Hazard, ReviewCase, ReviewEvent, Source, User, utcnow
 
 OUTCOMES = {
@@ -62,6 +62,7 @@ _CODE_CATEGORY = {
     "claim_ungrounded": "claim not grounded",
     "dose_unsupported": "dose not in sources",
     "patient_unsafe": "patient safety block",
+    "unsupported_language": "language not supported",
 }
 
 
@@ -108,7 +109,8 @@ def _user_names(s, ids) -> dict[int, str]:
 
 
 def _event(s, case: ReviewCase, action: str, user_id: int | None = None, note: str = "") -> None:
-    s.add(ReviewEvent(case_id=case.id, action=action, user_id=user_id, note=note.strip()[:4000]))
+    s.add(ReviewEvent(case_id=case.id, action=action, user_id=user_id,
+                      note=guards_input.deidentify(note.strip()[:4000]).text if note.strip() else ""))
 
 
 def _overdue(case: ReviewCase, now: datetime) -> bool:
@@ -322,7 +324,7 @@ def resolve(case_id: int, outcome: str, note: str, user_id: int | None,
         now = utcnow()
         case.status = "resolved"
         case.outcome = outcome
-        case.outcome_note = (note or "").strip()[:4000]
+        case.outcome_note = guards_input.deidentify((note or "").strip()[:4000]).text
         case.resolved_at = now
         case.resolved_by = user_id
         _event(s, case, "resolved", user_id, f"{OUTCOMES[outcome]}. {case.outcome_note}".strip())

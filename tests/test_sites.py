@@ -151,3 +151,23 @@ def test_a_move_between_sites_takes_effect(group):
     assert sites.of_user(person) == north["id"]
     group_admin.patch(f"/api/users/{person}", json={"site_id": south["id"]})
     assert sites.of_user(person) == south["id"]     # not the remembered site
+
+
+def test_a_remembered_site_never_carries_over_to_another_database(tmp_path, monkeypatch):
+    """The site of a person is remembered briefly, by user id; another database has other people with the same ids,
+    and tagging an audit record with a site that doesn't exist there fails its foreign key."""
+    import conftest
+    from app import auth, config, db, sites
+
+    seen = []
+    for name, extra_sites in (("one", 2), ("two", 0)):
+        monkeypatch.setattr(config, "DATABASE_URL", f"sqlite:///{tmp_path / (name + '.db')}")
+        conftest._forget_database()
+        assert db.ready()
+        ids = [sites.create(f"s{n}-{name}", f"S{n}")["id"] for n in range(extra_sites + 1)]
+        user = auth.create_user(f"u-{name}@example.org", "correct horse battery staple", role="clinician", name="u", site_id=ids[-1])
+        seen.append((user.id, sites.of_user(user.id), ids[-1]))
+    monkeypatch.undo()
+    conftest._forget_database()
+    assert seen[0][0] == seen[1][0] == 1
+    assert seen[0][1] == seen[0][2] == 3 and seen[1][1] == seen[1][2] == 1

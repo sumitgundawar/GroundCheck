@@ -17,6 +17,7 @@ import hashlib
 import json
 import math
 import re
+import contextvars
 import threading
 import time
 from contextlib import contextmanager
@@ -52,6 +53,7 @@ _version = 0
 # A release being evaluated before it goes live is searched only by the
 # thread evaluating it (see app/releases.py), never by live questions.
 _override = threading.local()
+_view_lock = threading.Lock()
 
 
 def resolve_device(name: str) -> str:
@@ -162,7 +164,8 @@ def write_index(records: list[dict], vectors: np.ndarray) -> None:
             "kind": classify_kind(r),
             "text": r["text"],
         }
-        for extra in ("source_id", "source_version", "document_key", "document_title", "effective_from", "expires_on"):
+        for extra in ("source_id", "source_version", "document_key", "document_title", "effective_from", "expires_on",
+                      "site_id"):
             if r.get(extra) is not None:
                 entry[extra] = r[extra]
         metadata.append(entry)
@@ -260,9 +263,55 @@ def _state() -> IndexState:
     return _active
 
 
-def index_version() -> int:
-    """Changes when the index changes. Part of every cache key."""
-    return _version
+_scope: contextvars.ContextVar = contextvars.ContextVar("retrieval_site_scope", default=None)
+
+
+@contextmanager
+def site_scope(site_id: int | None):
+    """Search as someone at this site (None: the group, which sees only content shared by every site),
+    in this thread of work only."""
+    token = _scope.set(site_id)
+    try:
+        yield
+    finally:
+        _scope.reset(token)
+
+
+def _has_site_content(state: IndexState) -> bool:
+    found = state.cache.get("has_site_content")
+    if found is None:
+        found = state.cache["has_site_content"] = any(r.get("site_id") is not None for r in state.metadata)
+    return found
+
+
+def index_version() -> "int | str":
+    """Changes when the index changes, or when the caller's site would see different passages.
+    Part of every cache key."""
+    state = getattr(_override, "state", None) or _active
+    return f"{_version}:{_scope.get()}" if state is not None and _has_site_content(state) else _version
+
+
+def _view() -> IndexState:
+    """The index as the current caller may see it: passages shared by every site, and their own site's.
+    Without any site-specific passage this is the index itself."""
+    base = _state()
+    if not _has_site_content(base):
+        return base
+    scope = _scope.get()
+    with _view_lock:
+        views = base.cache.setdefault("site_views", {})
+        view = views.get(scope)
+        if view is None:
+            rows = [i for i, r in enumerate(base.metadata) if r.get("site_id") in (None, scope)]
+            if len(rows) == len(base.metadata):
+                view = base
+            else:
+                store = vectorstore.LocalStore()
+                store._matrix = np.ascontiguousarray(
+                    base.store.vectors(rows) if rows else np.zeros((0, base.store.vectors([0]).shape[1])), dtype="float32")
+                view = make_state(store, [base.metadata[i] for i in rows])
+            views[scope] = view
+        return view
 
 
 def is_loaded() -> bool:
@@ -283,13 +332,13 @@ _TOKEN = re.compile(r"[a-z][a-z0-9'-]*")
 
 def is_known_term(word: str) -> bool:
     """Whether a word appears in the indexed documents."""
-    candidate = getattr(_override, "state", None) or _active
+    candidate = _view() if (getattr(_override, "state", None) or _active) is not None else None
     return candidate is not None and word.lower() in candidate.lexical.postings
 
 
 def document_frequency(word: str) -> int:
     """How many passages in the index contain this word."""
-    state = getattr(_override, "state", None) or _active
+    state = _view() if (getattr(_override, "state", None) or _active) is not None else None
     return len(state.lexical.postings.get(word.lower(), ())) if state is not None else 0
 
 
@@ -367,7 +416,7 @@ def search(query: str, k: int | None = None,
     blend of cosine score and keyword score, so the first result is not always
     the highest-scoring one; callers that need the best score should take the
     maximum."""
-    state = _state()
+    state = _view()
     k = k or config.TOP_K
     hybrid = config.HYBRID_RETRIEVAL if hybrid is None else hybrid
     query_vec = embed_query(query)
@@ -531,12 +580,12 @@ def best_sentences(query: str, passages: list[str]) -> list[str]:
 def topic_records(topics: set[str]) -> list[dict]:
     """Every passage of these topics, in corpus order."""
     wanted = {t.lower() for t in topics}
-    return [r for r in _state().metadata if r.get("topic", "").lower() in wanted]
+    return [r for r in _view().metadata if r.get("topic", "").lower() in wanted]
 
 
 def passage_scores(query: str, ids: list[str]) -> dict[str, float]:
     """Cosine of the question against each passage, from the stored vectors."""
-    state = _state()
+    state = _view()
     rows = state.cache.get("row_of")
     if rows is None:
         rows = {record["id"]: i for i, record in enumerate(state.metadata)}
@@ -580,7 +629,7 @@ def best_sentence(query: str, passage_text: str) -> str:
 def _topic_names() -> dict[str, str]:
     """Each corpus topic keyed by its distinctive first word, for example
     "caloradine" or "veltris". Reference topics are generic and skipped."""
-    state = _state()
+    state = _view()
     if "topic_names" in state.cache:
         return state.cache["topic_names"]
     names: dict[str, str] = {}
@@ -602,7 +651,7 @@ def topics_mentioned(query: str) -> dict[str, str]:
 
 
 def record_for(source_id: str) -> dict | None:
-    state = _state()
+    state = _view()
     by_id = state.cache.get("by_id")
     if by_id is None:
         by_id = {record["id"]: record for record in state.metadata}
@@ -614,7 +663,7 @@ def corpus_text_for(source_id: str) -> str | None:
     # Called once per claim per cited source while checking grounding, and
     # again in the judge loop. Walking the whole corpus each time made
     # answering slower the more documents a site had approved.
-    state = _state()
+    state = _view()
     by_id = state.cache.get("by_id")
     if by_id is None:
         by_id = {record["id"]: record for record in state.metadata}
@@ -623,14 +672,22 @@ def corpus_text_for(source_id: str) -> str | None:
     return record["text"] if record else None
 
 
+def passage_count(site_id: int | None = None) -> int:
+    """How many passages a person at this site may be answered from; for the group (None), every passage."""
+    if site_id is None:
+        return len(_state().metadata)
+    with site_scope(site_id):
+        return len(_view().metadata)
+
+
 def all_metadata() -> list[dict]:
-    return list(_state().metadata)
+    return list(_view().metadata)
 
 
 def corpus_size() -> int:
     """How many passages are indexed. The health probe wants the number, not a
     copy of every passage in the corpus, and it is polled continuously."""
-    return len(_state().metadata)
+    return len(_view().metadata)
 
 
 # --------------------------------------------------------------------------
@@ -643,7 +700,7 @@ def corpus_projection(dims: int = 3) -> list[dict]:
     flat index stores the original (normalised) vectors, so we reconstruct them
     rather than re-embedding. Each axis is scaled independently into [-1, 1].
     Returns x, y, and (for 3D) z, so the frontend can render either."""
-    state = _state()
+    state = _view()
     if not state.metadata:
         return []
     if ("projection", dims) in state.cache:
@@ -681,7 +738,7 @@ def corpus_projection(dims: int = 3) -> list[dict]:
 def embedding_summary() -> dict:
     """The embedding model, vector store and search settings, for the
     Embeddings page."""
-    state = _state()
+    state = _view()
     vectors = state.store.vectors([0]) if state.metadata else np.zeros((0, 0))
     documents = sum(1 for r in state.metadata if r.get("source_id"))
     return {
@@ -703,7 +760,7 @@ def embedding_summary() -> dict:
 
 def corpus_stats() -> dict:
     """Aggregate counts for the corpus map header tiles."""
-    metadata = _state().metadata
+    metadata = _view().metadata
     by_kind: dict[str, int] = {}
     by_section: dict[str, int] = {}
     topics: set[str] = set()

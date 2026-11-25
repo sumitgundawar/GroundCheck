@@ -639,8 +639,6 @@ def test_read_json_turns_every_bad_body_into_a_400():
     assert cds_hooks.read_json(b'{"hook": "order-sign"}') == {"hook": "order-sign"}
 
 
-@pytest.mark.xfail(strict=True, reason="app/main.py's route parses with request.json() and catches only ValueError; "
-                                       "it should call cds_hooks.read_json (engineer X)")
 def test_a_json_body_nested_beyond_the_parsers_limit_is_a_400_not_a_500(ehr):
     """Robustness: a body too deeply nested for the JSON parser is rejected as bad input."""
     assert call(ehr, None, raw=DEEP).status_code == 400
@@ -841,8 +839,6 @@ def test_feedback_items_survive_any_shape():
     assert len(cds_hooks.feedback_items({"feedback": [{}] * 500})) == 50
 
 
-@pytest.mark.xfail(strict=True, reason="app/main.py's feedback route calls item.get on entries that may not be objects; "
-                                       "it should use cds_hooks.feedback_items (engineer X)")
 def test_odd_feedback_shapes_are_not_a_500_over_http(ehr):
     """Feedback: unexpected shapes never produce a server error."""
     for body in ODD_FEEDBACK:

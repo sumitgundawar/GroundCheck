@@ -368,13 +368,14 @@ def test_configured_when_credentials_present(monkeypatch):
         assert providers.configured(name) is True
 
 
-def test_unset_provider_keeps_the_groq_alias_behaviour(monkeypatch):
+def test_unset_provider_keeps_the_groq_alias_behaviour(monkeypatch, config_restored):
     import importlib
 
     for var in ("LLM_PROVIDER", "LLM_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("GROQ_API_KEY", "gsk_alias")
     monkeypatch.setenv("GROQ_BASE_URL", "https://groq.example/v1")
+    monkeypatch.setenv("FORCE_EXTRACTIVE", "false")   # other test modules set it for the whole process
     try:
         importlib.reload(config)
         assert config.LLM_API_KEY == "gsk_alias" and config.GROQ_API_KEY == "gsk_alias"
@@ -392,10 +393,9 @@ def test_unset_provider_keeps_the_groq_alias_behaviour(monkeypatch):
         assert config.LLM_PROVIDER == "azure_openai"
     finally:
         monkeypatch.undo()
-        importlib.reload(config)
 
 
-def test_an_unknown_provider_name_is_treated_as_none(monkeypatch):
+def test_an_unknown_provider_name_is_treated_as_none(monkeypatch, config_restored):
     import importlib
 
     monkeypatch.setenv("LLM_PROVIDER", "mystery")
@@ -405,7 +405,6 @@ def test_an_unknown_provider_name_is_treated_as_none(monkeypatch):
         assert config.LLM_PROVIDER_EFFECTIVE == "" and not config.llm_configured()
     finally:
         monkeypatch.undo()
-        importlib.reload(config)
 
 
 def test_building_a_non_cloud_provider_fails():

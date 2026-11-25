@@ -40,45 +40,46 @@
   <!-- Sign-in: shown instead of the dashboard when accounts are required -->
   <section class="auth-screen" id="auth-screen" hidden aria-labelledby="auth-title">
     <div class="auth-card">
-      <p class="auth-brand">GroundCheckHealth</p>
-      <h1 class="auth-title" id="auth-title">Sign in</h1>
-      <p class="auth-lede" id="auth-lede">Sign in to ask questions and review answers.</p>
+      <p class="auth-brand" data-i18n="auth_screen.groundcheckhealth">GroundCheckHealth</p>
+      <h1 class="auth-title" id="auth-title" data-i18n="auth_title.sign_in">Sign in</h1>
+      <p class="auth-lede" id="auth-lede" data-i18n="auth_lede.sign_in_to_ask">Sign in to ask questions and review answers.</p>
 
       <div class="sso-block" id="sso-block" hidden>
-        <a class="btn btn-primary sso-button" id="sso-button" href="/api/auth/sso/start">Sign in with your organisation</a>
-        <p class="sso-divider" id="sso-divider"><span>or use a password</span></p>
+        <a class="btn btn-primary sso-button" id="sso-button" href="/api/auth/sso/start" data-i18n="sso_button.sign_in_with_your">Sign in with your organisation</a>
+        <p class="sso-divider" id="sso-divider"><span data-i18n="sso_divider.or_use_a_password">or use a password</span></p>
       </div>
       <form class="auth-form" id="login-form" novalidate>
-        <label for="login-email">Email</label>
+        <label for="login-email" data-i18n="login_form.email">Email</label>
         <input id="login-email" type="email" autocomplete="username" required>
-        <label for="login-password">Password</label>
+        <label for="login-password" data-i18n="login_form.password">Password</label>
         <input id="login-password" type="password" autocomplete="current-password" required>
-        <button type="submit" class="btn btn-primary">Sign in</button>
+        <button type="submit" class="btn btn-primary" data-i18n="auth_title.sign_in">Sign in</button>
       </form>
 
       <form class="auth-form" id="mfa-form" novalidate hidden>
-        <label for="mfa-code">6-digit code from your authenticator app</label>
+        <label for="mfa-code" data-i18n="mfa_form.6_digit_code_from">6-digit code from your authenticator app</label>
         <input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="7" required>
-        <button type="submit" class="btn btn-primary">Verify</button>
-        <button type="button" class="btn btn-ghost" id="mfa-cancel">Use a different account</button>
+        <button type="submit" class="btn btn-primary" data-i18n="mfa_form.verify">Verify</button>
+        <button type="button" class="btn btn-ghost" id="mfa-cancel" data-i18n="mfa_cancel.use_a_different_account">Use a different account</button>
       </form>
 
       <form class="auth-form" id="first-admin-form" novalidate hidden>
-        <label for="admin-name">Name</label>
+        <label for="admin-name" data-i18n="first_admin_form.name">Name</label>
         <input id="admin-name" autocomplete="name">
-        <label for="admin-email">Email</label>
+        <label for="admin-email" data-i18n="login_form.email">Email</label>
         <input id="admin-email" type="email" autocomplete="username" required>
-        <label for="admin-password">Password</label>
+        <label for="admin-password" data-i18n="login_form.password">Password</label>
         <input id="admin-password" type="password" autocomplete="new-password" minlength="12" required>
-        <p class="auth-hint">At least 12 characters.</p>
-        <button type="submit" class="btn btn-primary">Create admin account</button>
+        <p class="auth-hint" data-i18n="first_admin_form.at_least_12_characters">At least 12 characters.</p>
+        <button type="submit" class="btn btn-primary" data-i18n="first_admin_form.create_admin_account">Create admin account</button>
       </form>
 
       <p class="auth-error" id="auth-error" role="alert" hidden></p>
-      <div class="theme-switch auth-theme" role="radiogroup" aria-label="Colour theme">
-        <button type="button" role="radio" data-theme-choice="system" aria-checked="true" title="Match this device"><svg aria-hidden="true"><use href="#i-monitor"/></svg><span>System</span></button>
-        <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light"><svg aria-hidden="true"><use href="#i-sun"/></svg><span>Light</span></button>
-        <button type="button" role="radio" data-theme-choice="dark" aria-checked="false" title="Dark"><svg aria-hidden="true"><use href="#i-moon"/></svg><span>Dark</span></button>
+      <select class="select locale-select" aria-label="Language" data-i18n-attr="aria-label:locale.language"><option value="en" data-i18n-skip>English</option><option value="es" data-i18n-skip>Español</option></select>
+      <div class="theme-switch auth-theme" role="radiogroup" aria-label="Colour theme" data-i18n-attr="aria-label:auth_screen.colour_theme">
+        <button type="button" role="radio" data-theme-choice="system" aria-checked="true" title="Match this device" data-i18n-attr="title:auth_screen.match_this_device"><svg aria-hidden="true"><use href="#i-monitor"/></svg><span data-i18n="auth_screen.system">System</span></button>
+        <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light" data-i18n-attr="title:auth_screen.light"><svg aria-hidden="true"><use href="#i-sun"/></svg><span data-i18n="auth_screen.light">Light</span></button>
+        <button type="button" role="radio" data-theme-choice="dark" aria-checked="false" title="Dark" data-i18n-attr="title:auth_screen.dark"><svg aria-hidden="true"><use href="#i-moon"/></svg><span data-i18n="auth_screen.dark">Dark</span></button>
       </div>
     </div>
   </section>
@@ -87,39 +88,39 @@
   <!-- Account settings -->
   <dialog class="modal" id="account-dialog" aria-labelledby="account-dialog-title">
     <div class="modal-head">
-      <h2 id="account-dialog-title">Account and security</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="account-dialog-title" data-i18n="account_dialog_title.account_and_security">Account and security</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
 
     <section class="modal-section" aria-labelledby="password-title">
-      <h3 id="password-title">Change password</h3>
+      <h3 id="password-title" data-i18n="password_title.change_password">Change password</h3>
       <form class="auth-form" id="password-form" novalidate>
-        <label for="current-password">Current password</label>
+        <label for="current-password" data-i18n="password_form.current_password">Current password</label>
         <input id="current-password" type="password" autocomplete="current-password" required>
-        <label for="new-password">New password</label>
+        <label for="new-password" data-i18n="password_form.new_password">New password</label>
         <input id="new-password" type="password" autocomplete="new-password" minlength="12" required>
-        <button type="submit" class="btn btn-ghost">Change password</button>
+        <button type="submit" class="btn btn-ghost" data-i18n="password_title.change_password">Change password</button>
       </form>
     </section>
 
     <section class="modal-section" aria-labelledby="twofa-title">
-      <h3 id="twofa-title">Two-factor authentication</h3>
+      <h3 id="twofa-title" data-i18n="twofa_title.two_factor_authentication">Two-factor authentication</h3>
       <p class="modal-status" id="twofa-status"></p>
-      <button type="button" class="btn btn-ghost" id="twofa-start" hidden>Turn on</button>
+      <button type="button" class="btn btn-ghost" id="twofa-start" hidden data-i18n="twofa_start.turn_on">Turn on</button>
       <div class="twofa-setup" id="twofa-setup" hidden>
-        <p>Scan this code with an authenticator app, then enter the 6-digit code it shows.</p>
-        <img id="twofa-qr" alt="QR code for your authenticator app" width="200" height="200">
-        <p class="auth-hint">Can’t scan? Enter this key: <code id="twofa-secret"></code></p>
+        <p data-i18n="twofa_setup.scan_this_code_with">Scan this code with an authenticator app, then enter the 6-digit code it shows.</p>
+        <img id="twofa-qr" alt="QR code for your authenticator app" width="200" height="200" data-i18n-attr="alt:twofa_qr.qr_code_for_your">
+        <p class="auth-hint"><span data-i18n="twofa_setup.can_t_scan_enter">Can’t scan? Enter this key:</span> <code id="twofa-secret"></code></p>
         <form class="auth-form" id="twofa-confirm-form" novalidate>
-          <label for="twofa-code">Code</label>
+          <label for="twofa-code" data-i18n="twofa_confirm_form.code">Code</label>
           <input id="twofa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required>
-          <button type="submit" class="btn btn-primary">Confirm</button>
+          <button type="submit" class="btn btn-primary" data-i18n="twofa_confirm_form.confirm">Confirm</button>
         </form>
       </div>
       <form class="auth-form" id="twofa-disable-form" novalidate hidden>
-        <label for="twofa-disable-password">Password, to turn it off</label>
+        <label for="twofa-disable-password" data-i18n="twofa_disable_form.password_to_turn_it">Password, to turn it off</label>
         <input id="twofa-disable-password" type="password" autocomplete="current-password" required>
-        <button type="submit" class="btn btn-ghost">Turn off</button>
+        <button type="submit" class="btn btn-ghost" data-i18n="twofa_disable_form.turn_off">Turn off</button>
       </form>
     </section>
     <p class="modal-message" id="account-message" role="status" hidden></p>
@@ -128,17 +129,17 @@
   <!-- Document detail -->
   <dialog class="modal modal-wide" id="document-dialog" aria-labelledby="document-dialog-title">
     <div class="modal-head">
-      <h2 id="document-dialog-title">Document</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="document-dialog-title" data-i18n="document_dialog_title.document">Document</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
     <p class="modal-status" id="document-meta"></p>
     <section class="modal-section" id="document-eval-section" hidden aria-labelledby="document-eval-title">
-      <h3 id="document-eval-title">Evaluation</h3>
+      <h3 id="document-eval-title" data-i18n="document_eval_title.evaluation">Evaluation</h3>
       <p class="modal-status" id="document-eval-summary"></p>
       <ul class="eval-cases document-eval-cases" id="document-eval-cases"></ul>
     </section>
     <section class="modal-section" aria-labelledby="document-sections-title">
-      <h3 id="document-sections-title">Sections and citation IDs</h3>
+      <h3 id="document-sections-title" data-i18n="document_sections_title.sections_and_citation_ids">Sections and citation IDs</h3>
       <ol class="document-sections" id="document-sections"></ol>
     </section>
   </dialog>
@@ -146,54 +147,54 @@
   <!-- Review case -->
   <dialog class="modal modal-wide" id="case-dialog" aria-labelledby="case-dialog-title">
     <div class="modal-head">
-      <h2 id="case-dialog-title">Review case</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="case-dialog-title" data-i18n="case_dialog_title.review_case">Review case</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
     <p class="case-query" id="case-query"></p>
     <p class="modal-status" id="case-meta"></p>
     <section class="modal-section" id="case-answer-section" hidden aria-labelledby="case-answer-title">
-      <h3 id="case-answer-title">What was shown</h3>
+      <h3 id="case-answer-title" data-i18n="case_answer_title.what_was_shown">What was shown</h3>
       <p class="case-answer" id="case-answer"></p>
       <p class="modal-status" id="case-sources"></p>
     </section>
     <section class="modal-section" id="case-work" aria-labelledby="case-work-title">
-      <h3 id="case-work-title">Work on this case</h3>
+      <h3 id="case-work-title" data-i18n="case_work_title.work_on_this_case">Work on this case</h3>
       <div class="case-assign">
-        <label for="case-assignee">Assigned to</label>
+        <label for="case-assignee" data-i18n="case_work.assigned_to">Assigned to</label>
         <select id="case-assignee"></select>
-        <button type="button" class="btn btn-sm btn-ghost" id="case-assign">Assign</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="case-assign" data-i18n="case_assign.assign">Assign</button>
       </div>
       <form class="case-form" id="case-comment-form" novalidate>
-        <label for="case-comment">Comment</label>
+        <label for="case-comment" data-i18n="case_comment_form.comment">Comment</label>
         <textarea id="case-comment" rows="2" placeholder="What you checked, who you asked"></textarea>
-        <div><button type="submit" class="btn btn-sm btn-ghost">Add comment</button></div>
+        <div><button type="submit" class="btn btn-sm btn-ghost" data-i18n="case_comment_form.add_comment">Add comment</button></div>
       </form>
       <form class="case-form" id="case-resolve-form" novalidate>
-        <label for="case-outcome">Outcome</label>
+        <label for="case-outcome" data-i18n="case_resolve_form.outcome">Outcome</label>
         <select id="case-outcome" required></select>
         <div class="case-expected" id="case-expected-field" hidden>
-          <label for="case-expected">The correct decision is to</label>
+          <label for="case-expected" data-i18n="case_expected_field.the_correct_decision_is">The correct decision is to</label>
           <select id="case-expected">
-            <option value="">Choose…</option>
-            <option value="refuse">Refuse</option>
-            <option value="answer">Answer</option>
+            <option value="" data-i18n="case_expected.choose">Choose…</option>
+            <option value="refuse" data-i18n="case_expected.refuse">Refuse</option>
+            <option value="answer" data-i18n="case_expected.answer">Answer</option>
           </select>
         </div>
-        <label for="case-note">Note <span class="optional">optional</span></label>
+        <label for="case-note"><span data-i18n="case_resolve_form.note">Note</span> <span class="optional" data-i18n="case_resolve_form.optional">optional</span></label>
         <textarea id="case-note" rows="2"></textarea>
-        <div><button type="submit" class="btn btn-sm btn-primary">Resolve case</button></div>
+        <div><button type="submit" class="btn btn-sm btn-primary" data-i18n="case_resolve_form.resolve_case">Resolve case</button></div>
       </form>
     </section>
     <section class="modal-section" id="case-closed" hidden>
       <p class="modal-status" id="case-outcome-text"></p>
       <form class="case-form" id="case-reopen-form" novalidate>
-        <label for="case-reopen-note">Reason for reopening</label>
+        <label for="case-reopen-note" data-i18n="case_reopen_form.reason_for_reopening">Reason for reopening</label>
         <textarea id="case-reopen-note" rows="2"></textarea>
-        <div><button type="submit" class="btn btn-sm btn-ghost">Reopen case</button></div>
+        <div><button type="submit" class="btn btn-sm btn-ghost" data-i18n="case_reopen_form.reopen_case">Reopen case</button></div>
       </form>
     </section>
     <section class="modal-section" aria-labelledby="case-timeline-title">
-      <h3 id="case-timeline-title">Timeline</h3>
+      <h3 id="case-timeline-title" data-i18n="case_timeline_title.timeline">Timeline</h3>
       <ol class="case-timeline" id="case-timeline"></ol>
     </section>
     <p class="modal-message" id="case-message" role="status" hidden></p>
@@ -202,74 +203,74 @@
   <!-- Reporting an incident -->
   <dialog class="modal modal-wide" id="incident-report-dialog" aria-labelledby="incident-report-title">
     <div class="modal-head">
-      <h2 id="incident-report-title">Report an incident</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="incident-report-title" data-i18n="incident_report_title.report_an_incident">Report an incident</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
-    <p class="modal-status">Anything that went wrong, or nearly did. Don’t enter patient names or identifiers.</p>
+    <p class="modal-status" data-i18n="incident_report_dialog.anything_that_went_wrong">Anything that went wrong, or nearly did. Don’t enter patient names or identifiers.</p>
     <form class="hazard-form" id="incident-report-form" novalidate>
       <div class="field hazard-wide">
-        <label for="ir-title">What happened, in a few words</label>
-        <input id="ir-title" class="text-input" maxlength="200" required placeholder="e.g. Answer gave the tablet dose for the oral solution">
+        <label for="ir-title" data-i18n="incident_report_form.what_happened_in_a">What happened, in a few words</label>
+        <input id="ir-title" class="text-input" maxlength="200" required placeholder="e.g. Answer gave the tablet dose for the oral solution" data-i18n-attr="placeholder:ir_title.e_g_answer_gave">
       </div>
       <div class="field">
-        <label for="ir-category">It concerns</label>
+        <label for="ir-category" data-i18n="incident_report_form.it_concerns">It concerns</label>
         <select id="ir-category" class="text-input"></select>
       </div>
       <div class="field">
-        <label for="ir-harm">Harm to a patient</label>
+        <label for="ir-harm" data-i18n="incident_report_form.harm_to_a_patient">Harm to a patient</label>
         <select id="ir-harm" class="text-input"></select>
       </div>
       <div class="field">
-        <label for="ir-occurred">When it happened <span class="optional">optional</span></label>
+        <label for="ir-occurred"><span data-i18n="incident_report_form.when_it_happened">When it happened</span> <span class="optional" data-i18n="case_resolve_form.optional">optional</span></label>
         <input id="ir-occurred" class="text-input" type="datetime-local">
       </div>
       <div class="field">
-        <label for="ir-audit">Audit ID <span class="optional">optional, from the answer</span></label>
+        <label for="ir-audit"><span data-i18n="incident_report_form.audit_id">Audit ID</span> <span class="optional" data-i18n="incident_report_form.optional_from_the_answer">optional, from the answer</span></label>
         <input id="ir-audit" class="text-input mono" maxlength="16" autocomplete="off" spellcheck="false">
       </div>
       <div class="field hazard-wide">
-        <label for="ir-description">Description</label>
+        <label for="ir-description" data-i18n="incident_report_form.description">Description</label>
         <textarea id="ir-description" class="text-input" rows="5" maxlength="20000" placeholder="What happened, what was the effect, and what was done at the time"></textarea>
       </div>
       <p class="field-hint hazard-wide" id="ir-links" hidden></p>
       <p class="modal-message hazard-wide" id="ir-message" role="status" hidden></p>
-      <div class="hazard-wide report-actions"><button type="submit" class="btn btn-primary" id="ir-submit">Report incident</button></div>
+      <div class="hazard-wide report-actions"><button type="submit" class="btn btn-primary" id="ir-submit" data-i18n="ir_submit.report_incident">Report incident</button></div>
     </form>
   </dialog>
 
   <!-- An incident -->
   <dialog class="modal modal-wide" id="incident-dialog" aria-labelledby="incident-dialog-title">
     <div class="modal-head">
-      <h2 id="incident-dialog-title">Incident</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="incident-dialog-title" data-i18n="incident_dialog_title.incident">Incident</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
     <p class="modal-status" id="incident-meta"></p>
     <div class="incident-deadlines" id="incident-deadlines"></div>
     <p class="case-answer" id="incident-description"></p>
     <p class="modal-status" id="incident-links"></p>
     <section class="modal-section" id="incident-manage" aria-labelledby="incident-manage-title">
-      <h3 id="incident-manage-title">Investigation</h3>
+      <h3 id="incident-manage-title" data-i18n="incident_manage_title.investigation">Investigation</h3>
       <form class="hazard-form" id="incident-form" novalidate>
-        <div class="field"><label for="if-status">Status</label>
-          <select id="if-status" class="text-input"><option value="open">Open</option><option value="investigating">Investigating</option><option value="closed">Closed</option></select></div>
-        <div class="field"><label for="if-owner">Owner</label><select id="if-owner" class="text-input"></select></div>
-        <div class="field"><label for="if-harm">Harm</label><select id="if-harm" class="text-input"></select></div>
-        <div class="field"><label for="if-category">Concerns</label><select id="if-category" class="text-input"></select></div>
-        <div class="field hazard-wide"><label for="if-root">Root cause</label><textarea id="if-root" class="text-input" rows="3" maxlength="20000"></textarea></div>
-        <div class="field hazard-wide"><label for="if-actions">Actions taken</label><textarea id="if-actions" class="text-input" rows="3" maxlength="20000"></textarea></div>
-        <div class="field"><label for="if-external">External report <span class="optional">reference, or why not reportable</span></label><input id="if-external" class="text-input" maxlength="500"></div>
-        <div class="field"><label for="if-hazard">Hazard log entry <span class="optional">number</span></label><input id="if-hazard" class="text-input" type="number" min="1" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="if-status" data-i18n="incident_form.status">Status</label>
+          <select id="if-status" class="text-input"><option value="open" data-i18n="if_status.open">Open</option><option value="investigating" data-i18n="if_status.investigating">Investigating</option><option value="closed" data-i18n="if_status.closed">Closed</option></select></div>
+        <div class="field"><label for="if-owner" data-i18n="incident_form.owner">Owner</label><select id="if-owner" class="text-input"></select></div>
+        <div class="field"><label for="if-harm" data-i18n="incident_form.harm">Harm</label><select id="if-harm" class="text-input"></select></div>
+        <div class="field"><label for="if-category" data-i18n="incident_form.concerns">Concerns</label><select id="if-category" class="text-input"></select></div>
+        <div class="field hazard-wide"><label for="if-root" data-i18n="incident_form.root_cause">Root cause</label><textarea id="if-root" class="text-input" rows="3" maxlength="20000"></textarea></div>
+        <div class="field hazard-wide"><label for="if-actions" data-i18n="incident_form.actions_taken">Actions taken</label><textarea id="if-actions" class="text-input" rows="3" maxlength="20000"></textarea></div>
+        <div class="field"><label for="if-external"><span data-i18n="incident_form.external_report">External report</span> <span class="optional" data-i18n="incident_form.reference_or_why_not">reference, or why not reportable</span></label><input id="if-external" class="text-input" maxlength="500"></div>
+        <div class="field"><label for="if-hazard"><span data-i18n="incident_form.hazard_log_entry">Hazard log entry</span> <span class="optional" data-i18n="incident_form.number">number</span></label><input id="if-hazard" class="text-input" type="number" min="1" step="1" inputmode="numeric"></div>
         <p class="modal-message hazard-wide" id="if-message" role="status" hidden></p>
-        <div class="hazard-wide report-actions"><button type="submit" class="btn btn-sm btn-primary">Save changes</button></div>
+        <div class="hazard-wide report-actions"><button type="submit" class="btn btn-sm btn-primary" data-i18n="incident_form.save_changes">Save changes</button></div>
       </form>
     </section>
     <section class="modal-section" aria-labelledby="incident-timeline-title">
-      <h3 id="incident-timeline-title">Timeline</h3>
+      <h3 id="incident-timeline-title" data-i18n="case_timeline_title.timeline">Timeline</h3>
       <ol class="case-timeline" id="incident-timeline"></ol>
       <form class="case-form incident-comment" id="incident-comment-form" novalidate>
-        <label for="incident-comment">Add a comment</label>
+        <label for="incident-comment" data-i18n="incident_comment_form.add_a_comment">Add a comment</label>
         <textarea id="incident-comment" rows="2" maxlength="4000"></textarea>
-        <div class="flag-actions"><button type="submit" class="btn btn-sm btn-ghost">Add comment</button></div>
+        <div class="flag-actions"><button type="submit" class="btn btn-sm btn-ghost" data-i18n="case_comment_form.add_comment">Add comment</button></div>
       </form>
     </section>
   </dialog>
@@ -277,55 +278,55 @@
   <!-- Hazard -->
   <dialog class="modal modal-wide" id="hazard-dialog" aria-labelledby="hazard-dialog-title">
     <div class="modal-head">
-      <h2 id="hazard-dialog-title">Hazard</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="hazard-dialog-title" data-i18n="hazard_dialog_title.hazard">Hazard</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
     <form class="hazard-form" id="hazard-form" novalidate>
       <div class="upload-field hazard-wide">
-        <label for="hazard-title">Hazard</label>
-        <input id="hazard-title" required placeholder="e.g. An outdated protocol is cited">
+        <label for="hazard-title" data-i18n="hazard_dialog_title.hazard">Hazard</label>
+        <input id="hazard-title" required placeholder="e.g. An outdated protocol is cited" data-i18n-attr="placeholder:hazard_title.e_g_an_outdated">
       </div>
       <div class="upload-field">
-        <label for="hazard-cause">Cause</label>
+        <label for="hazard-cause" data-i18n="hazard_form.cause">Cause</label>
         <textarea id="hazard-cause" rows="2"></textarea>
       </div>
       <div class="upload-field">
-        <label for="hazard-effect">Effect on the patient</label>
+        <label for="hazard-effect" data-i18n="hazard_form.effect_on_the_patient">Effect on the patient</label>
         <textarea id="hazard-effect" rows="2"></textarea>
       </div>
       <div class="upload-field hazard-wide">
-        <label for="hazard-controls">Controls</label>
+        <label for="hazard-controls" data-i18n="hazard_form.controls">Controls</label>
         <textarea id="hazard-controls" rows="3" placeholder="What prevents it or catches it"></textarea>
       </div>
       <fieldset class="risk-fieldset">
-        <legend>Before controls</legend>
-        <label for="hazard-severity">Severity</label>
+        <legend data-i18n="hazard_form.before_controls">Before controls</legend>
+        <label for="hazard-severity" data-i18n="hazard_form.severity">Severity</label>
         <select id="hazard-severity" data-scale="severity"></select>
-        <label for="hazard-likelihood">Likelihood</label>
+        <label for="hazard-likelihood" data-i18n="hazard_form.likelihood">Likelihood</label>
         <select id="hazard-likelihood" data-scale="likelihood"></select>
         <span class="risk-score" id="hazard-initial-risk"></span>
       </fieldset>
       <fieldset class="risk-fieldset">
-        <legend>After controls</legend>
-        <label for="hazard-residual-severity">Severity</label>
+        <legend data-i18n="hazard_form.after_controls">After controls</legend>
+        <label for="hazard-residual-severity" data-i18n="hazard_form.severity">Severity</label>
         <select id="hazard-residual-severity" data-scale="severity"></select>
-        <label for="hazard-residual-likelihood">Likelihood</label>
+        <label for="hazard-residual-likelihood" data-i18n="hazard_form.likelihood">Likelihood</label>
         <select id="hazard-residual-likelihood" data-scale="likelihood"></select>
         <span class="risk-score" id="hazard-residual-risk"></span>
       </fieldset>
       <div class="upload-field">
-        <label for="hazard-status">Status</label>
+        <label for="hazard-status" data-i18n="incident_form.status">Status</label>
         <select id="hazard-status">
-          <option value="open">Open</option>
-          <option value="mitigated">Mitigated</option>
-          <option value="closed">Closed</option>
+          <option value="open" data-i18n="if_status.open">Open</option>
+          <option value="mitigated" data-i18n="hazard_status.mitigated">Mitigated</option>
+          <option value="closed" data-i18n="if_status.closed">Closed</option>
         </select>
       </div>
       <div class="upload-field">
-        <label for="hazard-owner">Owner</label>
-        <input id="hazard-owner" placeholder="e.g. Clinical safety officer">
+        <label for="hazard-owner" data-i18n="incident_form.owner">Owner</label>
+        <input id="hazard-owner" placeholder="e.g. Clinical safety officer" data-i18n-attr="placeholder:hazard_owner.e_g_clinical_safety">
       </div>
-      <div class="hazard-wide"><button type="submit" class="btn btn-primary" id="hazard-save">Save hazard</button></div>
+      <div class="hazard-wide"><button type="submit" class="btn btn-primary" id="hazard-save" data-i18n="hazard_save.save_hazard">Save hazard</button></div>
     </form>
     <p class="modal-message" id="hazard-message" role="status" hidden></p>
   </dialog>
@@ -333,8 +334,8 @@
   <!-- Medicine rules -->
   <dialog class="modal modal-wide" id="medicine-dialog" aria-labelledby="medicine-dialog-title">
     <div class="modal-head">
-      <h2 id="medicine-dialog-title">Medicine</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="medicine-dialog-title" data-i18n="medicine_dialog_title.medicine">Medicine</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
     <dl class="protection-list" id="medicine-rules"></dl>
   </dialog>
@@ -342,55 +343,55 @@
   <!-- Folder browser -->
   <dialog class="modal modal-wide" id="browse-dialog" aria-labelledby="browse-title">
     <div class="modal-head">
-      <h2 id="browse-title">Choose a folder</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="browse-title" data-i18n="browse_title.choose_a_folder">Choose a folder</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
     <p class="browse-path mono" id="browse-path"></p>
     <ul class="browse-list" id="browse-list"></ul>
     <p class="modal-message" id="browse-message" role="status" hidden></p>
     <div class="modal-actions">
-      <button type="button" class="btn btn-ghost" data-close>Cancel</button>
-      <button type="button" class="btn btn-primary" id="browse-use">Use this folder</button>
+      <button type="button" class="btn btn-ghost" data-close data-i18n="browse_dialog.cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="browse-use" data-i18n="browse_use.use_this_folder">Use this folder</button>
     </div>
   </dialog>
 
   <!-- How a model is applied to CT and MRI series -->
   <dialog class="modal" id="model-imaging-dialog" aria-labelledby="model-imaging-title">
     <div class="modal-head">
-      <h2 id="model-imaging-title">Use on CT and MRI</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="model-imaging-title" data-i18n="model_imaging_title.use_on_ct_and">Use on CT and MRI</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
-    <p class="modal-status" id="model-imaging-meta">Tell GroundCheckHealth how this model’s training images were made, so it can cut matching regions from a whole series.</p>
+    <p class="modal-status" id="model-imaging-meta" data-i18n="model_imaging_meta.tell_groundcheckhealth_how_this">Tell GroundCheckHealth how this model’s training images were made, so it can cut matching regions from a whole series.</p>
     <form class="report-form" id="model-imaging-form" novalidate>
       <div class="field">
-        <label for="mi-modality">Trained on</label>
-        <select id="mi-modality" class="text-input"><option value="CT">CT</option><option value="MR">MR</option></select>
-        <span class="field-hint">Series of any other modality are refused.</span>
+        <label for="mi-modality" data-i18n="model_imaging_form.trained_on">Trained on</label>
+        <select id="mi-modality" class="text-input"><option value="CT" data-i18n="mi_modality.ct">CT</option><option value="MR" data-i18n="mi_modality.mr">MR</option></select>
+        <span class="field-hint" data-i18n="model_imaging_form.series_of_any_other">Series of any other modality are refused.</span>
       </div>
       <div class="field">
-        <label for="mi-window">Display window of the training images</label>
+        <label for="mi-window" data-i18n="model_imaging_form.display_window_of_the">Display window of the training images</label>
         <select id="mi-window" class="text-input"></select>
       </div>
       <div class="field">
-        <label for="mi-orientation">Orientation of the training images</label>
+        <label for="mi-orientation" data-i18n="model_imaging_form.orientation_of_the_training">Orientation of the training images</label>
         <select id="mi-orientation" class="text-input">
-          <option value="identity">Standard radiological display</option>
-          <option value="transpose">Rows and columns swapped</option>
+          <option value="identity" data-i18n="mi_orientation.standard_radiological_display">Standard radiological display</option>
+          <option value="transpose" data-i18n="mi_orientation.rows_and_columns_swapped">Rows and columns swapped</option>
         </select>
       </div>
       <div class="field">
-        <label for="mi-patch">Width of anatomy in each training image, in mm <span class="optional">optional</span></label>
+        <label for="mi-patch"><span data-i18n="model_imaging_form.width_of_anatomy_in">Width of anatomy in each training image, in mm</span> <span class="optional" data-i18n="case_resolve_form.optional">optional</span></label>
         <input id="mi-patch" class="text-input" type="number" min="10" max="600" step="any" inputmode="decimal">
-        <span class="field-hint">Left empty, the model sees each whole slice.</span>
+        <span class="field-hint" data-i18n="model_imaging_form.left_empty_the_model">Left empty, the model sees each whole slice.</span>
       </div>
       <div class="field">
-        <label for="mi-note">Note <span class="optional">optional</span></label>
+        <label for="mi-note"><span data-i18n="case_resolve_form.note">Note</span> <span class="optional" data-i18n="case_resolve_form.optional">optional</span></label>
         <input id="mi-note" class="text-input" maxlength="500">
       </div>
       <p class="modal-message" id="model-imaging-message" role="status" hidden></p>
       <div class="report-actions">
-        <button type="button" class="btn btn-sm btn-ghost" id="mi-remove">Stop using on series</button>
-        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        <button type="button" class="btn btn-sm btn-ghost" id="mi-remove" data-i18n="mi_remove.stop_using_on_series">Stop using on series</button>
+        <button type="submit" class="btn btn-sm btn-primary" data-i18n="model_imaging_form.save">Save</button>
       </div>
     </form>
   </dialog>
@@ -398,149 +399,150 @@
   <!-- Model details and trying a model -->
   <dialog class="modal modal-wide" id="model-dialog" aria-labelledby="model-dialog-title">
     <div class="modal-head">
-      <h2 id="model-dialog-title">Model</h2>
-      <button type="button" class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="model-dialog-title" data-i18n="model_dialog_title.model">Model</h2>
+      <button type="button" class="modal-close" data-close aria-label="Close" data-i18n-attr="aria-label:account_dialog.close">×</button>
     </div>
     <p class="modal-status" id="model-meta"></p>
     <section class="modal-section" aria-labelledby="try-title">
-      <h3 id="try-title">Try it on an image</h3>
+      <h3 id="try-title" data-i18n="try_title.try_it_on_an">Try it on an image</h3>
       <div class="try-row">
         <label class="drop-zone" id="try-drop" for="try-file">
           <input type="file" id="try-file" accept="image/png,image/jpeg,image/bmp,image/tiff,image/webp">
           <img id="try-preview" alt="" hidden>
-          <span id="try-hint">Choose or drop an image</span>
+          <span id="try-hint" data-i18n="try_hint.choose_or_drop_an">Choose or drop an image</span>
         </label>
         <div class="try-result" id="try-result" aria-live="polite"></div>
       </div>
     </section>
     <section class="modal-section" aria-labelledby="model-perf-title">
-      <h3 id="model-perf-title">How it performed</h3>
+      <h3 id="model-perf-title" data-i18n="model_perf_title.how_it_performed">How it performed</h3>
       <div class="stat-grid" id="model-stats"></div>
       <div class="users-table-wrap">
         <table class="users-table class-table">
-          <thead><tr><th scope="col">Class</th><th scope="col">Images</th><th scope="col">Sensitivity</th><th scope="col">Specificity</th><th scope="col">Precision</th><th scope="col">AUC</th></tr></thead>
+          <thead><tr><th scope="col" data-i18n="model_dialog.class">Class</th><th scope="col" data-i18n="model_dialog.images">Images</th><th scope="col" data-i18n="model_dialog.sensitivity">Sensitivity</th><th scope="col" data-i18n="model_dialog.specificity">Specificity</th><th scope="col" data-i18n="model_dialog.precision">Precision</th><th scope="col" data-i18n="model_dialog.auc">AUC</th></tr></thead>
           <tbody id="model-classes"></tbody>
         </table>
       </div>
-      <h3 class="subhead">Confusion matrix <span class="chart-note">rows are the true class, columns the prediction</span></h3>
+      <h3 class="subhead"><span data-i18n="model_dialog.confusion_matrix">Confusion matrix</span> <span class="chart-note" data-i18n="model_dialog.rows_are_the_true">rows are the true class, columns the prediction</span></h3>
       <div class="confusion-wrap" id="model-confusion"></div>
     </section>
     <section class="modal-section" aria-labelledby="model-train-title">
-      <h3 id="model-train-title">Training</h3>
+      <h3 id="model-train-title" data-i18n="model_train_title.training">Training</h3>
       <dl class="protection-list" id="model-training"></dl>
     </section>
   </dialog>
 
   <div class="app" id="dashboard">
     <!-- Navigation: a sidebar on wide screens, a drawer on narrow ones -->
-    <aside class="sidebar" id="sidebar" aria-label="GroundCheckHealth">
+    <aside class="sidebar" id="sidebar" aria-label="GroundCheckHealth" data-i18n-attr="aria-label:auth_screen.groundcheckhealth">
       <div class="sidebar-head">
-        <a class="brand" href="#/ask" aria-label="GroundCheckHealth, ask a question">
+        <a class="brand" href="#/ask" aria-label="GroundCheckHealth, ask a question" data-i18n-attr="aria-label:sidebar.groundcheckhealth_ask_a_question">
           <span class="brand-mark" id="brand-mark"></span>
-          <span class="brand-word">GroundCheckHealth</span>
+          <span class="brand-word" data-i18n="auth_screen.groundcheckhealth">GroundCheckHealth</span>
         </a>
-        <button type="button" class="icon-button nav-close" id="nav-close" aria-label="Close menu">
+        <button type="button" class="icon-button nav-close" id="nav-close" aria-label="Close menu" data-i18n-attr="aria-label:nav_close.close_menu">
           <svg aria-hidden="true"><use href="#i-x"/></svg>
         </button>
       </div>
-      <nav class="nav" aria-label="Main">
+      <nav class="nav" aria-label="Main" data-i18n-attr="aria-label:sidebar.main">
         <div class="nav-group">
           <a class="nav-link" href="#/ask" data-view="ask">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-message-square-quote"/></svg>
-            <span>Ask</span>
+            <span data-i18n="sidebar.ask">Ask</span>
           </a>
           <a class="nav-link" href="#/usage" data-view="usage">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-activity"/></svg>
-            <span>Usage</span>
+            <span data-i18n="sidebar.usage">Usage</span>
           </a>
           <a class="nav-link" href="#/review" data-view="review" data-nav="review">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-user-check"/></svg>
-            <span>Review</span>
+            <span data-i18n="sidebar.review">Review</span>
             <span class="nav-count" id="nav-review-count" hidden></span>
           </a>
           <a class="nav-link" href="#/incidents" data-view="incidents">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-siren"/></svg>
-            <span>Incidents</span>
+            <span data-i18n="sidebar.incidents">Incidents</span>
           </a>
         </div>
         <div class="nav-group">
-          <p class="nav-label">Knowledge</p>
+          <p class="nav-label" data-i18n="sidebar.knowledge">Knowledge</p>
           <a class="nav-link" href="#/documents" data-view="documents">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-file-text"/></svg>
-            <span>Documents</span>
+            <span data-i18n="sidebar.documents">Documents</span>
           </a>
           <a class="nav-link" href="#/releases" data-view="releases">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-history"/></svg>
-            <span>Releases</span>
+            <span data-i18n="sidebar.releases">Releases</span>
           </a>
           <a class="nav-link" href="#/medicines" data-view="medicines">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-list-checks"/></svg>
-            <span>Medicines</span>
+            <span data-i18n="sidebar.medicines">Medicines</span>
           </a>
           <a class="nav-link" href="#/evaluation" data-view="evaluation">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-list-checks"/></svg>
-            <span>Evaluation</span>
+            <span data-i18n="document_eval_title.evaluation">Evaluation</span>
           </a>
           <a class="nav-link" href="#/embeddings" data-view="embeddings">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-network"/></svg>
-            <span>Embeddings</span>
+            <span data-i18n="sidebar.embeddings">Embeddings</span>
           </a>
         </div>
         <div class="nav-group">
-          <p class="nav-label">Imaging</p>
+          <p class="nav-label" data-i18n="sidebar.imaging">Imaging</p>
           <a class="nav-link" href="#/imaging" data-view="imaging">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-scan"/></svg>
-            <span>CT and MRI</span>
-            <span class="nav-count nav-live" id="nav-imaging-live" hidden>running</span>
+            <span data-i18n="sidebar.ct_and_mri">CT and MRI</span>
+            <span class="nav-count nav-live" id="nav-imaging-live" hidden data-i18n="nav_imaging_live.running">running</span>
           </a>
           <a class="nav-link" href="#/training" data-view="training">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-brain-circuit"/></svg>
-            <span>Training</span>
-            <span class="nav-count nav-live" id="nav-training-live" hidden>live</span>
+            <span data-i18n="model_train_title.training">Training</span>
+            <span class="nav-count nav-live" id="nav-training-live" hidden data-i18n="nav_training_live.live">live</span>
           </a>
           <a class="nav-link" href="#/models" data-view="models">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-layers"/></svg>
-            <span>Model library</span>
+            <span data-i18n="sidebar.model_library">Model library</span>
           </a>
         </div>
         <div class="nav-group" id="nav-admin">
-          <p class="nav-label">Administration</p>
+          <p class="nav-label" data-i18n="nav_admin.administration">Administration</p>
           <a class="nav-link" href="#/monitoring" data-view="monitoring">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-bell"/></svg>
-            <span>Monitoring</span>
+            <span data-i18n="nav_admin.monitoring">Monitoring</span>
             <span class="nav-count nav-alert" id="nav-alert-count" hidden></span>
           </a>
           <a class="nav-link" href="#/local-ai" data-view="local-ai">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-cpu"/></svg>
-            <span>Local AI</span>
+            <span data-i18n="nav_admin.local_ai">Local AI</span>
           </a>
           <a class="nav-link" href="#/ehr" data-view="ehr">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-network"/></svg>
-            <span>EHR integration</span>
+            <span data-i18n="nav_admin.ehr_integration">EHR integration</span>
           </a>
           <a class="nav-link" href="#/data-protection" data-view="data-protection" data-nav="data-protection">
             <svg class="nav-icon" aria-hidden="true"><use href="#i-lock-keyhole"/></svg>
-            <span>Data protection</span>
+            <span data-i18n="nav_admin.data_protection">Data protection</span>
           </a>
           <a class="nav-link" href="#/users" data-view="users" data-nav="users" hidden>
             <svg class="nav-icon" aria-hidden="true"><use href="#i-users"/></svg>
-            <span>Users</span>
+            <span data-i18n="nav_admin.users">Users</span>
           </a>
         </div>
       </nav>
       <div class="sidebar-foot">
-        <div class="theme-switch" role="radiogroup" aria-label="Colour theme">
-          <button type="button" role="radio" data-theme-choice="system" aria-checked="true" title="Match this device"><svg aria-hidden="true"><use href="#i-monitor"/></svg><span>System</span></button>
-          <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light"><svg aria-hidden="true"><use href="#i-sun"/></svg><span>Light</span></button>
-          <button type="button" role="radio" data-theme-choice="dark" aria-checked="false" title="Dark"><svg aria-hidden="true"><use href="#i-moon"/></svg><span>Dark</span></button>
+        <select class="select locale-select" aria-label="Language" data-i18n-attr="aria-label:locale.language"><option value="en" data-i18n-skip>English</option><option value="es" data-i18n-skip>Español</option></select>
+        <div class="theme-switch" role="radiogroup" aria-label="Colour theme" data-i18n-attr="aria-label:auth_screen.colour_theme">
+          <button type="button" role="radio" data-theme-choice="system" aria-checked="true" title="Match this device" data-i18n-attr="title:auth_screen.match_this_device"><svg aria-hidden="true"><use href="#i-monitor"/></svg><span data-i18n="auth_screen.system">System</span></button>
+          <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light" data-i18n-attr="title:auth_screen.light"><svg aria-hidden="true"><use href="#i-sun"/></svg><span data-i18n="auth_screen.light">Light</span></button>
+          <button type="button" role="radio" data-theme-choice="dark" aria-checked="false" title="Dark" data-i18n-attr="title:auth_screen.dark"><svg aria-hidden="true"><use href="#i-moon"/></svg><span data-i18n="auth_screen.dark">Dark</span></button>
         </div>
-        <dl class="system-status" aria-label="System status">
-          <div id="provider-pill" title="What drafts answers">
-            <dt>Answers</dt>
+        <dl class="system-status" aria-label="System status" data-i18n-attr="aria-label:sidebar.system_status">
+          <div id="provider-pill" title="What drafts answers" data-i18n-attr="title:provider_pill.what_drafts_answers">
+            <dt data-i18n="provider_pill.answers">Answers</dt>
             <dd><span class="dot" id="provider-dot"></span><span id="provider-label">…</span></dd>
           </div>
-          <div id="corpus-pill" title="Indexed source passages">
-            <dt>Passages</dt>
+          <div id="corpus-pill" title="Indexed source passages" data-i18n-attr="title:corpus_pill.indexed_source_passages">
+            <dt data-i18n="corpus_pill.passages">Passages</dt>
             <dd class="mono" id="corpus-count">…</dd>
           </div>
         </dl>
@@ -551,8 +553,8 @@
           </button>
           <div class="account-dropdown" id="account-dropdown" hidden>
             <p class="account-who"><span id="account-email"></span></p>
-            <button type="button" class="account-item" id="open-account">Account and security</button>
-            <button type="button" class="account-item" id="sign-out">Sign out</button>
+            <button type="button" class="account-item" id="open-account" data-i18n="account_dialog_title.account_and_security">Account and security</button>
+            <button type="button" class="account-item" id="sign-out" data-i18n="sign_out.sign_out">Sign out</button>
           </div>
         </div>
       </div>
@@ -561,12 +563,12 @@
 
     <div class="main">
       <header class="topbar">
-        <button type="button" class="icon-button" id="nav-open" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+        <button type="button" class="icon-button" id="nav-open" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false" data-i18n-attr="aria-label:nav_open.open_menu">
           <svg aria-hidden="true"><use href="#i-menu"/></svg>
         </button>
-        <span class="topbar-title" id="topbar-title">Ask</span>
+        <span class="topbar-title" id="topbar-title" data-i18n="sidebar.ask">Ask</span>
       </header>
-      <div class="disclaimer" role="note">
+      <div class="disclaimer" role="note" data-i18n="dashboard.synthetic_demonstration_data_all">
         Synthetic demonstration data. All conditions, medications and dosages are fictional. Not medical advice.
       </div>
 
@@ -575,13 +577,13 @@
         <section class="view" id="view-ask" data-title="Ask" aria-labelledby="ask-title">
         <header class="page-head">
           <div>
-            <h1 class="page-title"><span id="ask-title">Grounded answers, or none at all</span></h1>
-            <p class="page-sub">Answers come only from approved sources, with a citation for every statement. When a question can’t be grounded, GroundCheckHealth refuses and sends it for review.</p>
+            <h1 class="page-title"><span id="ask-title" data-i18n="ask_title.grounded_answers_or_none">Grounded answers, or none at all</span></h1>
+            <p class="page-sub" data-i18n="view_ask.answers_come_only_from">Answers come only from approved sources, with a citation for every statement. When a question can’t be grounded, GroundCheckHealth refuses and sends it for review.</p>
           </div>
         </header>
       <section class="panel ask-panel">
         <form id="ask-form" class="ask-form" autocomplete="off" novalidate>
-          <label for="query" class="eyebrow">Ask a question</label>
+          <label for="query" class="eyebrow" data-i18n="ask_form.ask_a_question">Ask a question</label>
           <div class="ask-row">
             <input
               type="text"
@@ -591,63 +593,63 @@
               placeholder="How is Veltris syndrome treated?"
               maxlength="400"
               required
-            />
+             data-i18n-attr="placeholder:query.how_is_veltris_syndrome"/>
             <button type="submit" class="btn btn-primary" id="ask-btn">
-              <span class="btn-label">Ask</span>
+              <span class="btn-label" data-i18n="sidebar.ask">Ask</span>
               <canvas class="btn-orb" id="spinner" data-orb="searching" data-orb-size="20" data-orb-theme="inverse" aria-hidden="true" hidden></canvas>
             </button>
           </div>
-          <div class="chips" id="chips" aria-label="Example queries"></div>
+          <div class="chips" id="chips" aria-label="Example queries" data-i18n-attr="aria-label:chips.example_queries"></div>
           <details class="patient-box" id="patient-box">
             <summary>
-              <span class="patient-summary-title">For a specific patient</span>
-              <span class="patient-status" id="patient-status">No patient details</span>
+              <span class="patient-summary-title" data-i18n="patient_box.for_a_specific_patient">For a specific patient</span>
+              <span class="patient-status" id="patient-status" data-i18n="patient_status.no_patient_details">No patient details</span>
             </summary>
             <div class="patient-body">
-              <p class="field-hint">Answers are checked against this patient’s allergies, medicines, kidney and liver function, age, weight and pregnancy. Don’t enter names or record numbers. Details stay in this page until you clear them or leave.</p>
+              <p class="field-hint" data-i18n="patient_box.answers_are_checked_against">Answers are checked against this patient’s allergies, medicines, kidney and liver function, age, weight and pregnancy. Don’t enter names or record numbers. Details stay in this page until you clear them or leave.</p>
               <div class="ehr-strip" id="ehr-strip" hidden>
                 <div class="ehr-strip-text">
                   <strong id="ehr-source"></strong>
                   <span id="ehr-meta"></span>
                   <ul class="ehr-warnings" id="ehr-warnings"></ul>
                 </div>
-                <button type="button" class="btn btn-sm btn-ghost" id="ehr-forget">Forget EHR patient</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="ehr-forget" data-i18n="ehr_forget.forget_ehr_patient">Forget EHR patient</button>
               </div>
               <div class="ehr-load" id="ehr-load" hidden>
-                <div class="field"><label for="ehr-server">FHIR server</label><select id="ehr-server" class="select"></select></div>
-                <div class="field"><label for="ehr-patient-id">Patient ID</label><input id="ehr-patient-id" class="text-input mono" autocomplete="off" spellcheck="false"></div>
-                <button type="button" class="btn btn-sm btn-primary" id="ehr-load-button">Load from EHR</button>
+                <div class="field"><label for="ehr-server" data-i18n="ehr_load.fhir_server">FHIR server</label><select id="ehr-server" class="select"></select></div>
+                <div class="field"><label for="ehr-patient-id" data-i18n="ehr_load.patient_id">Patient ID</label><input id="ehr-patient-id" class="text-input mono" autocomplete="off" spellcheck="false"></div>
+                <button type="button" class="btn btn-sm btn-primary" id="ehr-load-button" data-i18n="ehr_load_button.load_from_ehr">Load from EHR</button>
               </div>
               <div class="patient-grid">
-                <div class="field"><label for="pt-age">Age (years)</label><input id="pt-age" class="text-input" type="number" min="0" max="130" step="any" inputmode="decimal"></div>
-                <div class="field"><label for="pt-sex">Sex</label>
-                  <select id="pt-sex" class="select"><option value="">Not given</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
-                <div class="field"><label for="pt-weight">Weight (kg)</label><input id="pt-weight" class="text-input" type="number" min="0.3" max="400" step="any" inputmode="decimal"></div>
-                <div class="field"><label for="pt-egfr">eGFR <span class="optional">mL/min/1.73 m²</span></label><input id="pt-egfr" class="text-input" type="number" min="0" max="200" step="any" inputmode="decimal"></div>
-                <div class="field"><label for="pt-creatinine">Serum creatinine <span class="optional">µmol/L</span></label><input id="pt-creatinine" class="text-input" type="number" min="1" max="3000" step="any" inputmode="decimal"></div>
-                <div class="field"><label for="pt-liver">Liver function</label>
-                  <select id="pt-liver" class="select"><option value="">Not given</option><option value="A">Child-Pugh A</option><option value="B">Child-Pugh B</option><option value="C">Child-Pugh C</option></select></div>
+                <div class="field"><label for="pt-age" data-i18n="patient_box.age_years">Age (years)</label><input id="pt-age" class="text-input" type="number" min="0" max="130" step="any" inputmode="decimal"></div>
+                <div class="field"><label for="pt-sex" data-i18n="patient_box.sex">Sex</label>
+                  <select id="pt-sex" class="select"><option value="" data-i18n="pt_sex.not_given">Not given</option><option value="female" data-i18n="pt_sex.female">Female</option><option value="male" data-i18n="pt_sex.male">Male</option><option value="other" data-i18n="pt_sex.other">Other</option></select></div>
+                <div class="field"><label for="pt-weight" data-i18n="patient_box.weight_kg">Weight (kg)</label><input id="pt-weight" class="text-input" type="number" min="0.3" max="400" step="any" inputmode="decimal"></div>
+                <div class="field"><label for="pt-egfr"><span data-i18n="patient_box.egfr">eGFR</span> <span class="optional" data-i18n="patient_box.ml_min_1_73">mL/min/1.73 m²</span></label><input id="pt-egfr" class="text-input" type="number" min="0" max="200" step="any" inputmode="decimal"></div>
+                <div class="field"><label for="pt-creatinine"><span data-i18n="patient_box.serum_creatinine">Serum creatinine</span> <span class="optional" data-i18n="patient_box.mol_l">µmol/L</span></label><input id="pt-creatinine" class="text-input" type="number" min="1" max="3000" step="any" inputmode="decimal"></div>
+                <div class="field"><label for="pt-liver" data-i18n="patient_box.liver_function">Liver function</label>
+                  <select id="pt-liver" class="select"><option value="" data-i18n="pt_sex.not_given">Not given</option><option value="A" data-i18n="pt_liver.child_pugh_a">Child-Pugh A</option><option value="B" data-i18n="pt_liver.child_pugh_b">Child-Pugh B</option><option value="C" data-i18n="pt_liver.child_pugh_c">Child-Pugh C</option></select></div>
                 <div class="field field-checks">
-                  <label class="check"><input type="checkbox" id="pt-pregnant"> Pregnant</label>
-                  <label class="check"><input type="checkbox" id="pt-breastfeeding"> Breastfeeding</label>
+                  <label class="check"><input type="checkbox" id="pt-pregnant"> <span data-i18n="patient_box.pregnant">Pregnant</span></label>
+                  <label class="check"><input type="checkbox" id="pt-breastfeeding"> <span data-i18n="patient_box.breastfeeding">Breastfeeding</span></label>
                 </div>
-                <div class="field field-wide"><label for="pt-allergies">Allergies <span class="optional">separate with commas</span></label><input id="pt-allergies" class="text-input" placeholder="e.g. quorl, penicillin"></div>
-                <div class="field field-wide"><label for="pt-medicines">Current medicines <span class="optional">separate with commas</span></label><input id="pt-medicines" class="text-input" list="formulary-names" placeholder="e.g. Tessorin"></div>
-                <div class="field field-wide"><label for="pt-conditions">Conditions <span class="optional">separate with commas</span></label><input id="pt-conditions" class="text-input"></div>
+                <div class="field field-wide"><label for="pt-allergies"><span data-i18n="patient_box.allergies">Allergies</span> <span class="optional" data-i18n="patient_box.separate_with_commas">separate with commas</span></label><input id="pt-allergies" class="text-input" placeholder="e.g. quorl, penicillin" data-i18n-attr="placeholder:pt_allergies.e_g_quorl_penicillin"></div>
+                <div class="field field-wide"><label for="pt-medicines"><span data-i18n="patient_box.current_medicines">Current medicines</span> <span class="optional" data-i18n="patient_box.separate_with_commas">separate with commas</span></label><input id="pt-medicines" class="text-input" list="formulary-names" placeholder="e.g. Tessorin" data-i18n-attr="placeholder:pt_medicines.e_g_tessorin"></div>
+                <div class="field field-wide"><label for="pt-conditions"><span data-i18n="patient_box.conditions">Conditions</span> <span class="optional" data-i18n="patient_box.separate_with_commas">separate with commas</span></label><input id="pt-conditions" class="text-input"></div>
               </div>
               <details class="advanced">
-                <summary>Lab results</summary>
+                <summary data-i18n="patient_box.lab_results">Lab results</summary>
                 <div class="patient-grid">
-                  <div class="field"><label for="pt-lab-potassium">Potassium <span class="optional">mmol/L</span></label><input id="pt-lab-potassium" data-lab="potassium" class="text-input" type="number" step="any"></div>
-                  <div class="field"><label for="pt-lab-sodium">Sodium <span class="optional">mmol/L</span></label><input id="pt-lab-sodium" data-lab="sodium" class="text-input" type="number" step="any"></div>
-                  <div class="field"><label for="pt-lab-inr">INR</label><input id="pt-lab-inr" data-lab="inr" class="text-input" type="number" step="any"></div>
-                  <div class="field"><label for="pt-lab-platelets">Platelets <span class="optional">×10⁹/L</span></label><input id="pt-lab-platelets" data-lab="platelets" class="text-input" type="number" step="any"></div>
-                  <div class="field"><label for="pt-lab-alt">ALT <span class="optional">U/L</span></label><input id="pt-lab-alt" data-lab="alt" class="text-input" type="number" step="any"></div>
-                  <div class="field"><label for="pt-lab-qtc">QTc <span class="optional">ms</span></label><input id="pt-lab-qtc" data-lab="qtc" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-potassium"><span data-i18n="patient_box.potassium">Potassium</span> <span class="optional" data-i18n="patient_box.mmol_l">mmol/L</span></label><input id="pt-lab-potassium" data-lab="potassium" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-sodium"><span data-i18n="patient_box.sodium">Sodium</span> <span class="optional" data-i18n="patient_box.mmol_l">mmol/L</span></label><input id="pt-lab-sodium" data-lab="sodium" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-inr" data-i18n="patient_box.inr">INR</label><input id="pt-lab-inr" data-lab="inr" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-platelets"><span data-i18n="patient_box.platelets">Platelets</span> <span class="optional" data-i18n="patient_box.10_l">×10⁹/L</span></label><input id="pt-lab-platelets" data-lab="platelets" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-alt"><span data-i18n="patient_box.alt">ALT</span> <span class="optional" data-i18n="patient_box.u_l">U/L</span></label><input id="pt-lab-alt" data-lab="alt" class="text-input" type="number" step="any"></div>
+                  <div class="field"><label for="pt-lab-qtc"><span data-i18n="patient_box.qtc">QTc</span> <span class="optional" data-i18n="patient_box.ms">ms</span></label><input id="pt-lab-qtc" data-lab="qtc" class="text-input" type="number" step="any"></div>
                 </div>
               </details>
               <div class="patient-actions">
-                <button type="button" class="btn btn-sm btn-ghost" id="pt-clear">Clear patient</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="pt-clear" data-i18n="pt_clear.clear_patient">Clear patient</button>
                 <span class="field-hint" id="pt-error" role="alert"></span>
               </div>
             </div>
@@ -664,59 +666,59 @@
         <p class="redaction-line" id="redaction-line" hidden></p>
         <div class="answer-body" id="answer-body"></div>
         <p class="answer-summary" id="answer-summary" hidden></p>
-        <ol class="claim-rows" id="claim-rows" aria-label="Claims in the answer" hidden></ol>
+        <ol class="claim-rows" id="claim-rows" aria-label="Claims in the answer" hidden data-i18n-attr="aria-label:claim_rows.claims_in_the_answer"></ol>
         <div class="flag-row feedback-row" id="feedback-row" hidden>
-          <span class="feedback-label" id="feedback-label">Was this answer useful?</span>
-          <button type="button" class="btn btn-sm btn-ghost" id="feedback-up" aria-pressed="false" aria-describedby="feedback-label">Useful</button>
-          <button type="button" class="btn btn-sm btn-ghost" id="feedback-down" aria-pressed="false" aria-describedby="feedback-label">Not useful</button>
+          <span class="feedback-label" id="feedback-label" data-i18n="feedback_label.was_this_answer_useful">Was this answer useful?</span>
+          <button type="button" class="btn btn-sm btn-ghost" id="feedback-up" aria-pressed="false" aria-describedby="feedback-label" data-i18n="feedback_up.useful">Useful</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="feedback-down" aria-pressed="false" aria-describedby="feedback-label" data-i18n="feedback_down.not_useful">Not useful</button>
           <form class="case-form flag-form" id="feedback-form" hidden novalidate>
-            <label for="feedback-reason">What was the problem?</label>
+            <label for="feedback-reason" data-i18n="feedback_form.what_was_the_problem">What was the problem?</label>
             <select id="feedback-reason">
-              <option value="">Choose a reason (optional)</option>
-              <option value="not_useful">Not useful</option>
-              <option value="incomplete">Incomplete</option>
-              <option value="wrong">Wrong</option>
-              <option value="too_slow">Too slow</option>
+              <option value="" data-i18n="feedback_reason.choose_a_reason_optional">Choose a reason (optional)</option>
+              <option value="not_useful" data-i18n="feedback_down.not_useful">Not useful</option>
+              <option value="incomplete" data-i18n="feedback_reason.incomplete">Incomplete</option>
+              <option value="wrong" data-i18n="feedback_reason.wrong">Wrong</option>
+              <option value="too_slow" data-i18n="feedback_reason.too_slow">Too slow</option>
             </select>
-            <label for="feedback-comment">Comment <span class="optional">optional; saved with names and numbers removed, so leave patient details out</span></label>
+            <label for="feedback-comment"><span data-i18n="case_comment_form.comment">Comment</span> <span class="optional" data-i18n="feedback_form.optional_saved_with_names">optional; saved with names and numbers removed, so leave patient details out</span></label>
             <textarea id="feedback-comment" rows="2" maxlength="500"></textarea>
-            <p class="auth-hint">Choosing “Wrong” also sends the answer to a reviewer.</p>
+            <p class="auth-hint" data-i18n="feedback_form.choosing_wrong_also_sends">Choosing “Wrong” also sends the answer to a reviewer.</p>
             <div class="flag-actions">
-              <button type="submit" class="btn btn-sm btn-primary" id="feedback-send">Send feedback</button>
-              <button type="button" class="btn btn-sm btn-ghost" id="feedback-cancel">Cancel</button>
+              <button type="submit" class="btn btn-sm btn-primary" id="feedback-send" data-i18n="feedback_send.send_feedback">Send feedback</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="feedback-cancel" data-i18n="browse_dialog.cancel">Cancel</button>
             </div>
           </form>
           <p class="modal-message" id="feedback-message" role="status" hidden></p>
         </div>
         <div class="flag-row" id="flag-row" hidden>
-          <button type="button" class="btn btn-sm btn-ghost" id="flag-open">Flag this answer for review</button>
-          <button type="button" class="btn btn-sm btn-ghost" id="incident-from-answer">Report an incident</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="flag-open" data-i18n="flag_open.flag_this_answer_for">Flag this answer for review</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="incident-from-answer" data-i18n="incident_report_title.report_an_incident">Report an incident</button>
           <form class="case-form flag-form" id="flag-form" hidden novalidate>
-            <label for="flag-note">What looks wrong?</label>
+            <label for="flag-note" data-i18n="flag_form.what_looks_wrong">What looks wrong?</label>
             <textarea id="flag-note" rows="2" placeholder="e.g. The dose doesn't match our renal guidance"></textarea>
             <div class="flag-actions">
-              <button type="submit" class="btn btn-sm btn-primary">Send for review</button>
-              <button type="button" class="btn btn-sm btn-ghost" id="flag-cancel">Cancel</button>
+              <button type="submit" class="btn btn-sm btn-primary" data-i18n="flag_form.send_for_review">Send for review</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="flag-cancel" data-i18n="browse_dialog.cancel">Cancel</button>
             </div>
           </form>
           <p class="modal-message" id="flag-message" role="status" hidden></p>
         </div>
         <div class="flag-row ehr-save" id="ehr-save" hidden>
           <form class="case-form flag-form" id="ehr-save-form" novalidate>
-            <label for="ehr-save-comment">Save this to the patient’s record <span class="optional">as a preliminary note, with your comment</span></label>
+            <label for="ehr-save-comment"><span data-i18n="ehr_save_form.save_this_to_the">Save this to the patient’s record</span> <span class="optional" data-i18n="ehr_save_form.as_a_preliminary_note">as a preliminary note, with your comment</span></label>
             <textarea id="ehr-save-comment" rows="2" placeholder="e.g. Reviewed; dose confirmed against local guidance"></textarea>
             <div class="flag-actions">
-              <button type="submit" class="btn btn-sm btn-primary" id="ehr-save-button">Save to patient record</button>
+              <button type="submit" class="btn btn-sm btn-primary" id="ehr-save-button" data-i18n="ehr_save_button.save_to_patient_record">Save to patient record</button>
             </div>
           </form>
           <p class="modal-message" id="ehr-save-message" role="status" hidden></p>
         </div>
         <div class="patient-findings" id="patient-findings" hidden>
-          <h3 class="patient-findings-title">Checked for this patient</h3>
+          <h3 class="patient-findings-title" data-i18n="patient_findings.checked_for_this_patient">Checked for this patient</h3>
           <ul id="patient-findings-list"></ul>
         </div>
         <div class="refuse-callout" id="refuse-callout" hidden>
-          <span class="eyebrow">Why it refused</span>
+          <span class="eyebrow" data-i18n="refuse_callout.why_it_refused">Why it refused</span>
           <p id="refuse-detail"></p>
           <p class="refuse-explain" id="refuse-explain"></p>
           <div class="refuse-suggestions" id="refuse-suggestions" hidden></div>
@@ -726,25 +728,25 @@
 
       <div class="grid-2" id="results-grid" hidden>
         <section class="panel" id="sources-panel">
-          <h2 class="panel-title eyebrow">Retrieved sources</h2>
+          <h2 class="panel-title eyebrow" data-i18n="sources_panel.retrieved_sources">Retrieved sources</h2>
           <div class="sources" id="sources"></div>
         </section>
 
         <section class="panel" id="trace-panel">
-          <h2 class="panel-title eyebrow">Pipeline trace</h2>
+          <h2 class="panel-title eyebrow" data-i18n="trace_panel.pipeline_trace">Pipeline trace</h2>
           <ol class="trace" id="trace"></ol>
         </section>
       </div>
 
       <section class="panel collapsible" id="audit-panel" hidden>
         <button class="collapsible-toggle" id="audit-toggle" aria-expanded="false">
-          <span class="eyebrow">View audit record</span>
+          <span class="eyebrow" data-i18n="audit_toggle.view_audit_record">View audit record</span>
           <span class="chevron">▸</span>
         </button>
         <div class="audit-controls" id="audit-controls" hidden>
-          <button type="button" class="btn btn-ghost btn-sm" id="audit-expand">Expand all</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="audit-collapse">Collapse all</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="audit-copy">Copy JSON</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="audit-expand" data-i18n="audit_expand.expand_all">Expand all</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="audit-collapse" data-i18n="audit_collapse.collapse_all">Collapse all</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="audit-copy" data-i18n="audit_copy.copy_json">Copy JSON</button>
         </div>
         <div class="audit-tree" id="audit-json" hidden></div>
       </section>
@@ -752,12 +754,12 @@
       <section class="panel collapsible tuning-panel" id="tuning-panel">
         <button class="collapsible-toggle" id="tuning-toggle" aria-expanded="false">
           <span class="toggle-icon" id="tuning-icon"></span>
-          <span class="eyebrow">Tuning</span>
-          <span class="tuning-status" id="tuning-status">defaults</span>
+          <span class="eyebrow" data-i18n="tuning_toggle.tuning">Tuning</span>
+          <span class="tuning-status" id="tuning-status" data-i18n="tuning_status.defaults">defaults</span>
           <span class="chevron">▸</span>
         </button>
         <div class="tuning-body" id="tuning-body" hidden>
-          <p class="tuning-hint">
+          <p class="tuning-hint" data-i18n="tuning_body.adjust_the_pipeline_then">
             Adjust the pipeline, then ask again. Lower the gate to answer more often,
             raise it to refuse more. Switch a guard off to see what an ungoverned
             system would have returned.
@@ -766,38 +768,38 @@
           <div class="tuning-grid">
             <div class="control">
               <div class="control-head">
-                <label for="set-retrieval">Retrieval gate</label>
+                <label for="set-retrieval" data-i18n="tuning_body.retrieval_gate">Retrieval gate</label>
                 <output id="set-retrieval-val" class="control-val">0.30</output>
               </div>
               <input type="range" id="set-retrieval" min="0" max="1" step="0.01" value="0.30" />
-              <p class="control-note">Minimum source similarity. Below this, refuse before generating.</p>
+              <p class="control-note" data-i18n="tuning_body.minimum_source_similarity_below">Minimum source similarity. Below this, refuse before generating.</p>
             </div>
 
             <div class="control">
               <div class="control-head">
-                <label for="set-grounding">Grounding threshold</label>
+                <label for="set-grounding" data-i18n="tuning_body.grounding_threshold">Grounding threshold</label>
                 <output id="set-grounding-val" class="control-val">0.45</output>
               </div>
               <input type="range" id="set-grounding" min="0" max="1" step="0.01" value="0.45" />
-              <p class="control-note">How strongly each claim must match its cited source.</p>
+              <p class="control-note" data-i18n="tuning_body.how_strongly_each_claim">How strongly each claim must match its cited source.</p>
             </div>
 
             <div class="control">
               <div class="control-head">
-                <label for="set-topk">Sources retrieved</label>
+                <label for="set-topk" data-i18n="tuning_body.sources_retrieved">Sources retrieved</label>
                 <output id="set-topk-val" class="control-val">4</output>
               </div>
               <input type="range" id="set-topk" min="1" max="12" step="1" value="4" />
-              <p class="control-note">How many passages the retriever returns (top-k).</p>
+              <p class="control-note" data-i18n="tuning_body.how_many_passages_the">How many passages the retriever returns (top-k).</p>
             </div>
 
             <div class="control">
               <div class="control-head">
-                <label for="set-temperature">Model temperature</label>
+                <label for="set-temperature" data-i18n="tuning_body.model_temperature">Model temperature</label>
                 <output id="set-temperature-val" class="control-val">0.0</output>
               </div>
               <input type="range" id="set-temperature" min="0" max="1.5" step="0.1" value="0.0" />
-              <p class="control-note">0 is deterministic. Higher makes the model's wording vary between runs.</p>
+              <p class="control-note" data-i18n="tuning_body.0_is_deterministic_higher">0 is deterministic. Higher makes the model's wording vary between runs.</p>
             </div>
           </div>
 
@@ -805,76 +807,76 @@
             <label class="switch">
               <input type="checkbox" id="set-extractive" />
               <span class="switch-track"><span class="switch-thumb"></span></span>
-              <span class="switch-label">Bypass model (naive retrieval)</span>
+              <span class="switch-label" data-i18n="tuning_body.bypass_model_naive_retrieval">Bypass model (naive retrieval)</span>
             </label>
             <label class="switch">
               <input type="checkbox" id="set-pii" checked />
               <span class="switch-track"><span class="switch-thumb"></span></span>
-              <span class="switch-label">PII redaction (input)</span>
+              <span class="switch-label" data-i18n="tuning_body.pii_redaction_input">PII redaction (input)</span>
             </label>
             <label class="switch">
               <input type="checkbox" id="set-injection" checked />
               <span class="switch-track"><span class="switch-thumb"></span></span>
-              <span class="switch-label">Injection guard (input)</span>
+              <span class="switch-label" data-i18n="tuning_body.injection_guard_input">Injection guard (input)</span>
             </label>
             <label class="switch">
               <input type="checkbox" id="set-coverage" checked />
               <span class="switch-track"><span class="switch-thumb"></span></span>
-              <span class="switch-label">Source coverage guard</span>
+              <span class="switch-label" data-i18n="tuning_body.source_coverage_guard">Source coverage guard</span>
             </label>
             <label class="switch">
               <input type="checkbox" id="set-grounding-guard" checked />
               <span class="switch-track"><span class="switch-thumb"></span></span>
-              <span class="switch-label">Grounding guard</span>
+              <span class="switch-label" data-i18n="tuning_body.grounding_guard">Grounding guard</span>
             </label>
             <label class="switch">
               <input type="checkbox" id="set-dosage" checked />
               <span class="switch-track"><span class="switch-thumb"></span></span>
-              <span class="switch-label">Dosage guard</span>
+              <span class="switch-label" data-i18n="tuning_body.dosage_guard">Dosage guard</span>
             </label>
             <label class="switch" id="judge-switch">
               <input type="checkbox" id="set-judge" checked />
               <span class="switch-track"><span class="switch-thumb"></span></span>
-              <span class="switch-label">LLM grounding judge</span>
+              <span class="switch-label" data-i18n="judge_switch.llm_grounding_judge">LLM grounding judge</span>
             </label>
           </div>
 
           <div class="tuning-actions">
-            <button type="button" class="btn btn-ghost" id="tuning-reset">Reset to defaults</button>
-            <span class="tuning-applies">Changes apply to your next question.</span>
+            <button type="button" class="btn btn-ghost" id="tuning-reset" data-i18n="tuning_reset.reset_to_defaults">Reset to defaults</button>
+            <span class="tuning-applies" data-i18n="tuning_body.changes_apply_to_your">Changes apply to your next question.</span>
           </div>
         </div>
       </section>
 
       <section class="panel collapsible howitworks-panel" id="how-panel">
         <button class="collapsible-toggle" id="how-toggle" aria-expanded="false">
-          <span class="eyebrow">How it works</span>
-          <span class="how-summary">The pipeline, stage by stage</span>
+          <span class="eyebrow" data-i18n="how_toggle.how_it_works">How it works</span>
+          <span class="how-summary" data-i18n="how_toggle.the_pipeline_stage_by">The pipeline, stage by stage</span>
           <span class="chevron">▸</span>
         </button>
         <div class="how-body" id="how-body" hidden>
           <p class="how-intro">
-            Every question runs through a fixed pipeline. The decision to answer or
+            <span data-i18n="how_body.every_question_runs_through">Every question runs through a fixed pipeline. The decision to answer or
             refuse is deterministic and never depends on a live model call, so the
             system behaves the same with or without an LLM. Each stage below records
-            a status and a timing. After you ask, the <strong>Pipeline trace</strong>
-            shows the real run, and every step there is clickable for the detail of
-            what happened, including the LLM judge's verdict on each claim.
+            a status and a timing. After you ask, the</span> <strong data-i18n="trace_panel.pipeline_trace">Pipeline trace</strong>
+            <span data-i18n="how_body.shows_the_real_run">shows the real run, and every step there is clickable for the detail of
+            what happened, including the LLM judge's verdict on each claim.</span>
           </p>
           <ol class="how-stages" id="how-stages"></ol>
           <div class="how-judge">
-            <h3 class="how-judge-title">The LLM as a judge</h3>
+            <h3 class="how-judge-title" data-i18n="how_body.the_llm_as_a">The LLM as a judge</h3>
             <p>
-              Grounding is decided in two layers. First, a deterministic embedding
+              <span data-i18n="how_body.grounding_is_decided_in">Grounding is decided in two layers. First, a deterministic embedding
               similarity between each claim and its cited source must clear a
               threshold. This is authoritative and reproducible. Second, when a live
               provider is configured, a separate, cheaper model is shown only the
               claim and its cited source and asked, strictly, whether the source
-              supports the claim. It returns JSON: <code>{"supported": bool,
-              "reason": string}</code>. The judge is corroboration, recorded in the
+              supports the claim. It returns JSON:</span> <code>{"supported": bool,
+              "reason": string}</code><span data-i18n="how_body.the_judge_is_corroboration">. The judge is corroboration, recorded in the
               trace, never the deciding vote. So a flaky model can never turn a
               refusal into an answer. Open the grounding step in the trace to read
-              the judge's verdict and reasoning for each claim.
+              the judge's verdict and reasoning for each claim.</span>
             </p>
           </div>
         </div>
@@ -886,15 +888,15 @@
         <section class="view" id="view-usage" data-title="Usage" aria-labelledby="usage-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title" id="usage-title">Usage</h1>
-            <p class="page-sub">Questions asked, what was answered and refused, how fast, and what needs review.</p>
+            <h1 class="page-title" id="usage-title" data-i18n="sidebar.usage">Usage</h1>
+            <p class="page-sub" data-i18n="view_usage.questions_asked_what_was">Questions asked, what was answered and refused, how fast, and what needs review.</p>
           </div>
           <div class="page-actions">
-            <label class="visually-hidden" for="usage-days">Period</label>
+            <label class="visually-hidden" for="usage-days" data-i18n="view_usage.period">Period</label>
             <select id="usage-days" class="select">
-              <option value="7">Last 7 days</option>
-              <option value="30" selected>Last 30 days</option>
-              <option value="90">Last 90 days</option>
+              <option value="7" data-i18n="usage_days.last_7_days">Last 7 days</option>
+              <option value="30" selected data-i18n="usage_days.last_30_days">Last 30 days</option>
+              <option value="90" data-i18n="usage_days.last_90_days">Last 90 days</option>
             </select>
           </div>
         </header>
@@ -902,43 +904,43 @@
           <div class="stat-grid" id="usage-stats"></div>
           <section class="panel chart-panel">
             <div class="chart-head">
-              <h2 class="panel-heading">Questions per day</h2>
+              <h2 class="panel-heading" data-i18n="view_usage.questions_per_day">Questions per day</h2>
               <div class="legend" id="usage-legend">
-                <span><i class="swatch swatch-answered"></i>Answered</span>
-                <span><i class="swatch swatch-refused"></i>Refused</span>
+                <span><i class="swatch swatch-answered"></i><span data-i18n="usage_legend.answered">Answered</span></span>
+                <span><i class="swatch swatch-refused"></i><span data-i18n="usage_legend.refused">Refused</span></span>
               </div>
             </div>
             <div class="chart" id="usage-chart"></div>
           </section>
           <div class="usage-grid">
             <section class="panel">
-              <h2 class="panel-heading">Why questions were refused</h2>
+              <h2 class="panel-heading" data-i18n="view_usage.why_questions_were_refused">Why questions were refused</h2>
               <div class="bars" id="usage-reasons"></div>
             </section>
             <section class="panel">
-              <h2 class="panel-heading">Most-cited sources</h2>
+              <h2 class="panel-heading" data-i18n="view_usage.most_cited_sources">Most-cited sources</h2>
               <div class="bars" id="usage-sources"></div>
             </section>
             <section class="panel usage-wide" id="usage-users-panel">
-              <h2 class="panel-heading">Questions by person</h2>
+              <h2 class="panel-heading" data-i18n="usage_users_panel.questions_by_person">Questions by person</h2>
               <div class="bars" id="usage-users"></div>
             </section>
           </div>
           <section class="panel" id="adoption-panel" aria-labelledby="adoption-title" hidden>
             <div class="review-toolbar">
-              <h2 class="panel-heading" id="adoption-title">Adoption and value</h2>
-              <a class="btn btn-sm btn-ghost" id="pilot-report-download" href="/api/governance/pilot-report?days=30" download>Download pilot report</a>
+              <h2 class="panel-heading" id="adoption-title" data-i18n="adoption_title.adoption_and_value">Adoption and value</h2>
+              <a class="btn btn-sm btn-ghost" id="pilot-report-download" href="/api/governance/pilot-report?days=30" download data-i18n="pilot_report_download.download_pilot_report">Download pilot report</a>
             </div>
-            <p class="auth-hint">Counted in UTC days. Evaluation runs and demonstration records are left out. The pilot report prints no question text.</p>
+            <p class="auth-hint" data-i18n="adoption_panel.counted_in_utc_days">Counted in UTC days. Evaluation runs and demonstration records are left out. The pilot report prints no question text.</p>
             <p class="modal-message" id="adoption-message" role="status" hidden></p>
             <div class="stat-grid" id="adoption-stats"></div>
             <div class="usage-grid">
               <section>
-                <h3>Active clinicians by week</h3>
+                <h3 data-i18n="adoption_panel.active_clinicians_by_week">Active clinicians by week</h3>
                 <div class="bars" id="adoption-weekly"></div>
               </section>
               <section>
-                <h3>Feedback</h3>
+                <h3 data-i18n="adoption_panel.feedback">Feedback</h3>
                 <div class="bars" id="adoption-feedback"></div>
               </section>
             </div>
@@ -949,75 +951,75 @@
         <section class="view" id="view-review" data-title="Review" aria-labelledby="review-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title"><span id="review-title">Review</span></h1>
-            <p class="page-sub">Every refusal and flagged answer waits here for a clinician. Resolve a case as a test and the question is checked from then on. <span class="page-stat" id="review-summary"></span></p>
+            <h1 class="page-title"><span id="review-title" data-i18n="sidebar.review">Review</span></h1>
+            <p class="page-sub"><span data-i18n="view_review.every_refusal_and_flagged">Every refusal and flagged answer waits here for a clinician. Resolve a case as a test and the question is checked from then on.</span> <span class="page-stat" id="review-summary"></span></p>
           </div>
         </header>
       <section class="panel review-panel" id="review-panel">
         <div class="review-body" id="review-body">
-          <div class="review-tabs" role="tablist" aria-label="Review">
-            <button type="button" role="tab" class="review-tab" id="tab-queue" aria-controls="review-queue" aria-selected="true">Queue</button>
-            <button type="button" role="tab" class="review-tab" id="tab-hazards" aria-controls="review-hazards" aria-selected="false" tabindex="-1">Hazard log</button>
-            <button type="button" role="tab" class="review-tab" id="tab-report" aria-controls="review-report" aria-selected="false" tabindex="-1">Report</button>
-            <button type="button" role="tab" class="review-tab" id="tab-controls" aria-controls="review-controls" aria-selected="false" tabindex="-1">Controls</button>
+          <div class="review-tabs" role="tablist" aria-label="Review" data-i18n-attr="aria-label:sidebar.review">
+            <button type="button" role="tab" class="review-tab" id="tab-queue" aria-controls="review-queue" aria-selected="true" data-i18n="tab_queue.queue">Queue</button>
+            <button type="button" role="tab" class="review-tab" id="tab-hazards" aria-controls="review-hazards" aria-selected="false" tabindex="-1" data-i18n="tab_hazards.hazard_log">Hazard log</button>
+            <button type="button" role="tab" class="review-tab" id="tab-report" aria-controls="review-report" aria-selected="false" tabindex="-1" data-i18n="tab_report.report">Report</button>
+            <button type="button" role="tab" class="review-tab" id="tab-controls" aria-controls="review-controls" aria-selected="false" tabindex="-1" data-i18n="hazard_form.controls">Controls</button>
           </div>
           <p class="modal-message" id="review-message" role="status" hidden></p>
 
           <div role="tabpanel" id="review-queue" aria-labelledby="tab-queue">
             <div class="review-filters">
-              <label for="review-status">Show</label>
+              <label for="review-status" data-i18n="review_queue.show">Show</label>
               <select id="review-status">
-                <option value="open">Open cases</option>
-                <option value="resolved">Resolved cases</option>
-                <option value="all">All cases</option>
+                <option value="open" data-i18n="review_status.open_cases">Open cases</option>
+                <option value="resolved" data-i18n="review_status.resolved_cases">Resolved cases</option>
+                <option value="all" data-i18n="review_status.all_cases">All cases</option>
               </select>
-              <label class="check"><input type="checkbox" id="review-mine"> Assigned to me</label>
-              <label class="check"><input type="checkbox" id="review-overdue"> Overdue only</label>
+              <label class="check"><input type="checkbox" id="review-mine"> <span data-i18n="review_queue.assigned_to_me">Assigned to me</span></label>
+              <label class="check"><input type="checkbox" id="review-overdue"> <span data-i18n="review_queue.overdue_only">Overdue only</span></label>
             </div>
             <div class="review-counts" id="review-counts"></div>
             <div class="users-table-wrap">
               <table class="users-table review-table">
-                <thead><tr><th scope="col">Question</th><th scope="col">Type</th><th scope="col">Asked</th><th scope="col">Due</th><th scope="col">Assigned</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                <thead><tr><th scope="col" data-i18n="review_queue.question">Question</th><th scope="col" data-i18n="review_queue.type">Type</th><th scope="col" data-i18n="review_queue.asked">Asked</th><th scope="col" data-i18n="review_queue.due">Due</th><th scope="col" data-i18n="review_queue.assigned">Assigned</th><th scope="col"><span class="visually-hidden" data-i18n="review_queue.actions">Actions</span></th></tr></thead>
                 <tbody id="review-rows"></tbody>
               </table>
             </div>
-            <p class="auth-hint" id="review-empty" hidden>Nothing to review.</p>
+            <p class="auth-hint" id="review-empty" hidden data-i18n="review_empty.nothing_to_review">Nothing to review.</p>
           </div>
 
           <div role="tabpanel" id="review-hazards" aria-labelledby="tab-hazards" hidden>
             <div class="review-toolbar">
-              <p class="auth-hint">Risk is severity × likelihood, each scored 1 to 5. Highest remaining risk first.</p>
-              <button type="button" class="btn btn-sm btn-primary" id="hazard-add">Add hazard</button>
+              <p class="auth-hint" data-i18n="review_hazards.risk_is_severity_likelihood">Risk is severity × likelihood, each scored 1 to 5. Highest remaining risk first.</p>
+              <button type="button" class="btn btn-sm btn-primary" id="hazard-add" data-i18n="hazard_add.add_hazard">Add hazard</button>
             </div>
             <div class="users-table-wrap">
               <table class="users-table hazard-table">
-                <thead><tr><th scope="col">ID</th><th scope="col">Hazard</th><th scope="col">Before controls</th><th scope="col">After controls</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                <thead><tr><th scope="col" data-i18n="review_hazards.id">ID</th><th scope="col" data-i18n="hazard_dialog_title.hazard">Hazard</th><th scope="col" data-i18n="hazard_form.before_controls">Before controls</th><th scope="col" data-i18n="hazard_form.after_controls">After controls</th><th scope="col" data-i18n="incident_form.status">Status</th><th scope="col" data-i18n="incident_form.owner">Owner</th><th scope="col"><span class="visually-hidden" data-i18n="review_queue.actions">Actions</span></th></tr></thead>
                 <tbody id="hazard-rows"></tbody>
               </table>
             </div>
-            <p class="auth-hint" id="hazard-empty" hidden>No hazards recorded yet.</p>
+            <p class="auth-hint" id="hazard-empty" hidden data-i18n="hazard_empty.no_hazards_recorded_yet">No hazards recorded yet.</p>
           </div>
 
           <div role="tabpanel" id="review-report" aria-labelledby="tab-report" hidden>
             <div class="review-toolbar">
               <div class="review-filters">
-                <label for="report-days">Period</label>
+                <label for="report-days" data-i18n="view_usage.period">Period</label>
                 <select id="report-days">
-                  <option value="7">Last 7 days</option>
-                  <option value="30" selected>Last 30 days</option>
-                  <option value="90">Last 90 days</option>
-                  <option value="365">Last 12 months</option>
+                  <option value="7" data-i18n="usage_days.last_7_days">Last 7 days</option>
+                  <option value="30" selected data-i18n="usage_days.last_30_days">Last 30 days</option>
+                  <option value="90" data-i18n="usage_days.last_90_days">Last 90 days</option>
+                  <option value="365" data-i18n="report_days.last_12_months">Last 12 months</option>
                 </select>
               </div>
-              <a class="btn btn-sm btn-ghost" id="safety-case-download" href="/api/governance/safety-case?days=30" download>Download safety case</a>
-              <a class="btn btn-sm btn-ghost" id="surveillance-download" href="/api/governance/surveillance?days=90" download>Download surveillance report</a>
+              <a class="btn btn-sm btn-ghost" id="safety-case-download" href="/api/governance/safety-case?days=30" download data-i18n="safety_case_download.download_safety_case">Download safety case</a>
+              <a class="btn btn-sm btn-ghost" id="surveillance-download" href="/api/governance/surveillance?days=90" download data-i18n="surveillance_download.download_surveillance_report">Download surveillance report</a>
             </div>
             <div class="report-grid" id="report-grid"></div>
             <div class="report-reasons" id="report-reasons"></div>
             <div class="review-tests">
               <div class="review-toolbar">
-                <h3>Tests added from reviews</h3>
-                <button type="button" class="btn btn-sm btn-ghost" id="review-tests-run">Run tests</button>
+                <h3 data-i18n="review_report.tests_added_from_reviews">Tests added from reviews</h3>
+                <button type="button" class="btn btn-sm btn-ghost" id="review-tests-run" data-i18n="review_tests_run.run_tests">Run tests</button>
               </div>
               <p class="auth-hint" id="review-tests-summary"></p>
               <ul class="eval-cases" id="review-tests-list"></ul>
@@ -1028,15 +1030,15 @@
             <p class="controls-banner" id="controls-banner" role="note"></p>
             <div class="review-toolbar">
               <div class="review-filters">
-                <label for="controls-status">Show</label>
+                <label for="controls-status" data-i18n="review_queue.show">Show</label>
                 <select id="controls-status">
-                  <option value="">All controls</option>
-                  <option value="supported">Supported by product</option>
-                  <option value="customer">Customer responsibility</option>
-                  <option value="not_addressed">Not addressed</option>
+                  <option value="" data-i18n="controls_status.all_controls">All controls</option>
+                  <option value="supported" data-i18n="controls_status.supported_by_product">Supported by product</option>
+                  <option value="customer" data-i18n="controls_status.customer_responsibility">Customer responsibility</option>
+                  <option value="not_addressed" data-i18n="controls_status.not_addressed">Not addressed</option>
                 </select>
               </div>
-              <a class="btn btn-sm btn-ghost" id="controls-download" href="/api/governance/controls.csv" download>Download CSV</a>
+              <a class="btn btn-sm btn-ghost" id="controls-download" href="/api/governance/controls.csv" download data-i18n="controls_download.download_csv">Download CSV</a>
             </div>
             <div class="report-grid" id="controls-totals"></div>
             <div id="controls-frameworks"></div>
@@ -1051,8 +1053,8 @@
         <section class="view" id="view-documents" data-title="Documents" aria-labelledby="documents-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title"><span id="documents-title">Documents</span></h1>
-            <p class="page-sub">Your guidelines, formularies and protocols. A document is cited only after someone other than the uploader approves it, and only between its effective and expiry dates. <span class="page-stat" id="documents-summary"></span></p>
+            <h1 class="page-title"><span id="documents-title" data-i18n="sidebar.documents">Documents</span></h1>
+            <p class="page-sub"><span data-i18n="view_documents.your_guidelines_formularies_and">Your guidelines, formularies and protocols. A document is cited only after someone other than the uploader approves it, and only between its effective and expiry dates.</span> <span class="page-stat" id="documents-summary"></span></p>
           </div>
         </header>
       <section class="panel documents-panel" id="documents-panel">
@@ -1061,43 +1063,48 @@
 
           <form class="upload-form" id="upload-form" novalidate>
             <div class="upload-field upload-file">
-              <label for="upload-file">File</label>
+              <label for="upload-file" data-i18n="upload_form.file">File</label>
               <input id="upload-file" type="file" accept=".pdf,.docx,.html,.htm,.md,.markdown,.txt" required>
-              <span class="auth-hint">PDF, Word (.docx), HTML, Markdown or text, up to 25 MB.</span>
+              <span class="auth-hint" data-i18n="upload_form.pdf_word_docx_html">PDF, Word (.docx), HTML, Markdown or text, up to 25 MB.</span>
             </div>
             <div class="upload-field">
-              <label for="upload-title">Title <span class="optional">optional</span></label>
-              <input id="upload-title" placeholder="Taken from the document">
+              <label for="upload-title"><span data-i18n="upload_form.title">Title</span> <span class="optional" data-i18n="case_resolve_form.optional">optional</span></label>
+              <input id="upload-title" placeholder="Taken from the document" data-i18n-attr="placeholder:upload_title.taken_from_the_document">
             </div>
             <div class="upload-field">
-              <label for="upload-owner">Owner</label>
-              <input id="upload-owner" placeholder="e.g. Pharmacy">
+              <label for="upload-owner" data-i18n="incident_form.owner">Owner</label>
+              <input id="upload-owner" placeholder="e.g. Pharmacy" data-i18n-attr="placeholder:upload_owner.e_g_pharmacy">
             </div>
             <div class="upload-field">
-              <label for="upload-effective">Effective from <span class="optional">optional</span></label>
+              <label for="upload-effective"><span data-i18n="upload_form.effective_from">Effective from</span> <span class="optional" data-i18n="case_resolve_form.optional">optional</span></label>
               <input id="upload-effective" type="date">
             </div>
             <div class="upload-field">
-              <label for="upload-expires">Expires on <span class="optional">optional</span></label>
+              <label for="upload-expires"><span data-i18n="upload_form.expires_on">Expires on</span> <span class="optional" data-i18n="case_resolve_form.optional">optional</span></label>
               <input id="upload-expires" type="date">
             </div>
+            <div class="upload-field" id="upload-site-field" hidden>
+              <label for="upload-site" data-i18n="upload_site_field.site">Site</label>
+              <select id="upload-site" class="select"></select>
+              <span class="auth-hint" data-i18n="upload_site_field.which_site_s_clinicians">Which site's clinicians may cite this document. "Every site" shares it across the group.</span>
+            </div>
             <div class="upload-actions">
-              <button type="submit" class="btn btn-primary" id="upload-button">Upload for review</button>
+              <button type="submit" class="btn btn-primary" id="upload-button" data-i18n="upload_button.upload_for_review">Upload for review</button>
             </div>
           </form>
 
           <div class="index-status" id="index-status">
-            <span id="index-status-text">Index status unknown</span>
-            <button type="button" class="btn btn-sm btn-ghost" id="index-rebuild">Rebuild index</button>
+            <span id="index-status-text" data-i18n="index_status_text.index_status_unknown">Index status unknown</span>
+            <button type="button" class="btn btn-sm btn-ghost" id="index-rebuild" data-i18n="index_rebuild.rebuild_index">Rebuild index</button>
           </div>
 
           <div class="users-table-wrap">
             <table class="users-table documents-table">
-              <thead><tr><th scope="col">Document</th><th scope="col">Status</th><th scope="col">Owner</th><th scope="col">In force</th><th scope="col">Sections</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+              <thead><tr><th scope="col" data-i18n="document_dialog_title.document">Document</th><th scope="col" data-i18n="incident_form.status">Status</th><th scope="col" data-i18n="incident_form.owner">Owner</th><th scope="col" data-i18n="documents_body.in_force">In force</th><th scope="col" data-i18n="documents_body.sections">Sections</th><th scope="col"><span class="visually-hidden" data-i18n="review_queue.actions">Actions</span></th></tr></thead>
               <tbody id="documents-body-rows"></tbody>
             </table>
           </div>
-          <p class="auth-hint" id="documents-empty" hidden>No documents yet. Upload one to start.</p>
+          <p class="auth-hint" id="documents-empty" hidden data-i18n="documents_empty.no_documents_yet_upload">No documents yet. Upload one to start.</p>
         </div>
       </section>
 
@@ -1107,23 +1114,23 @@
         <section class="view" id="view-medicines" data-title="Medicines" aria-labelledby="medicines-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title" id="medicines-title">Medicines</h1>
-            <p class="page-sub">The formulary patient checks use: allergies, interactions, and dose rules for age, weight, kidney and liver function, pregnancy and lab results. <span class="page-stat" id="medicines-summary"></span></p>
+            <h1 class="page-title" id="medicines-title" data-i18n="sidebar.medicines">Medicines</h1>
+            <p class="page-sub"><span data-i18n="view_medicines.the_formulary_patient_checks">The formulary patient checks use: allergies, interactions, and dose rules for age, weight, kidney and liver function, pregnancy and lab results.</span> <span class="page-stat" id="medicines-summary"></span></p>
           </div>
         </header>
-          <p class="notice warn" id="formulary-synthetic" hidden>This is the synthetic demo formulary: every medicine and rule is invented. Point <code>FORMULARY_PATH</code> at your organisation’s licensed data before clinical use.</p>
+          <p class="notice warn" id="formulary-synthetic" hidden><span data-i18n="formulary_synthetic.this_is_the_synthetic">This is the synthetic demo formulary: every medicine and rule is invented. Point</span> <code>FORMULARY_PATH</code> <span data-i18n="formulary_synthetic.at_your_organisation_s">at your organisation’s licensed data before clinical use.</span></p>
           <section class="panel">
             <div class="review-toolbar">
-              <label class="visually-hidden" for="medicine-search">Search medicines</label>
-              <input id="medicine-search" class="text-input medicine-search" type="search" placeholder="Search by name or class">
+              <label class="visually-hidden" for="medicine-search" data-i18n="view_medicines.search_medicines">Search medicines</label>
+              <input id="medicine-search" class="text-input medicine-search" type="search" placeholder="Search by name or class" data-i18n-attr="placeholder:medicine_search.search_by_name_or">
             </div>
             <div class="users-table-wrap">
               <table class="users-table medicines-table">
-                <thead><tr><th scope="col">Medicine</th><th scope="col">Adult dose</th><th scope="col">Rules</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+                <thead><tr><th scope="col" data-i18n="medicine_dialog_title.medicine">Medicine</th><th scope="col" data-i18n="view_medicines.adult_dose">Adult dose</th><th scope="col" data-i18n="view_medicines.rules">Rules</th><th scope="col"><span class="visually-hidden" data-i18n="review_queue.actions">Actions</span></th></tr></thead>
                 <tbody id="medicine-rows"></tbody>
               </table>
             </div>
-            <p class="auth-hint" id="medicines-empty" hidden>No medicines match.</p>
+            <p class="auth-hint" id="medicines-empty" hidden data-i18n="medicines_empty.no_medicines_match">No medicines match.</p>
           </section>
         </section>
 
@@ -1131,8 +1138,8 @@
         <section class="view" id="view-evaluation" data-title="Evaluation" aria-labelledby="evaluation-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title"><span id="evaluation-title">Evaluation</span></h1>
-            <p class="page-sub">Every release runs a golden set of answerable and must-refuse questions, and adversarial probes. <span class="page-stat" id="eval-summary-inline"></span></p>
+            <h1 class="page-title"><span id="evaluation-title" data-i18n="document_eval_title.evaluation">Evaluation</span></h1>
+            <p class="page-sub"><span data-i18n="view_evaluation.every_release_runs_a">Every release runs a golden set of answerable and must-refuse questions, and adversarial probes.</span> <span class="page-stat" id="eval-summary-inline"></span></p>
           </div>
         </header>
       <section class="panel" id="eval-panel">
@@ -1155,50 +1162,50 @@
         <section class="view" id="view-embeddings" data-title="Embeddings" aria-labelledby="corpus-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title"><span id="corpus-title">Embeddings</span></h1>
-            <p class="page-sub">How passages are turned into vectors and searched. <span class="page-stat" id="corpus-summary"></span></p>
+            <h1 class="page-title"><span id="corpus-title" data-i18n="sidebar.embeddings">Embeddings</span></h1>
+            <p class="page-sub"><span data-i18n="view_embeddings.how_passages_are_turned">How passages are turned into vectors and searched.</span> <span class="page-stat" id="corpus-summary"></span></p>
           </div>
         </header>
-          <div class="stat-grid" id="embed-stats" aria-label="Embedding index"></div>
+          <div class="stat-grid" id="embed-stats" aria-label="Embedding index" data-i18n-attr="aria-label:embed_stats.embedding_index"></div>
           <section class="panel embed-settings">
-            <h2 class="panel-heading">Search settings</h2>
+            <h2 class="panel-heading" data-i18n="view_embeddings.search_settings">Search settings</h2>
             <dl class="protection-list" id="embed-settings"></dl>
           </section>
-          <h2 class="section-heading">Map of every passage</h2>
-          <p class="section-sub">Each passage projected from its embedding to three dimensions with PCA, so similar passages sit together. Drag to rotate, hover a point. After you ask, the retrieved sources light up.</p>
+          <h2 class="section-heading" data-i18n="view_embeddings.map_of_every_passage">Map of every passage</h2>
+          <p class="section-sub" data-i18n="view_embeddings.each_passage_projected_from">Each passage projected from its embedding to three dimensions with PCA, so similar passages sit together. Drag to rotate, hover a point. After you ask, the retrieved sources light up.</p>
       <section class="panel" id="corpus-panel">
         <div class="corpus-body" id="corpus-body">
           <div class="corpus-tiles" id="corpus-tiles"></div>
           <div class="corpus-map-wrap">
             <div class="corpus-canvas-wrap" id="corpus-canvas-wrap">
-              <canvas id="corpus-canvas" class="corpus-canvas" aria-label="3D corpus embedding map"></canvas>
-              <span class="corpus-drag-hint" id="corpus-drag-hint">drag to rotate, hover a point</span>
-              <button type="button" class="corpus-fs-btn" id="corpus-fs-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen">⤢</button>
+              <canvas id="corpus-canvas" class="corpus-canvas" aria-label="3D corpus embedding map" data-i18n-attr="aria-label:corpus_canvas.3d_corpus_embedding_map"></canvas>
+              <span class="corpus-drag-hint" id="corpus-drag-hint" data-i18n="corpus_drag_hint.drag_to_rotate_hover">drag to rotate, hover a point</span>
+              <button type="button" class="corpus-fs-btn" id="corpus-fs-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen" data-i18n-attr="title:corpus_fs_btn.toggle_fullscreen;aria-label:corpus_fs_btn.toggle_fullscreen">⤢</button>
               <div class="corpus-tooltip" id="corpus-tooltip" hidden></div>
             </div>
             <div class="corpus-legend" id="corpus-legend"></div>
           </div>
           <div class="corpus-section-bars" id="corpus-section-bars"></div>
           <div class="dataset-note" id="dataset-note">
-            <span class="eyebrow">Dataset provenance</span>
+            <span class="eyebrow" data-i18n="dataset_note.dataset_provenance">Dataset provenance</span>
             <p>
-              This corpus is <strong>fully synthetic</strong>. Every condition,
+              <span data-i18n="dataset_note.this_corpus_is">This corpus is</span> <strong data-i18n="dataset_note.fully_synthetic">fully synthetic</strong><span data-i18n="dataset_note.every_condition_medication_lab">. Every condition,
               medication, lab marker, dosage, and procedure is invented for this
-              demonstration. Nothing here is real and nothing is medical advice.
+              demonstration. Nothing here is real and nothing is medical advice.</span>
             </p>
             <p>
-              The document <em>structure</em> mirrors two real, public reference
+              <span data-i18n="dataset_note.the_document">The document</span> <em data-i18n="dataset_note.structure">structure</em> <span data-i18n="dataset_note.mirrors_two_real_public">mirrors two real, public reference
               formats so that retrieval and grounding are exercised realistically:
-              disease entries follow the
-              <a href="https://github.com/abachaa/MedQuAD" target="_blank" rel="noopener">MedQuAD</a>
-              question-type taxonomy (information, causes, symptoms, treatment,
+              disease entries follow the</span>
+              <a href="https://github.com/abachaa/MedQuAD" target="_blank" rel="noopener" data-i18n="dataset_note.medquad">MedQuAD</a>
+              <span data-i18n="dataset_note.question_type_taxonomy_information">question-type taxonomy (information, causes, symptoms, treatment,
               monitoring, prognosis), and drug entries follow the FDA Structured
-              Product Labeling sections used by
-              <a href="https://dailymed.nlm.nih.gov" target="_blank" rel="noopener">DailyMed</a>
-              (indications, dosage, contraindications, interactions, adverse
-              reactions). The records themselves are generated procedurally by
-              <code>scripts/generate_corpus.py</code>, seeded so the corpus is
-              reproducible.
+              Product Labeling sections used by</span>
+              <a href="https://dailymed.nlm.nih.gov" target="_blank" rel="noopener" data-i18n="dataset_note.dailymed">DailyMed</a>
+              <span data-i18n="dataset_note.indications_dosage_contraindications_interactions">(indications, dosage, contraindications, interactions, adverse
+              reactions). The records themselves are generated procedurally by</span>
+              <code>scripts/generate_corpus.py</code><span data-i18n="dataset_note.seeded_so_the_corpus">, seeded so the corpus is
+              reproducible.</span>
             </p>
           </div>
         </div>
@@ -1210,15 +1217,15 @@
         <section class="view" id="view-local-ai" data-title="Local AI" aria-labelledby="local-ai-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title"><span id="local-ai-title">Local AI</span></h1>
-            <p class="page-sub">Run an open-source model on this machine. It drafts answers; the same checks still decide what is shown, and answers fall back to extractive mode if it isn’t available. <span class="page-stat" id="local-ai-summary"></span></p>
+            <h1 class="page-title"><span id="local-ai-title" data-i18n="nav_admin.local_ai">Local AI</span></h1>
+            <p class="page-sub"><span data-i18n="view_local_ai.run_an_open_source">Run an open-source model on this machine. It drafts answers; the same checks still decide what is shown, and answers fall back to extractive mode if it isn’t available.</span> <span class="page-stat" id="local-ai-summary"></span></p>
           </div>
         </header>
       <section class="panel local-ai-panel" id="local-ai-panel">
         <div class="local-ai-body" id="local-ai-body">
-          <div class="local-ai-facts" id="local-ai-hw" aria-label="This machine"></div>
+          <div class="local-ai-facts" id="local-ai-hw" aria-label="This machine" data-i18n-attr="aria-label:local_ai_hw.this_machine"></div>
           <p class="local-ai-message" id="local-ai-message" hidden></p>
-          <ul class="local-ai-models" id="local-ai-models" aria-label="Models"></ul>
+          <ul class="local-ai-models" id="local-ai-models" aria-label="Models" data-i18n-attr="aria-label:local_ai_models.models"></ul>
         </div>
       </section>
 
@@ -1228,8 +1235,8 @@
         <section class="view" id="view-training" data-title="Training" aria-labelledby="training-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title" id="training-title">Training</h1>
-            <p class="page-sub">Train an image classifier on a folder of your own images, on this machine’s GPU. The model is saved to the library, with its accuracy and the confidence below which it refuses to answer.</p>
+            <h1 class="page-title" id="training-title" data-i18n="model_train_title.training">Training</h1>
+            <p class="page-sub" data-i18n="view_training.train_an_image_classifier">Train an image classifier on a folder of your own images, on this machine’s GPU. The model is saved to the library, with its accuracy and the confidence below which it refuses to answer.</p>
           </div>
         </header>
           <p class="modal-message" id="training-message" role="status" hidden></p>
@@ -1237,12 +1244,12 @@
           <section class="panel run-live" id="run-live" hidden aria-live="polite">
             <div class="run-live-head">
               <div>
-                <h2 class="panel-heading" id="run-live-name">Training</h2>
+                <h2 class="panel-heading" id="run-live-name" data-i18n="model_train_title.training">Training</h2>
                 <p class="run-live-status" id="run-live-status"></p>
               </div>
               <div class="document-actions">
-                <button type="button" class="btn btn-sm btn-primary" id="run-resume" hidden>Resume training</button>
-                <button type="button" class="btn btn-sm btn-ghost" id="run-cancel">Cancel training</button>
+                <button type="button" class="btn btn-sm btn-primary" id="run-resume" hidden data-i18n="run_resume.resume_training">Resume training</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="run-cancel" data-i18n="run_cancel.cancel_training">Cancel training</button>
               </div>
             </div>
             <div class="run-progress" role="progressbar" aria-labelledby="run-live-name" aria-valuemin="0" aria-valuemax="100" id="run-progressbar">
@@ -1251,84 +1258,84 @@
             <div class="stat-grid run-stats" id="run-stats"></div>
             <div class="run-charts">
               <div>
-                <h3 class="chart-title">Loss <span class="chart-note">lower is better</span></h3>
+                <h3 class="chart-title"><span data-i18n="run_live.loss">Loss</span> <span class="chart-note" data-i18n="run_live.lower_is_better">lower is better</span></h3>
                 <div class="chart line-chart" id="chart-loss"></div>
               </div>
               <div>
-                <h3 class="chart-title">Accuracy</h3>
+                <h3 class="chart-title" data-i18n="run_live.accuracy">Accuracy</h3>
                 <div class="chart line-chart" id="chart-accuracy"></div>
               </div>
             </div>
             <div class="legend">
-              <span><i class="swatch swatch-answered"></i>Training images</span>
-              <span><i class="swatch swatch-val"></i>Validation images</span>
+              <span><i class="swatch swatch-answered"></i><span data-i18n="run_live.training_images">Training images</span></span>
+              <span><i class="swatch swatch-val"></i><span data-i18n="run_live.validation_images">Validation images</span></span>
             </div>
             <p class="run-result" id="run-result" hidden></p>
           </section>
 
           <form class="train-form" id="train-form" novalidate>
             <section class="panel train-step" aria-labelledby="step-data-title">
-              <h2 class="step-title" id="step-data-title"><span class="step-num">1</span>Choose a folder of images</h2>
-              <p class="step-sub">One subfolder per class, such as <code>normal/</code> and <code>abnormal/</code>, or <code>train/</code>, <code>val/</code> and <code>test/</code> folders each holding class subfolders.</p>
+              <h2 class="step-title" id="step-data-title"><span class="step-num">1</span><span data-i18n="step_data_title.choose_a_folder_of">Choose a folder of images</span></h2>
+              <p class="step-sub"><span data-i18n="train_form.one_subfolder_per_class">One subfolder per class, such as</span> <code>normal/</code> <span data-i18n="train_form.and">and</span> <code>abnormal/</code><span data-i18n="train_form.or">, or</span> <code>train/</code>, <code>val/</code> <span data-i18n="train_form.and">and</span> <code>test/</code> <span data-i18n="train_form.folders_each_holding_class">folders each holding class subfolders.</span></p>
               <div class="folder-row">
-                <label class="visually-hidden" for="train-dataset">Folder</label>
-                <input id="train-dataset" class="text-input mono" placeholder="data/datasets/organamnist-64" autocomplete="off" spellcheck="false">
+                <label class="visually-hidden" for="train-dataset" data-i18n="train_form.folder">Folder</label>
+                <input id="train-dataset" class="text-input mono" placeholder="data/datasets/organamnist-64" autocomplete="off" spellcheck="false" data-i18n-attr="placeholder:train_dataset.data_datasets_organamnist_64">
                 <button type="button" class="btn btn-ghost" id="train-browse">
-                  <svg class="btn-icon" aria-hidden="true"><use href="#i-folder-open"/></svg>Browse
+                  <svg class="btn-icon" aria-hidden="true"><use href="#i-folder-open"/></svg><span data-i18n="train_browse.browse">Browse</span>
                 </button>
-                <button type="button" class="btn btn-ghost" id="train-scan">Check folder</button>
+                <button type="button" class="btn btn-ghost" id="train-scan" data-i18n="train_scan.check_folder">Check folder</button>
               </div>
               <div class="dataset-summary" id="dataset-summary" hidden></div>
             </section>
 
             <section class="panel train-step" aria-labelledby="step-hw-title">
-              <h2 class="step-title" id="step-hw-title"><span class="step-num">2</span>Choose where to train</h2>
-              <p class="step-sub" id="hw-sub">Checking this machine’s hardware…</p>
+              <h2 class="step-title" id="step-hw-title"><span class="step-num">2</span><span data-i18n="step_hw_title.choose_where_to_train">Choose where to train</span></h2>
+              <p class="step-sub" id="hw-sub" data-i18n="hw_sub.checking_this_machine_s">Checking this machine’s hardware…</p>
               <div class="device-list" id="device-list" role="radiogroup" aria-labelledby="step-hw-title"></div>
             </section>
 
             <section class="panel train-step" aria-labelledby="step-settings-title">
-              <h2 class="step-title" id="step-settings-title"><span class="step-num">3</span>Name the model and set how it trains</h2>
+              <h2 class="step-title" id="step-settings-title"><span class="step-num">3</span><span data-i18n="step_settings_title.name_the_model_and">Name the model and set how it trains</span></h2>
               <div class="settings-grid">
                 <div class="field field-wide">
-                  <label for="train-name">Model name</label>
-                  <input id="train-name" class="text-input" placeholder="e.g. Abdominal CT organ classifier" maxlength="80">
+                  <label for="train-name" data-i18n="train_form.model_name">Model name</label>
+                  <input id="train-name" class="text-input" placeholder="e.g. Abdominal CT organ classifier" maxlength="80" data-i18n-attr="placeholder:train_name.e_g_abdominal_ct">
                 </div>
                 <div class="field field-wide">
-                  <span class="field-label" id="arch-label">Architecture</span>
+                  <span class="field-label" id="arch-label" data-i18n="arch_label.architecture">Architecture</span>
                   <div class="arch-list" id="arch-list" role="radiogroup" aria-labelledby="arch-label"></div>
-                  <label class="check" id="pretrained-row" hidden><input type="checkbox" id="train-pretrained"> Start from ImageNet weights (downloads 45 MB once; check their terms for commercial use)</label>
+                  <label class="check" id="pretrained-row" hidden><input type="checkbox" id="train-pretrained"> <span data-i18n="pretrained_row.start_from_imagenet_weights">Start from ImageNet weights (downloads 45 MB once; check their terms for commercial use)</span></label>
                 </div>
                 <div class="field">
-                  <label for="train-epochs">Epochs</label>
+                  <label for="train-epochs" data-i18n="train_form.epochs">Epochs</label>
                   <input id="train-epochs" class="text-input" type="number" min="1" max="300" value="15">
-                  <span class="field-hint">Passes over the training images. Stops early when validation stops improving.</span>
+                  <span class="field-hint" data-i18n="train_form.passes_over_the_training">Passes over the training images. Stops early when validation stops improving.</span>
                 </div>
                 <div class="field">
-                  <label for="train-size">Image size</label>
+                  <label for="train-size" data-i18n="train_form.image_size">Image size</label>
                   <select id="train-size" class="select"></select>
-                  <span class="field-hint">Images are resized to this square. Larger is slower.</span>
+                  <span class="field-hint" data-i18n="train_form.images_are_resized_to">Images are resized to this square. Larger is slower.</span>
                 </div>
                 <details class="field field-wide advanced">
-                  <summary>Advanced settings</summary>
+                  <summary data-i18n="train_form.advanced_settings">Advanced settings</summary>
                   <div class="settings-grid">
                     <div class="field">
-                      <label for="train-batch">Batch size</label>
+                      <label for="train-batch" data-i18n="train_form.batch_size">Batch size</label>
                       <input id="train-batch" class="text-input" type="number" min="1" max="1024">
                     </div>
                     <div class="field">
-                      <label for="train-lr">Learning rate</label>
+                      <label for="train-lr" data-i18n="train_form.learning_rate">Learning rate</label>
                       <input id="train-lr" class="text-input" type="number" min="0.000001" max="1" step="any">
                     </div>
                     <div class="field">
-                      <label for="train-val">Validation share</label>
+                      <label for="train-val" data-i18n="train_form.validation_share">Validation share</label>
                       <input id="train-val" class="text-input" type="number" min="0.05" max="0.4" step="0.01" value="0.15">
-                      <span class="field-hint">Used when the folder has no val folder.</span>
+                      <span class="field-hint" data-i18n="train_form.used_when_the_folder">Used when the folder has no val folder.</span>
                     </div>
                     <div class="field">
-                      <label for="train-test">Test share</label>
+                      <label for="train-test" data-i18n="train_form.test_share">Test share</label>
                       <input id="train-test" class="text-input" type="number" min="0" max="0.4" step="0.01" value="0.15">
-                      <span class="field-hint">Used when the folder has no test folder.</span>
+                      <span class="field-hint" data-i18n="train_form.used_when_the_folder_2">Used when the folder has no test folder.</span>
                     </div>
                   </div>
                 </details>
@@ -1336,20 +1343,20 @@
             </section>
 
             <div class="train-submit">
-              <button type="submit" class="btn btn-primary btn-lg" id="train-start">Start training</button>
+              <button type="submit" class="btn btn-primary btn-lg" id="train-start" data-i18n="train_start.start_training">Start training</button>
               <span class="field-hint" id="train-submit-hint"></span>
             </div>
           </form>
 
           <section class="panel" aria-labelledby="runs-title">
-            <h2 class="panel-heading" id="runs-title">Training runs</h2>
+            <h2 class="panel-heading" id="runs-title" data-i18n="runs_title.training_runs">Training runs</h2>
             <div class="users-table-wrap">
               <table class="users-table runs-table">
-                <thead><tr><th scope="col">Model</th><th scope="col">Status</th><th scope="col">Hardware</th><th scope="col">Started</th><th scope="col">Result</th></tr></thead>
+                <thead><tr><th scope="col" data-i18n="model_dialog_title.model">Model</th><th scope="col" data-i18n="incident_form.status">Status</th><th scope="col" data-i18n="view_training.hardware">Hardware</th><th scope="col" data-i18n="view_training.started">Started</th><th scope="col" data-i18n="view_training.result">Result</th></tr></thead>
                 <tbody id="runs-rows"></tbody>
               </table>
             </div>
-            <p class="auth-hint" id="runs-empty" hidden>No training runs yet.</p>
+            <p class="auth-hint" id="runs-empty" hidden data-i18n="runs_empty.no_training_runs_yet">No training runs yet.</p>
           </section>
         </section>
 
@@ -1357,18 +1364,18 @@
         <section class="view" id="view-releases" data-title="Releases" aria-labelledby="releases-title" hidden>
           <header class="page-head">
             <div>
-              <h1 class="page-title" id="releases-title">Releases</h1>
-              <p class="page-sub">Every change to what answers are grounded in is checked against the safety tests before it goes live. If something is wrong, go back to the previous release in one step.</p>
+              <h1 class="page-title" id="releases-title" data-i18n="sidebar.releases">Releases</h1>
+              <p class="page-sub" data-i18n="view_releases.every_change_to_what">Every change to what answers are grounded in is checked against the safety tests before it goes live. If something is wrong, go back to the previous release in one step.</p>
             </div>
             <div class="page-actions">
-              <button type="button" class="btn btn-sm btn-ghost" id="release-rebuild" hidden>Rebuild and check</button>
-              <button type="button" class="btn btn-sm btn-ghost" id="release-rollback" hidden>Roll back</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="release-rebuild" hidden data-i18n="release_rebuild.rebuild_and_check">Rebuild and check</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="release-rollback" hidden data-i18n="release_rollback.roll_back">Roll back</button>
             </div>
           </header>
           <p class="modal-message" id="releases-message" role="status" hidden></p>
           <div class="live-release" id="live-release"></div>
           <section class="panel" aria-labelledby="release-list-title">
-            <h2 class="panel-heading" id="release-list-title">History</h2>
+            <h2 class="panel-heading" id="release-list-title" data-i18n="release_list_title.history">History</h2>
             <ol class="release-list" id="release-list"></ol>
             <p class="field-hint" id="release-policy"></p>
           </section>
@@ -1378,33 +1385,33 @@
         <section class="view" id="view-incidents" data-title="Incidents" aria-labelledby="incidents-title" hidden>
           <header class="page-head">
             <div>
-              <h1 class="page-title" id="incidents-title">Incidents</h1>
-              <p class="page-sub" id="incidents-sub">Report anything that went wrong, or nearly did. Reviewers investigate, record the root cause and the actions taken, and close it.</p>
+              <h1 class="page-title" id="incidents-title" data-i18n="sidebar.incidents">Incidents</h1>
+              <p class="page-sub" id="incidents-sub" data-i18n="incidents_sub.report_anything_that_went">Report anything that went wrong, or nearly did. Reviewers investigate, record the root cause and the actions taken, and close it.</p>
             </div>
             <div class="page-actions">
-              <a class="btn btn-sm btn-ghost" href="/api/incidents/export.csv" id="incidents-export" hidden>Download CSV</a>
-              <button type="button" class="btn btn-sm btn-primary" id="incident-new">Report an incident</button>
+              <a class="btn btn-sm btn-ghost" href="/api/incidents/export.csv" id="incidents-export" hidden data-i18n="controls_download.download_csv">Download CSV</a>
+              <button type="button" class="btn btn-sm btn-primary" id="incident-new" data-i18n="incident_report_title.report_an_incident">Report an incident</button>
             </div>
           </header>
           <p class="modal-message" id="incidents-message" role="status" hidden></p>
           <section class="panel" aria-labelledby="incident-list-title">
             <div class="review-toolbar">
-              <h2 class="panel-heading flush" id="incident-list-title">Reported incidents</h2>
+              <h2 class="panel-heading flush" id="incident-list-title" data-i18n="incident_list_title.reported_incidents">Reported incidents</h2>
               <div class="review-filters">
-                <label for="incident-status-filter">Status</label>
-                <select id="incident-status-filter"><option value="active">Open or investigating</option><option value="open">Open</option><option value="investigating">Investigating</option><option value="closed">Closed</option><option value="">All</option></select>
-                <label for="incident-category-filter">Concerns</label>
-                <select id="incident-category-filter"><option value="">Anything</option></select>
+                <label for="incident-status-filter" data-i18n="incident_form.status">Status</label>
+                <select id="incident-status-filter"><option value="active" data-i18n="incident_status_filter.open_or_investigating">Open or investigating</option><option value="open" data-i18n="if_status.open">Open</option><option value="investigating" data-i18n="if_status.investigating">Investigating</option><option value="closed" data-i18n="if_status.closed">Closed</option><option value="" data-i18n="incident_status_filter.all">All</option></select>
+                <label for="incident-category-filter" data-i18n="incident_form.concerns">Concerns</label>
+                <select id="incident-category-filter"><option value="" data-i18n="incident_category_filter.anything">Anything</option></select>
               </div>
             </div>
             <div class="review-counts" id="incident-counts"></div>
             <div class="users-table-wrap">
               <table class="users-table review-table incident-table">
-                <thead><tr><th scope="col">Incident</th><th scope="col">Harm</th><th scope="col">Status</th><th scope="col">Reported</th><th scope="col">Owner</th></tr></thead>
+                <thead><tr><th scope="col" data-i18n="incident_dialog_title.incident">Incident</th><th scope="col" data-i18n="incident_form.harm">Harm</th><th scope="col" data-i18n="incident_form.status">Status</th><th scope="col" data-i18n="view_incidents.reported">Reported</th><th scope="col" data-i18n="incident_form.owner">Owner</th></tr></thead>
                 <tbody id="incident-rows"></tbody>
               </table>
             </div>
-            <p class="auth-hint" id="incident-empty" hidden>No incidents match.</p>
+            <p class="auth-hint" id="incident-empty" hidden data-i18n="incident_empty.no_incidents_match">No incidents match.</p>
           </section>
         </section>
 
@@ -1412,40 +1419,40 @@
         <section class="view" id="view-monitoring" data-title="Monitoring" aria-labelledby="monitoring-title" hidden>
           <header class="page-head">
             <div>
-              <h1 class="page-title" id="monitoring-title">Monitoring</h1>
-              <p class="page-sub">Alerts from live use: refusals, response times, drift from the documents, overdue reviews, expiring documents and the audit trail. Prometheus can scrape <code>/metrics</code>.</p>
+              <h1 class="page-title" id="monitoring-title" data-i18n="nav_admin.monitoring">Monitoring</h1>
+              <p class="page-sub"><span data-i18n="view_monitoring.alerts_from_live_use">Alerts from live use: refusals, response times, drift from the documents, overdue reviews, expiring documents and the audit trail. Prometheus can scrape</span> <code>/metrics</code>.</p>
             </div>
             <div class="page-actions">
-              <button type="button" class="btn btn-sm btn-primary" id="monitoring-check">Check now</button>
+              <button type="button" class="btn btn-sm btn-primary" id="monitoring-check" data-i18n="monitoring_check.check_now">Check now</button>
             </div>
           </header>
           <p class="modal-message" id="monitoring-message" role="status" hidden></p>
           <div class="monitor-status" id="monitor-status" role="status"></div>
           <div class="stat-grid monitor-stats" id="monitor-stats"></div>
           <section class="panel" aria-labelledby="alerts-title">
-            <h2 class="panel-heading" id="alerts-title">Firing</h2>
+            <h2 class="panel-heading" id="alerts-title" data-i18n="alerts_title.firing">Firing</h2>
             <ul class="alert-list" id="alert-list"></ul>
-            <p class="auth-hint" id="alert-empty" hidden>Nothing is firing.</p>
+            <p class="auth-hint" id="alert-empty" hidden data-i18n="alert_empty.nothing_is_firing">Nothing is firing.</p>
           </section>
           <div class="usage-grid">
             <section class="panel" aria-labelledby="instance-title">
-              <h2 class="panel-heading" id="instance-title">This instance</h2>
+              <h2 class="panel-heading" id="instance-title" data-i18n="instance_title.this_instance">This instance</h2>
               <dl class="protection-list" id="instance-details"></dl>
             </section>
             <section class="panel" aria-labelledby="rules-title">
-              <h2 class="panel-heading" id="rules-title">Checks</h2>
+              <h2 class="panel-heading" id="rules-title" data-i18n="rules_title.checks">Checks</h2>
               <div class="users-table-wrap">
                 <table class="users-table rules-table">
-                  <thead><tr><th scope="col">Check</th><th scope="col">Alerts when</th><th scope="col">Now</th></tr></thead>
+                  <thead><tr><th scope="col" data-i18n="view_monitoring.check">Check</th><th scope="col" data-i18n="view_monitoring.alerts_when">Alerts when</th><th scope="col" data-i18n="view_monitoring.now">Now</th></tr></thead>
                   <tbody id="rules-rows"></tbody>
                 </table>
               </div>
               <p class="field-hint" id="monitor-notify"></p>
             </section>
             <section class="panel" aria-labelledby="resolved-title">
-              <h2 class="panel-heading" id="resolved-title">Recently resolved</h2>
+              <h2 class="panel-heading" id="resolved-title" data-i18n="resolved_title.recently_resolved">Recently resolved</h2>
               <ul class="alert-list resolved" id="resolved-list"></ul>
-              <p class="auth-hint" id="resolved-empty" hidden>No resolved alerts yet.</p>
+              <p class="auth-hint" id="resolved-empty" hidden data-i18n="resolved_empty.no_resolved_alerts_yet">No resolved alerts yet.</p>
             </section>
           </div>
         </section>
@@ -1455,34 +1462,34 @@
           <div id="imaging-list">
             <header class="page-head">
               <div>
-                <h1 class="page-title" id="imaging-title">CT and MRI</h1>
-                <p class="page-sub">Import a series, run a model over it, read the images and sign a report. Series are de-identified as they’re imported. <span class="page-stat" id="imaging-summary"></span></p>
+                <h1 class="page-title" id="imaging-title" data-i18n="sidebar.ct_and_mri">CT and MRI</h1>
+                <p class="page-sub"><span data-i18n="imaging_list.import_a_series_run">Import a series, run a model over it, read the images and sign a report. Series are de-identified as they’re imported.</span> <span class="page-stat" id="imaging-summary"></span></p>
               </div>
             </header>
             <p class="modal-message" id="imaging-message" role="status" hidden></p>
 
             <section class="panel imaging-import" aria-labelledby="imaging-import-title">
-              <h2 class="panel-heading" id="imaging-import-title">Import a series</h2>
-              <div class="review-tabs" role="tablist" aria-label="Import from" id="imaging-import-tabs">
-                <button type="button" class="review-tab" role="tab" id="imaging-tab-upload" aria-controls="imaging-upload" aria-selected="true">Upload files</button>
-                <button type="button" class="review-tab" role="tab" id="imaging-tab-pacs" aria-controls="imaging-pacs" aria-selected="false" tabindex="-1">From the PACS</button>
+              <h2 class="panel-heading" id="imaging-import-title" data-i18n="imaging_import_title.import_a_series">Import a series</h2>
+              <div class="review-tabs" role="tablist" aria-label="Import from" id="imaging-import-tabs" data-i18n-attr="aria-label:imaging_import_tabs.import_from">
+                <button type="button" class="review-tab" role="tab" id="imaging-tab-upload" aria-controls="imaging-upload" aria-selected="true" data-i18n="imaging_tab_upload.upload_files">Upload files</button>
+                <button type="button" class="review-tab" role="tab" id="imaging-tab-pacs" aria-controls="imaging-pacs" aria-selected="false" tabindex="-1" data-i18n="imaging_tab_pacs.from_the_pacs">From the PACS</button>
               </div>
               <form id="imaging-upload" class="imaging-upload" role="tabpanel" aria-labelledby="imaging-tab-upload" novalidate>
                 <label class="dicom-drop" id="dicom-drop" for="dicom-files">
                   <svg aria-hidden="true"><use href="#i-scan"/></svg>
-                  <span class="dicom-drop-main">Drop DICOM files, a folder or a zip here</span>
-                  <span class="dicom-drop-sub" id="dicom-drop-sub">CT and MR image storage. Up to 3,000 files.</span>
+                  <span class="dicom-drop-main" data-i18n="dicom_drop.drop_dicom_files_a">Drop DICOM files, a folder or a zip here</span>
+                  <span class="dicom-drop-sub" id="dicom-drop-sub" data-i18n="dicom_drop_sub.ct_and_mr_image">CT and MR image storage. Up to 3,000 files.</span>
                   <input id="dicom-files" type="file" multiple accept=".dcm,.zip,application/dicom,application/zip">
                 </label>
                 <div class="imaging-upload-side">
                   <div class="field">
-                    <label for="dicom-label">Label <span class="optional">optional, not a patient identifier</span></label>
-                    <input id="dicom-label" class="text-input" maxlength="200" placeholder="e.g. Teaching case 12">
+                    <label for="dicom-label"><span data-i18n="imaging_upload.label">Label</span> <span class="optional" data-i18n="imaging_upload.optional_not_a_patient">optional, not a patient identifier</span></label>
+                    <input id="dicom-label" class="text-input" maxlength="200" placeholder="e.g. Teaching case 12" data-i18n-attr="placeholder:dicom_label.e_g_teaching_case">
                   </div>
                   <div class="imaging-upload-actions">
-                    <button type="button" class="btn btn-sm btn-ghost" id="dicom-folder">Choose a folder</button>
+                    <button type="button" class="btn btn-sm btn-ghost" id="dicom-folder" data-i18n="browse_title.choose_a_folder">Choose a folder</button>
                     <input id="dicom-folder-input" type="file" webkitdirectory multiple hidden tabindex="-1" aria-hidden="true">
-                    <button type="submit" class="btn btn-primary" id="dicom-upload" disabled>Import</button>
+                    <button type="submit" class="btn btn-primary" id="dicom-upload" disabled data-i18n="dicom_upload.import">Import</button>
                   </div>
                   <div class="upload-progress" id="dicom-progress" hidden>
                     <div class="bar-track"><span class="bar-fill" id="dicom-progress-fill"></span></div>
@@ -1491,52 +1498,52 @@
                 </div>
               </form>
               <div id="imaging-pacs" role="tabpanel" aria-labelledby="imaging-tab-pacs" hidden>
-                <p class="step-sub flush" id="pacs-off" hidden>No PACS is connected. Set <code>DICOMWEB_URL</code> to search a PACS or vendor-neutral archive over DICOMweb.</p>
+                <p class="step-sub flush" id="pacs-off" hidden><span data-i18n="pacs_off.no_pacs_is_connected">No PACS is connected. Set</span> <code>DICOMWEB_URL</code> <span data-i18n="pacs_off.to_search_a_pacs">to search a PACS or vendor-neutral archive over DICOMweb.</span></p>
                 <form class="pacs-search" id="pacs-search" novalidate>
-                  <div class="field"><label for="pacs-patient-id">Patient ID</label><input id="pacs-patient-id" class="text-input" autocomplete="off"></div>
-                  <div class="field"><label for="pacs-patient-name">Patient name</label><input id="pacs-patient-name" class="text-input" autocomplete="off"></div>
-                  <div class="field"><label for="pacs-accession">Accession number</label><input id="pacs-accession" class="text-input" autocomplete="off"></div>
-                  <div class="field"><label for="pacs-date">Study date</label><input id="pacs-date" class="text-input" placeholder="YYYYMMDD or a range" autocomplete="off"></div>
-                  <div class="field"><label for="pacs-modality">Modality</label>
-                    <select id="pacs-modality" class="text-input"><option value="">Any</option><option>CT</option><option>MR</option></select></div>
-                  <div class="pacs-search-actions"><button type="submit" class="btn btn-primary" id="pacs-go">Search</button></div>
+                  <div class="field"><label for="pacs-patient-id" data-i18n="ehr_load.patient_id">Patient ID</label><input id="pacs-patient-id" class="text-input" autocomplete="off"></div>
+                  <div class="field"><label for="pacs-patient-name" data-i18n="pacs_search.patient_name">Patient name</label><input id="pacs-patient-name" class="text-input" autocomplete="off"></div>
+                  <div class="field"><label for="pacs-accession" data-i18n="pacs_search.accession_number">Accession number</label><input id="pacs-accession" class="text-input" autocomplete="off"></div>
+                  <div class="field"><label for="pacs-date" data-i18n="pacs_search.study_date">Study date</label><input id="pacs-date" class="text-input" placeholder="YYYYMMDD or a range" autocomplete="off" data-i18n-attr="placeholder:pacs_date.yyyymmdd_or_a_range"></div>
+                  <div class="field"><label for="pacs-modality" data-i18n="pacs_search.modality">Modality</label>
+                    <select id="pacs-modality" class="text-input"><option value="" data-i18n="pacs_modality.any">Any</option><option data-i18n="mi_modality.ct">CT</option><option data-i18n="mi_modality.mr">MR</option></select></div>
+                  <div class="pacs-search-actions"><button type="submit" class="btn btn-primary" id="pacs-go" data-i18n="pacs_go.search">Search</button></div>
                 </form>
                 <div class="pacs-results" id="pacs-results" aria-live="polite"></div>
               </div>
             </section>
 
             <section class="panel" aria-labelledby="imaging-series-title">
-              <h2 class="panel-heading" id="imaging-series-title">Series</h2>
+              <h2 class="panel-heading" id="imaging-series-title" data-i18n="imaging_series_title.series">Series</h2>
               <div class="users-table-wrap">
                 <table class="users-table imaging-table">
-                  <thead><tr><th scope="col">Series</th><th scope="col">Images</th><th scope="col">Imported</th><th scope="col">Model</th><th scope="col">Report</th></tr></thead>
+                  <thead><tr><th scope="col" data-i18n="imaging_series_title.series">Series</th><th scope="col" data-i18n="model_dialog.images">Images</th><th scope="col" data-i18n="imaging_list.imported">Imported</th><th scope="col" data-i18n="model_dialog_title.model">Model</th><th scope="col" data-i18n="tab_report.report">Report</th></tr></thead>
                   <tbody id="imaging-rows"></tbody>
                 </table>
               </div>
-              <p class="auth-hint" id="imaging-empty" hidden>No series yet. Import one above. To try it with public data, run <code>python scripts/fetch_dicom_samples.py</code> and upload a folder from <code>data/imaging-samples</code>.</p>
+              <p class="auth-hint" id="imaging-empty" hidden><span data-i18n="imaging_empty.no_series_yet_import">No series yet. Import one above. To try it with public data, run</span> <code>python scripts/fetch_dicom_samples.py</code> <span data-i18n="imaging_empty.and_upload_a_folder">and upload a folder from</span> <code>data/imaging-samples</code>.</p>
             </section>
           </div>
 
           <div id="imaging-viewer" hidden>
             <header class="page-head viewer-head">
               <div>
-                <a class="back-link" href="#/imaging">All series</a>
-                <h1 class="page-title" id="viewer-title">Series</h1>
+                <a class="back-link" href="#/imaging" data-i18n="imaging_viewer.all_series">All series</a>
+                <h1 class="page-title" id="viewer-title" data-i18n="imaging_series_title.series">Series</h1>
                 <p class="page-sub" id="viewer-sub"></p>
               </div>
               <div class="page-actions">
-                <button type="button" class="btn btn-sm btn-ghost" id="viewer-delete" hidden>Delete series</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="viewer-delete" hidden data-i18n="viewer_delete.delete_series">Delete series</button>
               </div>
             </header>
             <p class="modal-message" id="viewer-message" role="status" hidden></p>
             <div class="viewer-layout">
-              <section class="viewer-stage-wrap" aria-label="Image viewer">
+              <section class="viewer-stage-wrap" aria-label="Image viewer" data-i18n-attr="aria-label:imaging_viewer.image_viewer">
                 <div class="viewer-toolbar">
                   <div class="field inline-field">
-                    <label for="viewer-window">Window</label>
+                    <label for="viewer-window" data-i18n="imaging_viewer.window">Window</label>
                     <select id="viewer-window" class="text-input"></select>
                   </div>
-                  <label class="check viewer-overlay-toggle"><input type="checkbox" id="viewer-overlay" checked> Model regions</label>
+                  <label class="check viewer-overlay-toggle"><input type="checkbox" id="viewer-overlay" checked> <span data-i18n="imaging_viewer.model_regions">Model regions</span></label>
                   <span class="viewer-slice-label mono" id="viewer-slice-label" aria-live="polite"></span>
                 </div>
                 <div class="viewer-stage" id="viewer-stage" tabindex="0" aria-describedby="viewer-keys">
@@ -1550,23 +1557,23 @@
                   </div>
                 </div>
                 <div class="viewer-scrub">
-                  <label class="visually-hidden" for="viewer-slice">Slice</label>
+                  <label class="visually-hidden" for="viewer-slice" data-i18n="imaging_viewer.slice">Slice</label>
                   <input type="range" id="viewer-slice" min="0" max="0" value="0">
-                  <div class="slice-map" id="slice-map" aria-label="Where the model reported each label, by slice"></div>
+                  <div class="slice-map" id="slice-map" aria-label="Where the model reported each label, by slice" data-i18n-attr="aria-label:slice_map.where_the_model_reported"></div>
                 </div>
                 <p class="field-hint viewer-caption"><span class="mono" id="viewer-scale"></span></p>
-                <p class="field-hint" id="viewer-keys">Scroll, drag the slider or use the arrow keys to move through slices. Page Up and Page Down jump ten.</p>
+                <p class="field-hint" id="viewer-keys" data-i18n="viewer_keys.scroll_drag_the_slider">Scroll, drag the slider or use the arrow keys to move through slices. Page Up and Page Down jump ten.</p>
               </section>
 
               <div class="viewer-side">
                 <section class="panel" aria-labelledby="analysis-title">
-                  <h2 class="panel-heading" id="analysis-title">Model analysis</h2>
+                  <h2 class="panel-heading" id="analysis-title" data-i18n="analysis_title.model_analysis">Model analysis</h2>
                   <form class="analysis-form" id="analysis-form" novalidate>
                     <div class="field">
-                      <label for="analysis-model">Model</label>
+                      <label for="analysis-model" data-i18n="model_dialog_title.model">Model</label>
                       <select id="analysis-model" class="text-input"></select>
                     </div>
-                    <button type="submit" class="btn btn-primary" id="analysis-run">Run</button>
+                    <button type="submit" class="btn btn-primary" id="analysis-run" data-i18n="analysis_run.run">Run</button>
                   </form>
                   <p class="field-hint" id="analysis-hint"></p>
                   <div class="analysis-progress" id="analysis-progress" hidden>
@@ -1577,39 +1584,39 @@
                 </section>
 
                 <section class="panel" aria-labelledby="report-title">
-                  <h2 class="panel-heading" id="report-title">Report</h2>
+                  <h2 class="panel-heading" id="report-title" data-i18n="tab_report.report">Report</h2>
                   <div id="report-signed"></div>
                   <form class="report-form" id="report-form" novalidate>
                     <fieldset class="agreement" id="report-agreement">
-                      <legend class="field-label">The model’s output</legend>
-                      <label class="agree-option"><input type="radio" name="agreement" value="agree"> Agree</label>
-                      <label class="agree-option"><input type="radio" name="agreement" value="partly"> Partly agree</label>
-                      <label class="agree-option"><input type="radio" name="agreement" value="disagree"> Disagree</label>
-                      <label class="agree-option"><input type="radio" name="agreement" value="not_used" checked> Not used</label>
+                      <legend class="field-label" data-i18n="report_agreement.the_model_s_output">The model’s output</legend>
+                      <label class="agree-option"><input type="radio" name="agreement" value="agree"> <span data-i18n="report_agreement.agree">Agree</span></label>
+                      <label class="agree-option"><input type="radio" name="agreement" value="partly"> <span data-i18n="report_agreement.partly_agree">Partly agree</span></label>
+                      <label class="agree-option"><input type="radio" name="agreement" value="disagree"> <span data-i18n="report_agreement.disagree">Disagree</span></label>
+                      <label class="agree-option"><input type="radio" name="agreement" value="not_used" checked> <span data-i18n="report_agreement.not_used">Not used</span></label>
                     </fieldset>
                     <div class="field">
-                      <label for="report-findings">Findings</label>
+                      <label for="report-findings" data-i18n="report_form.findings">Findings</label>
                       <textarea id="report-findings" class="text-input" rows="5" maxlength="20000"></textarea>
                     </div>
                     <div class="field">
-                      <label for="report-impression">Impression</label>
+                      <label for="report-impression" data-i18n="report_form.impression">Impression</label>
                       <textarea id="report-impression" class="text-input" rows="3" maxlength="5000"></textarea>
                     </div>
                     <p class="modal-message" id="report-message" role="status" hidden></p>
                     <div class="report-actions">
-                      <button type="button" class="btn btn-sm btn-ghost" id="report-save">Save draft</button>
-                      <button type="submit" class="btn btn-sm btn-primary" id="report-sign">Sign report</button>
+                      <button type="button" class="btn btn-sm btn-ghost" id="report-save" data-i18n="report_save.save_draft">Save draft</button>
+                      <button type="submit" class="btn btn-sm btn-primary" id="report-sign" data-i18n="report_sign.sign_report">Sign report</button>
                     </div>
                     <p class="field-hint" id="report-draft-note"></p>
                   </form>
                   <details class="report-history" id="report-history" hidden>
-                    <summary>Earlier versions</summary>
+                    <summary data-i18n="report_history.earlier_versions">Earlier versions</summary>
                     <ol id="report-history-list"></ol>
                   </details>
                 </section>
 
                 <section class="panel" aria-labelledby="series-details-title">
-                  <h2 class="panel-heading" id="series-details-title">Series details</h2>
+                  <h2 class="panel-heading" id="series-details-title" data-i18n="series_details_title.series_details">Series details</h2>
                   <dl class="protection-list" id="series-details"></dl>
                 </section>
               </div>
@@ -1621,16 +1628,16 @@
         <section class="view" id="view-models" data-title="Model library" aria-labelledby="models-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title" id="models-title">Model library</h1>
-            <p class="page-sub">Trained models, ready to use. Each abstains when it isn’t confident enough, or when an image doesn’t look like what it was trained on. <span class="page-stat" id="models-summary"></span></p>
+            <h1 class="page-title" id="models-title" data-i18n="sidebar.model_library">Model library</h1>
+            <p class="page-sub"><span data-i18n="view_models.trained_models_ready_to">Trained models, ready to use. Each abstains when it isn’t confident enough, or when an image doesn’t look like what it was trained on.</span> <span class="page-stat" id="models-summary"></span></p>
           </div>
-          <div class="page-actions"><a class="btn btn-ghost" href="#/training" id="models-train-link">Train a model</a></div>
+          <div class="page-actions"><a class="btn btn-ghost" href="#/training" id="models-train-link" data-i18n="models_train_link.train_a_model">Train a model</a></div>
         </header>
           <p class="modal-message" id="models-message" role="status" hidden></p>
           <div class="model-grid" id="model-grid"></div>
           <div class="empty-state" id="models-empty" hidden>
-            <h2>No models yet</h2>
-            <p>Train one on a folder of images. To try it first, download a public CT dataset:</p>
+            <h2 data-i18n="models_empty.no_models_yet">No models yet</h2>
+            <p data-i18n="models_empty.train_one_on_a">Train one on a folder of images. To try it first, download a public CT dataset:</p>
             <pre><code>python scripts/fetch_scan_dataset.py organamnist</code></pre>
           </div>
         </section>
@@ -1639,29 +1646,29 @@
         <section class="view" id="view-ehr" data-title="EHR integration" aria-labelledby="ehr-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title" id="ehr-title">EHR integration</h1>
-            <p class="page-sub">Launch GroundCheckHealth from a patient’s record with SMART on FHIR, and check medication orders inside the EHR with CDS Hooks.</p>
+            <h1 class="page-title" id="ehr-title" data-i18n="nav_admin.ehr_integration">EHR integration</h1>
+            <p class="page-sub" data-i18n="view_ehr.launch_groundcheckhealth_from_a">Launch GroundCheckHealth from a patient’s record with SMART on FHIR, and check medication orders inside the EHR with CDS Hooks.</p>
           </div>
         </header>
           <div class="usage-grid">
             <section class="panel" aria-labelledby="smart-title">
-              <h2 class="panel-heading" id="smart-title">SMART on FHIR app launch</h2>
+              <h2 class="panel-heading" id="smart-title" data-i18n="smart_title.smart_on_fhir_app">SMART on FHIR app launch</h2>
               <p class="step-sub flush" id="smart-status"></p>
               <dl class="protection-list" id="smart-settings"></dl>
             </section>
             <section class="panel" aria-labelledby="cds-title">
-              <h2 class="panel-heading" id="cds-title">CDS Hooks</h2>
+              <h2 class="panel-heading" id="cds-title" data-i18n="cds_title.cds_hooks">CDS Hooks</h2>
               <p class="step-sub flush" id="cds-status"></p>
               <dl class="protection-list" id="cds-settings"></dl>
             </section>
           </div>
           <section class="panel" aria-labelledby="cds-console-title">
             <div class="review-toolbar">
-              <h2 class="panel-heading flush" id="cds-console-title">Try a medication order</h2>
-              <button type="button" class="btn btn-sm btn-primary" id="cds-run">Send to the order-sign service</button>
+              <h2 class="panel-heading flush" id="cds-console-title" data-i18n="cds_console_title.try_a_medication_order">Try a medication order</h2>
+              <button type="button" class="btn btn-sm btn-primary" id="cds-run" data-i18n="cds_run.send_to_the_order">Send to the order-sign service</button>
             </div>
-            <p class="step-sub flush">A CDS Hooks request as an EHR would send it, for a draft order of Caloradine for a patient with reduced kidney function. Edit it and send it to see the cards.</p>
-            <label class="visually-hidden" for="cds-request">CDS Hooks request</label>
+            <p class="step-sub flush" data-i18n="view_ehr.a_cds_hooks_request">A CDS Hooks request as an EHR would send it, for a draft order of Caloradine for a patient with reduced kidney function. Edit it and send it to see the cards.</p>
+            <label class="visually-hidden" for="cds-request" data-i18n="view_ehr.cds_hooks_request">CDS Hooks request</label>
             <textarea id="cds-request" class="text-input code-input" rows="14" spellcheck="false"></textarea>
             <p class="modal-message" id="cds-message" role="status" hidden></p>
             <div class="cds-cards" id="cds-cards" aria-live="polite"></div>
@@ -1672,8 +1679,8 @@
         <section class="view" id="view-data-protection" data-title="Data protection" aria-labelledby="protection-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title"><span id="protection-title">Data protection</span></h1>
-            <p class="page-sub">Check the audit trail hasn’t been changed, and see how stored data is encrypted and how long it’s kept.</p>
+            <h1 class="page-title"><span id="protection-title" data-i18n="nav_admin.data_protection">Data protection</span></h1>
+            <p class="page-sub" data-i18n="view_data_protection.check_the_audit_trail">Check the audit trail hasn’t been changed, and see how stored data is encrypted and how long it’s kept.</p>
           </div>
         </header>
           <p class="modal-message" id="protection-message" role="status" hidden></p>
@@ -1681,34 +1688,34 @@
           <div id="review-protection">
             <section class="protection-block" aria-labelledby="audit-integrity-title">
               <div class="review-toolbar">
-                <h3 id="audit-integrity-title">Audit trail integrity</h3>
-                <button type="button" class="btn btn-sm btn-primary" id="audit-verify">Verify audit trail</button>
+                <h3 id="audit-integrity-title" data-i18n="audit_integrity_title.audit_trail_integrity">Audit trail integrity</h3>
+                <button type="button" class="btn btn-sm btn-primary" id="audit-verify" data-i18n="audit_verify.verify_audit_trail">Verify audit trail</button>
               </div>
-              <p class="auth-hint">Every audit record is chained to the one before it. Verifying checks that none has been changed, removed or reordered.</p>
+              <p class="auth-hint" data-i18n="review_protection.every_audit_record_is">Every audit record is chained to the one before it. Verifying checks that none has been changed, removed or reordered.</p>
               <div class="verify-result" id="verify-result" hidden></div>
             </section>
             <div id="protection-admin" hidden>
               <section class="protection-block" aria-labelledby="evidence-title">
                 <div class="review-toolbar">
-                  <h3 id="evidence-title">Evidence pack</h3>
-                  <a class="btn btn-sm btn-ghost" id="evidence-download" href="/api/governance/evidence-pack" download>Download evidence pack</a>
+                  <h3 id="evidence-title" data-i18n="evidence_title.evidence_pack">Evidence pack</h3>
+                  <a class="btn btn-sm btn-ghost" id="evidence-download" href="/api/governance/evidence-pack" download data-i18n="evidence_download.download_evidence_pack">Download evidence pack</a>
                 </div>
-                <p class="auth-hint">One zip for a clinical safety officer: the safety case, hazard log, evaluation results, audit-chain check, releases, incident register and a configuration snapshot with no secrets. Every file is listed with its SHA-256.</p>
+                <p class="auth-hint" data-i18n="protection_admin.one_zip_for_a">One zip for a clinical safety officer: the safety case, hazard log, evaluation results, audit-chain check, releases, incident register and a configuration snapshot with no secrets. Every file is listed with its SHA-256.</p>
               </section>
               <section class="protection-block" aria-labelledby="telemetry-title">
-                <h3 id="telemetry-title">Install telemetry</h3>
+                <h3 id="telemetry-title" data-i18n="telemetry_title.install_telemetry">Install telemetry</h3>
                 <p class="auth-hint" id="telemetry-summary"></p>
                 <dl class="protection-list" id="telemetry-fields"></dl>
                 <p class="auth-hint" id="telemetry-sample"></p>
               </section>
               <section class="protection-block" aria-labelledby="protection-status-title">
-                <h3 id="protection-status-title">Stored data</h3>
+                <h3 id="protection-status-title" data-i18n="protection_status_title.stored_data">Stored data</h3>
                 <dl class="protection-list" id="protection-list"></dl>
               </section>
               <section class="protection-block" aria-labelledby="retention-title">
                 <div class="review-toolbar">
-                  <h3 id="retention-title">Retention</h3>
-                  <button type="button" class="btn btn-sm btn-ghost" id="retention-run">Delete expired records</button>
+                  <h3 id="retention-title" data-i18n="retention_title.retention">Retention</h3>
+                  <button type="button" class="btn btn-sm btn-ghost" id="retention-run" data-i18n="retention_run.delete_expired_records">Delete expired records</button>
                 </div>
                 <p class="auth-hint" id="retention-summary"></p>
               </section>
@@ -1721,62 +1728,63 @@
         <section class="view" id="view-users" data-title="Users" aria-labelledby="users-title" hidden>
         <header class="page-head">
           <div>
-            <h1 class="page-title"><span id="users-title">Users</span></h1>
-            <p class="page-sub">Everyone who can sign in, their role, site and two-factor status.</p>
+            <h1 class="page-title"><span id="users-title" data-i18n="nav_admin.users">Users</span></h1>
+            <p class="page-sub" data-i18n="view_users.everyone_who_can_sign">Everyone who can sign in, their role, site and two-factor status.</p>
           </div>
         </header>
           <p class="modal-message" id="users-message" role="status" hidden></p>
           <section class="panel">
             <div class="users-table-wrap">
               <table class="users-table">
-                <thead><tr><th scope="col">User</th><th scope="col">Role</th><th scope="col" class="site-col" hidden>Site</th><th scope="col">2FA</th><th scope="col">Last sign-in</th><th scope="col">Status</th></tr></thead>
+                <thead><tr><th scope="col" data-i18n="view_users.user">User</th><th scope="col" data-i18n="view_users.role">Role</th><th scope="col" class="site-col" hidden data-i18n="view_users.site">Site</th><th scope="col" data-i18n="view_users.2fa">2FA</th><th scope="col" data-i18n="view_users.last_sign_in">Last sign-in</th><th scope="col" data-i18n="incident_form.status">Status</th></tr></thead>
                 <tbody id="users-body"></tbody>
               </table>
             </div>
           </section>
           <div class="usage-grid">
           <section class="panel add-user-panel" aria-labelledby="add-user-title">
-            <h3 id="add-user-title">Add a user</h3>
+            <h3 id="add-user-title" data-i18n="add_user_title.add_a_user">Add a user</h3>
             <form class="auth-form add-user-form" id="add-user-form" novalidate>
-              <label for="new-user-name">Name</label>
+              <label for="new-user-name" data-i18n="first_admin_form.name">Name</label>
               <input id="new-user-name" autocomplete="off">
-              <label for="new-user-email">Email</label>
+              <label for="new-user-email" data-i18n="login_form.email">Email</label>
               <input id="new-user-email" type="email" autocomplete="off" required>
-              <label for="new-user-password">Temporary password</label>
+              <label for="new-user-password" data-i18n="add_user_form.temporary_password">Temporary password</label>
               <input id="new-user-password" type="password" autocomplete="new-password" minlength="12" required>
-              <label for="new-user-role">Role</label>
+              <label for="new-user-role" data-i18n="view_users.role">Role</label>
               <select id="new-user-role">
-                <option value="clinician">Clinician: asks questions</option>
-                <option value="reviewer">Reviewer: also reads the audit trail</option>
-                <option value="admin">Admin: also manages users and models</option>
+                <option value="clinician" data-i18n="new_user_role.clinician_asks_questions">Clinician: asks questions</option>
+                <option value="reviewer" data-i18n="new_user_role.reviewer_also_reads_the">Reviewer: also reads the audit trail</option>
+                <option value="admin" data-i18n="new_user_role.admin_also_manages_users">Admin: also manages users and models</option>
               </select>
-              <label for="new-user-site" class="site-field" hidden>Site</label>
+              <label for="new-user-site" class="site-field" hidden data-i18n="view_users.site">Site</label>
               <select id="new-user-site" class="site-field" hidden></select>
-              <button type="submit" class="btn btn-primary">Add user</button>
+              <button type="submit" class="btn btn-primary" data-i18n="add_user_form.add_user">Add user</button>
             </form>
           </section>
           <section class="panel" id="sites-panel" aria-labelledby="sites-title">
-            <h3 id="sites-title">Sites</h3>
-            <p class="field-hint" id="sites-intro">For a group of hospitals or clinics. People at a site see only that site’s questions, reviews, incidents and imaging; people with no site see every site’s. Documents, medicines and models are shared.</p>
+            <h3 id="sites-title" data-i18n="sites_title.sites">Sites</h3>
+            <p class="field-hint" id="sites-intro" data-i18n="sites_intro.for_a_group_of">For a group of hospitals or clinics. People at a site see only that site’s questions, reviews, incidents and imaging; people with no site see every site’s. Documents, medicines and models are shared.</p>
             <ul class="site-list" id="site-list"></ul>
             <form class="auth-form add-user-form" id="add-site-form" novalidate>
-              <label for="new-site-name">Name</label>
-              <input id="new-site-name" autocomplete="off" placeholder="e.g. St Mary’s Hospital">
-              <label for="new-site-key">Key <span class="optional">used by single sign-on, such as st-marys</span></label>
+              <label for="new-site-name" data-i18n="first_admin_form.name">Name</label>
+              <input id="new-site-name" autocomplete="off" placeholder="e.g. St Mary’s Hospital" data-i18n-attr="placeholder:new_site_name.e_g_st_mary">
+              <label for="new-site-key"><span data-i18n="add_site_form.key">Key</span> <span class="optional" data-i18n="add_site_form.used_by_single_sign">used by single sign-on, such as st-marys</span></label>
               <input id="new-site-key" class="mono" autocomplete="off" spellcheck="false">
-              <button type="submit" class="btn btn-ghost">Add site</button>
+              <button type="submit" class="btn btn-ghost" data-i18n="add_site_form.add_site">Add site</button>
             </form>
           </section>
           </div>
         </section>
 
-        <footer class="footer">
+        <footer class="footer" data-i18n="content.groundcheckhealth_built_to_refuse">
           GroundCheckHealth. Built to refuse rather than guess. Synthetic corpus structured after MedQuAD and FDA DailyMed labelling.
         </footer>
       </main>
     </div>
   </div>
 
+  <script src="/i18n.js"></script>
   <script src="/app.js"></script>
   <script type="module" src="/orbs.js"></script>
 </body>

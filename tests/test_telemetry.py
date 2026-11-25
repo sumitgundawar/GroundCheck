@@ -104,7 +104,7 @@ def put(created, decision="answer", test_run=False, kind=None):
 @pytest.mark.parametrize("value,expected", [(None, "off"), ("", "off"), ("off", "off"), ("OFF", "off"), ("no", "off"),
                                             ("maybe", "off"), ("false", "off"), ("0", "off"), ("on", "on"),
                                             ("ON", "on"), ("true", "on"), ("1", "on"), ("yes", "on")])
-def test_the_setting_defaults_to_off_and_only_clear_yes_turns_it_on(monkeypatch, value, expected):
+def test_the_setting_defaults_to_off_and_only_clear_yes_turns_it_on(monkeypatch, config_restored, value, expected):
     if value is None:
         monkeypatch.delenv("TELEMETRY", raising=False)
     else:
@@ -114,7 +114,6 @@ def test_the_setting_defaults_to_off_and_only_clear_yes_turns_it_on(monkeypatch,
         assert config.TELEMETRY == expected
     finally:
         monkeypatch.undo()
-        importlib.reload(config)
 
 
 def test_the_shipped_default_is_off():

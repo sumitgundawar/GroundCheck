@@ -357,6 +357,7 @@ class Source(Base):
     effective_from: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     expires_on: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     uploaded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utcnow)
     reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
@@ -369,6 +370,7 @@ class Source(Base):
     __table_args__ = (
         Index("ix_sources_document_key", "document_key"),
         Index("ix_sources_status", "status"),
+        Index("ix_sources_site_id", "site_id"),
     )
 
 

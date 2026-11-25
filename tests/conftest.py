@@ -13,21 +13,52 @@ _tmp = Path(tempfile.mkdtemp(prefix="groundcheck-tests-"))
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{_tmp / 'test.db'}")
 os.environ["AUDIT_LOG_PATH"] = str(_tmp / "audit.jsonl")
 os.environ["LOCAL_AI_STATE_PATH"] = str(_tmp / "local_ai.json")
+# Every module used to set these itself before importing the app, so the order the files ran in decided
+# whether the app saw them: the first file to import it fixes the settings for the whole run.
+os.environ.setdefault("RATE_LIMIT_PER_MINUTE", "1000000")
+os.environ.setdefault("FORCE_EXTRACTIVE", "true")
+os.environ["GROQ_API_KEY"] = ""
 os.environ["SESSION_COOKIE_SECURE"] = "false"  # the test client talks plain HTTP
 # Checking a release runs over a thousand questions; tests/test_releases.py
 # turns it on with a small set.
 os.environ.setdefault("RELEASE_CHECKS", "false")
 os.environ.setdefault("ALERT_INTERVAL_SECONDS", "0")
 
+@pytest.fixture(autouse=True)
+def _no_shared_volume_cache():
+    """Imaging volumes are cached by series id, and every test's database starts again at id 1."""
+    from app.imaging import store
+
+    store._cache.clear()
+    yield
+    store._cache.clear()
+
+
+@pytest.fixture()
+def config_restored():
+    """Reloading the config module re-reads the whole environment, including variables other test modules
+    export for the process (AUDIT_PERSIST, FORCE_EXTRACTIVE). Put back exactly what it held."""
+    from app import config
+
+    saved = dict(vars(config))
+    yield
+    for name in set(vars(config)) - set(saved):
+        delattr(config, name)
+    for name, value in saved.items():
+        setattr(config, name, value)
+
+
 BACKENDS = ["sqlite"] + (["postgresql"] if os.environ.get("TEST_POSTGRES_URL") else [])
 
 
 def _forget_database() -> None:
-    from app import audit, db
+    from app import audit, db, knowledge, sites
 
     db.reset_engine()
     db._ready = False
     audit.store._backend = None
+    sites.forget_user()
+    knowledge._status = knowledge.IndexStatus()      # names the documents of the database it was built from
 
 
 @pytest.fixture(params=BACKENDS)

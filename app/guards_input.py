@@ -11,7 +11,7 @@ import time
 from collections import deque
 from dataclasses import dataclass
 
-from . import config, deid
+from . import config, deid, langpack, language
 
 # --- De-identification (see app/deid.py) ------------------------------------
 
@@ -80,6 +80,46 @@ def check_scope_and_injection(text: str, check_injection: bool = True) -> GuardR
                            "instruction-override pattern detected")
     detail = "no scope or injection issues" if check_injection else "injection guard disabled"
     return GuardResult(True, detail=detail)
+
+
+# --- Language -----------------------------------------------------------------
+
+@dataclass
+class LanguageGate:
+    ok: bool
+    lang: str = "en"
+    detail: str = ""
+    reason: str = ""
+    code: str = "unsupported_language"
+    english: str | None = None   # the question as the guards read it, for a supported non-English language
+
+
+def check_language(text: str, check_injection: bool = True) -> LanguageGate:
+    """Refuse a question in a language with no pack. A question in a language
+    that has one is translated with the pack's closed vocabulary; anything the
+    pack cannot verify is refused, never passed through."""
+    found = language.check(text)
+    langs = sorted(language.supported())
+    if not found.ok:
+        name = language.LANGUAGE_NAMES.get(found.lang, found.lang)
+        allowed = ", ".join(language.LANGUAGE_NAMES.get(c, c) for c in langs)
+        return LanguageGate(False, found.lang, found.detail,
+                            f"This question is in {name}, which this installation cannot check against its sources "
+                            f"(supported: {allowed}).")
+    if found.lang == "en":
+        return LanguageGate(True, "en")
+    name = language.LANGUAGE_NAMES.get(found.lang, found.lang)
+    translated = langpack.translate(text, found.lang)
+    if not translated.ok:
+        what = "; ".join((translated.reasons + [f"'{w}'" for w in translated.unverified])[:3])
+        return LanguageGate(False, found.lang, f"{name} wording could not be verified: {what}",
+                            f"Part of this {name} question could not be verified ({what}), so it was refused "
+                            "rather than guessed at. Ask in English, or rephrase with plain words and units.")
+    scope = check_scope_and_injection(translated.english, check_injection)
+    if not scope.ok:
+        return LanguageGate(False, found.lang, f"{name}: {scope.detail}", scope.reason, "input_blocked")
+    return LanguageGate(True, found.lang, f"language {found.lang}, read as English by its word list",
+                        english=translated.english)
 
 
 # --- Rate limiting ---------------------------------------------------------

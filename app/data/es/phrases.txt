@@ -1,0 +1,53 @@
+# Multi-word Spanish phrases and their English. Longest match wins.
+# Format: spanish<TAB>english
+con qué frecuencia	how often
+cada día	every day
+al día	daily
+por día	per day
+una vez al día	once daily
+dos veces al día	twice daily
+tres veces al día	three times daily
+cuatro veces al día	four times daily
+una vez por semana	once weekly
+una vez a la semana	once weekly
+recién nacidos	newborns
+recién nacido	newborn
+madres lactantes	breastfeeding mothers
+mujeres embarazadas	pregnant women
+durante el embarazo	during pregnancy
+durante la lactancia	during breastfeeding
+durante la gestación	during pregnancy
+en el embarazo	in pregnancy
+efectos secundarios	side effects
+efectos adversos	adverse effects
+reacciones adversas	adverse reactions
+pacientes pediátricos	paediatric patients
+en pacientes pediátricos	in paediatric patients
+personas mayores	elderly
+adultos mayores	elderly
+el tratamiento de	the treatment for
+el tratamiento para	the treatment for
+primera línea	first-line
+función renal	kidney function
+función hepática	liver function
+presión arterial	blood pressure
+azúcar en sangre	blood sugar
+glucosa en sangre	blood glucose
+no se debe	should not
+pregunta rápida antes de la ronda de la sala	quick question before the ward round
+preguntando para la reunión de equipo de mañana	asking for the team meeting tomorrow
+preguntando para la reunión del equipo de mañana	asking for the team meeting tomorrow
+mi colega me preguntó esto y no estaba seguro	my colleague asked me this and I wasn't sure
+puedo enviar la respuesta por correo a un colega	can I email the answer to a colleague
+es correcto que esto está cubierto en la guía	is it correct that this is covered in the guidance
+es cierto que las fuentes dicen algo sobre esto	is it right that the sources say something about this
+para la auditoría anual	for the yearly audit
+podrías recordarme	could you remind me
+según nuestra política local	per our local policy
+las fuentes	the sources
+por favor	please
+con las comidas	with meals
+podría decirme	could you tell me
+puede decirme	could you tell me
+dime	tell me
+necesito saber	I need to know

@@ -141,6 +141,9 @@ _CONTRACTIONS = [(re.compile(p, re.IGNORECASE), r) for p, r in (
     (r"\b(\w+)n['’]t\b", r"\1 not"))]
 
 _NUM_RE = re.compile(rf"\b{guards_output._QTY}(?![A-Za-z])", re.IGNORECASE)
+_ABBREVIATION = re.compile(
+    r"(?<![\w.])(?:b\.?\s?i\.?\s?d|b\.?\s?d|bds|t\.?\s?i\.?\s?d|t\.?\s?d\.?\s?s|tds|q\.?\s?i\.?\s?d|q\.?\s?d\.?\s?s|qds|"
+    r"o\.?\s?d|q\.?\s?d|q\.?\s?\d{1,2}\s?h(?:rs?)?|qhs|nocte|mane|prn)(?![\w])", re.IGNORECASE)
 _WORD = re.compile(r"[a-z0-9]+")
 
 
@@ -370,7 +373,7 @@ def assess(text: str, candidates: list[dict], allowed: set[str] | None,
     words, numbers, pairs = _tokens(flat)
     if has_pii:
         words = [w for w in words if w not in _PII_FILLER]
-    if not _meaningful(words) and not numbers:
+    if not _meaningful(words) and not numbers and not pairs:
         return None
     result = Assessment(text=text, clean=" ".join(flat.split()))
     unknown = [c for c in cited if retrieval.record_for(c) is None]
@@ -427,6 +430,10 @@ def assess(text: str, candidates: list[dict], allowed: set[str] | None,
             fail.append(f"'{w}' is not in the source")
         else:
             review.append(f"'{w}' is not in the source")
+    for found in _ABBREVIATION.finditer(flat):
+        if not _ABBREVIATION.search(best.text):
+            fail.append(f"'{found.group(0)}' is a dosing abbreviation that cannot be checked against the source")
+            break
     if not fail:
         stray = _in_order(_critical_sequence(words), _critical_sequence(best.tokens))
         if stray is not None:

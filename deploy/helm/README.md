@@ -10,8 +10,8 @@ uninstalling the chart never deletes.
 1. **Build and push the image**, from the repository root:
 
    ```bash
-   docker build -t registry.example.org/groundcheck:1.0.0 .
-   docker push registry.example.org/groundcheck:1.0.0
+   docker build -t registry.example.org/groundcheck:3.0.0 .
+   docker push registry.example.org/groundcheck:3.0.0
    ```
 
 2. **Create a PostgreSQL database** and a Secret with its URL:

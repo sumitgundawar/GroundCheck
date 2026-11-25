@@ -413,6 +413,11 @@ def _principal_out(principal: auth.Principal) -> dict:
     return {**principal.__dict__, "site_name": _site_name(principal.site_id)}
 
 
+def _visible_sites(admin: auth.Principal) -> list[dict]:
+    """Every site for an admin of the group; only their own for an admin of one site."""
+    return [x for x in sites.list_sites() if admin.site_id is None or x["id"] == admin.site_id]
+
+
 def _site_name(site_id: int | None) -> str | None:
     if site_id is None:
         return None
@@ -430,7 +435,7 @@ def _manageable(admin: auth.Principal, user_id: int) -> None:
 @app.get("/api/users")
 def users_list(admin: auth.Principal = Depends(_admin)) -> dict:
     users = [u for u in auth.list_users() if admin.site_id is None or u["site_id"] == admin.site_id]
-    return {"users": users, "sites": sites.list_sites(), "my_site_id": admin.site_id}
+    return {"users": users, "sites": _visible_sites(admin), "my_site_id": admin.site_id}
 
 
 @app.post("/api/users")
@@ -470,8 +475,8 @@ def _group_admin(admin: auth.Principal) -> None:
 
 
 @app.get("/api/sites")
-def sites_list(_: auth.Principal = Depends(_admin)) -> dict:
-    return {"sites": sites.list_sites()}
+def sites_list(admin: auth.Principal = Depends(_admin)) -> dict:
+    return {"sites": _visible_sites(admin)}
 
 
 @app.post("/api/sites")
@@ -567,8 +572,9 @@ def ask(body: AskRequest, request: Request,
     # Rate limiting is keyed by client IP, taken from the socket unless a
     # trusted proxy is configured; see _client_ip.
     client_id = _client_ip(request) or "global"
-    return pipeline.run(body.query, body.settings, client_id=client_id, patient=body.patient,
-                        user_id=user.id if user else None)
+    with retrieval.site_scope(user.site_id if user else None):
+        return pipeline.run(body.query, body.settings, client_id=client_id, patient=body.patient,
+                            user_id=user.id if user else None)
 
 
 @app.get("/api/settings")
@@ -775,7 +781,7 @@ def local_ai_status(request: Request) -> JSONResponse:
 @app.post("/api/local-ai/pull")
 def local_ai_pull(body: LocalModelRequest, request: Request) -> StreamingResponse:
     """Download a catalogue model, streaming progress as newline-delimited JSON."""
-    _require_local_ai_admin(request)
+    _require_group_admin(require_manager(request, "admin"))
     if not body.model or body.model not in {m.name for m in local_ai.CATALOGUE}:
         raise HTTPException(status_code=400, detail="Choose a model from the catalogue.")
 
@@ -795,7 +801,7 @@ def local_ai_pull(body: LocalModelRequest, request: Request) -> StreamingRespons
 async def local_ai_select(body: LocalModelRequest, request: Request) -> JSONResponse:
     """Make a downloaded model the one that drafts answers, and load it into
     memory. A null model switches back to the cloud model or extractive mode."""
-    _require_local_ai_admin(request)
+    _require_group_admin(require_manager(request, "admin"))
     previous = local_ai.selected_model()
     if body.model is None:
         local_ai.select_model(None)
@@ -855,6 +861,13 @@ async def sources_upload(request: Request) -> dict:
     user = require_manager(request, "reviewer")
     _require_database()
     form = await request.form()
+    site_id = _site(user)
+    if site_id is None and form.get("site_id"):
+        try:
+            with db.session() as s:
+                site_id = sites.check(s, int(str(form.get("site_id"))))
+        except (ValueError, sites.SiteError) as exc:
+            raise HTTPException(status_code=400, detail="There's no such site.") from exc
     upload = form.get("file")
     if upload is None or not hasattr(upload, "read"):
         raise HTTPException(status_code=400, detail="Choose a file to upload.")
@@ -866,7 +879,7 @@ async def sources_upload(request: Request) -> dict:
             owner=str(form.get("owner") or ""),
             effective_from=_parse_date(str(form.get("effective_from") or ""), "Effective date"),
             expires_on=_parse_date(str(form.get("expires_on") or ""), "Expiry date"),
-            uploaded_by=user.id if user else None,
+            uploaded_by=user.id if user else None, site_id=site_id,
         )}
     except Exception as exc:  # noqa: BLE001 - mapped to a 400 or re-raised
         raise _knowledge_error(exc) from exc
@@ -876,9 +889,9 @@ async def sources_upload(request: Request) -> dict:
 def sources_list(request: Request) -> dict:
     from . import knowledge
 
-    require_manager(request, "reviewer")
+    user = require_manager(request, "reviewer")
     _require_database()
-    return {"sources": knowledge.list_sources(), "index": knowledge.index_status(),
+    return {"sources": knowledge.list_sources(_site(user), everything=_site(user) is None), "index": knowledge.index_status(_site(user), _site(user) is None),
             "include_demo_corpus": config.INCLUDE_DEMO_CORPUS}
 
 
@@ -886,10 +899,10 @@ def sources_list(request: Request) -> dict:
 def sources_get(source_id: int, request: Request) -> dict:
     from . import knowledge
 
-    require_manager(request, "reviewer")
+    user = require_manager(request, "reviewer")
     _require_database()
     try:
-        return {"source": knowledge.get_source(source_id)}
+        return {"source": knowledge.get_source(source_id, _site(user), everything=_site(user) is None)}
     except Exception as exc:  # noqa: BLE001
         raise _knowledge_error(exc) from exc
 
@@ -898,10 +911,11 @@ def sources_get(source_id: int, request: Request) -> dict:
 async def sources_evaluate(source_id: int, request: Request) -> dict:
     from . import knowledge
 
-    require_manager(request, "admin")
+    user = require_manager(request, "admin")
     _require_database()
     try:
-        return {"evaluation": await run_in_threadpool(knowledge.evaluate_source, source_id)}
+        return {"evaluation": await run_in_threadpool(knowledge.evaluate_source, source_id, 10, _site(user),
+                                                      _site(user) is None)}
     except Exception as exc:  # noqa: BLE001
         raise _knowledge_error(exc) from exc
 
@@ -916,14 +930,15 @@ def sources_review(source_id: int, decision: str, body: ReviewRequest, request: 
     _require_database()
     try:
         source = knowledge.review(source_id, decision, user.id if user else None, body.note,
-                                  allow_self_approval=not config.AUTH_REQUIRED)
+                                  allow_self_approval=not config.AUTH_REQUIRED, site_id=_site(user),
+                                  everything=_site(user) is None)
     except Exception as exc:  # noqa: BLE001
         raise _knowledge_error(exc) from exc
     if decision in ("approve", "retire"):
         verb = "Approved" if decision == "approve" else "Retired"
         knowledge.rebuild_index_in_background(f"{verb} {source['title']} v{source.get('version', 1)}"[:300],
                                               *_who(user))
-    return {"source": source, "index": knowledge.index_status()}
+    return {"source": source, "index": knowledge.index_status(_site(user), _site(user) is None)}
 
 
 @app.post("/api/index/rebuild")
@@ -932,15 +947,15 @@ def index_rebuild(request: Request) -> dict:
 
     user = require_manager(request, "admin")
     knowledge.rebuild_index_in_background("Rebuilt by hand", *_who(user))
-    return {"index": knowledge.index_status()}
+    return {"index": knowledge.index_status(_site(user), _site(user) is None)}
 
 
 @app.get("/api/index")
 def index_get(request: Request) -> dict:
     from . import knowledge
 
-    require_manager(request, "reviewer")
-    return {"index": knowledge.index_status(), "passages": len(retrieval.all_metadata())}
+    user = require_manager(request, "reviewer")
+    return {"index": knowledge.index_status(_site(user), _site(user) is None), "passages": retrieval.passage_count(_site(user))}
 
 
 # --- Review and governance ------------------------------------------------------
@@ -1110,6 +1125,7 @@ def hazards_list(request: Request) -> dict:
 @app.post("/api/hazards")
 def hazards_create(body: HazardRequest, request: Request) -> dict:
     user = require_manager(request, "admin")
+    _require_group_admin(user)
     _require_database()
     try:
         return {"hazard": governance.save_hazard(body.model_dump(), user.id if user else None)}
@@ -1120,6 +1136,7 @@ def hazards_create(body: HazardRequest, request: Request) -> dict:
 @app.put("/api/hazards/{hazard_id}")
 def hazards_update(hazard_id: int, body: HazardRequest, request: Request) -> dict:
     user = require_manager(request, "admin")
+    _require_group_admin(user)
     _require_database()
     try:
         return {"hazard": governance.save_hazard(body.model_dump(), user.id if user else None, hazard_id)}
@@ -1422,6 +1439,8 @@ async def ehr_note(body: EhrNoteRequest, request: Request,
     record = audit.store.get(body.audit_id)
     if record is None:
         raise HTTPException(status_code=404, detail="That answer isn't in the audit trail.")
+    if user is not None and _site(user) is not None and record.get("site_id") != _site(user):
+        raise HTTPException(status_code=404, detail="That answer isn't in the audit trail.")
     if user is not None and record.get("user_id") not in (None, user.id):
         raise HTTPException(status_code=403, detail="You can only save answers you asked.")
     with db.session() as s:
@@ -1434,7 +1453,7 @@ async def ehr_note(body: EhrNoteRequest, request: Request,
     except smart.SmartError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     logging.getLogger("groundcheck.ehr").info("Saved audit record %s to the EHR as %s", body.audit_id, result["reference"])
-    return {"reference": result["reference"]}
+    return {"reference": result["reference"], **{k: result[k] for k in ("provenance", "audit_event") if k in result}}
 
 
 CDS_CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -1464,14 +1483,10 @@ async def cds_service(service_id: str, request: Request) -> JSONResponse:
     try:
         await run_in_threadpool(cds_hooks.verify, request.headers.get("authorization"),
                                 f"{_base_url(request)}/cds-services/{service_id}")
-        body = await request.json()
-        if not isinstance(body, dict):
-            raise cds_hooks.CdsError("The request must be a JSON object.")
-        result = await run_in_threadpool(cds_hooks.cards_for, body)
+        body = cds_hooks.read_json(await request.body())
+        result = await run_in_threadpool(cds_hooks.cards_for, body, service_id)
     except cds_hooks.CdsError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=exc.status, headers=CDS_CORS)
-    except ValueError:
-        return JSONResponse({"detail": "The request isn't valid JSON."}, status_code=400, headers=CDS_CORS)
     logging.getLogger("groundcheck.cds").info("CDS %s: %d cards for hook instance %s", service_id,
                                               len(result["cards"]), cds_hooks.safe_hook_instance(body))
     return JSONResponse(result, headers=CDS_CORS)
@@ -1484,15 +1499,15 @@ async def cds_feedback(service_id: str, request: Request) -> JSONResponse:
     try:
         await run_in_threadpool(cds_hooks.verify, request.headers.get("authorization"),
                                 f"{_base_url(request)}/cds-services/{service_id}/feedback")
-        body = await request.json()
+        try:
+            body = json.loads(await request.body())
+        except (ValueError, RecursionError):
+            raise cds_hooks.CdsError("The request isn't valid JSON.") from None
     except cds_hooks.CdsError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=exc.status, headers=CDS_CORS)
-    except ValueError:
-        return JSONResponse({"detail": "The request isn't valid JSON."}, status_code=400, headers=CDS_CORS)
-    for item in (body.get("feedback") or [])[:50] if isinstance(body, dict) else []:
-        logging.getLogger("groundcheck.cds").info(
-            "CDS feedback %s: card %s %s, reason %s", service_id, str(item.get("card", ""))[:64],
-            str(item.get("outcome", ""))[:20], str((item.get("overrideReason") or {}).get("reason", {}).get("code", ""))[:40])
+    for item in cds_hooks.feedback_items(body):
+        logging.getLogger("groundcheck.cds").info("CDS feedback %s: card %s %s, reason %s", service_id,
+                                                  item["card"], item["outcome"], item["reason"])
     return JSONResponse({}, headers=CDS_CORS)
 
 
@@ -1509,7 +1524,7 @@ def data_protection(request: Request) -> dict:
 
 @app.post("/api/audit/verify")
 async def audit_verify(request: Request) -> dict:
-    require_manager(request, "reviewer")
+    _require_group_admin(require_manager(request, "reviewer"))
     _require_database()
     return await run_in_threadpool(integrity.verify)
 
@@ -1517,6 +1532,7 @@ async def audit_verify(request: Request) -> dict:
 @app.post("/api/retention/run")
 def retention_run(request: Request) -> dict:
     user = require_manager(request, "admin")
+    _require_group_admin(user)
     _require_database()
     return {"run": retention.apply(user.id if user else None), "retention": retention.plan()}
 
@@ -1613,6 +1629,7 @@ async def training_start(body: TrainingRequest, request: Request) -> dict:
     from .training import runs
 
     user = require_manager(request, "admin")
+    _require_group_admin(user)
     try:
         return {"run": await run_in_threadpool(runs.start, body.model_dump(exclude_none=True),
                                                (user.name or user.email) if user else None)}
@@ -1643,7 +1660,7 @@ def training_run(run_id: str, request: Request) -> dict:
 def training_cancel(run_id: str, request: Request) -> dict:
     from .training import runs
 
-    require_manager(request, "admin")
+    _require_group_admin(require_manager(request, "admin"))
     try:
         return {"run": runs.cancel(run_id)}
     except Exception as exc:  # noqa: BLE001
@@ -1654,7 +1671,7 @@ def training_cancel(run_id: str, request: Request) -> dict:
 def training_resume(run_id: str, request: Request) -> dict:
     from .training import runs
 
-    require_manager(request, "admin")
+    _require_group_admin(require_manager(request, "admin"))
     try:
         return {"run": runs.resume(run_id)}
     except Exception as exc:  # noqa: BLE001
@@ -1684,7 +1701,7 @@ def models_get(model_id: str, request: Request) -> dict:
 def models_delete(model_id: str, request: Request) -> dict:
     from .training import library
 
-    require_manager(request, "admin")
+    _require_group_admin(require_manager(request, "admin"))
     try:
         library.delete_model(model_id)
         return {"deleted": model_id}
@@ -1737,7 +1754,7 @@ class ModelImagingRequest(BaseModel):
 def models_set_imaging(model_id: str, body: ModelImagingRequest, request: Request) -> dict:
     from .training import library
 
-    require_manager(request, "admin")
+    _require_group_admin(require_manager(request, "admin"))
     try:
         return {"imaging": library.set_imaging(model_id, body.model_dump())}
     except Exception as exc:  # noqa: BLE001
@@ -1748,7 +1765,7 @@ def models_set_imaging(model_id: str, body: ModelImagingRequest, request: Reques
 def models_remove_imaging(model_id: str, request: Request) -> dict:
     from .training import library
 
-    require_manager(request, "admin")
+    _require_group_admin(require_manager(request, "admin"))
     try:
         return {"imaging": library.set_imaging(model_id, None)}
     except Exception as exc:  # noqa: BLE001
@@ -2098,6 +2115,12 @@ async def imaging_pacs_retrieve(body: PacsRetrieveRequest, request: Request) -> 
 
 # --- Knowledge releases ---------------------------------------------------------
 
+def _require_group_admin(user: auth.Principal | None) -> None:
+    """Releases are the knowledge every site is answered from: only an admin who isn't tied to one site changes them."""
+    if _site(user) is not None:
+        raise HTTPException(status_code=403, detail="This covers every site: only staff who aren't tied to one site can do it.")
+
+
 def _release_error(exc: Exception) -> HTTPException:
     if isinstance(exc, LookupError):
         return HTTPException(status_code=404, detail="No such release.")
@@ -2110,14 +2133,16 @@ def _release_error(exc: Exception) -> HTTPException:
 def releases_list(request: Request) -> dict:
     from . import knowledge
 
-    require_manager(request, "reviewer")
+    user = require_manager(request, "reviewer")
     _require_database()
-    return {**releases.list_releases(), "index": knowledge.index_status()}
+    return {**releases.list_releases(_site(user), everything=_site(user) is None),
+            "index": knowledge.index_status(_site(user), _site(user) is None)}
 
 
 @app.post("/api/releases/{release_id}/promote")
 async def releases_promote(release_id: int, request: Request) -> dict:
     user = require_manager(request, "admin")
+    _require_group_admin(user)
     _require_database()
     try:
         return {"release": await run_in_threadpool(releases.promote, release_id, *_who(user))}
@@ -2128,6 +2153,7 @@ async def releases_promote(release_id: int, request: Request) -> dict:
 @app.post("/api/releases/rollback")
 async def releases_rollback(request: Request) -> dict:
     user = require_manager(request, "admin")
+    _require_group_admin(user)
     _require_database()
     try:
         return {"release": await run_in_threadpool(releases.rollback, *_who(user))}

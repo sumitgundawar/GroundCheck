@@ -28,6 +28,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import threading
@@ -83,7 +84,7 @@ def _documents(records: list[dict]) -> list[dict]:
         if r.get("source_id") is not None:
             key = r.get("document_key") or f"source-{r['source_id']}"
             seen.setdefault(key, {"key": key, "source_id": int(r["source_id"]), "version": r.get("source_version"),
-                                  "title": r.get("document_title") or r.get("title", "")})
+                                  "title": r.get("document_title") or r.get("title", ""), "site_id": r.get("site_id")})
     return sorted(seen.values(), key=lambda d: d["title"].lower())
 
 
@@ -386,11 +387,38 @@ def baseline() -> dict | None:
         return None
 
 
-def list_releases() -> dict:
+class _Visible:
+    def __init__(self, release, documents):
+        self.id, self.documents = release.id, documents
+
+
+_GENERIC_REASON = re.compile(r"^(Index rebuilt|Rebuilt by hand|First index on this server|The index in use when releases began|"
+                             r"Rolled back.*|Released.*)$")
+
+
+def mask(summary: dict | None, site_id: int | None) -> dict | None:
+    """A release as someone at `site_id` may see it: without other sites' documents, who made or promoted it,
+    or a reason that could name a document they may not see."""
+    if summary is None:
+        return None
+    out = dict(summary)
+    out["documents"] = [d for d in summary.get("documents") or [] if d.get("site_id") in (None, site_id)]
+    out["created_by"], out["live_by"] = "", None
+    if not _GENERIC_REASON.match(summary.get("reason") or ""):
+        out["reason"] = "Documents changed"       # a reason that names a document may name another site's
+    return out
+
+
+def list_releases(site_id: int | None = None, everything: bool = True) -> dict:
+    """The releases. Someone at a site (everything=False) is shown only what concerns their site and the group's."""
     with db.session() as s:
         rows = s.scalars(select(Release).order_by(Release.number.desc()).limit(50)).all()
         live = _live(s)
         out = [_summary(r) for r in rows]
+    if not everything:
+        out = [mask(r, site_id) for r in out]
+        if live is not None:
+            live = _Visible(live, [d for d in live.documents if d.get("site_id") in (None, site_id)])
     live_docs = {d["key"]: d for d in (live.documents if live else [])}
     for r in out:
         docs = {d["key"]: d for d in r["documents"]}

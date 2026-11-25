@@ -121,6 +121,9 @@ async function main() {
     if ((await box.getAttribute("open")) === null) await page.click("#patient-box > summary");
     await page.fill("#pt-age", "5");
     await page.fill("#pt-weight", "18");
+    // Caloradine's rules need kidney function first, so without it the backend
+    // asks for that before it reaches the child rule. Give it, to reach the rule.
+    await page.fill("#pt-egfr", "90");
     const decision = await ask(page, "What is the dose of Caloradine?");
     equal(decision, "REFUSED", "the decision for a five-year-old");
     const findings = (await page.textContent("#patient-findings")) || "";

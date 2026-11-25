@@ -27,7 +27,7 @@ SCHEMA = 1
 FIELDS = {
     "schema": "Version of this payload format (an integer).",
     "install_id": "A random identifier generated on first send. Not derived from anything about the machine or organisation.",
-    "version": "The GroundCheckHealth version, for example 1.0.0.",
+    "version": "The GroundCheckHealth version, for example 3.0.0.",
     "db_kind": "The database engine: sqlite, postgresql or mysql.",
     "llm_provider_kind": "How answers are drafted: extractive (no model), local, or cloud. Not the provider, model or address.",
     "week_start": "The Monday (UTC date) of the week the counts cover.",

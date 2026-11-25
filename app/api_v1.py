@@ -31,7 +31,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Query, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import APIKeyHeader, HTTPBearer
@@ -289,10 +289,24 @@ def install(app: FastAPI) -> None:
         message = exc.detail if isinstance(exc.detail, str) and exc.status_code < 500 else "Request failed."
         return envelope(exc.status_code, CODES.get(exc.status_code, "error"), message, dict(exc.headers or {}))
 
+    @app.exception_handler(OverflowError)
+    async def _out_of_range(request: Request, exc: OverflowError):
+        """A number too large for the database's integer: no such record, or a value nobody could mean."""
+        if request.path_params:
+            if in_envelope(request.url.path):
+                return envelope(404, "not_found", "Not found.")
+            return JSONResponse({"detail": "Not found."}, status_code=404)
+        if in_envelope(request.url.path):
+            return envelope(422, "validation_error", "A number in the request is out of range.")
+        return JSONResponse({"detail": "A number in the request is out of range."}, status_code=422)
+
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError):
         if not in_envelope(request.url.path):
-            return await request_validation_exception_handler(request, exc)
+            # The default reply echoes the offending input, and a NaN in it cannot be written as JSON.
+            return JSONResponse({"detail": [{"loc": list(e.get("loc", ())), "msg": str(e.get("msg", "invalid")),
+                                             "type": str(e.get("type", "value_error"))} for e in exc.errors()]},
+                                status_code=422)
         errors = exc.errors()
         if any(isinstance((e.get("ctx") or {}).get("error"), TooLong) for e in errors):
             text = next(str(e["ctx"]["error"]) for e in errors if isinstance((e.get("ctx") or {}).get("error"), TooLong))
@@ -319,8 +333,9 @@ FAILURES = {code: {"model": ErrorEnvelope, "description": text} for code, text i
 def ask(body: V1AskRequest, call: Call = Depends(current_call)) -> AskResponse:
     site_id = resolve_site(call, body.site)
     call.reserve()
-    response = pipeline.run(body.question, client_id=f"key:{call.key.id}", patient=body.patient,
-                            service=pipeline.ServiceCaller(call.key.id, site_id))
+    with retrieval.site_scope(site_id):
+        response = pipeline.run(body.question, client_id=f"key:{call.key.id}", patient=body.patient,
+                                service=pipeline.ServiceCaller(call.key.id, site_id))
     call.ok(response.decision)
     return response
 
@@ -329,11 +344,12 @@ def ask(body: V1AskRequest, call: Call = Depends(current_call)) -> AskResponse:
              summary="Check an answer that another model wrote")
 def verify_answer(body: V1VerifyRequest, call: Call = Depends(current_call)) -> VerifyResponse:
     site_id = resolve_site(call, body.site)
-    for source_id in body.sources or []:
-        if retrieval.record_for(source_id) is None:
-            raise apikeys.ApiKeyError(422, "unknown_source", f"There is no source '{source_id[:64]}'.")
-    call.reserve()
-    response, extras = verify.verify(body.question, body.answer, body.sources, body.patient)
+    with retrieval.site_scope(site_id):
+        for source_id in body.sources or []:
+            if retrieval.record_for(source_id) is None:
+                raise apikeys.ApiKeyError(422, "unknown_source", f"There is no source '{source_id[:64]}'.")
+        call.reserve()
+        response, extras = verify.verify(body.question, body.answer, body.sources, body.patient)
     audit_id = audit.store.new_id()
     response.audit_id = audit_id
     if body.patient is not None and not body.patient.is_empty():

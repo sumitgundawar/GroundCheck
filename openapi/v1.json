@@ -73,7 +73,8 @@
                   "insufficient_context",
                   "claim_ungrounded",
                   "dose_unsupported",
-                  "patient_unsafe"
+                  "patient_unsafe",
+                  "unsupported_language"
                 ],
                 "type": "string"
               },
