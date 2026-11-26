@@ -1600,3 +1600,7 @@ code, .mono{ font-family: var(--font-mono); font-size: 0.9em; }
 
 .misses.fixed { border-left-color: var(--pass); }
 .misses.fixed h3 .i { color: var(--pass); }
+
+[data-fill="99.7"] { --fill: 99.7; }
+.phase-card[data-state="planned"] { border-style: dashed; box-shadow: none; }
+.phase-card[data-state="planned"] .state { color: var(--muted); background: transparent; border-color: var(--line-strong); }
