@@ -61,10 +61,14 @@ class Review:
     def blocking(self) -> PatientFinding | None:
         return next((f for f in self.findings if f.severity == "block"), None)
 
+    subject: str = "answer"
+
     def add(self, severity, code, medicine, message, rule_id="", source="", params=None):
         self.findings.append(PatientFinding(severity=severity, code=code, medicine=medicine.name,
                                             message=message, rule_id=rule_id, source=source,
-                                            rule=rule_id or code, params={"medicine": medicine.name, **(params or {})}))
+                                            rule=rule_id or code,
+                                            params={"medicine": medicine.name, "subject": self.subject,
+                                                    **(params or {})}))
 
 
 def creatinine_clearance(patient: PatientContext) -> float | None:
@@ -96,13 +100,51 @@ def _stated_amounts(claims: list[Claim], medicine: Medicine, only_medicine: bool
 
 
 def _exceeds(amounts: list[tuple[float, str]], limit: float, unit: str) -> float | None:
+    """The first stated amount above the limit, in the limit's unit (15 g against a mg limit is 15000 mg)."""
     for value, stated_unit in amounts:
         if stated_unit == unit and value > limit + 1e-9:
             return value
         if stated_unit in _UNIT_FACTOR and unit in _UNIT_FACTOR:
             if value * _UNIT_FACTOR[stated_unit] > limit * _UNIT_FACTOR[unit] + 1e-9:
-                return value
+                return round(value * _UNIT_FACTOR[stated_unit] / _UNIT_FACTOR[unit], 6)
     return None
+
+
+_TIMES = {"once": 1, "one": 1, "twice": 2, "two": 2, "three": 3, "thrice": 3, "four": 4, "five": 5, "six": 6,
+          "seven": 7, "eight": 8}
+_PER_DAY = [
+    (re.compile(r"\b(?:once|1\s*x|1\s*times?)\s*(?:a|per|each|/)?\s*(?:daily|day|d)\b|\b(?:od|qd)\b|\bevery\s+24\s*(?:h|hours?)\b", re.I), 1),
+    (re.compile(r"\b(?:twice|bid|b\.i\.d\.?|bd)\b", re.I), 2),
+    (re.compile(r"\b(?:tid|t\.i\.d\.?|tds|thrice)\b", re.I), 3),
+    (re.compile(r"\b(?:qid|q\.i\.d\.?|qds)\b", re.I), 4),
+]
+
+
+def times_per_day(text: str) -> int | None:
+    """How many times a day a sentence says the dose is taken, when it says so: 15 mg four times daily is 4."""
+    for pattern, times in _PER_DAY:
+        if pattern.search(text):
+            return times
+    every = re.search(r"\bevery\s+(\d{1,2})\s*(?:h|hrs?|hours?)\b", text, re.I)
+    if every and int(every.group(1)) > 0:
+        return max(1, round(24 / int(every.group(1))))
+    count = re.search(r"\b(\d{1,2}|" + "|".join(_TIMES) + r")\s*(?:x|times?)\s*(?:a|per|each|/)?\s*(?:daily|day|d)\b", text, re.I)
+    if count:
+        word = count.group(1).lower()
+        return int(word) if word.isdigit() else _TIMES[word]
+    return None
+
+
+def _daily_totals(claims: list[Claim], medicine: Medicine, only_medicine: bool) -> list[tuple[float, str, int]]:
+    """(amount a day, unit, doses a day) for each sentence that states a dose and how often it is taken."""
+    names = [formulary.normalise(n) for n in [medicine.name, *medicine.aliases]]
+    found = []
+    for claim in claims:
+        if only_medicine or any(re.search(rf"\b{re.escape(n)}\b", formulary.normalise(claim.text)) for n in names):
+            times = times_per_day(claim.text)
+            if times and times > 1:
+                found += [(float(v.replace(",", "")) * times, u.replace("ml", "mL"), times) for v, u in _VALUE.findall(claim.text)]
+    return found
 
 
 def _matches(term: str, candidates: list[str]) -> bool:
@@ -117,7 +159,7 @@ def _singular(text: str) -> str:
 
 def review(query: str, claims: list[Claim], patient: PatientContext | None, subject: str = "answer") -> Review:
     """subject names what's being checked in messages: "answer", or "order" for CDS Hooks."""
-    result = Review()
+    result = Review(subject=subject)
     if patient is None or patient.is_empty():
         return result
     idx = formulary.index()
@@ -287,12 +329,16 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                            f"The {subject} gives an adult dose. For this child the formulary gives {_fmt(round(capped, 2))} "
                            f"{dose.unit} {dose.frequency} ({calc}).", source="Formulary",
                            params={"amount": round(capped, 2), "unit": dose.unit, "frequency": dose.frequency,
-                                   "stated": too_high})
+                                   "stated": too_high, "per_kg": dose.per_kg, "weight": patient.weight_kg,
+                                   "uncapped": round(amount, 2),
+                                   "max_single": dose.max_single if capped < amount else None})
             else:
                 result.add("info", "paediatric_dose", med,
                            f"For this child the formulary gives {_fmt(round(capped, 2))} {dose.unit} {dose.frequency} "
                            f"({calc}).", source="Formulary",
-                           params={"amount": round(capped, 2), "unit": dose.unit, "frequency": dose.frequency})
+                           params={"amount": round(capped, 2), "unit": dose.unit, "frequency": dose.frequency,
+                                   "per_kg": dose.per_kg, "weight": patient.weight_kg, "uncapped": round(amount, 2),
+                                   "max_single": dose.max_single if capped < amount else None})
             continue
 
         limit = med.adult_dose
@@ -341,10 +387,13 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                            f"The {subject}'s {_fmt(too_high)} {dose.unit} is above this patient's maximum for "
                            f"{med.name}. {calculated}", source="Formulary",
                            params={"stated": too_high, "unit": dose.unit, "amount": round(capped, 2),
-                                   "frequency": dose.frequency})
+                                   "frequency": dose.frequency, "per_kg": dose.per_kg, "weight": patient.weight_kg,
+                                   "max_single": dose.max_single if capped < amount else None})
             else:
                 result.add("info", "weight_dose", med, calculated, source="Formulary",
-                           params={"amount": round(capped, 2), "unit": dose.unit, "frequency": dose.frequency})
+                           params={"amount": round(capped, 2), "unit": dose.unit, "frequency": dose.frequency,
+                                   "per_kg": dose.per_kg, "weight": patient.weight_kg,
+                                   "max_single": dose.max_single if capped < amount else None})
         elif limit and limit.max_daily:
             daily_factor = _DOSES_PER_DAY.get(limit.frequency or "", 1)
             too_high = _exceeds(amounts, limit.max_daily / daily_factor, limit.unit)
@@ -354,5 +403,16 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                            f"The {subject}'s {_fmt(too_high)} {limit.unit} is above the maximum for {med.name} "
                            f"({_dose_text(limit)}).", source=", ".join(med.source_ids[:1]),
                            params={"stated": too_high, "unit": limit.unit, "dose": _dose_text(limit)})
+            elif too_high is None and subject == "order":     # an order's frequency is structured data; an answer's wording is the source's own and may mix phrases
+                totals = _daily_totals(claims, med, len(medicines) == 1)
+                day = _exceeds([(v, u) for v, u, _ in totals], limit.max_daily, limit.unit)
+                if day is not None:
+                    times = next(n for v, u, n in totals if _exceeds([(v, u)], limit.max_daily, limit.unit) is not None)
+                    result.add("block", "dose_above_maximum", med,
+                               f"The {subject}'s {_fmt(day)} {limit.unit} a day ({times} doses) is above the maximum daily "
+                               f"dose for {med.name} ({_fmt(limit.max_daily)} {limit.unit} a day).",
+                               source=", ".join(med.source_ids[:1]),
+                               params={"stated": day, "unit": limit.unit, "dose": _dose_text(limit), "doses_per_day": times,
+                                       "max_daily": limit.max_daily})
 
     return result

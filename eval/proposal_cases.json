@@ -9,7 +9,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is 37.5 mg a day at most acceptable for Rirgetumide?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -48,7 +48,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Rirgetumide 75 mg every 24 hours?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -97,7 +97,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Could I give Sesvusaleen no more than 10 mcg per day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -123,7 +123,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Sesvusaleen be given 20 mcg twice a day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -200,7 +200,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Girlotaleen 40 mcg once every day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -249,7 +249,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is Godfesoltin a maximum of 50 mcg a day ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -277,7 +277,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 50 mcg 2x daily fine for Godfesoltin?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -355,7 +355,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Pitdomendal be given 15 mg 2x daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -433,7 +433,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 50 mcg daily fine for Lembitulex?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -510,7 +510,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Vadrumestal 5 mg once daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -593,7 +593,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Lomsunorphil 50 mg bd?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -670,7 +670,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Konkimostan 15 mg once every day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -749,7 +749,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Vorlimirin 40 mg every 24 hours?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -827,7 +827,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Milrusestal 2.5 mL daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -906,7 +906,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 40 mg od fine for Namtanufen?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -986,7 +986,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Putsenumide 15 mg twice daily?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1022,7 +1022,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Lurvelufen a daily maximum of 5 mg, correct?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -1065,7 +1065,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Lurvelufen 5 mg 2x daily?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1208,7 +1208,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is it safe to give Kamnetravil a maximum of 40 mL a day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -1221,7 +1221,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 40 mL two times a day fine for Kamnetravil?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1299,7 +1299,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Tisrusorphil 25 mg daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1375,7 +1375,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Vitfataprex 2.5 mg od?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1536,7 +1536,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Vespesumide 20 mcg once every day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1612,7 +1612,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 40 mg od fine for Mumsunorphil?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1677,7 +1677,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is a daily maximum of 2.5 mg okay for Letkodirin?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -1690,7 +1690,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Letkodirin be given 2.5 mg daily?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1726,7 +1726,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is it safe to give Demtetaprex no more than 20 mg per day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -1765,7 +1765,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Demtetaprex 10 mg 2x daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -1923,7 +1923,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Folgurendal 50 mg od?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2002,7 +2002,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Lerburaprex 2.5 mg q12h?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2077,7 +2077,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Gonlitestal 40 mg od?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2113,7 +2113,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is Gidlirorphil 200 mg a day at most ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -2139,7 +2139,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Could I give Gidlirorphil no more than 50 mg per day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -2152,7 +2152,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Gidlirorphil 50 mg od?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2230,7 +2230,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 40 mg once daily fine for Vuspemoxine?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2266,7 +2266,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is no more than 40 mg per day acceptable for Potkemestal?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -2307,7 +2307,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Potkemestal 20 mg every 24 hours?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2422,7 +2422,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is up to 300 mg daily acceptable for Gemfuladine?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -2462,7 +2462,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Gemfuladine be given 75 mg bid?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2537,7 +2537,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Bimgimaprex 50 mL every 24 hours?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2618,7 +2618,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Dusradavine 10 mcg once daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2695,7 +2695,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Samdodirin be given 5 mg bd?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2773,7 +2773,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Virselravil 20 mcg od?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2823,7 +2823,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is no more than 40 mcg per day acceptable for Filpomirin?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -2849,7 +2849,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Filpomirin be given 20 mcg every 24 hours?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2928,7 +2928,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 40 mg twice daily fine for Ridgilavine?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -2964,7 +2964,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Massadufen a maximum of 15 mL a day, correct?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -2993,7 +2993,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Would up to 30 mL daily be fine for Massadufen?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -3006,7 +3006,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Massadufen 15 mL every 24 hours?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3082,7 +3082,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Runkenizane be given 75 mL every 24 hours?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3157,7 +3157,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Lirkumondel be given 2.5 mg daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3232,7 +3232,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 75 mg 2x daily fine for Barkoririn?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3310,7 +3310,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Nerduradine 40 mg every 24 hours?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3470,7 +3470,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Rulpuraprex 10 mcg once every day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3534,7 +3534,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is Sumlaladine no more than 75 mg per day ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -3547,7 +3547,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 75 mg bd fine for Sumlaladine?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3625,7 +3625,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 20 mL bd fine for Letfalethol?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3705,7 +3705,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Tetbetumide be given 5 mcg od?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3768,7 +3768,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Tomgutoltin a daily maximum of 200 mg, correct?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -3781,7 +3781,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Tomgutoltin be given 100 mg od?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3845,7 +3845,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is a maximum of 20 mg a day okay for Nonkumadine?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -3858,7 +3858,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Nonkumadine 10 mg twice a day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -3933,7 +3933,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Rodbimizane be given 75 mL daily?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4012,7 +4012,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Retkunorphil 50 mg od?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4089,7 +4089,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 25 mcg two times a day fine for Lunlidaleen?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4166,7 +4166,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Solromondel 10 mg once daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4242,7 +4242,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 2.5 mg every 24 hours fine for Simfadufen?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4318,7 +4318,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 50 mg twice daily fine for Nedmusestal?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4431,7 +4431,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is it safe to give Kunpenravil a maximum of 150 mg a day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -4470,7 +4470,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Shouldn't Kunpenravil be given 50 mg daily?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4549,7 +4549,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Vatviloxine 40 mg every 12 hours?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4785,7 +4785,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 2.5 mg two times a day fine for Tamdamravil?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4862,7 +4862,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Kulferondel 50 mL bid?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -4940,7 +4940,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Is it not okay to give Rinmalendal 50 mcg every 12 hours?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -5083,7 +5083,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Can I give Purvisondel a daily maximum of 40 mg?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -5096,7 +5096,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Purvisondel 40 mg bid?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -5132,7 +5132,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is it safe to give Targulufen no more than 40 mcg per day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -5174,7 +5174,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 20 mcg once a day fine for Targulufen?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -5238,7 +5238,7 @@
    "family": "tuned",
    "kind": "max",
    "query": "Is up to 5 mg daily okay for Gadvudaprex?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -5251,7 +5251,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Can't I give Gadvudaprex 2.5 mg bid?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -5330,7 +5330,7 @@
    "family": "tuned",
    "kind": "negated",
    "query": "Isn't 5 mg daily fine for Pitgaraprex?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -7517,7 +7517,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Quick question: is Dedsotestal a maximum daily dose of 100 mcg appropriate?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -7530,7 +7530,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Dedsotestal 25 mcg 2x/day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -7761,7 +7761,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Nonraraprex 25 mg one time a day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -7823,7 +7823,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Would it be ok to prescribe Dostinendal not more than 100 mg a day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -7836,7 +7836,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Dostinendal 50 mg twice per day be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -7901,7 +7901,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Would it be ok to prescribe Kudromulex 25 mg per day maximum?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -7914,7 +7914,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Kudromulex 25 mg 2x/day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -7990,7 +7990,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Simvurostan 100 mg q.12.h?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8102,7 +8102,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Quick question: is Varloraprex 10 mL per day maximum appropriate?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -8144,7 +8144,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Varloraprex 5 mL one time a day be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8301,7 +8301,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Visfatostan 100 mg once per day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8412,7 +8412,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Is giving Lamfasoxine 30 mg per day maximum recommended?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -8425,7 +8425,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Do you agree that Lamfasoxine should be a max of 30 mg per day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -8451,7 +8451,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Lamfasoxine 15 mg 2x/day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8527,7 +8527,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Gidpinirin 10 mg qd be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8604,7 +8604,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Pullosestal 20 mg bds be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8681,7 +8681,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Sednelostan 75 mL qd be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8759,7 +8759,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Lennedizane 40 mcg q.12.h?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8836,7 +8836,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Gorfutizane 5 mg every 24 hrs be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8914,7 +8914,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Nospulondel 25 mg once per day be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -8976,7 +8976,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "a max of 200 mcg per day for Komgemaprex: is that fine?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -8989,7 +8989,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Komgemaprex 100 mcg every 24 hrs be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9064,7 +9064,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Sestamavine 20 mg 1x/day be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9113,7 +9113,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "What if I give Dumkesadine a max of 25 mcg per day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -9139,7 +9139,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Dumkesadine 25 mcg qd be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9214,7 +9214,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Vodfonravil 5 mg qd be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9279,7 +9279,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Am I allowed to give Rispumirin a max of 40 mg per day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -9292,7 +9292,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Rispumirin 40 mg once per day be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9342,7 +9342,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Quick question: is Lustelondel 150 mL per day maximum appropriate?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -9369,7 +9369,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Lustelondel 75 mL bds be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9434,7 +9434,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Am I allowed to give Fasmamavine not more than 200 mg a day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -9447,7 +9447,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Fasmamavine 100 mg qd?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9529,7 +9529,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Manpolondel 15 mL q.12.h?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9607,7 +9607,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Petmunorphil 5 mL 2 times daily?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9685,7 +9685,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Vinvatumide 100 mcg q.12.h?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9763,7 +9763,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Pemkorostan 20 mcg 1x/day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9839,7 +9839,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Ferrumizane 50 mg every 24 hrs?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9914,7 +9914,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Kormalizane 20 mg qd be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -9950,7 +9950,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Do you agree that Memgosoxine should be not more than 80 mg a day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -9991,7 +9991,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Memgosoxine 20 mg 2 times daily be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10066,7 +10066,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Gossataprex 5 mg twice per day be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10144,7 +10144,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Losnelethol 25 mL 2 times daily be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10295,7 +10295,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Sedgerulex 75 mg every 24 hrs be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10370,7 +10370,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Tuldadaleen 20 mL every 24 hrs be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10432,7 +10432,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "My colleague suggests Ronladoxine a maximum daily dose of 150 mL. Is that right?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -10445,7 +10445,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Ronladoxine 75 mL q.12.h?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10595,7 +10595,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Betbarondel 15 mg once per day be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10674,7 +10674,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Sirfalorphil 2.5 mg 2x/day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10754,7 +10754,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Velvalondel 25 mL 1x/day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10868,7 +10868,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Would it be ok to prescribe Lurridestal not more than 450 mg a day?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -10907,7 +10907,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Lurridestal 75 mg every 24 hrs be ok?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -10943,7 +10943,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Is giving Vesrisoxine a maximum daily dose of 1.25 mcg recommended?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -10983,7 +10983,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Vesrisoxine 2.5 mcg every twelve hours?",
-   "expect": "mismatch",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -11045,7 +11045,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Do you agree that Rotmitufen should be a max of 15 mg per day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -11058,7 +11058,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Isn't it correct to give Rotmitufen 15 mg once per day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -11188,7 +11188,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Would it be ok to prescribe Ludresirin a maximum daily dose of 25 mg?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -11215,7 +11215,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Ludresirin 25 mg every 24 hrs be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"
@@ -11251,7 +11251,7 @@
    "family": "heldout",
    "kind": "max",
    "query": "Am I allowed to give Vamsemoltin not more than 200 mcg a day?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "max_daily"
    ],
@@ -11291,7 +11291,7 @@
    "family": "heldout",
    "kind": "negated",
    "query": "Wouldn't Vamsemoltin 100 mcg bds be ok?",
-   "expect": "match",
+   "expect": "unverifiable",
    "dims": [
     "dose",
     "frequency"

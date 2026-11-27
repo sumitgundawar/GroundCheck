@@ -374,6 +374,82 @@ async function main() {
     await phone.close();
   });
 
+  console.log("Proposals, patient calculations and monitoring, in English and Spanish");
+
+  await check("a proposed regimen shows its verdict and each part against the source", async () => {
+    await go(page, "ask");
+    equal(await ask(page, "Is 15 mg of Caloradine three times daily by mouth for 21 days okay?"), "ANSWER", "the decision");
+    const verdict = ((await page.textContent("#proposal-check .proposal-verdict.mismatch")) || "").trim();
+    assert(verdict.startsWith("No — the source gives 15 mg once daily"), `the verdict reads: ${verdict}`);
+    const rows = await page.$$eval("#proposal-check .proposal-table tbody tr", (trs) => trs.map((tr) => ({ cls: tr.className, text: tr.textContent.replace(/\s+/g, " ").trim() })));
+    assert(rows.length === 4, `${rows.length} rows in the table`);
+    assert(rows.some((r) => r.cls === "dim-mismatch" && /Frequency.*three times daily.*once daily/.test(r.text)), `no frequency mismatch row: ${JSON.stringify(rows)}`);
+    assert(rows.some((r) => r.cls === "dim-match" && /Dose.*15 mg.*15 mg/.test(r.text)), "no matching dose row");
+    const body = ((await page.textContent("#answer-body")) || "").trim();
+    assert(body.startsWith("The standard adult regimen") && !/^No —/.test(body), `the cited sentences should follow the verdict: ${body.slice(0, 60)}`);
+    equal(await page.locator("#proposal-check .proposal-table caption").count(), 1, "the table has a caption");
+    equal(await page.locator("#proposal-check .proposal-table th[scope=col]").count(), 4, "column headers");
+  });
+
+  await check("a question that proposes nothing shows no regimen table", async () => {
+    await ask(page, "What is the standard dose of Caloradine?");
+    assert(await page.locator("#proposal-check").isHidden(), "the proposal box stayed open");
+  });
+
+  const spanish = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+  const es = await spanish.newPage();
+  const esErrors = [];
+  es.on("pageerror", (e) => esErrors.push(e.message));
+  await es.goto(BASE + "/?locale=es", { waitUntil: "networkidle" });
+  await es.evaluate(() => window.gcI18n.ready);
+
+  await check("Spanish: the 'No' verdict names the source's regimen and the proposed one, numbers and units untouched", async () => {
+    await ask(es, "Is 15 mg of Caloradine three times daily by mouth for 21 days okay?");
+    const verdict = ((await es.textContent("#proposal-check .proposal-verdict.mismatch")) || "").trim();
+    equal(verdict, "No — la fuente indica 15 mg una vez al día durante 14 días por vía oral, no 15 mg tres veces al día durante 21 días por vía oral.", "the verdict");
+    const table = ((await es.textContent("#proposal-check .proposal-table")) || "").replace(/\s+/g, " ");
+    for (const want of ["Régimen comparado con la fuente", "Frecuencia", "tres veces al día", "una vez al día", "21 días", "14 días", "Difiere", "Coincide"]) {
+      assert(table.includes(want), `the table lacks "${want}": ${table}`);
+    }
+    assert(!/matches|differs|Frequency|three times/i.test(table), `English left in the table: ${table}`);
+  });
+
+  await check("Spanish: a proposal that cannot be checked says which part, in Spanish", async () => {
+    await ask(es, "Is it harmful to give Caloradine 15 mg once daily and a clock time of 8:30?");
+    const detail = ((await es.textContent("#refuse-detail")) || "").trim();
+    assert(detail.startsWith("El régimen propuesto no se puede comprobar con las fuentes: "), `the refusal reads: ${detail}`);
+    assert(!/could not|cannot be|the sources/.test(detail), `English left in the refusal: ${detail}`);
+    assert(await es.locator("#proposal-check .dim-unverifiable").count() >= 1, "no unchecked row");
+  });
+
+  await check("Spanish: a child's dose calculation keeps every number and unit", async () => {
+    const box = es.locator("#patient-box");
+    if ((await box.getAttribute("open")) === null) await es.click("#patient-box > summary");
+    await es.fill("#pt-age", "8");
+    await es.fill("#pt-weight", "18");
+    await es.fill("#pt-egfr", "90");
+    await ask(es, "What is the dose of Mendel solution?");
+    const text = ((await es.textContent("#patient-findings-list")) || "").replace(/\s+/g, " ");
+    assert(text.includes("Para este paciente pediátrico, el formulario indica 1.8 mL una vez al día (0.1 mL/kg × 18 kg = 1.8 mL)"), `the calculation reads: ${text}`);
+    assert(!/formulary|For this child|once daily/.test(text), `English left in the findings: ${text}`);
+    await es.click("#pt-clear").catch(() => {});
+  });
+
+  await check("Spanish: the monitoring rules and every firing alert are in Spanish", async () => {
+    await go(es, "monitoring");
+    await es.waitForSelector("#rules-rows tr");
+    const rules = ((await es.textContent("#rules-rows")) || "").replace(/\s+/g, " ");
+    assert(rules.includes("Tasa de rechazo") && rules.includes("Percentil 95"), `the rules read: ${rules}`);
+    assert(!/Refusal rate|Response time|Alerts when/.test(rules), `English left in the rules: ${rules}`);
+    const alerts = ((await es.textContent("#alert-list")) || "").trim();
+    assert(!/Refusals are|Answers are slow|are past the due date/.test(alerts), `an alert is in English: ${alerts.slice(0, 120)}`);
+  });
+
+  await spanish.close();
+  await check("no Spanish page reported a script error", () => {
+    assert(esErrors.length === 0, esErrors.slice(0, 3).join(" | "));
+  });
+
   await check("no page reported a script error", () => {
     assert(pageErrors.length === 0, pageErrors.slice(0, 3).join(" | "));
   });

@@ -568,7 +568,7 @@
         </button>
         <span class="topbar-title" id="topbar-title" data-i18n="sidebar.ask">Ask</span>
       </header>
-      <div class="disclaimer" role="note" data-i18n="dashboard.synthetic_demonstration_data_all">
+      <div class="disclaimer" role="region" aria-label="Disclaimer" data-i18n-attr="aria-label:dashboard.disclaimer" data-i18n="dashboard.synthetic_demonstration_data_all">
         Synthetic demonstration data. All conditions, medications and dosages are fictional. Not medical advice.
       </div>
 
@@ -664,6 +664,7 @@
           <span class="decision-reason" id="decision-reason"></span>
         </div>
         <p class="redaction-line" id="redaction-line" hidden></p>
+        <div class="proposal-check" id="proposal-check" hidden></div>
         <div class="answer-body" id="answer-body"></div>
         <p class="answer-summary" id="answer-summary" hidden></p>
         <ol class="claim-rows" id="claim-rows" aria-label="Claims in the answer" hidden data-i18n-attr="aria-label:claim_rows.claims_in_the_answer"></ol>
@@ -714,7 +715,7 @@
           <p class="modal-message" id="ehr-save-message" role="status" hidden></p>
         </div>
         <div class="patient-findings" id="patient-findings" hidden>
-          <h3 class="patient-findings-title" data-i18n="patient_findings.checked_for_this_patient">Checked for this patient</h3>
+          <h2 class="patient-findings-title" data-i18n="patient_findings.checked_for_this_patient">Checked for this patient</h2>
           <ul id="patient-findings-list"></ul>
         </div>
         <div class="refuse-callout" id="refuse-callout" hidden>
@@ -1688,7 +1689,7 @@
           <div id="review-protection">
             <section class="protection-block" aria-labelledby="audit-integrity-title">
               <div class="review-toolbar">
-                <h3 id="audit-integrity-title" data-i18n="audit_integrity_title.audit_trail_integrity">Audit trail integrity</h3>
+                <h2 id="audit-integrity-title" data-i18n="audit_integrity_title.audit_trail_integrity">Audit trail integrity</h2>
                 <button type="button" class="btn btn-sm btn-primary" id="audit-verify" data-i18n="audit_verify.verify_audit_trail">Verify audit trail</button>
               </div>
               <p class="auth-hint" data-i18n="review_protection.every_audit_record_is">Every audit record is chained to the one before it. Verifying checks that none has been changed, removed or reordered.</p>
@@ -1697,24 +1698,24 @@
             <div id="protection-admin" hidden>
               <section class="protection-block" aria-labelledby="evidence-title">
                 <div class="review-toolbar">
-                  <h3 id="evidence-title" data-i18n="evidence_title.evidence_pack">Evidence pack</h3>
+                  <h2 id="evidence-title" data-i18n="evidence_title.evidence_pack">Evidence pack</h2>
                   <a class="btn btn-sm btn-ghost" id="evidence-download" href="/api/governance/evidence-pack" download data-i18n="evidence_download.download_evidence_pack">Download evidence pack</a>
                 </div>
                 <p class="auth-hint" data-i18n="protection_admin.one_zip_for_a">One zip for a clinical safety officer: the safety case, hazard log, evaluation results, audit-chain check, releases, incident register and a configuration snapshot with no secrets. Every file is listed with its SHA-256.</p>
               </section>
               <section class="protection-block" aria-labelledby="telemetry-title">
-                <h3 id="telemetry-title" data-i18n="telemetry_title.install_telemetry">Install telemetry</h3>
+                <h2 id="telemetry-title" data-i18n="telemetry_title.install_telemetry">Install telemetry</h2>
                 <p class="auth-hint" id="telemetry-summary"></p>
                 <dl class="protection-list" id="telemetry-fields"></dl>
                 <p class="auth-hint" id="telemetry-sample"></p>
               </section>
               <section class="protection-block" aria-labelledby="protection-status-title">
-                <h3 id="protection-status-title" data-i18n="protection_status_title.stored_data">Stored data</h3>
+                <h2 id="protection-status-title" data-i18n="protection_status_title.stored_data">Stored data</h2>
                 <dl class="protection-list" id="protection-list"></dl>
               </section>
               <section class="protection-block" aria-labelledby="retention-title">
                 <div class="review-toolbar">
-                  <h3 id="retention-title" data-i18n="retention_title.retention">Retention</h3>
+                  <h2 id="retention-title" data-i18n="retention_title.retention">Retention</h2>
                   <button type="button" class="btn btn-sm btn-ghost" id="retention-run" data-i18n="retention_run.delete_expired_records">Delete expired records</button>
                 </div>
                 <p class="auth-hint" id="retention-summary"></p>

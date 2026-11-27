@@ -1484,7 +1484,8 @@ async def cds_service(service_id: str, request: Request) -> JSONResponse:
         await run_in_threadpool(cds_hooks.verify, request.headers.get("authorization"),
                                 f"{_base_url(request)}/cds-services/{service_id}")
         body = cds_hooks.read_json(await request.body())
-        result = await run_in_threadpool(cds_hooks.cards_for, body, service_id)
+        result = await run_in_threadpool(cds_hooks.cards_for, body, service_id,
+                                         request.headers.get("accept-language"))
     except cds_hooks.CdsError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=exc.status, headers=CDS_CORS)
     logging.getLogger("groundcheck.cds").info("CDS %s: %d cards for hook instance %s", service_id,

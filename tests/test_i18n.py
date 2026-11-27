@@ -3,7 +3,9 @@ that may lack keys (they show English). These checks need no browser."""
 
 from __future__ import annotations
 
+import functools
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -125,7 +127,10 @@ def test_no_value_is_empty_or_untranslated_by_accident():
                "train_dataset.data_datasets_organamnist_64", "view_users.2fa", "imaging_series_title.series", "js.child_pugh",
                "js.compatible", "js.considerable", "js.control", "js.duration_h_min", "js.duration_min_s", "js.groundcheckhealth", "js.http",
                "js.local_numpy", "js.mm", "js.px_2", "patient_box.mmol_l", "plural.series.other", "pt_liver.child_pugh_a",
-               "pt_liver.child_pugh_b", "pt_liver.child_pugh_c"}
+               "pt_liver.child_pugh_b", "pt_liver.child_pugh_c",
+               # templates that are only slots, and words Spanish spells the same
+               "msg.calc.child", "msg.class.orrin_blockers", "msg.find.lab", "msg.find.rule", "msg.pv.intramuscular",
+               "msg.pv.nasal", "msg.pv.oral", "msg.pv.rectal", "msg.pv.sublingual"}
     brand_or_unit = {k for k in same if not re.search(r"[a-z]{4,}", EN[k])}
     # An example question Spanish has no verified wording for is sent as written.
     unverified_queries = {k for k in same if k.startswith("example.query.")}
@@ -136,9 +141,9 @@ def test_placeholders_survive_translation():
     """Every {name} in English appears in Spanish, and no new one. {s} only marks
     an English plural ending, so a translation may do without it."""
     for key, value in ES.items():
-        want = {p for p in PLACEHOLDER.findall(EN[key]) if not re.fullmatch(r"\{s\d*\}", p)}
-        got = set(PLACEHOLDER.findall(value))
-        assert want <= got <= want | {p for p in PLACEHOLDER.findall(EN[key])}, key
+        want = {p.lower() for p in PLACEHOLDER.findall(EN[key]) if not re.fullmatch(r"\{s\d*\}", p)}
+        got = {p.lower() for p in PLACEHOLDER.findall(value)}
+        assert want <= got <= want | {p.lower() for p in PLACEHOLDER.findall(EN[key])}, key
 
 
 def test_the_main_views_are_translated():
@@ -478,3 +483,339 @@ def test_the_messages_module_looks_up_reasons_and_falls_back():
     assert messages.message("js.no_such_key", "es") is None
     assert messages.message("reason.term_not_covered", "fr") == EN["reason.term_not_covered"]
     assert messages.stage_explanation("rate limit", "es") == ES["srv.explain.rate_limit"]
+
+
+# --- Structured server text: findings, proposal verdicts, alerts, CDS cards ------
+
+NUMBER = re.compile(r"\d+(?:\.\d+)?")
+
+
+def _node(items):
+    out = subprocess.run(["node", "localize_unit.mjs"], cwd=ROOT / "tests" / "ui", input=json.dumps(items),
+                         capture_output=True, text=True, timeout=180)
+    report = json.loads(out.stdout.strip().splitlines()[-1])
+    assert out.returncode == 0, [r["name"] for r in report["results"] if not r["ok"]]
+    return report["rendered"]
+
+
+def _finding_samples():
+    """Findings from the real checks over every kind of rule in the demo formulary, with and without a stated dose."""
+    from app import formulary, patient_checks
+    from app.schemas import Claim, PatientContext
+
+    meds = formulary.index().formulary.medicines
+    pick = [m for m in meds if m.renal or m.hepatic or m.labs or m.weight_dose or m.paediatric_dose or m.classes] + meds[:6]
+    patients = [dict(age_years=40, egfr=20, sex="male"), dict(age_years=40, egfr=45, sex="female"),
+                dict(age_years=40, egfr=90, child_pugh="C"), dict(age_years=40, egfr=90, child_pugh="B"),
+                dict(age_years=40, egfr=90, labs={"potassium": 6.2, "sodium": 120, "inr": 2.1, "platelets": 50, "alt": 300, "qtc": 520}),
+                dict(age_years=40, creatinine_umol_l=300, weight_kg=70, sex="female"),
+                dict(age_years=8, weight_kg=18, egfr=90), dict(age_years=8, weight_kg=100, egfr=90),
+                dict(age_years=70, weight_kg=170, egfr=90, sex="male"), dict(age_years=70, weight_kg=40, egfr=90, sex="male"),
+                dict(age_years=40, allergies=["penicillin"], conditions=["asthma"], pregnant=True, breastfeeding=True, egfr=90)]
+    seen, out = set(), []
+    for m in pick:
+        others = [o.name for o in meds if o is not m][:2] + [o.name for o in meds if o is not m and set(o.classes) & set(m.classes)][:1]
+        for pat in patients:
+            for query, claims, subject in ((f"What is the dose of {m.name}?", [], "answer"),
+                                           (f"What is the dose of {m.name}?", [Claim(text=f"The dose of {m.name} is 900 mg once daily.", source_ids=["X"], grounded=True)], "answer"),
+                                           (f"dose of {m.name}", [Claim(text=f"{m.name} 2 mL once daily.", source_ids=["ORDER"], grounded=True)], "order")):
+                review = patient_checks.review(query, claims, PatientContext(**pat, medicines=others), subject=subject)
+                for f in review.findings:
+                    key = (f.code, f.severity, f.message)
+                    if key not in seen:
+                        seen.add(key)
+                        out.append(f)
+    return out
+
+
+@pytest.fixture(scope="module")
+def finding_samples():
+    return _finding_samples()
+
+
+def test_the_samples_cover_every_structured_finding_code(finding_samples):
+    codes = {f.code for f in finding_samples}
+    assert {"renal", "renal_dose", "hepatic", "hepatic_caution", "lab_potassium", "lab_platelets", "lab_inr", "interaction_contraindicated",
+            "interaction_major", "paediatric_dose", "weight_dose", "dose_above_maximum"} <= codes, sorted(codes)
+
+
+def test_a_finding_written_in_english_from_its_params_is_the_servers_own_sentence(finding_samples):
+    from app import messages
+
+    structured = [f for f in finding_samples if messages.finding(f.code, f.params, f.severity, "en") is not None]
+    assert len(structured) > 20
+    for f in structured:
+        assert messages.finding(f.code, f.params, f.severity, "en") == f.message, f.code
+
+
+def test_a_duplicate_class_finding_is_written_from_its_params():
+    from app import messages
+
+    params = {"medicine": "Vorantil", "subject": "answer", "other": "Tessorin", "class": "anticoagulants"}
+    assert messages.finding("duplicate_class", params, "warn", "en") == "The patient already takes Tessorin, which is also one of the anticoagulants."
+    assert messages.finding("duplicate_class", params, "warn", "es") == "El paciente ya toma Tessorin, que también es uno de los anticoagulantes."
+    assert messages.finding("duplicate_class", {**params, "class": "unheard-of agents"}, "warn", "es") is None
+
+
+def test_spanish_findings_keep_every_number_unit_and_name(finding_samples):
+    from app import messages
+
+    spanish = 0
+    for f in finding_samples:
+        es = messages.finding_text(f, "es")
+        if es is None:
+            continue
+        spanish += 1
+        assert NUMBER.findall(es) == NUMBER.findall(f.message), (f.message, es)
+        for unit in re.findall(r"\b(?:mg|mcg|mL|g|units)\b", f.message):
+            assert unit in es, (f.message, es)
+        for name in ("medicine", "other", "condition", "allergy"):
+            if f.params.get(name) and f.params[name] in f.message:
+                assert f.params[name] in es, (name, f.message, es)
+        assert not re.search(r"\b(?:The patient|should|must not|formulary gives)\b", es), es
+    assert spanish > 40
+
+
+def test_every_finding_with_structured_fields_has_spanish(finding_samples):
+    from app import messages
+
+    handled = ("renal", "hepatic", "lab_", "interaction_", "paediatric_dose", "weight_dose", "dose_above_maximum")
+    missing = [f.message for f in finding_samples if f.code.startswith(handled) and messages.finding_text(f, "es") is None]
+    assert missing == []
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_the_browser_and_the_server_write_the_same_spanish(finding_samples):
+    from app import messages
+
+    rendered = _node([{"kind": "full", "finding": f.model_dump()} for f in finding_samples])
+    for f, js in zip(finding_samples, rendered):
+        py = messages.finding_text(f, "es")
+        if py is not None:
+            assert js == py, (f.code, f.message, js, py)
+        else:
+            assert js is None or NUMBER.findall(js) == NUMBER.findall(f.message), (f.message, js)
+
+
+def test_every_formulary_note_has_spanish_and_keeps_its_numbers():
+    from app import messages
+
+    formulary = json.loads((ROOT / "app" / "data" / "formulary.json").read_text(encoding="utf-8"))["medicines"]
+    notes = {r["note"] for m in formulary for group in ("interactions", "labs", "renal", "hepatic") for r in m.get(group, []) if r.get("note")}
+    assert len(notes) >= 10
+    for n in notes:
+        es = messages.note(n, "es")
+        assert es is not None and NUMBER.findall(es) == NUMBER.findall(n), n
+    assert messages.note("A note a customer wrote themselves.", "es") is None
+    assert messages.note("Caloradine should not be combined with Fol-blockers.", "es") == "Caloradine no debe combinarse con Fol-blockers."
+
+
+def test_a_phrase_is_written_with_its_numbers_and_units_copied_or_not_at_all():
+    from app import messages
+
+    assert messages.phrase("7.5 mg once daily", "es") == "7.5 mg una vez al día"
+    assert messages.phrase("100 mL every 12 hours", "es") == "100 mL cada 12 horas"
+    assert messages.phrase("2 to 14 days", "es") == "2 a 14 días"
+    assert messages.phrase("1 week", "es") == "1 semana"
+    assert messages.phrase("in the morning before food", "es") == "por la mañana antes de la comida"
+    assert messages.phrase("15 mg once a fortnight", "es") is None
+    assert messages.phrase("3 tablets twice daily", "es") is None
+    assert messages.phrase("15 mg once daily", "en") == "15 mg once daily"
+
+
+def test_accept_language_picks_a_supported_language_or_english():
+    from app import messages
+
+    assert messages.pick_locale("es-ES,es;q=0.9,en;q=0.5") == "es"
+    assert messages.pick_locale("fr-FR, es;q=0.4") == "es"
+    assert messages.pick_locale("en-US,en;q=0.9,es;q=0.8") == "en"
+    assert messages.pick_locale("pseudo", "de", None) == "en"
+    assert messages.pick_locale(None, "es") == "es"
+    assert messages.pick_locale("es;q=0") == "en"
+
+
+@functools.lru_cache(maxsize=None)
+def _proposal_responses(limit_per_kind: int = 14):
+    from app import config, pipeline, retrieval
+
+    try:
+        retrieval.load_index()
+    except FileNotFoundError:
+        retrieval.build_index()
+        retrieval.load_index()
+    cases = json.loads((ROOT / "eval" / "proposal_cases.json").read_text(encoding="utf-8"))["cases"]
+    taken: dict[tuple, int] = {}
+    chosen = []
+    for c in cases:
+        key = (c["kind"], c["expect"])
+        if taken.get(key, 0) < limit_per_kind:
+            taken[key] = taken.get(key, 0) + 1
+            chosen.append(c["query"])
+    saved = config.SUPPORTED_LANGUAGES
+    config.SUPPORTED_LANGUAGES = "en,es"
+    out = []
+    try:
+        for q in chosen + ["Is 15 mg of Caloradine once daily for 14 days okay?", "Is 15 mg of Caloradine three times daily by mouth for 21 days okay?",
+                           "Is it wrong that I give Caloradine 15 mg once daily?"]:
+            pipeline.clear_answer_cache()
+            r = pipeline.run(q, review=False)
+            if r.proposal_check is not None:
+                out.append(r)
+    finally:
+        config.SUPPORTED_LANGUAGES = saved
+        pipeline.clear_answer_cache()
+    return tuple(out)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_spanish_proposal_verdict_keeps_every_number_unit_and_medicine_or_stays_english():
+    responses = _proposal_responses()
+    answered = [r for r in responses if r.decision == "answer" and r.proposal_check.status != "unverifiable"]
+    assert len(answered) > 40 and any(r.proposal_check.status == "mismatch" for r in answered)
+    rendered = _node([{"kind": "verdict", "data": r.model_dump()} for r in answered])
+    translated = 0
+    for r, es in zip(answered, rendered):
+        first = r.claims[0].text
+        lead = r.answer_text[:r.answer_text.index(first)].strip()
+        if es is None:
+            continue
+        translated += 1
+        assert NUMBER.findall(es) == NUMBER.findall(lead), (lead, es)
+        for unit in re.findall(r"\b\d\s?(?:mg|mcg|mL|g)\b", lead):
+            assert unit in es, (lead, es)
+        assert es.startswith(("Sí —", "No —")) and es.startswith("Sí" if lead.startswith("Yes") else "No"), (lead, es)
+        assert not re.search(r"\b(?:the source|matches|not)\b", es), es
+    assert translated > len(answered) * 0.9, (translated, len(answered))
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_spanish_no_names_what_the_source_gives_and_what_was_proposed():
+    from app import pipeline
+
+    r = pipeline.run("Is 15 mg of Caloradine three times daily by mouth for 21 days okay?", review=False)
+    assert r.proposal_check.status == "mismatch"
+    es = _node([{"kind": "verdict", "data": r.model_dump()}])[0]
+    assert es == ("No — la fuente indica 15 mg una vez al día durante 14 días por vía oral, "
+                  "no 15 mg tres veces al día durante 21 días por vía oral.")
+    yes = pipeline.run("Is 15 mg of Caloradine once daily for 14 days okay?", review=False)
+    assert _node([{"kind": "verdict", "data": yes.model_dump()}])[0] == "Sí — esto coincide con la fuente: 15 mg una vez al día durante 14 días."
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_refused_proposal_is_explained_part_by_part_in_spanish_or_left_in_english():
+    responses = [r for r in _proposal_responses() if r.reason_code == "proposal_unverifiable"]
+    assert len(responses) > 10
+    rendered = _node([{"kind": "refusal", "data": r.model_dump()} for r in responses])
+    said = 0
+    for r, es in zip(responses, rendered):
+        if es is None:
+            continue
+        said += 1
+        assert es.startswith("El régimen propuesto no se puede comprobar con las fuentes")
+        assert NUMBER.findall(es) == NUMBER.findall(r.refused_reason), (r.refused_reason, es)
+    assert said >= len(responses) * 0.8, (said, len(responses))
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_proposal_table_values_are_translated_without_changing_a_number():
+    cells = [("dose", "15 mg"), ("dose", "50 mcg a day"), ("frequency", "three times daily"), ("duration", "21 days"),
+             ("route", "intravenous"), ("timing", "in the morning with food"), ("max_daily", "37.5 mg a day"), ("drug", "caloradine")]
+    got = _node([{"kind": "value", "name": n, "text": t} for n, t in cells])
+    assert got == ["15 mg", "50 mcg al día", "tres veces al día", "21 días", "intravenosa", "por la mañana con comida", "37.5 mg al día", "caloradine"]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_every_proposal_reason_the_evaluation_cases_produce_has_a_spanish_sentence():
+    from app import proposal, retrieval
+
+    try:
+        retrieval.load_index()
+    except FileNotFoundError:
+        retrieval.build_index()
+        retrieval.load_index()
+    cases = json.loads((ROOT / "eval" / "proposal_cases.json").read_text(encoding="utf-8"))["cases"]
+    reasons = set()
+    for c in cases:
+        outcome = proposal.evaluate(c["query"])
+        if outcome:
+            reasons |= {d.reason for d in outcome.check.dimensions if d.reason}
+    assert len(reasons) > 15
+    out = subprocess.run(["node", "localize_unit.mjs"], cwd=ROOT / "tests" / "ui", input=json.dumps([{"kind": "detail", "text": r} for r in sorted(reasons)]),
+                         capture_output=True, text=True, timeout=120)
+    missing = [m["text"] for m in json.loads(out.stdout.strip().splitlines()[-1])["missing"]]
+    assert missing == [], missing
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_alerts_and_rules_are_written_in_spanish_with_their_numbers(database, monkeypatch):
+    from datetime import timedelta
+
+    from fastapi.testclient import TestClient
+
+    from app import config, db, monitoring
+    from app.db import AuditRecord, ReviewCase, Source
+
+    monitoring.reset()
+    monkeypatch.setattr(config, "ALERT_WEBHOOK_URL", "")
+    monkeypatch.setattr(config, "ALERT_DISABLED_RULES", {"audit_chain"})
+    now = db.utcnow()
+
+    def add(n, refused, minutes_ago, ms=800, score=0.6, spread=0.0):
+        with db.session() as s:
+            for i in range(n):
+                s.add(AuditRecord(audit_id=os.urandom(4).hex(), created_at=now - timedelta(minutes=minutes_ago + i * spread),
+                                  decision="refuse" if i < refused else "answer", query="q", total_ms=ms, llm_used=False, record={},
+                                  test_run=False, top_score=score + (i % 10) * 0.01))
+
+    add(400, 0, 60 * 26, spread=30, score=0.7)
+    add(60, 0, 5, spread=1, score=0.35, ms=40000)
+    with db.session() as s:
+        s.add(ReviewCase(kind="refusal", query="q", query_key="k", first_audit_id="a", last_audit_id="a", due_at=now - timedelta(hours=1)))
+        for i, title in enumerate(("Anticoagulation guideline", "Insulin guideline", "Renal guideline", "Sepsis pathway")):
+            s.add(Source(document_key=f"d{i}", title=title, status="approved", owner="Pharmacy", filename="a.pdf",
+                         content_sha256="h" * 64, expires_on=now - timedelta(days=1 + i) if i < 2 else now + timedelta(days=3)))
+    monitoring.evaluate()
+    from app.main import app
+
+    overview = TestClient(app).get("/api/monitoring").json()
+    alerts = overview["firing"]
+    assert {a["rule"] for a in alerts} >= {"latency", "retrieval_drift", "review_overdue", "documents_expiring"}
+    assert all(a["params"] and a["code"] == a["rule"] for a in alerts)
+    rendered = _node([{"kind": "alert", "alert": a} for a in alerts] + [{"kind": "rule", "rule": r} for r in overview["rules"]])
+    for a, es in zip(alerts, rendered):
+        assert es is not None, a["rule"]
+        assert NUMBER.findall(es["detail"]) == NUMBER.findall(a["detail"]), (a["detail"], es["detail"])
+        assert NUMBER.findall(es["title"]) == NUMBER.findall(a["title"])
+        for name in a["params"].get("names", "").split(", "):
+            assert name in es["detail"]
+        assert not re.search(r"\b(?:questions|the last|documents expire|are past)\b", es["detail"]), es["detail"]
+    for r, es in zip(overview["rules"], rendered[len(alerts):]):
+        assert es is not None, r["rule"]
+        assert NUMBER.findall(es["limit"]) == NUMBER.findall(r["limit"]), (r["limit"], es["limit"])
+    assert "40.0 s" in alerts[[a["rule"] for a in alerts].index("latency")]["detail"]
+    assert any("40.0 s" in es["detail"] for es in rendered[:len(alerts)] if es)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_every_alert_rule_has_title_detail_and_rule_text_in_both_languages():
+    from app import monitoring
+
+    for rule in monitoring.RULES:
+        assert f"msg.rule.{rule}.name" in EN and f"msg.rule.{rule}.limit" in ES
+        assert any(k.startswith(f"msg.alert.{rule}.title") for k in EN), rule
+        assert any(k.startswith(f"msg.alert.{rule}.detail") for k in ES), rule
+    assert _node([{"kind": "alert", "alert": {"rule": "latency", "params": None}}]) == [None]
+    assert _node([{"kind": "alert", "alert": {"rule": "invented", "params": {"n": 1}}}]) == [None]
+
+
+def test_the_extractor_keeps_the_server_message_and_example_keys(tmp_path, monkeypatch):
+    """srv.*, msg.* and example.* are read by web/localize.js and app/messages.py, not by the page."""
+    en, index = tmp_path / "en.json", tmp_path / "index.html"
+    en.write_text((ROOT / "web" / "i18n" / "en.json").read_text(encoding="utf-8"), encoding="utf-8")
+    index.write_text((ROOT / "web" / "index.html").read_text(encoding="utf-8"), encoding="utf-8")
+    before = en.read_text(encoding="utf-8")
+    monkeypatch.setattr(i18n_extract, "EN", en)
+    monkeypatch.setattr(i18n_extract, "INDEX", index)
+    assert i18n_extract.main() == 0
+    assert en.read_text(encoding="utf-8") == before
+    assert any(k.startswith("srv.") for k in json.loads(before))

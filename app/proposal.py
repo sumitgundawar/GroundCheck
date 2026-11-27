@@ -82,6 +82,10 @@ _DURATION = re.compile(
     rf"\b(?:for\s+|over\s+|during\s+|x\s*|×\s*|course\s+of\s+|up\s+to\s+|within\s+)?({_NUMF}|an?)[\s-]*"
     r"(hours?|hrs?|days?|weeks?|wks?|months?|years?|yrs?|fortnights?)\b", re.I)
 
+_OPEN_BEFORE = re.compile(r"(?:at\s+least|minimum(?:\s+of)?|min\.?|more\s+than|longer\s+than|less\s+than|fewer\s+than|"
+                          r"(?:no|not)\s+(?:more|longer)\s+than|under|maximum(?:\s+of)?|up\s+to)\s*(?:of\s+|for\s+)?$", re.I)
+_OPEN_AFTER = re.compile(r"\s*(?:\+|plus\b|(?:or|and)\s+(?:longer|more|less|over|up|fewer|shorter|beyond)\b)", re.I)
+
 _ROUTES: list[tuple[re.Pattern, str]] = [(re.compile(p, re.I), r) for p, r in (
     (r"\b(?:orally|oral|by\s+mouth|per\s+os|swallow(?:ed)?)\b|(?<![\w.-])po(?![\w-])", "oral"),
     (r"\b(?:topical(?:ly)?|on\s+the\s+skin|to\s+the\s+skin|cutaneous(?:ly)?|transdermal(?:ly)?)\b", "topical"),
@@ -131,7 +135,10 @@ _INVERTED = re.compile(
     r"\b(?:too\s+(?:much|high|low|little|often|long|short|frequent(?:ly)?|many|few)|excessive(?:ly)?|overdos\w*|unsafe|"
     r"dangerous(?:ly)?|harm(?:ful)?|toxic|wrong|incorrect|bad|risky|risk|mistake|hurt|poison\w*|"
     r"under-?dos\w*)\b", re.I)
-_NEGATED = re.compile(r"\b(?:not|never|no|without|cannot)\b|n['’]t\b", re.I)
+_NEGATED = re.compile(r"\b(?:not|never|no|without|cannot|false|untrue|contraindicated|forbidden|prohibited|invalid|"
+                      r"disallowed|unacceptable|inappropriate)\b|n['’]t\b", re.I)
+_NEG_OK = re.compile(r"\b(?:no more than|not (?:more than|to exceed|exceed(?:ing)?|above|over|beyond)|"
+                     r"without\s+(?:a\s+|the\s+|any\s+)?(?:food|meals?|eating))\b", re.I)
 _INFO_START = re.compile(
     r"^\s*(?:what|which|how\s+(?:much|many|long|often|frequently)|when|why|who|where|describe|list|tell\s+me|explain|"
     r"give\s+me|show\s+me|name)\b", re.I)
@@ -173,6 +180,8 @@ class Parsed:
     food: set[str] = field(default_factory=set)
     ambiguities: dict[str, list[str]] = field(default_factory=dict)
     relative: bool = False
+    consumed: set[str] = field(default_factory=set)
+    context: bool = False
 
     def flag(self, dimension: str, reason: str) -> None:
         self.ambiguities.setdefault(dimension, [])
@@ -244,8 +253,10 @@ def parse(text: str) -> Parsed:
     if _RELATIVE.search(t):
         parsed.relative = True
         parsed.flag("dose", "a change relative to the usual dose, with no amount stated")
+    prepared_words = set(re.findall(r"[a-z]+", t))
     for pattern in (_AGE, _WEIGHT):
         for m in list(pattern.finditer(t)):
+            parsed.context = True
             t = _blank(t, m)
 
     spans: list[tuple[int, int]] = []
@@ -301,16 +312,26 @@ def parse(text: str) -> Parsed:
         t = _blank(t, m)
 
     for m in list(_DURATION.finditer(t)):
+        if (_OPEN_BEFORE.search(t[:m.start()]) or _OPEN_AFTER.match(t, m.end())
+                or re.match(r"(?:up\s+to|within|over)\b", m.group(0), re.I)):
+            parsed.flag("duration", "an open-ended duration (at least, or longer, up to), not a fixed number of days")
         _take_duration(parsed, m)
         t = _blank(t, m)
 
-    if _INJECTION.search(t):
-        parsed.flag("route", "'injection' does not name a route")
+    injection = _INJECTION.search(t)
     for pattern, route in _ROUTES:
-        if pattern.search(t) and route not in parsed.route:
-            parsed.route.append(route)
-    if re.search(r"(?<![\w'’-])IM(?![\w'’-])", text) and "intramuscular" not in parsed.route:
-        parsed.route.append("intramuscular")
+        for m in list(pattern.finditer(t)):
+            if route not in parsed.route:
+                parsed.route.append(route)
+            t = t[:m.start()] + "~" * (m.end() - m.start()) + t[m.end():]
+    if re.search(r"(?<![\w'’-])IM(?![\w'’-])", text):
+        if "intramuscular" not in parsed.route:
+            parsed.route.append("intramuscular")
+        t = re.sub(r"(?<![\w'’-])im(?![\w'’-])", "  ", t)
+    if injection and not parsed.route:
+        parsed.flag("route", "'injection' does not name a route")
+    elif injection:
+        t = _INJECTION.sub(lambda m: "~" * len(m.group(0)), t)
     if len(parsed.route) > 1:
         parsed.flag("route", "more than one route named")
     for m in list(_CLOCK.finditer(t)):
@@ -334,6 +355,7 @@ def parse(text: str) -> Parsed:
             parsed.tod.add(tod)
             t = _blank(t, m)
 
+    parsed.consumed = prepared_words - set(re.findall(r"[a-z]+", t))
     if re.search(r"\d", t):
         parsed.flag("dose", "a number that could not be placed (no unit, or wording not recognised)")
     if not (parsed.dose or parsed.freq or parsed.duration or parsed.route or parsed.max_daily or parsed.total_daily
@@ -506,12 +528,32 @@ def _drug_topics() -> dict[str, str]:
     return cache["drug_topic_names"]
 
 
+_ASKING = re.compile(r"^(?:is|are|can|could|should|would|do|does|did|may|am|will|shall|might)\b", re.I)
+
+
+def is_question(question: str) -> bool:
+    """A real question: a tag or marker word ("correct?", "okay"), or a "?" after a yes/no opening. A statement
+    or a bare "Caloradine 15,5 mg?" is not one."""
+    stripped = _FILLER.sub("", question)
+    return bool(_MARKER.search(question)) or ("?" in question and bool(_ASKING.match(stripped)))
+
+
+def explained(question: str, terms: list[str]) -> bool:
+    """True when every term is a word of the regimen itself (a route, a unit, a time of day or food), so that a
+    coverage gap on it is the proposal's own to judge."""
+    parsed = parse(question)
+    return not parsed.context and all(t.lower() in parsed.consumed for t in terms)
+
+
+_ASKS_DOSE = re.compile(r"\b(?:dose|dosage|dosing|regimen)\b", re.I)
+
+
 def _is_proposal_question(question: str, parsed: Parsed) -> bool:
     if not parsed.present():
         return False
     stripped = _FILLER.sub("", question)
     if _INFO_START.match(stripped) and not _MARKER.search(question):
-        return False
+        return bool(_ASKS_DOSE.search(question) and (parsed.dose or parsed.freq))
     return True
 
 
@@ -519,8 +561,7 @@ def read(question: str) -> Reading | None:
     parsed = parse(question)
     if not _is_proposal_question(question, parsed):
         return None
-    probe = re.sub(r"\b(?:no more than|not (?:more than|to exceed|exceed(?:ing)?|above|over|beyond))\b", " ",
-                   question, flags=re.I)
+    probe = _NEG_OK.sub(" ", question)
     names = _drug_topics()
     words = set(retrieval.tokenize(question))
     drugs = sorted({names[w] for w in words if w in names})
@@ -581,6 +622,7 @@ def _merge(into: Parsed, p: Parsed) -> None:
     into.duration += [d for d in p.duration if d not in into.duration]
     into.duration_shown += [s for s in p.duration_shown if s not in into.duration_shown]
     into.route += [r for r in p.route if r not in into.route]
+    into.max_daily += [q for q in p.max_daily if q.key() not in {x.key() for x in into.max_daily}]
     into.tod |= p.tod
     into.food |= p.food
     for k, v in p.ambiguities.items():
@@ -594,7 +636,7 @@ _CODES = (("misspelt", "misspelt_word"), ("comma", "ambiguous_separator"), ("rel
           ("tablets", "amount_not_in_units"), ("range", "range"), ("conflicting", "source_conflict"),
           ("two different timings", "source_conflict"), ("more than one regimen", "source_ambiguous"),
           ("more than one", "multiple_values"), ("no medicine", "no_medicine"), ("did you mean", "unknown_medicine"),
-          ("is not a medicine", "unknown_medicine"), ("too much", "harm_question"), ("clock time", "clock_time"),
+          ("is not a medicine", "unknown_medicine"), ("too much", "harm_question"), ("phrased negatively", "negated"), ("clock time", "clock_time"),
           ("kilogram", "unit_not_comparable"), ("cannot be compared", "unit_not_comparable"),
           ("no period", "no_period"), ("could not be placed", "number_without_unit"),
           ("could not be read", "unreadable"), ("does not name a route", "route_not_named"),
@@ -744,17 +786,18 @@ def compare(reading: Reading, doc: Documented) -> list[ProposalDimension]:
 
     for q in ([] if "max_daily" in p.ambiguities else p.total_daily + p.max_daily):
         name = "max_daily"
-        total = _daily_total(doc)
         proposed = f"{q.shown} a day"
-        if doc.max_stated:
+        stated = list({m.key(): m for m in src.max_daily}.values())
+        if not doc.max_stated or not stated:
             out.append(_dim(name, "unverifiable", proposed, None, _src(doc, "dose"),
-                            "the sources state a maximum of their own, which is not read here"))
-        elif total is None:
+                            "the sources state no maximum daily dose for this medicine (the usual regimen is not "
+                            "a maximum)"))
+        elif len(stated) > 1:
             out.append(_dim(name, "unverifiable", proposed, None, _src(doc, "dose"),
-                            "the sources do not give a daily total to compare with"))
+                            "the sources give more than one maximum"))
         else:
-            out.append(_dim(name, "match" if total.key() == q.key() else "mismatch", proposed,
-                            f"{total.shown} a day", _src(doc, "dose")))
+            out.append(_dim(name, "match" if stated[0].key() == q.key() else "mismatch", proposed,
+                            f"{stated[0].shown} a day", _src(doc, "dose")))
 
     if doses:
         status, shown, reason = _cmp_dose(doses[0], doc)
@@ -771,9 +814,9 @@ def compare(reading: Reading, doc: Documented) -> list[ProposalDimension]:
         if not sd:
             out.append(_dim("duration", "unverifiable", _duration_text(d, shown_p), None, _src(doc, "duration"),
                             "the sources state no duration for this medicine"))
-        elif len(set(sd)) > 1:
+        elif len(set(sd)) > 1 or "duration" in src.ambiguities:
             out.append(_dim("duration", "unverifiable", _duration_text(d, shown_p), None, _src(doc, "duration"),
-                            "the sources give conflicting durations"))
+                            "the sources give conflicting or open-ended durations"))
         else:
             lo, hi = d
             sl, sh = sd[0]
@@ -941,6 +984,10 @@ def evaluate(question: str) -> Outcome | None:
         if reading.misspelt:
             w, near = reading.misspelt[0]
             dims.append(_dim("drug", "unverifiable", w, reason=f"'{w}' is not a medicine in the sources"))
+    if reading.negated:
+        dims.append(_dim("proposal", "unverifiable", None,
+                         reason="the question is phrased negatively, so a yes or no would be ambiguous; ask it "
+                                "without the negative"))
     if reading.inverted:
         dims.append(_dim("proposal", "unverifiable", None,
                          reason="the question asks whether the amount is too much, too little or harmful, which the "

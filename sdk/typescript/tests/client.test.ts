@@ -411,6 +411,19 @@ describe("error statuses", () => {
     expect([e.message.length, e.code!.length]).toEqual([1000, 100]);
   });
 
+  it.each([
+    `Invalid key ${KEY}`,
+    `Authorization: Bearer ${KEY} was rejected`,
+    "bad token gck_s3cretvalueABCD",
+    `${"x".repeat(995)}${KEY}`,
+  ])("never puts an echoed API key in the exception (%#)", async (message) => {
+    server.fallback = { status: 401, body: err(`bad_${KEY}`, message), headers: { "x-request-id": KEY } };
+    const e = (await make().client.ask({ question: "q" }).catch((x: unknown) => x)) as Error & { code?: string; requestId?: string };
+    const shown = [e.message, String(e), e.code ?? "", e.requestId ?? "", JSON.stringify(e)].join(" ");
+    expect(shown).not.toContain(KEY);
+    expect(shown).not.toContain("s3cretvalue");
+  });
+
   it("does not follow redirects", async () => {
     server.fallback = { status: 302, body: "", headers: { Location: "/elsewhere" } };
     const e = (await make().client.ask({ question: "q" }).catch((x: unknown) => x)) as UnexpectedStatusError;

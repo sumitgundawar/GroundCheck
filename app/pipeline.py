@@ -12,12 +12,13 @@ import json
 import re
 import threading
 import time
+import unicodedata
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
 
 from . import (audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, proposal, retrieval,
                tracing)
-from .schemas import (AskResponse, Claim, ClaimSupport, Explanation, LLMAnswer, PatientContext, PatientFinding, Redaction, Review, Settings,
+from .schemas import (AskResponse, Claim, ClaimSupport, Explanation, LLMAnswer, LLMClaim, PatientContext, PatientFinding, Redaction, Review, Settings,
                       Source, TraceStep)
 
 # The full ordered set of stage names, used to render skipped stages after an
@@ -207,6 +208,7 @@ _EXPLAIN_SUMMARY = {
     "patient_unsafe": "The patient's details make the answer unsafe to give.",
     "unsupported_language": "The question is in a language this installation cannot check against its sources.",
     "proposal_unverifiable": "The question proposes a regimen that cannot be checked against the sources.",
+    "source_conflict": "Two approved documents give different doses of the same medicine.",
 }
 _EXPLAIN_SUGGESTION = {
     "term_not_covered": ["Check the spelling of the name.", "Ask about the medicine or condition by its listed name."],
@@ -218,6 +220,7 @@ _EXPLAIN_SUGGESTION = {
     "insufficient_context": ["Ask one thing at a time, naming the medicine or condition."],
     "input_blocked": ["Rephrase the question as a plain clinical question."],
     "unsupported_language": ["Ask the question in English, or in a language this installation supports."],
+    "source_conflict": ["Ask the documents' owners to reconcile them; the conflict has been flagged."],
     "proposal_unverifiable": ["Name one medicine and give each amount with its unit and period, for example "
                               "'15 mg twice daily for 7 days'.",
                               "Ask what the source gives to see the documented regimen."],
@@ -483,6 +486,17 @@ def _regimen_kept(claim) -> bool:
     return found is None or bool(found.dose_values) or not (found.status == "unsupported" and found.coverage >= 0.35)
 
 
+def _clean_claim(claim):
+    """Drop bidirectional and zero-width controls from a drafted claim, and any citation that names no source, so
+    neither reaches the guards or the answer; a claim left with no real source is ungrounded."""
+    text = "".join(ch for ch in claim.text if unicodedata.category(ch) != "Cf")
+    ids = [sid for sid in claim.source_ids if retrieval.corpus_text_for(sid)]
+    if text == claim.text and ids == list(claim.source_ids):
+        return claim
+    return LLMClaim(text=text, source_ids=ids, relevance=getattr(claim, "relevance", 0.0),
+                    support=getattr(claim, "support", None))
+
+
 def verify_claims(question: str, claims, sources: list[dict], patient: PatientContext | None,
                   cfg: "Settings", timer: "_Timer | None" = None) -> Verification:
     """Check claims that something else drafted: each must be grounded in its
@@ -500,6 +514,7 @@ def verify_claims(question: str, claims, sources: list[dict], patient: PatientCo
     judge_total = 0
     grounding_rows: list[dict] = []
     for llm_claim in claims:
+        llm_claim = _clean_claim(llm_claim)
         grounded, score = guards_output.check_claim_grounded(
             llm_claim.text, llm_claim.source_ids, cfg.grounding_min
         )
@@ -848,6 +863,13 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
             data=cover_report,
             ms=timer.lap_ms(),
         ))
+    proposed = None
+    if not covered:
+        proposed = _proposal_past_coverage(query, cover_code, cover_report)
+        if proposed is not None:
+            trace[-1].status = "warn"
+            trace[-1].detail += "; the question proposes a regimen, which is checked against the source instead"
+            covered = True
     if not covered:
         reason = cover_detail
         if cover_code in ("stated_value_unsupported", "form_unsupported"):
@@ -866,8 +888,17 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                        claims=[], sources=sources,
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
+    clash = _source_conflict(query)
+    if clash:
+        reason = f"two approved documents give different doses of {clash}"
+        _skip_after(trace, "source coverage")
+        return _finish(decision="refuse", answer_text=REFUSAL_PREFIX + reason[0].upper() + reason[1:] + ".",
+                       refused_reason=reason, reason_code="source_conflict",
+                       explanation=_explain("source_conflict", reason), claims=[], sources=sources, trace=trace,
+                       llm_used=False, timer=timer, extras=extras)
+
     # --- 4b. A proposed regimen ----------------------------------------------
-    proposed = proposal.evaluate(query)
+    proposed = proposed or proposal.evaluate(query)
     if proposed is not None:
         extras["proposal_check"] = proposed.check
         unusable = proposed.check.status == "unverifiable" or not proposed.claims
@@ -968,6 +999,55 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                    refused_reason=None, claims=claims, sources=sources,
                    trace=trace, llm_used=llm_used, timer=timer, extras=extras,
                    patient_findings=findings)
+
+
+def _doses_by_name() -> dict[str, dict[str, set[str]]]:
+    """For each word of a topic title, the dose values (number and unit) each topic with that word gives."""
+    cache = retrieval._view().cache
+    if "doses_by_name" not in cache:
+        found: dict[str, dict[str, set[str]]] = {}
+        for record in retrieval._view().metadata:
+            pairs = guards_output._canonical_pairs(record.get("text", ""))
+            if not pairs:
+                continue
+            topic = record.get("topic", "")
+            for word in set(retrieval.tokenize(topic)):
+                if len(word) >= 5:
+                    found.setdefault(word, {}).setdefault(topic, set()).update(pairs)
+        cache["doses_by_name"] = found
+    return cache["doses_by_name"]
+
+
+def _source_conflict(query: str) -> str | None:
+    """The medicine a question names when two topics of that name (two approved documents) give doses that share
+    no value, so neither can be served as the answer."""
+    names = _doses_by_name()
+    for word in sorted(set(retrieval.tokenize(query))):
+        topics = names.get(word)
+        if topics and len(topics) > 1:
+            sets = list(topics.values())
+            if not set.intersection(*sets):
+                return word
+    return None
+
+
+_PROPOSAL_GAPS = ("stated_value_unsupported", "form_unsupported", "term_not_covered", "limit_not_stated")
+
+
+def _proposal_past_coverage(query: str, code: str | None, report: dict):
+    """A question that proposes a regimen for one medicine is answered with a verdict, not refused, when the only
+    thing the coverage guard missed is part of the regimen itself (a dose or route the source does not state) and
+    the source documents that part: "No, the source gives X, not Y." Anything else the guard found still refuses."""
+    if code not in _PROPOSAL_GAPS or report.get("age") or not proposal.is_question(query):
+        return None
+    if not proposal.explained(query, list(report.get("uncovered") or []) + list(report.get("unsupported_forms") or [])):
+        return None
+    found = proposal.evaluate(query)
+    if found is None or found.check.status == "unverifiable" or not found.claims or not found.check.drug:
+        return None
+    if report.get("unanswerable_request") and not any(d.name == "max_daily" for d in found.check.dimensions):
+        return None
+    return found
 
 
 def _verdict_params(verdict: "Verification") -> dict:

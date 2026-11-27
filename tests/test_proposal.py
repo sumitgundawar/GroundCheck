@@ -146,7 +146,6 @@ MATCH = [
     "Is 15 mg once daily in the morning with food okay for Caloradine?",
     "Is it okay to give Caloradine in the morning?", "Is it okay to give Caloradine with food?",
     "Is 15 mg a day okay for Caloradine?", "Is 15 mg daily okay for Caloradine?",
-    "Is a maximum of 15 mg a day okay for Caloradine?",
     "Is 25 mL twice daily okay for Velvalondel?", "Is 25 mL bd okay for Velvalondel?",
     "Is 25 mL every 12 hours okay for Velvalondel?", "Is 25 mL q12h okay for Velvalondel?",
     "Is 25 mL two times a day for 7 days okay for Velvalondel?", "Is 0.025 L twice daily okay for Velvalondel?",
@@ -204,9 +203,6 @@ def test_a_proposal_that_differs_from_the_source_is_told_no(q, dimension):
     ("Is 0.03 g once daily okay for Caloradine?", "dose"), ("Is Caloradine okay intravenously?", "route"),
     ("Is Caloradine okay topically?", "route"), ("Is Caloradine okay subcutaneously?", "route"),
     ("Is 25 mL once daily okay for Velvalondel?", "frequency"), ("Is Caloradine okay at midday?", "timing"),
-    ("Is a maximum of 30 mg a day okay for Caloradine?", "max_daily"),
-    ("Is no more than 10 mg per day okay for Caloradine?", "max_daily"),
-    ("Is a maximum of 25 mL a day okay for Velvalondel?", "max_daily"),
 ])
 def test_a_wrong_dose_or_route_is_never_answered_without_a_no(q, dimension):
     """Other guards may refuse these first; an answer must lead with No, and the structured check says what differed."""
@@ -215,6 +211,79 @@ def test_a_wrong_dose_or_route_is_never_answered_without_a_no(q, dimension):
         assert r.answer_text.startswith("No — ") and r.proposal_check.status == "mismatch"
     elif r.proposal_check is not None:
         assert r.proposal_check.status == "mismatch" and statuses(r)[dimension] == "mismatch"
+
+
+WRONG_VALUE = [
+    ("Is 30 mg once daily okay for Caloradine?", "30 mg", "dose"),
+    ("Caloradine is 50 mg once daily, correct?", "50 mg", "dose"),
+    ("Is 7.5 mg once daily okay for Caloradine?", "7.5 mg", "dose"),
+    ("Is 15 mcg once daily okay for Caloradine?", "15 mcg", "dose"),
+    ("Is 15 mL once daily okay for Caloradine?", "15 mL", "dose"),
+    ("Is 0.03 g once daily okay for Caloradine?", "30 mg", "dose"),
+    ("Is Caloradine okay intravenously?", "intravenous", "route"),
+    ("Is Caloradine okay IV?", "intravenous", "route"),
+    ("Is Caloradine okay subcut?", "subcutaneous", "route"),
+    ("Is Caloradine okay SC?", "subcutaneous", "route"),
+    ("Is Caloradine okay IM?", "intramuscular", "route"),
+    ("Is Caloradine okay by subcutaneous injection?", "subcutaneous", "route"),
+    ("Is Caloradine okay topically?", "topical", "route"),
+    ("Is Velvalondel okay rectally?", "rectal", "route"),
+    ("Is 30 mg twice daily okay for Caloradine?", "30 mg", "dose"),
+    ("Is 25 mL once daily by mouth okay for Velvalondel?", "once daily", "frequency"),
+    ("Is 100 mcg once daily okay for Lembitulex?", "100 mcg", "dose"),
+]
+
+
+@pytest.mark.parametrize("q,wrong,dimension", WRONG_VALUE)
+def test_a_wrong_dose_or_route_is_answered_no_with_the_sourced_regimen_and_never_restated(q, wrong, dimension):
+    r = ask(q)
+    assert r.decision == "answer", (r.reason_code, r.refused_reason)
+    assert r.answer_text.startswith("No — the source gives "), r.answer_text
+    assert r.proposal_check.status == "mismatch" and statuses(r)[dimension] == "mismatch"
+    lead, _, rest = r.answer_text.partition(". ")
+    given, sep, said = lead.rpartition(", not ")
+    assert sep, lead
+    assert wrong.lower() not in given.lower() and wrong.lower() not in rest.lower(), r.answer_text
+    assert r.claims and all(c.grounded for c in r.claims) and "[" in r.answer_text
+    assert all(wrong.lower() not in c.text.lower() for c in r.claims)
+
+
+@pytest.mark.parametrize("q", [
+    "Caloradine is 50 mg once daily.", "Caloradine 50 mg once daily", "Caloradine should be 50 mg once daily",
+    "I think Caloradine IV",
+])
+def test_a_statement_that_is_not_a_question_with_a_wrong_value_is_still_refused(q):
+    r = ask(q)
+    assert r.decision == "refuse" or r.answer_text.startswith("No — ")
+    if r.decision == "answer":
+        assert "50 mg" not in r.answer_text.partition(", not ")[0]
+
+
+@pytest.mark.parametrize("q", [
+    "Is 50 mg once daily okay for Caloradine and Velvalondel?", "Is 50 mg once daily okay for Zorbextine?",
+    "Is 50 mg once daily okay for a 5 year old on Caloradine?", "Is 50 mg once daily okay for Caloradine XR?",
+    "Is 50 mg once daily okay for Caloradine in pregnancy?",
+    "Is Caloradine 50 mg once daily okay by injection?", "Is 50 mg once daily okay for Caloradine tablets?",
+])
+def test_a_wrong_value_is_still_refused_when_the_drug_or_the_term_cannot_be_judged(q):
+    r = ask(q)
+    assert r.decision == "refuse", r.answer_text
+
+
+def test_a_patient_the_sources_do_not_cover_still_wins_over_the_no():
+    r = ask("Is 50 mg once daily okay for Caloradine?", patient=PatientContext(age_years=5))
+    assert r.decision == "refuse"
+
+
+@pytest.mark.parametrize("q", [
+    "Is a maximum of 15 mg a day okay for Caloradine?", "Is a maximum of 30 mg a day okay for Caloradine?",
+    "Is no more than 10 mg per day okay for Caloradine?", "Is a maximum of 25 mL a day okay for Velvalondel?",
+    "Is a daily maximum of 50 mcg okay for Lembitulex?",
+])
+def test_a_maximum_daily_dose_is_never_judged_against_the_usual_regimen(q):
+    r = ask(q)
+    assert r.decision == "refuse", r.answer_text
+    assert not (r.proposal_check and r.proposal_check.status in ("match", "mismatch"))
 
 
 def test_the_verdict_names_what_the_source_gives_and_what_was_proposed():
@@ -262,11 +331,11 @@ NEGATED = ["Isn't {p} fine for Caloradine?", "Is it not okay to give Caloradine 
 
 
 @pytest.mark.parametrize("template", NEGATED)
-def test_a_negated_question_says_what_it_is_a_verdict_on(template):
-    good = ask(template.format(p="15 mg once daily"))
-    bad = ask(template.format(p="15 mg twice daily"))
-    assert good.answer_text.startswith("Yes — the proposed regimen matches the source")
-    assert bad.answer_text.startswith("No — the proposed regimen does not match the source")
+def test_a_negated_question_is_refused_because_a_yes_or_no_would_be_ambiguous(template):
+    for p in ("15 mg once daily", "15 mg twice daily"):
+        r = ask(template.format(p=p))
+        assert r.decision == "refuse" and r.reason_code == "proposal_unverifiable", r.answer_text
+        assert "phrased negatively" in r.refused_reason
 
 
 @pytest.mark.parametrize("template", ["Is {p} too much for Caloradine?", "Is it dangerous to give Caloradine {p}?",
@@ -386,6 +455,15 @@ def test_a_dose_the_sources_do_not_pair_with_a_daily_total_is_unverifiable():
     doc.parsed.freq.clear()
     dims = proposal.compare(proposal.read("Is a maximum of 15 mg a day okay for Caloradine?"), doc)
     assert dims[0].status == "unverifiable"
+
+
+def test_a_stated_maximum_is_compared_only_when_the_source_gives_one():
+    from decimal import Decimal
+    doc = proposal.documented("caloradine")
+    doc.max_stated = True
+    doc.parsed.max_daily = [proposal.Quantity(Decimal(30), "mass", "30 mg")]
+    assert proposal.compare(proposal.read("Is a maximum of 30 mg a day okay for Caloradine?"), doc)[0].status == "match"
+    assert proposal.compare(proposal.read("Is a maximum of 40 mg a day okay for Caloradine?"), doc)[0].status == "mismatch"
 
 
 def test_one_dose_or_a_total_for_the_day_when_the_two_readings_disagree_is_unverifiable():
@@ -528,3 +606,22 @@ def test_the_labelled_cases_have_no_wrong_answer():
         if failure:
             bad.append((c["id"], c["query"], failure))
     assert not bad, bad[:5]
+
+
+@pytest.mark.parametrize("q", ["Is 15 mg once daily without food okay for Caloradine?",
+                               "Is no more than 15 mg per day okay for Caloradine?"])
+def test_without_food_and_no_more_than_are_not_negations(q):
+    assert "phrased negatively" not in (ask(q).refused_reason or "")
+
+
+def test_a_dose_question_that_states_a_regimen_gets_the_verdict_on_it():
+    assert ask("What is the dose of Caloradine 15 mg twice daily?").answer_text.startswith("No — the source gives 15 mg once daily")
+    assert ask("What is the dose of Caloradine 15 mg once daily?").answer_text.startswith("Yes — ")
+    assert ask("What is the dose of Caloradine?").proposal_check is None
+
+
+@pytest.mark.parametrize("q", ["Is Caloradine okay for at least 14 days?", "Is Caloradine okay for up to 14 days?",
+                               "Is Caloradine okay for 14 days or more?", "Is Caloradine okay for 14+ days?"])
+def test_an_open_ended_duration_is_never_a_match(q):
+    r = ask(q)
+    assert r.decision == "refuse" and r.reason_code == "proposal_unverifiable"

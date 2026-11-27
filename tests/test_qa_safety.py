@@ -198,7 +198,7 @@ def test_an_adult_patient_gets_the_documented_dose():
 # --- Questions --------------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("question", [
-    "Is 150 mg of Caloradine okay?", "Dose of Caloradine for a 5 year old at 0.5 mg/kg?", "Caloradine 15,5 mg?",
+    "Dose of Caloradine for a 5 year old at 0.5 mg/kg?", "Caloradine 15,5 mg?",
     "Fifteen milligrams of Caloradine every eight hours?", "What is the maximum daily dose of Caloradine?",
     "Caloradin dose", "Caloradyne dose", "Calorodine dose", "Caloridine dose", "Carloradine dose", "Mendal solution dose in mL",
     "dose of caloradine in grams", "What is the dose of Quelvarin?",
@@ -207,6 +207,12 @@ def test_a_question_about_something_the_sources_do_not_state_is_refused(question
     r = pipeline.run(question, review=False)
     assert r.decision == "refuse", question
     assert "15 mg" not in r.answer_text and "5 mL" not in r.answer_text
+
+
+def test_a_proposed_dose_the_sources_do_not_state_is_answered_no_not_endorsed():
+    r = pipeline.run("Is 150 mg of Caloradine okay?", review=False)
+    assert r.decision == "answer" and r.answer_text.startswith("No — the source gives 15 mg, not 150 mg.")
+    assert "150 mg" not in r.answer_text.partition(". ")[2]
 
 
 @pytest.mark.parametrize("question", [

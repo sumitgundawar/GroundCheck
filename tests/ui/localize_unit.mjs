@@ -89,16 +89,33 @@ check("an example keeps its query unless Spanish has one", (() => {
   const b = L.example({ group: "Nothing", label: "Unlisted", query: "Q?" });
   return a.group === "Demostración principal" && /Zalortin/.test(a.query) && b.query === "Q?" && b.label === "Unlisted";
 })());
+check("a rule's source label is translated and a document id is left alone", L.source("Formulary") === "Formulario" && L.source("CALO-001") === null && en.gcLocalize.source("Formulary") === null);
+check("a finding from structured fields keeps its numbers, units and names", (() => {
+  const f = { code: "paediatric_dose", severity: "info", message: "x", params: { medicine: "Mendel solution", subject: "answer", amount: 5, unit: "mL", frequency: "once daily", per_kg: 0.1, weight: 100, uncapped: 10, max_single: 5 } };
+  return L.structured(f) === "Para este paciente pediátrico, el formulario indica 5 mL una vez al día (0.1 mL/kg × 100 kg = 10 mL, con un máximo de 5 mL).";
+})());
+check("a finding whose note or frequency is unknown is left to the server", L.structured({ code: "renal_dose", severity: "warn", params: { medicine: "X", subject: "answer", note: "A note nobody translated.", dose: "7.5 mg once daily", measure: "eGFR", value: 40, stated: null, unit: "mg" } }) === null
+  && L.structured({ code: "weight_dose", severity: "info", params: { medicine: "X", subject: "answer", per_kg: 1, unit: "mg", weight: 70, amount: 70, frequency: "once a fortnight", max_single: null } }) === null);
 check("pseudo-locale keeps the query as written", pseudo.gcLocalize.example({ group: "Core demo", label: "Dosage trap (refuses)", query: "raw?" }).query === "raw?");
 check("pseudo-locale still renders longer text", /^\[/.test(pseudo.gcLocalize.text("not reached") || ""));
 
 const stdin = fs.readFileSync(0, "utf8").trim();
 const missing = [];
+const rendered = [];
 if (stdin) {
-  for (const { kind, text } of JSON.parse(stdin)) {
+  for (const item of JSON.parse(stdin)) {
+    if (item.kind === "finding") { rendered.push(L.structured(item.finding)); continue; }
+    if (item.kind === "phrase") { rendered.push(L.phrase(item.text)); continue; }
+    if (item.kind === "full") { rendered.push(L.finding(item.finding)); continue; }
+    if (item.kind === "verdict") { rendered.push(L.verdict(item.data)); continue; }
+    if (item.kind === "alert") { rendered.push(L.alert(item.alert)); continue; }
+    if (item.kind === "rule") { rendered.push(L.rule(item.rule)); continue; }
+    if (item.kind === "refusal") { rendered.push(L.refusal(item.data)); continue; }
+    if (item.kind === "value") { rendered.push(L.value(item.name, item.text)); continue; }
+    const { kind, text } = item;
     const got = kind === "reason" ? L.reason(text) : kind === "answer" ? L.answerText(text) : L.text(text);
     if (got === null) missing.push({ kind, text });
   }
 }
-console.log(JSON.stringify({ results, missing }));
+console.log(JSON.stringify({ results, missing, rendered }));
 process.exit(results.every((r) => r.ok) ? 0 : 1);

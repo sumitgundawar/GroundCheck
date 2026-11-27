@@ -270,7 +270,9 @@ def _rule_refusal_rate(s, now) -> dict | None:
             "detail": f"{rate:.0%} of {len(recent)} questions in the last {config.ALERT_WINDOW_MINUTES} minutes were "
                       f"refused, against {base:.0%} over the previous week. Check for a document that expired or was "
                       "retired, a search index problem, or a new kind of question.",
-            "value": round(rate, 4)}
+            "value": round(rate, 4),
+            "params": {"rate": f"{rate:.0%}", "n": len(recent), "minutes": config.ALERT_WINDOW_MINUTES,
+                       "base": f"{base:.0%}"}}
 
 
 def _rule_latency(s, now) -> dict | None:
@@ -286,7 +288,9 @@ def _rule_latency(s, now) -> dict | None:
             "detail": f"95% of questions in the last {config.ALERT_WINDOW_MINUTES} minutes took up to "
                       f"{p95 / 1000:.1f} s, above the {config.ALERT_LATENCY_P95_MS / 1000:.1f} s limit. Check the "
                       "language model provider, the local model's hardware, and the database.",
-            "value": p95}
+            "value": p95,
+            "params": {"minutes": config.ALERT_WINDOW_MINUTES, "seconds": f"{p95 / 1000:.1f}",
+                       "limit": f"{config.ALERT_LATENCY_P95_MS / 1000:.1f}"}}
 
 
 def _rule_retrieval_drift(s, now) -> dict | None:
@@ -304,7 +308,8 @@ def _rule_retrieval_drift(s, now) -> dict | None:
                       f"(stability index {psi:.2f}, alert at {config.ALERT_DRIFT_PSI:.2f})"
                       f"{', mostly lower' if lower else ''}. People may be asking about topics the approved "
                       "documents don't cover. Look at recent refusals in the review queue.",
-            "value": round(psi, 4)}
+            "value": round(psi, 4),
+            "params": {"psi": f"{psi:.2f}", "threshold": f"{config.ALERT_DRIFT_PSI:.2f}", "lower": lower}}
 
 
 def _rule_review_overdue(s, now) -> dict | None:
@@ -318,7 +323,7 @@ def _rule_review_overdue(s, now) -> dict | None:
             "title": "Review cases are overdue",
             "detail": f"{overdue} review case{'s are' if overdue != 1 else ' is'} past the due date. Assign or "
                       "resolve them on the Review page.",
-            "value": overdue}
+            "value": overdue, "params": {"n": overdue}}
 
 
 def _rule_documents_expiring(s, now) -> dict | None:
@@ -339,7 +344,9 @@ def _rule_documents_expiring(s, now) -> dict | None:
                        f"{len(rows)} approved document{'s expire' if len(rows) != 1 else ' expires'} within "
                        f"{config.ALERT_DOCUMENT_EXPIRY_DAYS} days") +
                       f": {names}{more}. Upload a current version on the Documents page.",
-            "value": len(rows)}
+            "value": len(rows),
+            "params": {"expired": len(expired), "total": len(rows), "days": config.ALERT_DOCUMENT_EXPIRY_DAYS,
+                       "names": names, "more": max(len(rows) - 3, 0)}}
 
 
 def _rule_audit_chain(s, now) -> dict | None:
@@ -357,7 +364,9 @@ def _rule_audit_chain(s, now) -> dict | None:
                       f"{' at record ' + str(first.get('seq')) if first.get('seq') is not None else ''}: "
                       f"{first.get('problem', 'records were changed or removed')}. Treat this as a security "
                       "incident.",
-            "value": 0}
+            "value": 0,
+            "params": {"error": result.get("error") or "", "seq": first.get("seq"),
+                       "problem": first.get("problem", "records were changed or removed")}}
 
 
 def _rule_server_errors(s, now) -> dict | None:
@@ -372,7 +381,7 @@ def _rule_server_errors(s, now) -> dict | None:
     return {"severity": "critical", "title": "Server errors on this instance",
             "detail": f"{share:.0%} of {len(recent)} requests in the last 15 minutes failed with a server error. "
                       "Check the application logs.",
-            "value": round(share, 4)}
+            "value": round(share, 4), "params": {"share": f"{share:.0%}", "n": len(recent)}}
 
 
 def _rule_imaging_failures(s, now) -> dict | None:
@@ -385,7 +394,7 @@ def _rule_imaging_failures(s, now) -> dict | None:
     return {"severity": "warning", "title": "Imaging analyses failed",
             "detail": f"{failed} imaging analys{'es' if failed != 1 else 'is'} failed in the last day. The series "
                       "page shows each error.",
-            "value": failed}
+            "value": failed, "params": {"n": failed}}
 
 
 def _rule_release_blocked(s, now) -> dict | None:
@@ -399,7 +408,8 @@ def _rule_release_blocked(s, now) -> dict | None:
             "detail": f"R{latest.number} ({latest.reason}) " + (f"answered {unsafe} question{'s' if unsafe != 1 else ''} "
                       "that must be refused" if unsafe else "couldn't be checked") +
                       ", so it didn't go live and answers still come from the live release. See Releases.",
-            "value": unsafe or 0}
+            "value": unsafe or 0,
+            "params": {"number": latest.number, "reason": latest.reason, "unsafe": unsafe or 0}}
 
 
 RULES = {
@@ -455,7 +465,8 @@ def evaluate() -> dict:
             current = s.get(Alert, firing[rule].id) if rule in firing else None
             if found and current is None:
                 current = Alert(rule=rule, severity=found["severity"], title=found["title"], detail=found["detail"],
-                                value=found.get("value"), first_seen=now, last_seen=now, status="firing")
+                                value=found.get("value"), first_seen=now, last_seen=now, status="firing",
+                                params=found.get("params") or {})
                 s.add(current)
                 s.flush()
                 changes["fired"].append(rule)
@@ -464,6 +475,7 @@ def evaluate() -> dict:
                 escalated = SEVERITY_RANK[found["severity"]] > SEVERITY_RANK[current.severity]
                 current.severity, current.title, current.detail = found["severity"], found["title"], found["detail"]
                 current.value, current.last_seen = found.get("value"), now
+                current.params = found.get("params") or {}
                 if escalated:
                     current.acknowledged_at, current.acknowledged_by = None, None
                     _notify(current, "escalated")
@@ -492,7 +504,7 @@ def _instance() -> dict:
 
 def _alert(a) -> dict:
     return {"id": a.id, "rule": a.rule, "severity": a.severity, "status": a.status, "title": a.title,
-            "detail": a.detail, "value": a.value, "first_seen": a.first_seen.isoformat(),
+            "detail": a.detail, "code": a.rule, "params": a.params or {}, "value": a.value, "first_seen": a.first_seen.isoformat(),
             "last_seen": a.last_seen.isoformat(), "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
             "acknowledged_at": a.acknowledged_at.isoformat() if a.acknowledged_at else None,
             "acknowledged_by": a.acknowledged_by_name, "notified": a.notified}
@@ -541,15 +553,21 @@ def overview() -> dict:
             "uptime_seconds": round(time.time() - _started),
         },
         "rules": [
-            {"rule": "refusal_rate", "name": "Refusal rate", "limit": f"{config.ALERT_REFUSAL_RISE:.0%} above the last week, over {config.ALERT_WINDOW_MINUTES} min with at least {config.ALERT_MIN_QUESTIONS} questions"},
-            {"rule": "latency", "name": "Response time", "limit": f"95th percentile above {config.ALERT_LATENCY_P95_MS / 1000:.1f} s over {config.ALERT_WINDOW_MINUTES} min"},
-            {"rule": "retrieval_drift", "name": "Question drift", "limit": f"Stability index of search scores at least {config.ALERT_DRIFT_PSI:.2f}, last day against last month"},
-            {"rule": "review_overdue", "name": "Overdue reviews", "limit": f"Any overdue; critical at {config.ALERT_OVERDUE_CRITICAL}"},
-            {"rule": "documents_expiring", "name": "Document expiry", "limit": f"Expiring within {config.ALERT_DOCUMENT_EXPIRY_DAYS} days; critical once expired"},
-            {"rule": "audit_chain", "name": "Audit trail", "limit": f"Any break, checked every {config.ALERT_CHAIN_CHECK_MINUTES} min"},
-            {"rule": "server_errors", "name": "Server errors", "limit": "5% of requests in 15 min, on this instance"},
-            {"rule": "imaging_failures", "name": "Imaging failures", "limit": "Any failed analysis in the last day"},
-            {"rule": "release_blocked", "name": "Knowledge releases", "limit": "The newest release failed its safety check"},
+            {"rule": "refusal_rate", "name": "Refusal rate", "limit": f"{config.ALERT_REFUSAL_RISE:.0%} above the last week, over {config.ALERT_WINDOW_MINUTES} min with at least {config.ALERT_MIN_QUESTIONS} questions",
+             "params": {"rise": f"{config.ALERT_REFUSAL_RISE:.0%}", "minutes": config.ALERT_WINDOW_MINUTES, "min": config.ALERT_MIN_QUESTIONS}},
+            {"rule": "latency", "name": "Response time", "limit": f"95th percentile above {config.ALERT_LATENCY_P95_MS / 1000:.1f} s over {config.ALERT_WINDOW_MINUTES} min",
+             "params": {"seconds": f"{config.ALERT_LATENCY_P95_MS / 1000:.1f}", "minutes": config.ALERT_WINDOW_MINUTES}},
+            {"rule": "retrieval_drift", "name": "Question drift", "limit": f"Stability index of search scores at least {config.ALERT_DRIFT_PSI:.2f}, last day against last month",
+             "params": {"psi": f"{config.ALERT_DRIFT_PSI:.2f}"}},
+            {"rule": "review_overdue", "name": "Overdue reviews", "limit": f"Any overdue; critical at {config.ALERT_OVERDUE_CRITICAL}",
+             "params": {"critical": config.ALERT_OVERDUE_CRITICAL}},
+            {"rule": "documents_expiring", "name": "Document expiry", "limit": f"Expiring within {config.ALERT_DOCUMENT_EXPIRY_DAYS} days; critical once expired",
+             "params": {"days": config.ALERT_DOCUMENT_EXPIRY_DAYS}},
+            {"rule": "audit_chain", "name": "Audit trail", "limit": f"Any break, checked every {config.ALERT_CHAIN_CHECK_MINUTES} min",
+             "params": {"minutes": config.ALERT_CHAIN_CHECK_MINUTES}},
+            {"rule": "server_errors", "name": "Server errors", "limit": "5% of requests in 15 min, on this instance", "params": {}},
+            {"rule": "imaging_failures", "name": "Imaging failures", "limit": "Any failed analysis in the last day", "params": {}},
+            {"rule": "release_blocked", "name": "Knowledge releases", "limit": "The newest release failed its safety check", "params": {}},
         ],
         "instance": _instance(),
         "disabled": sorted(config.ALERT_DISABLED_RULES),

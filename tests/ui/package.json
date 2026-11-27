@@ -5,7 +5,9 @@
   "description": "Browser journey through the GroundCheckHealth app",
   "scripts": {
     "test": "node journey.mjs",
-    "postinstall": "playwright install --with-deps chromium"
+    "postinstall": "playwright install --with-deps chromium",
+    "a11y": "node a11y.mjs",
+    "responsive": "node responsive.mjs"
   },
   "devDependencies": {
     "playwright": "^1.50.0"

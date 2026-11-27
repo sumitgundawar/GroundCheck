@@ -25,6 +25,7 @@ ReasonCode = Literal[
     "population_not_covered", "stated_value_unsupported", "form_unsupported",
     "limit_not_stated", "combination_forbidden", "insufficient_context",
     "claim_ungrounded", "dose_unsupported", "patient_unsafe", "unsupported_language", "proposal_unverifiable",
+    "source_conflict",
 ]
 
 

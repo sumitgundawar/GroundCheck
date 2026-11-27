@@ -131,6 +131,13 @@ def _series_summary(row: ImagingSeries) -> dict:
     }
 
 
+def _clean_label(label: str) -> str:
+    """A label is free text typed at upload, and is shown and exported: names and identifiers do not stay in it."""
+    from ..deid import deidentify
+
+    return deidentify(str(label or "")[:200]).text[:200]
+
+
 def import_nifti(name: str, data: bytes, label: str = "", user_id: int | None = None, site_id: int | None = None,
                  modality: str | None = None) -> dict:
     """A NIfTI volume as a series. Nothing from the file's header text is kept, and the modality (which NIfTI
@@ -139,6 +146,7 @@ def import_nifti(name: str, data: bytes, label: str = "", user_id: int | None = 
 
     from . import nifti
 
+    label = _clean_label(label)
     try:
         found = nifti.read(nifti.decompress(data))
     except nifti.NiftiError as exc:
@@ -174,6 +182,7 @@ def import_series(uploads: list[tuple[str, bytes]], source: str = "upload", labe
                   user_id: int | None = None, site_id: int | None = None) -> dict:
     from . import nifti
 
+    label = _clean_label(label)
     volumes = [u for u in uploads if nifti.is_nifti_name(u[0])]
     if volumes:
         rest = [u for u in uploads if not nifti.is_nifti_name(u[0])]

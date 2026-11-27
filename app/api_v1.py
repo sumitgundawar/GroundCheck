@@ -129,6 +129,8 @@ def resolve_site(call: Call, site_key: str | None) -> int | None:
     with db.session() as s:
         site = sites.by_key(s, site_key)
         if site is None:
+            if call.key.site_id is not None:      # a site's key cannot tell a site that does not exist from one that does
+                raise apikeys.ApiKeyError(403, "site_forbidden", "This API key belongs to a different site.")
             raise apikeys.ApiKeyError(422, "unknown_site", "There is no site with that key.")
         if call.key.site_id is not None and site.id != call.key.site_id:
             raise apikeys.ApiKeyError(403, "site_forbidden", "This API key belongs to a different site.")

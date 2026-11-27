@@ -140,7 +140,6 @@ def test_core_demo_dose_and_interaction_question_still_answers():
 
 
 @pytest.mark.parametrize("query, reason_part", [
-    ("Caloradine is 50 mg once daily, correct?", "50 mg"),
     ("My email is a@b.com, what is the dose of Caloradine for a 5 year old?", "5-year-old"),
     ("What is the maximum dose of Caloradine?", "maximum dose"),
     ("Combine Caloradine with Orrin-blockers at what dose?", "must not be combined"),
@@ -168,8 +167,18 @@ def test_misspelled_names_are_refused_not_matched_by_prefix(query):
     "should i give 50 mcg of rulpuraprex once daily?",
 ])
 def test_a_dose_must_come_from_a_source_about_the_named_medicine(query):
-    # A retrieved passage about another medicine says 50 mcg; that doesn't support it.
-    assert pipeline.run(query, check_only=True).decision == "refuse"
+    # Another medicine's passage saying 50 mcg does not support it; Rulpuraprex's own source says 10 mcg, so the
+    # question is answered "No" with that, and 50 mcg appears only in the "not" clause.
+    r = pipeline.run(query, review=False)
+    assert r.decision == "answer" and r.answer_text.startswith("No — the source gives 10 mcg once daily, not 50 mcg")
+    assert "50 mcg" not in r.answer_text.partition(", not ")[2].partition(". ")[2]
+
+
+def test_a_leading_question_with_a_wrong_dose_is_answered_no():
+    r = pipeline.run("Caloradine is 50 mg once daily, correct?", review=False)
+    assert r.decision == "answer"
+    assert r.answer_text.startswith("No — the source gives 15 mg once daily, not 50 mg once daily.")
+    assert "50 mg" not in r.answer_text.partition(". ")[2]
 
 
 def test_other_species_are_refused():

@@ -66,7 +66,7 @@ On a Linux host with Docker Engine 24 or later and Docker Compose v2:
 
 ```bash
 git clone https://github.com/sumitgundawar/GroundCheck.git
-cd GroundCheckHealth
+cd GroundCheck
 cp deploy/.env.example deploy/.env
 ```
 
@@ -123,7 +123,7 @@ docker run -d --name groundcheck -p 7860:7860 \
   -e TRAINING_RUNS_DIR=/data/models/runs \
   -e IMAGING_DIR=/data/imaging \
   -e DATA_ENCRYPTION_KEYS=... -e AUDIT_SIGNING_KEYS=... \
-  groundcheck:1.0.0
+  groundcheck:3.0.0
 docker exec -it groundcheck python -m app.cli create-user \
   --email admin@your-trust.nhs.uk --role admin
 ```
@@ -241,7 +241,7 @@ chart passes `helm lint` and Kubernetes 1.30 schema validation.
   `Authorization: Bearer <METRICS_TOKEN>`.
 - The **Monitoring** page shows alerts on refusal rates, response times,
   drift from the documents, overdue reviews, expiring documents, the audit
-  trail and failed releases. Set `ALERT_WEBHOOK_URL` to post them to Slack,
+  trail, server errors, failed imaging analyses and failed releases. Set `ALERT_WEBHOOK_URL` to post them to Slack,
   Teams or a paging service.
 - Caddy writes JSON access logs to standard output, and the app writes its logs
   there too: collect them with your log platform.

@@ -20,6 +20,7 @@ issuer (with its access token) are contacted."""
 
 from __future__ import annotations
 
+import calendar
 import math
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
@@ -76,7 +77,8 @@ def concept_text(concept: dict | None) -> str:
 
 def _codes(concept: dict | None) -> list[tuple[str, str]]:
     coding = concept.get("coding") if isinstance(concept, dict) else None
-    return [(c.get("system", ""), c.get("code", "")) for c in coding or [] if isinstance(c, dict)] if isinstance(coding, list) else []
+    return [(c["system"] if isinstance(c.get("system"), str) else "", c["code"] if isinstance(c.get("code"), str) else "")
+            for c in coding or [] if isinstance(c, dict)] if isinstance(coding, list) else []
 
 
 def _status(resource: dict, field: str) -> str:
@@ -167,7 +169,12 @@ def _age(birth: str, today: date) -> float | None:
     if not isinstance(birth, str) or len(birth) < 4:
         return None
     try:
-        born = date.fromisoformat(birth[:10]) if len(birth) >= 10 else date(int(birth[:4]), int(birth[5:7] or 1), 1)
+        if len(birth) >= 10:
+            born = date.fromisoformat(birth[:10])
+        else:
+            # A year, or a year and month, could be any day in it: take the last, so the patient is never older than they may be.
+            year, month = int(birth[:4]), int(birth[5:7] or 12) if len(birth) > 5 else 12
+            born = min(date(year, month, calendar.monthrange(year, month)[1]), today)
     except ValueError:
         return None
     if born > today:
@@ -265,6 +272,7 @@ def map_patient(patient: dict, observations: list[dict], allergies: list[dict], 
         warnings.append("The record says this patient has died.")
 
     latest: dict[str, tuple[datetime | None, dict]] = {}
+    tied: set[str] = set()
     for obs in observations:
         if obs.get("status") in ("entered-in-error", "cancelled", "preliminary"):
             continue
@@ -278,10 +286,19 @@ def map_patient(patient: dict, observations: list[dict], allergies: list[dict], 
         best = latest.get(kind)
         if best is None or (when and (best[0] is None or when > best[0])):
             latest[kind] = (when, obs)
+            tied.discard(kind)
+        elif when == best[0] and kind != "pregnancy" and _quantity(kind, obs) != _quantity(kind, best[1]):
+            tied.add(kind)
+        elif when == best[0] and kind == "pregnancy" and _codes(obs.get("valueCodeableConcept")) != _codes(best[1].get("valueCodeableConcept")):
+            tied.add(kind)
 
     used = []
     labs = {}
     for kind, (when, obs) in latest.items():
+        if kind in tied:
+            warnings.append(f"The latest {kind} was recorded twice at the same time with different values, so neither was used.")
+            serious.append(f"The latest {kind} has conflicting values at the same time.")
+            continue
         if kind == "pregnancy":
             codes = {c for _, c in _codes(obs.get("valueCodeableConcept"))}
             if PREGNANT in codes:

@@ -560,6 +560,9 @@ class Alert(Base):
     acknowledged_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     acknowledged_by_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The numbers and names the title and detail were written from, so a screen
+    # can write them in another language.
+    params: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
 
     __table_args__ = (Index("ix_alerts_rule_status", "rule", "status"),)
 

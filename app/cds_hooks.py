@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import math
 import re
 import threading
 import time
@@ -24,7 +25,7 @@ import uuid
 
 import httpx
 
-from . import config, fhir, formulary, patient_checks
+from . import config, fhir, formulary, messages, patient_checks
 from .schemas import Claim, PatientContext
 
 SERVICE_ID = "groundcheck-medication-safety"
@@ -233,17 +234,63 @@ def _plain(amount: float) -> str:
     return text if text and text != "-0" else "0"
 
 
-def _order_dose(order: dict) -> tuple[str, float | None, str]:
-    """(sentence, amount, unit) describing an order's dose."""
-    dosage = (order.get("dosageInstruction") or [{}])[0]
-    quantity = next((d.get("doseQuantity") for d in dosage.get("doseAndRate", []) if d.get("doseQuantity")), None)
-    repeat = (dosage.get("timing") or {}).get("repeat", {})
-    frequency = _FREQUENCY.get((repeat.get("frequency", 1), repeat.get("period", 1), repeat.get("periodUnit", "d")), "")
-    if not quantity or not isinstance(quantity.get("value"), (int, float)):
-        return dosage.get("text", ""), None, ""
-    unit = (quantity.get("unit") or quantity.get("code") or "").replace("ml", "mL")
-    amount = float(quantity["value"])
+def _frequency(repeat: dict) -> str:
+    """How often, in words the dose checks read. A frequency this cannot express is left out, never turned into once daily
+    by a table miss: four times a day must not look like once."""
+    count, period, unit = repeat.get("frequency", 1), repeat.get("period", 1), repeat.get("periodUnit", "d")
+    numbers = [x for x in (count, period) if isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) and x > 0]
+    if len(numbers) != 2 or not isinstance(unit, str):
+        return ""
+    known = _FREQUENCY.get((count, period, unit))
+    if known:
+        return known
+    per_day = {"d": count / period, "h": count * 24 / period, "min": count * 1440 / period}.get(unit)
+    if per_day is None:
+        return ""
+    if per_day <= 1:
+        hours = 24 / per_day if per_day else 0
+        return f"every {_plain(hours)} hours" if hours and float(hours).is_integer() and per_day < 1 else ("once daily" if per_day == 1 else "")
+    if float(per_day).is_integer() and per_day <= 24:
+        return f"{int(per_day)} times daily"
+    return ""
+
+
+def _dosages(order: dict) -> list[dict]:
+    raw = order.get("dosageInstruction")
+    found = [d for d in raw if isinstance(d, dict)] if isinstance(raw, list) else []
+    return found or [{}]
+
+
+def _dose_of(dosage: dict) -> tuple[str, float | None, str]:
+    rates = dosage.get("doseAndRate") if isinstance(dosage.get("doseAndRate"), list) else []
+    quantity = next((d["doseQuantity"] for d in rates if isinstance(d, dict) and isinstance(d.get("doseQuantity"), dict)
+                     and d["doseQuantity"]), None)
+    timing = dosage.get("timing") if isinstance(dosage.get("timing"), dict) else {}
+    repeat = timing.get("repeat") if isinstance(timing.get("repeat"), dict) else {}
+    frequency = _frequency(repeat)
+    text = dosage.get("text") if isinstance(dosage.get("text"), str) else ""
+    value = quantity.get("value") if quantity else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return text, None, ""
+    raw_unit = quantity.get("unit") or quantity.get("code") or ""
+    unit = (raw_unit if isinstance(raw_unit, str) else "").replace("ml", "mL")
+    amount = float(value)
     return f"{_plain(amount)} {unit} {frequency}".strip(), amount, unit
+
+
+def _order_dose(order: dict) -> tuple[str, float | None, str]:
+    """(sentence, amount, unit) describing an order's first dosage instruction."""
+    return _dose_of(_dosages(order)[0])
+
+
+def _order_sentences(order: dict) -> list[str]:
+    """Every dosage instruction is checked, not only the first: a second line is still a dose the patient is given."""
+    seen = []
+    for dosage in _dosages(order):
+        sentence = _dose_of(dosage)[0]
+        if sentence not in seen:
+            seen.append(sentence)
+    return seen
 
 
 def _order_name(order: dict) -> str:
@@ -263,9 +310,14 @@ def _clip(text: str, n: int = 60) -> str:
     return text if len(text) <= n else text[: n - 1].rstrip() + "…"
 
 
-def _notice(summary: str, detail: str, code: str, indicator: str = "warning") -> dict:
+def _say(loc: str, key: str, english: str, **values: object) -> str:
+    """The wording for a card: the English written in the code, or the locale file's under `key`."""
+    return english if loc == "en" else (messages.message(key, loc, **values) or english)
+
+
+def _notice(summary: str, detail: str, code: str, indicator: str = "warning", loc: str = "en") -> dict:
     return {"uuid": str(uuid.uuid4()), "summary": summary[:140], "indicator": indicator, "detail": detail,
-            "source": {"label": "GroundCheckHealth formulary",
+            "source": {"label": _say(loc, "msg.cds.source", "GroundCheckHealth formulary"),
                        "topic": {"code": code, "system": "https://groundcheckhealth.com/cds/finding"}},
             "overrideReasons": []}
 
@@ -302,9 +354,12 @@ def validate_request(request, service_id: str | None = None) -> str:
     return hook
 
 
-def cards_for(request: dict, service_id: str | None = None) -> dict:
+def cards_for(request: dict, service_id: str | None = None, accept_language: str | None = None) -> dict:
     hook = validate_request(request, service_id)
     context = request["context"]
+    # The language of the cards: the hook's own, else the caller's Accept-Language, else English.
+    loc = messages.pick_locale(context.get("language"), context.get("locale"), request.get("language"),
+                               request.get("locale"), accept_language)
     patient_id = context["patientId"]
     prefetch = dict(request.get("prefetch") or {})
     missing = [k for k, t in (("patient", "Patient"), *_PREFETCH_TYPES.items()) if not _usable(prefetch, k, t)]
@@ -333,7 +388,8 @@ def cards_for(request: dict, service_id: str | None = None) -> dict:
     if wrong_patient:
         loaded.warnings.append(f"{wrong_patient} prefetched resources belonged to a different patient and were ignored.")
     orders = _bundle_resources(context.get("draftOrders"), "MedicationRequest")
-    selected = set(context.get("selections") or [])
+    selections = context.get("selections")
+    selected = {x for x in selections if isinstance(x, str)} if isinstance(selections, list) else set()
     if hook == "order-select" and selected:
         orders = [o for o in orders if f"MedicationRequest/{o.get('id')}" in selected]
 
@@ -349,20 +405,38 @@ def cards_for(request: dict, service_id: str | None = None) -> dict:
             # silence is read as clearance.
             cards.append({
                 "uuid": str(uuid.uuid4()),
-                "summary": f"Not checked: {_clip(name) or 'this medicine'} is not in the formulary",
+                "summary": (f"Not checked: {_clip(name) or 'this medicine'} is not in the formulary" if loc == "en" else
+                            messages.message("msg.cds.not_checked.summary", loc, name=_clip(name) or messages.message(
+                                "msg.cds.not_checked.fallback", loc))[:140]),
                 "indicator": "warning",
                 "detail": (f"**{name or 'This medicine'}** was not checked. It is not in the formulary "
                            f"GroundCheckHealth is running ({formulary.load().name}), so no allergy, interaction, "
                            f"kidney, liver, pregnancy or dose rule has been applied to this order.\n\n"
-                           f"This is not a statement that the order is safe."),
-                "source": {"label": "GroundCheckHealth formulary",
+                           f"This is not a statement that the order is safe." if loc == "en" else
+                           messages.message("msg.cds.not_checked.detail", loc, formulary=formulary.load().name,
+                                            name=name or messages.message("msg.cds.not_checked.fallback_cap", loc))),
+                "source": {"label": _say(loc, "msg.cds.source", "GroundCheckHealth formulary"),
                            "topic": {"code": "not_in_formulary",
                                      "system": "https://groundcheckhealth.com/cds/finding"}},
                 "overrideReasons": [],
             })
             continue
-        sentence, _, _ = _order_dose(order)
-        claims = [Claim(text=f"{medicine.name} {sentence}.", source_ids=["ORDER"], grounded=True, grounding_score=1.0)]
+        sentences = _order_sentences(order)
+        sentence = "; ".join(x for x in sentences if x)
+        claims = [Claim(text=f"{medicine.name} {x}.", source_ids=["ORDER"], grounded=True, grounding_score=1.0)
+                  for x in sentences]
+        if not any(patient_checks._VALUE.search(x) for x in sentences):
+            given = any(_dosages(order)[0].values())
+            kind = "given" if given else "none"
+            cards.append(_notice(
+                _say(loc, f"msg.cds.dose.summary_{kind}", f"Dose not checked: {_clip(medicine.name, 40)} has no readable dose"
+                     if given else f"Dose not checked: {_clip(medicine.name, 40)} has no dose", name=_clip(medicine.name, 40)),
+                _say(loc, f"msg.cds.dose.detail_{kind}", f"The order for **{medicine.name}** "
+                     + ("gives its dose in a form GroundCheckHealth cannot read (for example a range or free text without an amount), "
+                        if given else "does not state a dose, ")
+                     + "so no dose limit was applied. Other checks (allergy, interaction, kidney, liver, pregnancy) still ran. "
+                     "This is not a statement that the dose is safe.", name=medicine.name),
+                "dose_not_checked", "warning" if given else "info", loc))
         # The order itself: "the dose of X" makes the checks treat it as giving the medicine.
         others = PatientContext(**{**loaded.context.model_dump(),
                                    "medicines": [m for m in loaded.context.medicines
@@ -371,36 +445,47 @@ def cards_for(request: dict, service_id: str | None = None) -> dict:
         for finding in review.findings:
             if finding.code == "already_taking":
                 continue
-            summary = finding.message if len(finding.message) <= 140 else finding.message[:137].rstrip() + "…"
-            detail = f"**{medicine.name}** ({sentence or 'dose not stated'}): {finding.message}"
+            said = messages.finding_text(finding, loc) if loc != "en" else None
+            card_loc = loc if said else "en"
+            message = said or finding.message
+            summary = message if len(message) <= 140 else message[:137].rstrip() + "…"
+            shown = sentence
+            if card_loc != "en":
+                shown = "; ".join(messages.phrase(x, card_loc) or x for x in sentences if x)
+            detail = f"**{medicine.name}** ({shown or _say(card_loc, 'msg.cds.dose_not_stated', 'dose not stated')}): {message}"
             if loaded.warnings:
-                detail += "\n\n" + "\n".join(f"- {w}" for w in loaded.warnings)
+                detail += "\n\n" + (_say(card_loc, "msg.cds.warnings", "") + "\n" if card_loc != "en" else "") + "\n".join(f"- {w}" for w in loaded.warnings)
             cards.append({
                 "uuid": str(uuid.uuid4()),
                 "summary": summary,
                 "indicator": INDICATOR[finding.severity],
                 "detail": detail,
-                "source": {"label": "GroundCheckHealth formulary" + (f" ({finding.rule_id})" if finding.rule_id else ""),
+                "source": {"label": _say(card_loc, "msg.cds.source", "GroundCheckHealth formulary") + (f" ({finding.rule_id})" if finding.rule_id else ""),
                            "topic": {"code": finding.code, "system": "https://groundcheckhealth.com/cds/finding"}},
                 "overrideReasons": [
                     {"code": "clinically-appropriate", "system": "https://groundcheckhealth.com/cds/override",
-                     "display": "Clinically appropriate for this patient"},
+                     "display": _say(card_loc, "msg.cds.override.clinically", "Clinically appropriate for this patient")},
                     {"code": "data-out-of-date", "system": "https://groundcheckhealth.com/cds/override",
-                     "display": "The patient data is out of date"},
+                     "display": _say(card_loc, "msg.cds.override.outdated", "The patient data is out of date")},
                 ] if finding.severity == "block" else [],
             })
     if orders and gaps:
         what = ", ".join(_PREFETCH_LABELS[k] for k in gaps)
+        said = ", ".join(_say(loc, f"msg.cds.gap.{k}", _PREFETCH_LABELS[k]) for k in gaps)
+        more = _say(loc, "msg.cds.partly.stopped", f", and they couldn't be read from its FHIR server ({stopped})",
+                    stopped=stopped) if stopped else ""
         cards.append(_notice(
-            f"Partly checked: {what} not available", f"The EHR did not supply the patient's {what}"
-            + (f", and they couldn't be read from its FHIR server ({stopped})" if stopped else "")
-            + ". Checks that need them were not applied, so no card here is a statement that the order is safe.",
-            "patient_data_missing"))
+            _say(loc, "msg.cds.partly.summary", f"Partly checked: {what} not available", what=said),
+            _say(loc, "msg.cds.partly.detail", f"The EHR did not supply the patient's {what}{more}. Checks that need them "
+                 "were not applied, so no card here is a statement that the order is safe.", what=said, stopped=more),
+            "patient_data_missing", "warning", loc))
     if orders and (loaded.serious or wrong_patient):
+        lines = "\n".join(f"- {w}" for w in loaded.serious + loaded.warnings[-1:] * bool(wrong_patient))
         cards.append(_notice(
-            "Some patient data could not be read", "Parts of the patient's record were invalid or unreadable, so a check "
-            "may be missing:\n\n" + "\n".join(f"- {w}" for w in loaded.serious + loaded.warnings[-1:] * bool(wrong_patient)),
-            "patient_data_unreadable", "info"))
+            _say(loc, "msg.cds.unreadable.summary", "Some patient data could not be read"),
+            _say(loc, "msg.cds.unreadable.detail", "Parts of the patient's record were invalid or unreadable, so a check "
+                 "may be missing:\n\n" + lines, lines=lines),
+            "patient_data_unreadable", "info", loc))
     order_rank = {"critical": 0, "warning": 1, "info": 2}
     cards.sort(key=lambda c: order_rank[c["indicator"]])
     return {"cards": cards}

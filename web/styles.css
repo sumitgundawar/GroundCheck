@@ -954,8 +954,8 @@ details[open] > .j-summary::before { content: "▾"; }
 
 .protection-block { padding-bottom: var(--space-4); margin-bottom: var(--space-4); border-bottom: 1px solid var(--border); }
 .protection-block:last-child { border-bottom: 0; margin-bottom: 0; }
-.protection-block h3 { margin: 0; font-size: 14px; }
-.protection-block > h3 { margin-bottom: var(--space-2); }
+.protection-block h2 { margin: 0; font-size: 14px; }
+.protection-block > h2 { margin-bottom: var(--space-2); }
 .verify-result { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid; font-size: 13.5px; }
 .verify-result.ok { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
 .verify-result.bad { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
@@ -1690,3 +1690,31 @@ summary:focus-visible, .switch input:focus-visible + .switch-track { outline: 2p
 input[type="file"] { max-width: 100%; min-width: 0; }
 .users-table-wrap { max-width: 100%; }
 .suggestion-tip { display: inline-block; padding: var(--space-1) var(--space-3); border-left: 3px solid var(--border-strong, currentColor); color: var(--text-muted, inherit); font-size: 0.9em; overflow-wrap: anywhere; }
+
+/* A proposed regimen against the source */
+.proposal-check { display: flex; flex-direction: column; gap: var(--space-3); margin: 0 0 var(--space-3); }
+.proposal-check[hidden] { display: none; }
+.proposal-verdict { margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid; border-radius: var(--radius-sm); font-size: 16px; font-weight: 600; line-height: 1.5; }
+.proposal-verdict.match { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
+.proposal-verdict.mismatch { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.proposal-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.proposal-table caption { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); padding: 0 0 var(--space-2); }
+.proposal-table th, .proposal-table td { text-align: left; padding: var(--space-2); border-bottom: 1px solid var(--border); vertical-align: top; }
+.proposal-table thead th { font-size: 12px; font-weight: 500; color: var(--text-muted); border-bottom-color: var(--border-strong); }
+.proposal-table tbody th { font-weight: 600; color: var(--text); }
+.dim-status { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; white-space: nowrap; }
+.dim-status.match { color: var(--ok); }
+.dim-status.mismatch { color: var(--danger); }
+.dim-status.unverifiable { color: var(--warn); }
+.dim-mark { font-weight: 700; }
+.dim-cell { display: inline-block; }
+.dim-reason { display: block; margin-top: 2px; font-size: 13px; color: var(--text-muted); font-weight: 400; }
+@media (max-width: 640px) {
+  .proposal-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .proposal-table caption { display: block; }
+  .proposal-table tbody tr { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+  .proposal-table tbody th { grid-column: 1 / -1; border: 0; padding: 0; }
+  .proposal-table td { display: contents; }
+  .proposal-table td[data-label]::before { content: attr(data-label); font-size: 12px; color: var(--text-muted); align-self: center; }
+  .proposal-table td > * { justify-self: start; }
+}

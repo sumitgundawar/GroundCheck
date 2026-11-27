@@ -409,8 +409,16 @@ export class GroundCheck {
     }
   }
 
+  /** An error message must never carry the API key, even when the server echoes it back. */
+  #scrub(text: string): string {
+    let out = this.#apiKey ? text.split(this.#apiKey).join("***") : text;
+    out = out.replace(/gck_[A-Za-z0-9_-]{4,}/g, "***");
+    return out.replace(/\b(bearer|basic)\s+[^\s"',;]+/gi, "$1 ***");
+  }
+
   #error(status: number, headers: Headers, raw: Uint8Array, retryAfter: number | undefined): APIStatusError {
-    const requestId = headers.get("x-request-id") ?? undefined;
+    const rawId = headers.get("x-request-id");
+    const requestId = rawId === null ? undefined : this.#scrub(rawId);
     let code: string | undefined;
     let message = `HTTP ${status}`;
     try {
@@ -418,8 +426,8 @@ export class GroundCheck {
       const err = parsed !== null && typeof parsed === "object" ? (parsed as Record<string, unknown>)["error"] : undefined;
       if (err !== null && typeof err === "object") {
         const e = err as Record<string, unknown>;
-        if (typeof e["message"] === "string" && e["message"].trim()) message = e["message"].trim().slice(0, 1000);
-        if (typeof e["code"] === "string") code = e["code"].slice(0, 100);
+        if (typeof e["message"] === "string" && e["message"].trim()) message = this.#scrub(e["message"].trim()).slice(0, 1000);
+        if (typeof e["code"] === "string") code = this.#scrub(e["code"]).slice(0, 100);
       }
     } catch {
       // not JSON: keep the generic message

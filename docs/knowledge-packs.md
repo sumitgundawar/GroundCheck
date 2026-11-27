@@ -41,8 +41,7 @@ output is reproducible: the same inputs give the same bytes.
 Import adds each document as a **pending** version. A reviewer approves it in the usual way, which retires the
 previous approved version of a document with the same title. The pack's formulary is validated and staged
 beside its record (under `PACK_STORE_DIR`, default `data/packs/<name>/<version>/`) but not activated; point
-`FORMULARY_PATH` at it to use it. The eval set is kept for the release gate (`packs.release_gate_cases()`,
-run with `packs.run_eval`).
+`FORMULARY_PATH` at it to use it. The eval set is kept for the release gate (see "The release gate" below).
 
 Importing is safe to repeat: the same pack again changes nothing. A different pack with the same name and
 version is refused (publish changes under a new version). A newer version adds new pending versions of the
@@ -66,7 +65,12 @@ also recorded in the audit trail.
 Archives are read into memory, never extracted to disk. Names with `..`, absolute paths, drive letters, backslashes
 or control characters, links, encrypted members, duplicate names, oversized members and over-large totals are refused.
 
-## Not yet wired
+## The release gate
 
-The release gate itself (`app/releases.py`) does not yet read `packs.release_gate_cases()`; until it does, run
-`packs.run_eval(packs.release_gate_cases())` after approving a pack and before relying on it.
+Every release check (`app/releases.py`) runs the eval cases of every imported pack
+(`packs.release_gate_cases()`, through `packs.run_eval` with `check_only`) in addition to the golden set, the
+patient set and the review test cases. The result reports them as the `packs` group. Unlike the other groups, a
+pack's cases are checked in both directions: a must-refuse case that is answered is an unsafe answer, and any
+other case that gets the wrong decision also fails the release (`pack_failures`, with up to ten examples in
+`pack_failure_examples`). A release with any pack failure does not go live, and answers keep coming from the
+live release. The same cases can be run by hand with `packs.run_eval(packs.release_gate_cases())`.

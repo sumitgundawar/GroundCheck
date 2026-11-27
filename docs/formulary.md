@@ -59,6 +59,15 @@ Rule rows share `rule_id` (capitals, digits, hyphens; unique in the file), `rule
 
 `dose_*` columns are `dose_amount`, `dose_unit`, `dose_frequency`, `dose_max_daily`.
 
+## Notes and languages
+
+A rule's `note` is shown with the finding it produces, and CDS Hooks cards carry it too. The dashboard and the
+cards can write findings in Spanish, copying every number, unit and medicine name from the rule. A note is
+translated only when it is one the product has wording for (the demo formulary's own notes, and the pattern
+"X should not be combined with Y"); any other note, including one you write, is shown as written in every
+language, and a finding whose note cannot be translated is shown whole in English rather than half and half.
+Write notes in the language your clinicians read.
+
 ## Numbers and units
 
 Write numbers with a decimal point and no thousands separator (`1.5`, not `1,5` or `1,000`). Amounts must

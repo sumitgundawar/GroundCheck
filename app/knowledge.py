@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 import numpy as np
 from sqlalchemy import func, select
 
-from . import config, db, documents, guards_input
+from . import config, db, documents, formulary, guards_input, patient_checks
 from .db import Source, SourceChunk, utcnow
 
 log = logging.getLogger("groundcheck.knowledge")
@@ -63,6 +63,32 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
+def screen(texts: list[str]) -> list[str]:
+    """What a reviewer must look at before approving: text that tries to instruct the assistant, and doses that
+    contradict the formulary. Approved text is cited as the sources' own words, so a document that says
+    "ignore the rules" or gives ten times the maximum dose would otherwise be served as an answer."""
+    found: list[str] = []
+    idx = formulary.index()
+    for text in texts:
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            if "instruction-override" in guards_input.check_scope_and_injection(sentence).detail:
+                found.append(f"Instruction-like text: \"{sentence.strip()[:80]}\"")
+            amounts = [(float(v.replace(",", "")), u.replace("ml", "mL")) for v, u in patient_checks._VALUE.findall(sentence)]
+            times = patient_checks.times_per_day(sentence) or 1
+            for med in idx.mentioned(sentence):
+                limit = med.adult_dose
+                if not (limit and limit.max_daily):
+                    continue
+                if patient_checks._exceeds([(v * times, u) for v, u in amounts], limit.max_daily, limit.unit) is not None:
+                    found.append(f"Dose above the formulary maximum for {med.name} ({limit.max_daily:g} {limit.unit} a day): "
+                                 f"\"{sentence.strip()[:80]}\"")
+    return list(dict.fromkeys(found))[:20]
+
+
+def _screening_text(findings: list[str]) -> str:
+    return "Screening found " + str(len(findings)) + " item(s) to check: " + "; ".join(findings)
+
+
 def import_document(filename: str, data: bytes, *, title: str | None = None, owner: str = "",
                     effective_from: datetime | None = None, expires_on: datetime | None = None,
                     uploaded_by: int | None = None, max_chars: int = 1000, site_id: int | None = None) -> dict:
@@ -90,6 +116,8 @@ def import_document(filename: str, data: bytes, *, title: str | None = None, own
             owner=owner.strip()[:200], effective_from=effective_from, expires_on=expires_on,
             uploaded_by=uploaded_by, review_note="", site_id=site_id,
         )
+        findings = screen([c.text for c in chunks])
+        source.review_note = _screening_text(findings)[:2000] if findings else ""
         s.add(source)
         s.flush()
         for c in chunks:
@@ -175,6 +203,11 @@ def review(source_id: int, decision: str, reviewer_id: int | None, note: str = "
         if (decision == "approve" and not allow_self_approval and reviewer_id is not None
                 and source.uploaded_by == reviewer_id):
             raise KnowledgeError("Someone other than the uploader must approve a document.")
+
+        if decision == "approve" and not note.strip():
+            findings = screen([c.text for c in source.chunks])
+            if findings:
+                raise KnowledgeError(_screening_text(findings) + ". Approving needs a note saying why it is acceptable.")
 
         now = utcnow()
         if decision == "approve":

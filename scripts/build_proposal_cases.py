@@ -206,13 +206,14 @@ def build(held: bool, drug_pool: list[dict], rng: random.Random, per_drug: int) 
                 dur_part()
             elif kind == "max":
                 dims.append("max_daily")
+                # No source states a maximum daily dose; the usual regimen is not one, so every maximum is unverifiable.
+                status = "unverifiable"
                 if d["rate"] is None:
-                    total, status = d["dose"], "unverifiable"
+                    total = d["dose"]
                 elif dose_ok:
-                    total, status = d["dose"] * d["rate"], "match"
+                    total = d["dose"] * d["rate"]
                 else:
                     total = round(d["dose"] * d["rate"] * rng.choice([2, 0.5, 3]), 3)
-                    status = "mismatch"
                 word = rng.choice(["a maximum of {x} a day", "no more than {x} per day", "up to {x} daily",
                                    "a daily maximum of {x}", "{x} a day at most", "a total of {x} per day at most"]
                                   if not held else ["a max of {x} per day", "not more than {x} a day",
@@ -258,7 +259,7 @@ def build(held: bool, drug_pool: list[dict], rng: random.Random, per_drug: int) 
         parts = [f"{num(d['dose'])} {d['unit']}"] + ([rng.choice(freqs[d["rate"]])] if d["rate"] else [])
         wrong = [f"{num(d['dose'])} {d['unit']}", rng.choice(freqs[next(r for r in (1, 2, 3) if r != (d["rate"] or 0))])]
         pick = parts if rng.random() < 0.5 and d["rate"] else wrong
-        status = ("match" if pick is parts else "mismatch") if d["rate"] else "unverifiable"
+        status = "unverifiable"  # a negatively phrased question has no unambiguous yes or no
         cases.append({"family": fam, "kind": "negated", "query": rng.choice(negated).format(p=" ".join(pick), d=name),
                       "expect": status, "dims": ["dose", "frequency"], "patient": None, "drug": d["topic"], "note": ""})
         cases.append({"family": fam, "kind": "inverted", "query": rng.choice(INVERTED).format(p=" ".join(pick), d=name),

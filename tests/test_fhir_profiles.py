@@ -376,7 +376,7 @@ def test_age_and_dates_boundaries():
     assert fhir._age("2024-11-25", TODAY) == pytest.approx(2.0, abs=0.01)
     assert fhir._age("1896-11-24", TODAY) == 130.0
     assert fhir._age("1895-11-24", TODAY) is None
-    assert fhir._age("2000", TODAY) == 26.0
+    assert fhir._age("2000", TODAY) == 25.0          # a year alone could be any day in it: the patient is never older than they may be
 
 
 def test_non_object_entries_in_resource_lists_are_skipped():

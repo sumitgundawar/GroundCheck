@@ -16,7 +16,7 @@ Produce one for the exact environment you deploy (the container, not a
 developer's laptop):
 
 ```bash
-docker run --rm --entrypoint sh groundcheck:1.0.0 -c 'pip install -q cyclonedx-bom >/dev/null && cyclonedx-py environment -o - --output-format json' > sbom.json
+docker run --rm --entrypoint sh groundcheck:3.0.0 -c 'pip install -q cyclonedx-bom >/dev/null && cyclonedx-py environment -o - --output-format json' > sbom.json
 ```
 
 ## Licences

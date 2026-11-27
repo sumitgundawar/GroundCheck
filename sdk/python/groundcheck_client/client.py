@@ -11,6 +11,7 @@ import logging
 import math
 import os
 import random
+import re
 import socket
 import time
 import urllib.error
@@ -262,7 +263,7 @@ class Client:
                             self.max_retries)
                 self._sleep(delay)
                 continue
-            raise self._error(status, headers, raw, wait)
+            raise self._error(status, headers, raw, wait, self._key.reveal())
         raise AssertionError("unreachable")  # pragma: no cover
 
     def _send(self, method: str, url: str, payload: Optional[bytes]) -> Tuple[int, Mapping[str, str], bytes]:
@@ -320,7 +321,16 @@ class Client:
                          _int_header(headers, "x-ratelimit-reset"))
 
     @staticmethod
-    def _error(status: int, headers: Mapping[str, str], raw: bytes, retry_after: Optional[float]):
+    def _scrub(text: str, key: str) -> str:
+        """An error message must never carry the API key, even when the server echoes it back."""
+        if key:
+            text = text.replace(key, "***")
+        text = re.sub(r"gck_[A-Za-z0-9_-]{4,}", "***", text)
+        return re.sub(r"(?i)\b(bearer|basic)\s+[^\s\"',;]+", r"\1 ***", text)
+
+    @staticmethod
+    def _error(status: int, headers: Mapping[str, str], raw: bytes, retry_after: Optional[float], key: str = ""):
+        scrub = lambda v: Client._scrub(v, key)  # noqa: E731
         request_id = headers.get("x-request-id")
         code = None
         message = f"HTTP {status}"
@@ -329,12 +339,12 @@ class Client:
             err = parsed.get("error") if isinstance(parsed, dict) else None
             if isinstance(err, dict):
                 if isinstance(err.get("message"), str) and err["message"].strip():
-                    message = err["message"].strip()[:1000]
+                    message = scrub(err["message"].strip())[:1000]
                 if isinstance(err.get("code"), str):
-                    code = err["code"][:100]
+                    code = scrub(err["code"])[:100]
         except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
             pass
-        kw = {"status": status, "code": code, "request_id": request_id}
+        kw = {"status": status, "code": code, "request_id": scrub(request_id) if request_id else request_id}
         if status == 429:
             return RateLimitError(message, retry_after=retry_after, **kw)
         if status >= 500:

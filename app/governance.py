@@ -63,7 +63,8 @@ _CODE_CATEGORY = {
     "dose_unsupported": "dose not in sources",
     "patient_unsafe": "patient safety block",
     "unsupported_language": "language not supported",
-    "proposal_unverifiable": "not enough information",
+    "proposal_unverifiable": "proposal not verifiable",
+    "source_conflict": "sources conflict",
 }
 
 

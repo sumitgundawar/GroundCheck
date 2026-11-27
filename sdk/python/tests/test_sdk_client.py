@@ -600,3 +600,14 @@ def test_the_readme_example_runs(server):
     exec(compile(code, "README.md", "exec"), namespace)
     assert [r.path for r in server.requests] == ["/api/v1/verify", "/api/v1/ask"]
     assert server.requests[0].json()["patient"] == {"age_years": 50, "egfr": 80}
+
+
+@pytest.mark.parametrize("message", [f"Invalid key {KEY}", f"Authorization: Bearer {KEY} was rejected",
+                                     "bad token gck_s3cretvalueABCD", f"{'x' * 995}{KEY}"])
+def test_a_server_that_echoes_the_api_key_does_not_put_it_in_the_exception(server, message):
+    server.default = Step(401, {"error": {"code": f"bad_{KEY}", "message": message}}, headers={"x-request-id": KEY})
+    with pytest.raises(gc.AuthenticationError) as info:
+        make(server).ask("q")
+    shown = " ".join([info.value.message, str(info.value), repr(info.value), info.value.code or "",
+                      info.value.request_id or ""])
+    assert KEY not in shown and "s3cretvalue" not in shown

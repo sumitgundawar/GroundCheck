@@ -85,7 +85,8 @@
                   "dose_unsupported",
                   "patient_unsafe",
                   "unsupported_language",
-                  "proposal_unverifiable"
+                  "proposal_unverifiable",
+                  "source_conflict"
                 ],
                 "type": "string"
               },

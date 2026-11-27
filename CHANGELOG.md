@@ -32,6 +32,22 @@ Dates are when the work landed on `main`. Versions follow the app's
   amount is "too much") is refused with `proposal_unverifiable` rather than guessed. Same in extractive and model
   modes (the model is not asked), and over `/api/v1/ask`, which returns `proposal_check` (`match`, `mismatch` or
   `unverifiable`, with each part's proposed and documented value and source id).
+- A proposed dose or route that the source documents but the coverage guards used to refuse (`stated_value_unsupported`,
+  `form_unsupported`, `term_not_covered` on "subcut", `limit_not_stated`) now gets the same verdict: `No — the source
+  gives 15 mg once daily, not 50 mg once daily.` The proposed value appears only in the "not" clause. It applies only
+  to a question (a "?" or "correct", "okay" and the like) about one named medicine, with route synonyms (subcut/SC,
+  IV, PO/by mouth, IM) mapped and no patient age or weight in the text; any other uncovered term, a form the
+  question names that is not a route (XR, tablets), or a source that does not state that part still refuses.
+  Matching proposals that were over-refused ("subcut", "25000 mcg", "no more than 40 mcg per day") now get "Yes".
+- A maximum daily dose is judged only against a maximum the source states; the usual regimen is not a maximum, so
+  with none stated the question is refused. A negatively phrased question ("not correct?", "isn't", "never",
+  "false", "contraindicated", "or not") and an open-ended duration ("at least", "or longer", "up to") are refused
+  as `proposal_unverifiable` rather than given a yes or no. "What is the dose of X 15 mg twice daily?" gets the
+  verdict on the stated regimen.
+- Model claims are cleaned before the guards: bidirectional and zero-width controls are removed and a citation that
+  names no source is dropped (a claim left with no real source is ungrounded). Two approved documents that give
+  different doses of the same medicine are refused with the new reason code `source_conflict` (flagged for review)
+  instead of one being served. Both SDKs redact the API key from exception messages if a server echoes it.
 - Decimal commas ("0,5 mg") and "by mouth" are rewritten before the guards read them. `scripts/proposal_eval.py` gates on zero wrong answers over
   `eval/proposal_cases.json`.
 

@@ -84,7 +84,11 @@ def _age(value: str) -> str:
     match = re.fullmatch(r"(\d{3})([DWMY])", value or "")
     if match and match.group(2) == "Y" and int(match.group(1)) > 89:
         return "090Y"
-    return value
+    return value if match else ""     # anything else is free text in a field that should hold an age
+
+
+_KEPT_VALUE = {"PatientSex": re.compile(r"[MFO]"), "PatientSize": re.compile(r"\d{1,2}(?:\.\d{1,4})?"),
+               "PatientWeight": re.compile(r"\d{1,3}(?:\.\d{1,4})?")}
 
 
 def _known_identifiers(ds: Dataset) -> list[tuple[re.Pattern, str]]:
@@ -104,9 +108,10 @@ def _known_identifiers(ds: Dataset) -> list[tuple[re.Pattern, str]]:
 
 
 def _scrub(text: str, known: list[tuple[re.Pattern, str]]) -> str:
+    text = deidentify_text(text).text          # first: a name part inside an e-mail address must not leave the rest of it behind
     for pattern, label in known:
         text = pattern.sub(label, text)
-    return deidentify_text(text).text
+    return text
 
 
 def _clean(ds: Dataset, report: dict, known: list[tuple[re.Pattern, str]]) -> None:
@@ -129,7 +134,12 @@ def _clean(ds: Dataset, report: dict, known: list[tuple[re.Pattern, str]]) -> No
             report["uids_replaced"] += 1
             continue
         if keyword == "PatientAge":
-            elem.value = _age(str(elem.value))
+            elem.value = _age(str(elem.value).strip())
+            continue
+        if keyword in _KEPT_VALUE:
+            if not _KEPT_VALUE[keyword].fullmatch(str(elem.value).strip()):
+                elem.value = ""       # these are kept for dose checks, so only what they should hold is kept
+                report["emptied"] += 1
             continue
         if keyword in DESCRIPTORS and isinstance(elem.value, str) and elem.value:
             cleaned = _scrub(elem.value, known)
@@ -140,6 +150,14 @@ def _clean(ds: Dataset, report: dict, known: list[tuple[re.Pattern, str]]) -> No
         if elem.VR == "SQ":
             for item in elem.value:
                 _clean(item, report, known)
+        elif elem.VR in ("LT", "ST", "UT") and elem.value:
+            elem.value = ""       # free text in an attribute this list does not know: it can say anything
+            report["emptied"] += 1
+        elif elem.VR in ("LO", "SH") and isinstance(elem.value, str) and elem.value:
+            cleaned = _scrub(elem.value, known)
+            if cleaned != elem.value:
+                elem.value = cleaned[: 64 if elem.VR == "LO" else 16]
+                report["descriptors_cleaned"] += 1
         elif elem.VR in ("PN",) and elem.value:
             elem.value = ""
             report["emptied"] += 1

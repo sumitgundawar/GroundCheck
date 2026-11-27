@@ -60,6 +60,7 @@ const REASON_EXPLAIN = {
   dose_unsupported: "The draft answer contained a dose that no source about this medicine states.",
   patient_unsafe: "The answer from the sources doesn't fit the patient you described. The check above names the rule.",
   unsupported_language: "The question is in a language this installation cannot check against its sources, so it was refused rather than answered from English text by accident.",
+  source_conflict: "Two approved documents give different doses of the same medicine, so no single dose can be given until a reviewer resolves the conflict.",
   proposal_unverifiable: "A regimen in the question could not be checked part by part against the sources, so it was refused rather than guessed at.",
 };
 const REASON_FALLBACK = "The pipeline could not produce a fully grounded answer, so it declined.";
@@ -770,7 +771,7 @@ function renderDecision(data) {
     chip.textContent = t("js.answer", "ANSWER");
     const ids = citedIds(data);
     reason.textContent = ids.length ? t("js.grounded_in", "Grounded in {ids}.").replace("{ids}", ids.join(", ")) : t("js.grounded_cited", "Grounded in cited sources.");
-    body.appendChild(renderAnswerWithCitations(data.answer_text, data));
+    body.appendChild(renderAnswerWithCitations(renderProposal(data), data));
     callout.hidden = true;
     renderClaimRows(data);
     resetFlag(data.audit_id);
@@ -778,6 +779,7 @@ function renderDecision(data) {
     chip.className = "status-chip refuse";
     chip.textContent = t("js.refused", "REFUSED");
     resetFlag(null);
+    renderProposal(data);
     const said = L && L.refusal(data);
     reason.textContent = said || (data.refused_reason ? capitalize(data.refused_reason) : "");
     callout.hidden = false;
@@ -787,6 +789,68 @@ function renderDecision(data) {
     renderClaimRows(null);
   }
   renderRedaction(data.redaction);
+}
+
+// A question that proposes a regimen: the verdict first, then each part of the
+// proposal against the source. Returns the answer text without its opening verdict.
+const DIM_LABEL = () => ({
+  dose: t("js.dim_dose", "Dose"), frequency: t("js.dim_frequency", "Frequency"), duration: t("js.dim_duration", "Duration"),
+  route: t("js.dim_route", "Route"), max_daily: t("js.dim_max_daily", "Daily maximum"), timing: t("js.dim_timing", "Timing"),
+  drug: t("js.dim_drug", "Medicine"), proposal: t("js.dim_proposal", "Question"),
+});
+const DIM_STATUS = () => ({
+  match: t("js.dim_status_match", "Matches"), mismatch: t("js.dim_status_mismatch", "Differs"),
+  unverifiable: t("js.dim_status_unverifiable", "Cannot be checked"),
+});
+const DIM_MARK = { match: "✓", mismatch: "✕", unverifiable: "?" };
+
+function renderProposal(data) {
+  const box = $("proposal-check");
+  box.textContent = "";
+  const check = data.proposal_check;
+  box.hidden = !check || !check.dimensions || !check.dimensions.length;
+  if (box.hidden) return data.answer_text;
+  let rest = data.answer_text;
+  if (data.decision === "answer" && check.status !== "unverifiable") {
+    const first = data.claims && data.claims[0] && data.claims[0].text;
+    const at = first ? data.answer_text.indexOf(first) : -1;
+    const lead = at > 0 ? data.answer_text.slice(0, at).trim() : data.answer_text;
+    rest = at > 0 ? data.answer_text.slice(at) : "";
+    const verdict = el("p", `proposal-verdict ${check.status}`, (L && L.verdict(data)) || lead);
+    box.appendChild(verdict);
+  }
+  const wrap = el("div", "users-table-wrap");
+  const table = el("table", "proposal-table");
+  table.appendChild(el("caption", "", t("js.proposal_table_caption", "Regimen compared with the source")));
+  const head = document.createElement("tr");
+  const labels = [t("js.proposal_col_part", "Part"), t("js.proposal_col_proposed", "Proposed"), t("js.proposal_col_source", "The source says"), t("js.proposal_col_result", "Result")];
+  labels.forEach((text) => { const th = el("th", "", text); th.scope = "col"; head.appendChild(th); });
+  const thead = document.createElement("thead");
+  thead.appendChild(head);
+  const tbody = document.createElement("tbody");
+  check.dimensions.forEach((d) => {
+    const tr = document.createElement("tr");
+    tr.className = `dim-${d.status}`;
+    const part = el("th", "", DIM_LABEL()[d.name] || d.name);
+    part.scope = "row";
+    const cell = (...parts) => { const td = el("td"); const box = el("span", "dim-cell"); box.append(...parts); td.appendChild(box); return td; };
+    const proposed = cell((L && L.value(d.name, d.proposed)) || d.proposed || "–");
+    const sourceParts = [(L && L.value(d.name, d.documented)) || d.documented || "–"];
+    if (d.source_id && d.documented) { sourceParts.push(" ", renderAnswerWithCitations(`[${d.source_id}]`, data)); }
+    const source = cell(...sourceParts);
+    const pill = el("span", `dim-status ${d.status}`);
+    pill.append(el("span", "dim-mark", DIM_MARK[d.status]), ` ${DIM_STATUS()[d.status]}`);
+    const resultParts = [pill];
+    if (d.status === "unverifiable" && d.reason) resultParts.push(el("span", "dim-reason", (L && L.text(d.reason)) || d.reason));
+    const result = cell(...resultParts);
+    labelCells([proposed, source, result], labels.slice(1));
+    tr.append(part, proposed, source, result);
+    tbody.appendChild(tr);
+  });
+  table.append(thead, tbody);
+  wrap.appendChild(table);
+  box.appendChild(wrap);
+  return rest;
 }
 
 function renderRefusalExplanation(data) {
@@ -2511,7 +2575,9 @@ function renderCase(k) {
     li.appendChild(head);
     if (e.note) {
       const note = document.createElement("p");
-      note.textContent = (e.action !== "commented" && e.action !== "flagged" && e.action !== "resolved" && e.action !== "reopened" && L && L.text(e.note)) || e.note;
+      const outcome = e.action === "resolved" && Object.entries(review.data?.outcomes || {}).find(([, label]) => e.note === label || e.note.startsWith(`${label}. `));
+      if (outcome) note.textContent = coded("outcome", outcome[0], outcome[1]) + e.note.slice(outcome[1].length);
+      else note.textContent = (e.action !== "commented" && e.action !== "flagged" && e.action !== "resolved" && e.action !== "reopened" && L && L.text(e.note)) || e.note;
       li.appendChild(note);
     }
     list.appendChild(li);
@@ -3936,7 +4002,7 @@ function renderPatientFindings(findings, given) {
     if (f.rule_id || f.source) {
       const meta = document.createElement("span");
       meta.className = "finding-meta mono";
-      meta.textContent = [f.rule_id, f.source].filter(Boolean).join(" · ");
+      meta.textContent = [f.rule_id, (L && L.source(f.source)) || f.source].filter(Boolean).join(" · ");
       li.appendChild(meta);
     }
     list.appendChild(li);
@@ -4635,8 +4701,9 @@ function renderMonitoring(data) {
     const li = el("li", `alert-item ${a.severity}`);
     const body = document.createElement("div");
     const h = el("h3");
-    h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? t("js.critical", "Critical") : t("js.warning", "Warning")), a.title);
-    body.append(h, el("p", "", a.detail), el("p", "alert-meta",
+    const said = (L && L.alert(a)) || { title: a.title, detail: a.detail };
+    h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? t("js.critical", "Critical") : t("js.warning", "Warning")), said.title);
+    body.append(h, el("p", "", said.detail), el("p", "alert-meta",
       t("js.firing_since_last_checked", "Firing since {first_seen}, last checked {last_seen}.{acknowledged_by}", { first_seen: sinceText(a.first_seen), last_seen: sinceText(a.last_seen), acknowledged_by: a.acknowledged_by ? t("js.acknowledged_by", " Acknowledged by {acknowledged_by} {acknowledged_at}.", { acknowledged_by: a.acknowledged_by, acknowledged_at: sinceText(a.acknowledged_at) }) : "" })));
     const actions = el("div", "alert-actions");
     if (!a.acknowledged_at) {
@@ -4662,7 +4729,8 @@ function renderMonitoring(data) {
     const state = data.disabled.includes(r.rule) ? "off" : firingRules.has(r.rule) ? "firing" : "ok";
     const pill = el("span", `status-pill rule-state ${state === "firing" ? "status-rejected" : state === "ok" ? "status-approved" : "status-retired"}`, RULE_NOW()[state]);
     const cell = document.createElement("td"); cell.appendChild(pill);
-    tr.append(el("td", "", r.name), el("td", "", r.limit), cell);
+    const said = (L && L.rule(r)) || r;
+    tr.append(el("td", "", said.name), el("td", "", said.limit), cell);
     rows.appendChild(tr);
   });
   const instance = data.instance || {};
@@ -4687,7 +4755,7 @@ function renderMonitoring(data) {
   $("resolved-empty").hidden = data.resolved.length > 0;
   data.resolved.slice(0, 8).forEach((a) => {
     const li = el("li", "alert-item");
-    const h = el("h3"); h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? t("js.critical", "Critical") : t("js.warning", "Warning")), a.title);
+    const h = el("h3"); h.append(el("span", `sev ${a.severity}`, a.severity === "critical" ? t("js.critical", "Critical") : t("js.warning", "Warning")), (L && L.alert(a) || a).title);
     li.append(h, el("p", "alert-meta", t("js.fired_resolved", "Fired {first_seen}, resolved {resolved_at}.", { first_seen: dateTime(a.first_seen), resolved_at: sinceText(a.resolved_at) })));
     resolved.appendChild(li);
   });

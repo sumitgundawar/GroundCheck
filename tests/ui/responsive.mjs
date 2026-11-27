@@ -107,6 +107,11 @@ for (const name of wanted) {
       note((await overflow(page)) <= 1, `${tag}: a refusal scrolls sideways`);
       await shot(page, `${tag}-refusal`);
 
+      await ask(page, "Is 15 mg of Caloradine three times daily by mouth for 21 days okay?");
+      note((await overflow(page)) <= 1, `${tag}: a proposal verdict and its table scroll sideways (${await overflow(page)}px)`);
+      note(await page.locator("#proposal-check .proposal-table tbody tr").count() === 4, `${tag}: the proposal table is missing rows`);
+      await shot(page, `${tag}-proposal`);
+
       for (const view of await views(page)) {
         await go(page, view);
         const over = await overflow(page);
@@ -141,11 +146,29 @@ for (const name of wanted) {
           note(!/does not appear in any|not reached|within rate limit/.test(said), `${tag}: server English is showing in the refusal or trace`);
         }
         await shot(page, `${tag}-refusal`);
+        await ask(page, "Is 15 mg of Caloradine three times daily by mouth for 21 days okay?");
+        note((await overflow(page)) <= 1, `${tag}: a proposal scrolls sideways (${await overflow(page)}px)`);
+        if (locale === "es") {
+          const verdict = ((await page.textContent("#proposal-check .proposal-verdict")) || "").trim();
+          note(/^No — la fuente indica 15 mg una vez al día durante 14 días/.test(verdict), `${tag}: the verdict is not in Spanish: ${verdict}`);
+          note(!/Frequency|Matches|Differs/.test((await page.textContent("#proposal-check")) || ""), `${tag}: English in the proposal table`);
+        }
+        await shot(page, `${tag}-proposal`);
+        const box = page.locator("#patient-box");
+        if ((await box.getAttribute("open")) === null) await page.click("#patient-box > summary");
+        await page.fill("#pt-age", "8");
+        await page.fill("#pt-weight", "18");
+        await page.fill("#pt-egfr", "90");
+        await ask(page, "What is the dose of Mendel solution?");
+        note((await overflow(page)) <= 1, `${tag}: patient findings scroll sideways (${await overflow(page)}px)`);
+        if (locale === "es") note(/0\.1 mL\/kg × 18 kg = 1\.8 mL/.test((await page.textContent("#patient-findings-list")) || "") && !/formulary|For this child/.test((await page.textContent("#patient-findings-list")) || ""), `${tag}: the dose calculation is not in Spanish`);
+        await shot(page, `${tag}-dose`);
+        await page.click("#pt-clear").catch(() => {});
         for (const view of await views(page)) {
           await go(page, view);
           const over = await overflow(page);
           note(over <= 1, `${tag}: ${view} scrolls sideways by ${over}px ${over > 1 ? (await visibleOverflowers(page)).join("; ") : ""}`);
-          if (view === "review") await shot(page, `${tag}-review`);
+          if (view === "review" || view === "monitoring") await shot(page, `${tag}-${view}`);
         }
         note(errors.length === 0, `${tag}: script errors: ${errors.slice(0, 2).join(" | ")}`);
         await context.close();

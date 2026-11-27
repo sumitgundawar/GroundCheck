@@ -181,7 +181,8 @@ def extract(source: str) -> tuple[str, dict[str, str]]:
     return out, strings
 
 
-KEPT_PREFIXES = ("reason", "js", "app", "plural", "control_status", "outcome", "case_event", "hazard_status", "refusal_category")
+KEPT_PREFIXES = ("reason", "js", "app", "plural", "control_status", "outcome", "case_event", "hazard_status", "refusal_category",
+                 "srv", "msg", "example", "data")
 
 
 def main() -> int:
@@ -190,7 +191,11 @@ def main() -> int:
     rewritten, strings = extract(source)
     current = json.loads(EN.read_text(encoding="utf-8")) if EN.exists() else {}
     # Keys that the scripts use (not the HTML) are kept as they are.
-    kept = {k: v for k, v in current.items() if k not in strings and k.split(".")[0] in KEPT_PREFIXES}
+    # A key the page uses on an element that has child elements has no single text to read back; keep its string.
+    used = set(re.findall(r'data-i18n="([^"]+)"', source))
+    for pairs in re.findall(r'data-i18n-attr="([^"]+)"', source):
+        used |= {pair.partition(":")[2] for pair in pairs.split(";")}
+    kept = {k: v for k, v in current.items() if k not in strings and (k.split(".")[0] in KEPT_PREFIXES or k in used)}
     merged = {**strings, **kept}
     text = json.dumps(dict(sorted(merged.items())), indent=1, ensure_ascii=False) + "\n"
     if check:

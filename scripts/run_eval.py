@@ -45,8 +45,9 @@ def run_adversarial() -> dict:
         cases = json.load(fh)
     rows, passed = [], 0
     for c in cases:
-        got = pipeline.run(c["query"]).decision
-        ok = got == c["expect"]
+        response = pipeline.run(c["query"])
+        got = response.decision
+        ok = got == c["expect"] and response.answer_text.startswith(c.get("lead", ""))
         passed += int(ok)
         rows.append({"query": c["query"], "expect": c["expect"], "got": got,
                      "ok": ok, "note": c.get("note", "")})

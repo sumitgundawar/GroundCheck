@@ -64,10 +64,15 @@ MAX_FILE_BYTES = 25 * 1024 * 1024
 _WS = re.compile(r"\s+")
 
 
+# Characters that change what a reader sees without being visible: zero-width marks and the bidirectional controls that
+# reverse the order of digits and words (an "RLO" turns a displayed 10 mg into a stored 01 gm).
+_HIDDEN = re.compile("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]")
+
+
 def _clean(text: str) -> str:
     # NFKC turns typographic ligatures from PDFs (the single "fi" glyph) back
     # into plain letters, so keyword search and the coverage check can match.
-    text = unicodedata.normalize("NFKC", text).replace("­", "")
+    text = _HIDDEN.sub("", unicodedata.normalize("NFKC", text)).replace("­", "")
     return _WS.sub(" ", text).strip()
 
 
@@ -271,6 +276,8 @@ def parse_pdf(data: bytes) -> tuple[str, list[Section]]:
 
 def parse_text(data: bytes, markdown: bool) -> tuple[str, list[Section]]:
     text = data.decode("utf-8", errors="replace")
+    if markdown:
+        text = re.sub(r"<!--.*?(?:-->|\Z)", "", text, flags=re.DOTALL)   # a comment is not shown, so it is not a source
     title = ""
     sections: list[Section] = []
     paragraph: list[str] = []
