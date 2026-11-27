@@ -659,7 +659,7 @@ const result = await client.verify({ question: "…", answer: "…" });</code></
       <div class="wrap">
         <div class="section-intro">
           <h2 id="evaluation-title">Tested on 265,778 questions</h2>
-          <p>The build fails if a single question that should be refused gets answered, or a wrong answer passes verification. Over 3,500 automated tests run on the code.</p>
+          <p>The build fails if a single question that should be refused gets answered, or a wrong answer passes verification. Nearly 4,000 automated tests run on the code.</p>
         </div>
 
         <div class="eval-layout">
@@ -704,6 +704,14 @@ const result = await client.verify({ question: "…", answer: "…" });</code></
               <div class="meter-track" aria-hidden="true"><span class="meter-fill" data-fill="99.7"></span></div>
               <p>319 of 320 everyday questions answered. Answers average 1.26 claims (827 cases).</p>
             </li>
+            <li class="meter">
+              <div class="meter-label">
+                <h3>Is this dose right?</h3>
+                <span class="meter-value"><strong>0</strong> wrong in 1,047</span>
+              </div>
+              <div class="meter-track" aria-hidden="true"><span class="meter-fill" data-fill="100"></span></div>
+              <p>Yes when every part matches, No with what the source gives when one doesn’t, refused when the source sets no limit.</p>
+            </li>
           </ul>
 
           <aside class="misses fixed" aria-labelledby="misses-title">
@@ -721,7 +729,7 @@ const result = await client.verify({ question: "…", answer: "…" });</code></
         </div>
         <div class="eval-scale">
           <h3>And 250,000 more</h3>
-          <p>Beyond the gating set, a generated evaluation of <strong>265,778</strong> questions and patient scenarios: medicines that don’t exist, one-letter misspellings of real ones, questions about children and pregnancy the sources don’t cover, doses the sources never state, one medicine’s dose asserted against another, instructions to ignore the sources, and patients the formulary says a medicine is unsafe for. Expectations come from the documents and the formulary, never from GroundCheckHealth’s own code. A sample runs on every push and the whole set weekly. In the latest run, all <strong>222,210</strong> questions that had to be refused were refused.</p>
+          <p>Beyond the gating set, a generated evaluation of <strong>265,778</strong> questions and patient scenarios: medicines that don’t exist, one-letter misspellings of real ones, questions about children and pregnancy the sources don’t cover, doses the sources never state, one medicine’s dose asserted against another, instructions to ignore the sources, and patients the formulary says a medicine is unsafe for. Expectations come from the documents and the formulary, never from GroundCheckHealth’s own code. A sample runs on every push and the whole set weekly. In the latest run, all <strong>222,210</strong> questions that had to be refused were refused or, for a wrong dose, answered No with the dose the source gives, and none of the <strong>43,568</strong> answerable questions were refused.</p>
           <p>The other direction is measured too, because it is the one a clinician feels: <strong>12,056</strong> answerable questions asked the way a person asks them — “remind me”, “a colleague asked”, “what’s the duration”, “for a 40 year old” — with <strong>none</strong> refused. A separate run puts <strong>1,215 deliberately wrong claims</strong> to the grounding and dosage checks, which the big evaluation cannot do, because its answers are quoted from the sources and so are true by construction. None of the wrong doses were accepted.</p>
         </div>
         <p class="note">Runs offline in extractive mode, so these results measure the checks, not a language model. The demo corpus is synthetic, and the project wrote the test cases and the checks themselves, so read every number as a regression guard, not a forecast of real-world performance.</p>
@@ -905,6 +913,7 @@ docker run -p 7860:7860 groundcheck</code></pre>
                 <li>Eleven-stage pipeline with deterministic guards</li>
                 <li>Citations, trace and audit record for every request</li>
                 <li>Stable reason codes and plain explanations on every refusal, and “routed for review” only when a case was opened</li>
+                <li>Asked “Is 10 mg twice daily right?”, answers Yes, or No with the dose, frequency and duration the source gives</li>
                 <li>2,008-case evaluation that gates the build, and 265,778 generated cases behind it</li>
               </ul>
             </details>
