@@ -181,3 +181,8 @@ def test_group_admins_get_a_site_picker_on_document_upload():
     # Only an admin with no site gets it.
     assert 'u.role !== "admin"' in APP_JS and "u.site_id !== null" in APP_JS
     assert '"/api/sites"' in APP_JS
+
+
+def test_try_instead_tips_are_advice_not_buttons_that_ask_a_question():
+    block = re.search(r"const tips = .*?box\.append\(label, row\);", APP_JS, re.S).group(0)
+    assert "suggestion-tip" in block and "submitQuery" not in block and 'createElement("button")' not in block

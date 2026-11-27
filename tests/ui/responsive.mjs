@@ -26,8 +26,12 @@ function note(ok, message) {
   if (!ok) { failures.push(message); console.log("  FAIL ", message); }
 }
 
+// Extra spaces between words give each ask its own remembered-answer key.
+let asked = 0;
+const unique = (question) => { asked += 1; let n = Date.now() * 1000 + asked; return question.split(" ").map((w, i, all) => { const gap = i < all.length - 1 ? " ".repeat(1 + (n % 3)) : ""; n = Math.floor(n / 3); return w + gap; }).join(""); };
+
 async function ask(page, question) {
-  await page.fill("#query", question);
+  await page.fill("#query", unique(question));
   await page.click("#ask-btn");
   await page.waitForFunction(() => document.querySelector("#ask-btn").disabled, undefined, { timeout: 15000 }).catch(() => {});
   await page.waitForFunction(() => !document.querySelector("#ask-btn").disabled, undefined, { timeout: 60000 });
@@ -115,27 +119,37 @@ for (const name of wanted) {
     }
   }
 
-  // Longer text and Spanish on a phone.
+  // Longer text and Spanish at every width.
   for (const locale of LOCALES) {
-    for (const theme of THEMES) {
-      const tag = `${name}-375-${theme}-${locale}`;
-      const context = await browser.newContext({ viewport: { width: 375, height: 800 }, colorScheme: theme, reducedMotion: "reduce" });
-      const page = await context.newPage();
-      await page.goto(`${BASE}/?locale=${locale}`, { waitUntil: "networkidle" });
-      await page.waitForFunction(() => window.gcI18n && window.gcI18n.ready).catch(() => {});
-      await page.evaluate(() => window.gcI18n.ready);
-      console.log(tag);
-      const label = ((await page.textContent(".nav-link[data-view=\"ask\"]")) || "").trim();
-      note(locale === "es" ? /Preguntar/.test(label) : /^\[/.test(label), `${tag}: the locale was not applied (topbar says ${label})`);
-      await ask(page, "What is the dose of Zalortin?");
-      note((await overflow(page)) <= 1, `${tag}: the Ask view scrolls sideways (${await overflow(page)}px)`);
-      await shot(page, `${tag}-refusal`);
-      for (const view of await views(page)) {
-        await go(page, view);
-        const over = await overflow(page);
-        note(over <= 1, `${tag}: ${view} scrolls sideways by ${over}px ${over > 1 ? (await visibleOverflowers(page)).join("; ") : ""}`);
+    for (const width of WIDTHS) {
+      for (const theme of THEMES) {
+        const tag = `${name}-${width}-${theme}-${locale}`;
+        const context = await browser.newContext({ viewport: { width, height: width < 600 ? 800 : 900 }, colorScheme: theme, reducedMotion: "reduce" });
+        const page = await context.newPage();
+        const errors = [];
+        page.on("pageerror", (e) => errors.push(e.message));
+        await page.goto(`${BASE}/?locale=${locale}`, { waitUntil: "networkidle" });
+        await page.evaluate(() => window.gcI18n.ready);
+        console.log(tag);
+        const label = ((await page.textContent(".nav-link[data-view=\"ask\"]")) || "").trim();
+        note(locale === "es" ? /Preguntar/.test(label) : /^\[/.test(label), `${tag}: the locale was not applied (topbar says ${label})`);
+        await ask(page, "What is the dose of Zalortin?");
+        note((await overflow(page)) <= 1, `${tag}: the Ask view scrolls sideways (${await overflow(page)}px)`);
+        if (locale === "es") {
+          const said = ((await page.textContent("#refuse-callout")) || "") + ((await page.textContent("#trace")) || "");
+          note(/no aparece en ninguna fuente/.test(said), `${tag}: the refusal reason is not in Spanish`);
+          note(!/does not appear in any|not reached|within rate limit/.test(said), `${tag}: server English is showing in the refusal or trace`);
+        }
+        await shot(page, `${tag}-refusal`);
+        for (const view of await views(page)) {
+          await go(page, view);
+          const over = await overflow(page);
+          note(over <= 1, `${tag}: ${view} scrolls sideways by ${over}px ${over > 1 ? (await visibleOverflowers(page)).join("; ") : ""}`);
+          if (view === "review") await shot(page, `${tag}-review`);
+        }
+        note(errors.length === 0, `${tag}: script errors: ${errors.slice(0, 2).join(" | ")}`);
+        await context.close();
       }
-      await context.close();
     }
   }
   await browser.close();

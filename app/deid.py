@@ -94,7 +94,8 @@ class Result:
         """For the trace: what kinds were removed, never the values."""
         if not self.found:
             return "no identifiers found"
-        parts = [f"{n} {kind}{'' if n == 1 else 's'}" for kind, n in sorted(self.found.items())]
+        parts = [f"{n} {kind}{'' if n == 1 else 'es' if kind.endswith('s') else 's'}"
+                 for kind, n in sorted(self.found.items())]
         return "removed " + ", ".join(parts)
 
 

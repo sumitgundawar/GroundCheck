@@ -1689,3 +1689,4 @@ summary:focus-visible, .switch input:focus-visible + .switch-track { outline: 2p
 .empty-state, .protection-list > * { overflow-wrap: anywhere; }
 input[type="file"] { max-width: 100%; min-width: 0; }
 .users-table-wrap { max-width: 100%; }
+.suggestion-tip { display: inline-block; padding: var(--space-1) var(--space-3); border-left: 3px solid var(--border-strong, currentColor); color: var(--text-muted, inherit); font-size: 0.9em; overflow-wrap: anywhere; }

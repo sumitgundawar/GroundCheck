@@ -34,6 +34,7 @@ const STAGE_LABELS = () => ({
   "scope check": t("js.scope_check", "scope check"),
   "rate limit": t("js.rate_limit", "rate limit"),
   "dosage guard": t("js.dosage_guard", "dosage guard"),
+  "proposal check": t("js.proposal_check", "proposal check"),
   "grounding check": t("js.grounding_check", "grounding check"),
   "source coverage": t("js.source_coverage", "source coverage"),
   "retrieval gate": t("js.retrieval_gate", "retrieval gate"),
@@ -59,6 +60,7 @@ const REASON_EXPLAIN = {
   dose_unsupported: "The draft answer contained a dose that no source about this medicine states.",
   patient_unsafe: "The answer from the sources doesn't fit the patient you described. The check above names the rule.",
   unsupported_language: "The question is in a language this installation cannot check against its sources, so it was refused rather than answered from English text by accident.",
+  proposal_unverifiable: "A regimen in the question could not be checked part by part against the sources, so it was refused rather than guessed at.",
 };
 const REASON_FALLBACK = "The pipeline could not produce a fully grounded answer, so it declined.";
 const reasonFallback = () => t("reason.fallback", REASON_FALLBACK);
@@ -98,6 +100,7 @@ function startDashboard() {
   dashboardStarted = true;
   loadLocalAI();
   loadExamples();
+  document.addEventListener("localechange", () => { loadExamples(); loadHealth(); });
   loadSettings();
   loadEvalSummary();
   loadCorpus();
@@ -563,7 +566,8 @@ async function loadExamples() {
     wrap.innerHTML = "";
     const groups = [];
     const byGroup = {};
-    examples.forEach((ex) => {
+    const shown = examples.map((ex) => (L ? L.example(ex) : ex));
+    shown.forEach((ex) => {
       const g = ex.group || t("js.examples", "Examples");
       if (!byGroup[g]) { byGroup[g] = []; groups.push(g); }
       byGroup[g].push(ex);
@@ -774,9 +778,10 @@ function renderDecision(data) {
     chip.className = "status-chip refuse";
     chip.textContent = t("js.refused", "REFUSED");
     resetFlag(null);
-    reason.textContent = data.refused_reason ? capitalize(data.refused_reason) : "";
+    const said = L && L.refusal(data);
+    reason.textContent = said || (data.refused_reason ? capitalize(data.refused_reason) : "");
     callout.hidden = false;
-    $("refuse-detail").textContent = data.refused_reason || t("js.no_grounded", "No grounded answer available.");
+    $("refuse-detail").textContent = said || data.refused_reason || t("js.no_grounded", "No grounded answer available.");
     renderRefusalExplanation(data);
     renderRoutedLine(data);
     renderClaimRows(null);
@@ -789,11 +794,11 @@ function renderRefusalExplanation(data) {
   const ex = data.explanation || {};
   const generic = REASON_EXPLAIN[data.reason_code] ? t("reason." + data.reason_code, REASON_EXPLAIN[data.reason_code]) : refusalExplanation(data.refused_reason);
   explain.textContent = "";
-  const localised = window.gcI18n && gcI18n.locale() !== "en" && REASON_EXPLAIN[data.reason_code];
+  const localised = L && L.active() && REASON_EXPLAIN[data.reason_code];
   appendHighlighted(explain, (localised && generic) || ex.summary || generic, ex.missing_terms || []);
   const box = $("refuse-suggestions");
   box.textContent = "";
-  const tips = (ex.suggestions || []).filter(Boolean);
+  const tips = (ex.suggestions || []).filter(Boolean).map(serverText);
   box.hidden = !tips.length;
   if (!tips.length) return;
   const label = document.createElement("span");
@@ -802,12 +807,10 @@ function renderRefusalExplanation(data) {
   const row = document.createElement("div");
   row.className = "suggestion-chips";
   tips.forEach((text) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "chip suggestion";
-    chip.textContent = text;
-    chip.addEventListener("click", () => { $("query").value = text; submitQuery(text); });
-    row.appendChild(chip);
+    const tip = document.createElement("span");
+    tip.className = "suggestion-tip";
+    tip.textContent = text;
+    row.appendChild(tip);
   });
   box.append(label, row);
 }
@@ -833,7 +836,7 @@ function renderRoutedLine(data) {
   if (review.routed) {
     line.append(t("js.no_answer_is_shown_routed", "No answer is shown. Routed for review"));
     if (review.case_id != null) {
-      line.append(" as ");
+      line.append(t("js.routed_as", " as "));
       if (canSee("review")) {
         const link = document.createElement("a");
         link.href = "#/review";
@@ -845,7 +848,7 @@ function renderRoutedLine(data) {
     }
     line.append(".");
   } else {
-    line.textContent = review.note || t("js.not_routed_for_review", "Not routed for review.");
+    line.textContent = serverText(review.note) || t("js.not_routed_for_review", "Not routed for review.");
   }
 }
 
@@ -876,6 +879,8 @@ function renderRedaction(red) {
     } else if (part) q.appendChild(document.createTextNode(part));
   });
   const counts = Object.entries(kinds).map(([k, n]) => {
+    const said = L && L.kind(k, n);
+    if (said) return said;
     const names = REDACTION_LABEL()[k.toUpperCase()] || [k.toLowerCase(), `${k.toLowerCase()}s`];
     return `${n} ${n === 1 ? names[0] : names[1]}`;
   });
@@ -1136,7 +1141,7 @@ function renderTrace(steps) {
     name.textContent = STAGE_LABELS()[step.name] || step.name;
     const detail = document.createElement("div");
     detail.className = "trace-detail";
-    detail.textContent = step.detail;
+    detail.textContent = (L && L.traceDetail(step)) || step.detail;
     main.append(name, detail);
     const right = document.createElement("div");
     right.className = "trace-right";
@@ -1171,7 +1176,7 @@ function buildStageDetail(step) {
   if (step.explain) {
     const p = document.createElement("p");
     p.className = "stage-explain";
-    p.textContent = step.explain;
+    p.textContent = (L && L.explain(step)) || step.explain;
     frag.appendChild(p);
   }
   const d = step.data;
@@ -1193,7 +1198,7 @@ function kvDetail(obj, depth = 0) {
     const row = document.createElement("div");
     row.className = "data-line";
     const key = document.createElement("span");
-    key.className = "mono strong"; key.textContent = k.replace(/_/g, " ");
+    key.className = "mono strong"; key.textContent = t("data." + k, k.replace(/_/g, " "));
     row.appendChild(key);
     const complex = v && typeof v === "object" && (Array.isArray(v) ? v.some((x) => x && typeof x === "object") : true);
     if (complex && depth < 5) {
@@ -1203,7 +1208,7 @@ function kvDetail(obj, depth = 0) {
     } else {
       const val = document.createElement("span");
       val.className = "data-muted";
-      val.textContent = Array.isArray(v) ? (v.length ? v.join(", ") : t("js.none", "(none)")) : v === null || v === undefined ? t("js.none", "(none)") : String(v);
+      val.textContent = Array.isArray(v) ? (v.length ? v.join(", ") : t("js.none", "(none)")) : v === null || v === undefined ? t("js.none", "(none)") : typeof v === "boolean" ? (v ? t("js.yes", "Yes") : t("js.no", "No")) : String(v);
       row.appendChild(val);
     }
     wrap.appendChild(row);
@@ -1308,7 +1313,7 @@ function groundingDetail(d) {
 
   const method = document.createElement("p");
   method.className = "data-note";
-  method.textContent = t("js.method_judge", "Method: {method}. Judge: {judge_summary}", { method: d.method, judge_summary: d.judge_summary }) +
+  method.textContent = t("js.method_judge", "Method: {method}. Judge: {judge_summary}", { method: serverText(d.method), judge_summary: serverText(d.judge_summary) }) +
     (d.judge_model ? ` (${d.judge_model}).` : ".");
   wrap.appendChild(method);
 
@@ -1360,7 +1365,7 @@ function dosageDetail(d) {
   wrap.className = "stage-data";
   const rule = document.createElement("p");
   rule.className = "data-note";
-  rule.textContent = d.rule ? t("js.rule", "Rule: {rule}.", { rule: d.rule }) : t("js.dosage_guard_disabled", "Dosage guard disabled.");
+  rule.textContent = d.rule ? t("js.rule", "Rule: {rule}.", { rule: serverText(d.rule) }) : t("js.dosage_guard_disabled", "Dosage guard disabled.");
   wrap.appendChild(rule);
 
   if (!d.detected_values.length) {
@@ -2391,7 +2396,7 @@ async function loadReviews() {
     text.textContent = k.query;
     const why = document.createElement("div");
     why.className = "user-email";
-    why.textContent = k.kind === "flagged" ? t("js.flagged", "Flagged: {reason}", { reason: k.reason }) : k.reason_category;
+    why.textContent = k.kind === "flagged" ? t("js.flagged", "Flagged: {reason}", { reason: k.reason }) : coded("refusal_category", k.reason_category, k.reason_category);
     q.append(text, why);
 
     const type = document.createElement("td");
@@ -2451,7 +2456,7 @@ function renderCase(k) {
   $("case-dialog-title").textContent = `${KIND_LABELS()[k.kind] || t("js.case_2", "Case")} #${k.id}`;
   $("case-query").textContent = k.query;
   const meta = [
-    k.kind === "flagged" ? t("js.flagged_2", "Flagged{flagged_by_name}: {reason}", { flagged_by_name: k.flagged_by_name ? t("js.by", " by {flagged_by_name}", { flagged_by_name: k.flagged_by_name }) : "", reason: k.reason }) : t("js.refused_2", "Refused: {reason}", { reason: k.reason }),
+    k.kind === "flagged" ? t("js.flagged_2", "Flagged{flagged_by_name}: {reason}", { flagged_by_name: k.flagged_by_name ? t("js.by", " by {flagged_by_name}", { flagged_by_name: k.flagged_by_name }) : "", reason: k.reason }) : t("js.refused_2", "Refused: {reason}", { reason: reasonText(k.reason) }),
     t("js.asked_first", "Asked {occurrences}, first {created_at}", { occurrences: k.occurrences === 1 ? t("js.once", "once") : t("js.times", "{occurrences} times", { occurrences: k.occurrences }), created_at: dateTime(k.created_at) }),
     k.status === "open" ? t("js.due_2", "Due {due_at}{escalated}", { due_at: relativeTime(k.due_at), escalated: k.escalated ? t("js.escalated", ", escalated") : "" }) : "",
     t("js.audit_record", "Audit record {last_audit_id}", { last_audit_id: k.last_audit_id }),
@@ -2459,7 +2464,7 @@ function renderCase(k) {
   $("case-meta").textContent = meta.join(". ") + ".";
 
   $("case-answer-section").hidden = !k.answer_text;
-  $("case-answer").textContent = k.answer_text || "";
+  $("case-answer").textContent = (L && L.answerText(k.answer_text)) || k.answer_text || "";
   $("case-sources").textContent = (k.sources || []).length
     ? t("js.sources_retrieved", "Sources retrieved: {sources}.", { sources: k.sources.map((x) => x.id).join(", ") }) : "";
 
@@ -2506,7 +2511,7 @@ function renderCase(k) {
     li.appendChild(head);
     if (e.note) {
       const note = document.createElement("p");
-      note.textContent = e.note;
+      note.textContent = (e.action !== "commented" && e.action !== "flagged" && e.action !== "resolved" && e.action !== "reopened" && L && L.text(e.note)) || e.note;
       li.appendChild(note);
     }
     list.appendChild(li);
@@ -3926,7 +3931,7 @@ function renderPatientFindings(findings, given) {
     text.className = "finding-text";
     const med = document.createElement("strong");
     med.textContent = `${f.medicine}: `;
-    text.append(med, f.message);
+    text.append(med, (L && L.finding(f)) || f.message);
     li.append(tag, text);
     if (f.rule_id || f.source) {
       const meta = document.createElement("span");
@@ -5666,3 +5671,7 @@ function renderMetricBlock(id, titleText, noteText, block) {
 
 // ---------- Utils ----------
 function capitalize(s) { return s && s.length ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+// Server-written English shown in the chosen language where the table knows it.
+const L = window.gcLocalize;
+const serverText = (s) => (L && L.text(s)) || s;
+const reasonText = (s) => (L && L.reason(s)) || s;

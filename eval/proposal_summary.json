@@ -1,0 +1,292 @@
+{
+ "total": 1047,
+ "failures": {},
+ "wrong_answer": 0,
+ "wrong_no": 0,
+ "guessed": 0,
+ "patient": 0,
+ "over_refused_matches": 16,
+ "by_group": {
+  "heldout/all/mismatch": {
+   "refused:form_unsupported": 2,
+   "refused:stated_value_unsupported": 9,
+   "refused:term_not_covered": 1
+  },
+  "heldout/clock_time/unverifiable_or_refuse": {
+   "refused:proposal_unverifiable": 12
+  },
+  "heldout/dose+freq+duration/match": {
+   "yes": 1
+  },
+  "heldout/dose+freq+duration/mismatch": {
+   "refused:proposal_unverifiable": 2,
+   "refused:stated_value_unsupported": 7,
+   "refused:term_not_covered": 1,
+   "no": 2
+  },
+  "heldout/dose+freq+duration/unverifiable": {
+   "refused:proposal_unverifiable": 1
+  },
+  "heldout/dose+freq/match": {
+   "yes": 1
+  },
+  "heldout/dose+freq/mismatch": {
+   "no": 4,
+   "refused:stated_value_unsupported": 4
+  },
+  "heldout/dose+freq/unverifiable": {
+   "refused:proposal_unverifiable": 1
+  },
+  "heldout/dose+route/match": {
+   "yes": 3
+  },
+  "heldout/dose+route/mismatch": {
+   "refused:form_unsupported": 4,
+   "refused:stated_value_unsupported": 8
+  },
+  "heldout/dose/match": {
+   "refused:term_not_covered": 2,
+   "yes": 7
+  },
+  "heldout/dose/mismatch": {
+   "refused:stated_value_unsupported": 5
+  },
+  "heldout/duration/match": {
+   "yes": 9
+  },
+  "heldout/duration/mismatch": {
+   "no": 5
+  },
+  "heldout/form_unit/unverifiable": {
+   "refused:form_unsupported": 12
+  },
+  "heldout/freq/match": {
+   "yes": 9
+  },
+  "heldout/freq/mismatch": {
+   "no": 8
+  },
+  "heldout/freq/unverifiable": {
+   "refused:proposal_unverifiable": 6
+  },
+  "heldout/info/none": {
+   "answered": 47,
+   "refused": 3
+  },
+  "heldout/inverted/unverifiable": {
+   "refused:proposal_unverifiable": 39,
+   "refused:term_not_covered": 11
+  },
+  "heldout/max/match": {
+   "refused:stated_value_unsupported": 9,
+   "yes": 3,
+   "refused:limit_not_stated": 1
+  },
+  "heldout/max/mismatch": {
+   "refused:stated_value_unsupported": 4,
+   "no": 1
+  },
+  "heldout/max/unverifiable": {
+   "refused:limit_not_stated": 1,
+   "refused:proposal_unverifiable": 2
+  },
+  "heldout/misspelt_drug/refuse_any": {
+   "refused:term_not_covered": 11,
+   "refused:stated_value_unsupported": 1
+  },
+  "heldout/misspelt_freq/unverifiable_or_refuse": {
+   "refused:term_not_covered": 12
+  },
+  "heldout/negated/match": {
+   "yes": 20
+  },
+  "heldout/negated/mismatch": {
+   "no": 21
+  },
+  "heldout/negated/unverifiable": {
+   "refused:proposal_unverifiable": 9
+  },
+  "heldout/no_unit/unverifiable": {
+   "refused:proposal_unverifiable": 12
+  },
+  "heldout/patient_adult_match/match_or_patient": {
+   "yes": 15
+  },
+  "heldout/patient_adult_mismatch/mismatch_or_patient": {
+   "no": 15
+  },
+  "heldout/patient_child/refuse_patient": {
+   "refused:patient_unsafe": 15
+  },
+  "heldout/per_kg/unverifiable": {
+   "refused:stated_value_unsupported": 12
+  },
+  "heldout/relative/unverifiable": {
+   "refused:proposal_unverifiable": 12
+  },
+  "heldout/route/match": {
+   "refused:term_not_covered": 2,
+   "yes": 9
+  },
+  "heldout/route/mismatch": {
+   "refused:form_unsupported": 5
+  },
+  "heldout/thousands/unverifiable": {
+   "refused:stated_value_unsupported": 12
+  },
+  "heldout/timing/match": {
+   "yes": 1
+  },
+  "heldout/timing/mismatch": {
+   "no": 8
+  },
+  "heldout/timing/unverifiable": {
+   "refused:term_not_covered": 2
+  },
+  "heldout/two_drugs/unverifiable": {
+   "refused:proposal_unverifiable": 6
+  },
+  "heldout/unknown_drug/refuse_any": {
+   "refused:stated_value_unsupported": 7,
+   "refused:term_not_covered": 5
+  },
+  "tuned/all/mismatch": {
+   "refused:stated_value_unsupported": 19,
+   "no": 3,
+   "refused:form_unsupported": 7,
+   "refused:proposal_unverifiable": 1
+  },
+  "tuned/clock_time/unverifiable_or_refuse": {
+   "refused:proposal_unverifiable": 12
+  },
+  "tuned/dose+freq+duration/match": {
+   "yes": 3
+  },
+  "tuned/dose+freq+duration/mismatch": {
+   "no": 8,
+   "refused:stated_value_unsupported": 14,
+   "refused:proposal_unverifiable": 3
+  },
+  "tuned/dose+freq/match": {
+   "yes": 2
+  },
+  "tuned/dose+freq/mismatch": {
+   "refused:stated_value_unsupported": 11,
+   "no": 3
+  },
+  "tuned/dose+freq/unverifiable": {
+   "refused:proposal_unverifiable": 3
+  },
+  "tuned/dose+route/match": {
+   "yes": 4
+  },
+  "tuned/dose+route/mismatch": {
+   "refused:stated_value_unsupported": 10,
+   "refused:form_unsupported": 4
+  },
+  "tuned/dose/match": {
+   "yes": 5
+  },
+  "tuned/dose/mismatch": {
+   "refused:stated_value_unsupported": 12
+  },
+  "tuned/duration/match": {
+   "yes": 8
+  },
+  "tuned/duration/mismatch": {
+   "no": 10
+  },
+  "tuned/form_unit/unverifiable": {
+   "refused:form_unsupported": 12
+  },
+  "tuned/freq/match": {
+   "yes": 3
+  },
+  "tuned/freq/mismatch": {
+   "no": 8
+  },
+  "tuned/freq/unverifiable": {
+   "refused:proposal_unverifiable": 2
+  },
+  "tuned/info/none": {
+   "answered": 69,
+   "refused": 1
+  },
+  "tuned/inverted/unverifiable": {
+   "refused:proposal_unverifiable": 52,
+   "refused:term_not_covered": 18
+  },
+  "tuned/max/match": {
+   "yes": 5,
+   "refused:stated_value_unsupported": 2
+  },
+  "tuned/max/mismatch": {
+   "refused:stated_value_unsupported": 11,
+   "no": 3
+  },
+  "tuned/max/unverifiable": {
+   "refused:proposal_unverifiable": 4
+  },
+  "tuned/misspelt_drug/refuse_any": {
+   "refused:stated_value_unsupported": 2,
+   "refused:term_not_covered": 10
+  },
+  "tuned/misspelt_freq/unverifiable_or_refuse": {
+   "refused:term_not_covered": 12
+  },
+  "tuned/negated/match": {
+   "yes": 30
+  },
+  "tuned/negated/mismatch": {
+   "no": 30
+  },
+  "tuned/negated/unverifiable": {
+   "refused:proposal_unverifiable": 10
+  },
+  "tuned/no_unit/unverifiable": {
+   "refused:proposal_unverifiable": 12
+  },
+  "tuned/patient_adult_match/match_or_patient": {
+   "yes": 18
+  },
+  "tuned/patient_adult_mismatch/mismatch_or_patient": {
+   "no": 18
+  },
+  "tuned/patient_child/refuse_patient": {
+   "refused:patient_unsafe": 18
+  },
+  "tuned/per_kg/unverifiable": {
+   "refused:stated_value_unsupported": 12
+  },
+  "tuned/relative/unverifiable": {
+   "refused:proposal_unverifiable": 12
+  },
+  "tuned/route/match": {
+   "yes": 11
+  },
+  "tuned/route/mismatch": {
+   "refused:form_unsupported": 9
+  },
+  "tuned/thousands/unverifiable": {
+   "refused:stated_value_unsupported": 12
+  },
+  "tuned/timing/match": {
+   "yes": 7
+  },
+  "tuned/timing/mismatch": {
+   "no": 8,
+   "refused:term_not_covered": 4
+  },
+  "tuned/timing/unverifiable": {
+   "refused:term_not_covered": 1,
+   "refused:proposal_unverifiable": 2
+  },
+  "tuned/two_drugs/unverifiable": {
+   "refused:proposal_unverifiable": 6
+  },
+  "tuned/unknown_drug/refuse_any": {
+   "refused:stated_value_unsupported": 6,
+   "refused:term_not_covered": 6
+  }
+ }
+}

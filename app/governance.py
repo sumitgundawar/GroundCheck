@@ -63,7 +63,11 @@ _CODE_CATEGORY = {
     "dose_unsupported": "dose not in sources",
     "patient_unsafe": "patient safety block",
     "unsupported_language": "language not supported",
+    "proposal_unverifiable": "not enough information",
 }
+
+
+_CATEGORY_CODE = {category: code for code, category in _CODE_CATEGORY.items()}
 
 
 def categorise(reason: str, reason_code: str | None = None) -> str:
@@ -126,6 +130,7 @@ def _case_summary(case: ReviewCase, names: dict[int, str], now: datetime) -> dic
         "query": case.query,
         "reason": case.reason,
         "reason_category": case.reason_category,
+        "reason_code": _CATEGORY_CODE.get(case.reason_category),
         "occurrences": case.occurrences,
         "first_audit_id": case.first_audit_id,
         "last_audit_id": case.last_audit_id,
@@ -273,8 +278,8 @@ def get_case(case_id: int, site_id: int | None = None) -> dict:
         names = _user_names(s, [case.assigned_to, case.flagged_by, case.resolved_by]
                             + [e.user_id for e in case.events])
         summary = _case_summary(case, names, now)
-        summary["events"] = [{"at": e.at.isoformat(), "action": e.action, "user": names.get(e.user_id),
-                              "note": e.note} for e in case.events]
+        summary["events"] = [{"at": e.at.isoformat(), "action": e.action, "code": e.action,
+                              "user": names.get(e.user_id), "note": e.note} for e in case.events]
         record = s.scalar(select(AuditRecord).where(AuditRecord.audit_id == case.last_audit_id))
         if record is not None:
             response = record.record.get("response", {})

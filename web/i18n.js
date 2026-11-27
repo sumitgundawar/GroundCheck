@@ -98,6 +98,7 @@
 
   window.gcI18n = {
     t: t,
+    en: function () { return strings.en; },
     apply: apply,
     locale: function () { return pseudo ? "pseudo" : locale; },
     locales: LOCALES,

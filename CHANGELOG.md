@@ -21,6 +21,20 @@ Dates are when the work landed on `main`. Versions follow the app's
 - A knowledge pack's evaluation cases now gate a release: any case decided differently blocks it.
 - Administrative events in the audit chain are skipped by every report, monitor, list and lookup.
 
+### Proposed regimens
+
+- **A question that proposes a regimen** ("Is 15 mg twice a day okay for X?") is read into dose, frequency,
+  route, duration, daily maximum and timing and compared, part by part, with the cited source (`app/proposal.py`).
+  The answer leads with `No — the source gives 15 mg once daily, not 15 mg twice daily.` or `Yes — this matches
+  the source: ...`, then the cited sentences; units are compared as quantities (0.015 g is 15 mg), and
+  `bd`, `tds`, `q8h` and "every 8 hours" are doses a day. Anything that cannot be read or checked (no unit,
+  tablets, mg/kg, "1,000 mg", a second medicine, a source that contradicts itself, a question about whether an
+  amount is "too much") is refused with `proposal_unverifiable` rather than guessed. Same in extractive and model
+  modes (the model is not asked), and over `/api/v1/ask`, which returns `proposal_check` (`match`, `mismatch` or
+  `unverifiable`, with each part's proposed and documented value and source id).
+- Decimal commas ("0,5 mg") and "by mouth" are rewritten before the guards read them. `scripts/proposal_eval.py` gates on zero wrong answers over
+  `eval/proposal_cases.json`.
+
 ### Tenants and sites
 
 - **Tenant isolation.** A site's admins and staff no longer see other sites through `GET /api/sites`, the

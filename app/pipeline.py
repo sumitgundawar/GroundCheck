@@ -15,8 +15,9 @@ import time
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
 
-from . import audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, retrieval, tracing
-from .schemas import (AskResponse, Claim, ClaimSupport, Explanation, PatientContext, PatientFinding, Redaction, Review, Settings,
+from . import (audit, config, governance, guards_input, guards_output, llm, monitoring, patient_checks, proposal, retrieval,
+               tracing)
+from .schemas import (AskResponse, Claim, ClaimSupport, Explanation, LLMAnswer, PatientContext, PatientFinding, Redaction, Review, Settings,
                       Source, TraceStep)
 
 # The full ordered set of stage names, used to render skipped stages after an
@@ -104,6 +105,7 @@ def _finish(
     extras: dict,
     patient_findings: list[PatientFinding] | None = None,
     explanation: Explanation | None = None,
+    reason_params: dict | None = None,
 ) -> AskResponse:
     """answer_text, for a refusal, is the message without its routing
     sentence: whether the question was routed is only known once the review
@@ -149,11 +151,14 @@ def _finish(
         review=review,
         explanation=explanation or (_explain(reason_code, refused_reason) if decision == "refuse" else Explanation()),
         redaction=extras.get("redaction") or Redaction(),
+        proposal_check=extras.get("proposal_check"),
+        reason_params=reason_params or {},
     )
     if extras.get("check_only"):
         return response
     saved = {k: v for k, v in extras.items()
-             if k not in ("user_id", "review", "check_only", "remember", "raw_query", "redaction", "site_id", "api_key_id")}
+             if k not in ("user_id", "review", "check_only", "remember", "raw_query", "redaction", "site_id", "api_key_id",
+                                 "proposal_check")}
     key = extras.get("remember")
     if key and not any(step.name == "rate limit" and step.status == "fail" for step in trace):
         _remember_answer(key, response, saved)
@@ -201,6 +206,7 @@ _EXPLAIN_SUMMARY = {
     "dose_unsupported": "The drafted answer contained a dose the sources do not support.",
     "patient_unsafe": "The patient's details make the answer unsafe to give.",
     "unsupported_language": "The question is in a language this installation cannot check against its sources.",
+    "proposal_unverifiable": "The question proposes a regimen that cannot be checked against the sources.",
 }
 _EXPLAIN_SUGGESTION = {
     "term_not_covered": ["Check the spelling of the name.", "Ask about the medicine or condition by its listed name."],
@@ -212,6 +218,9 @@ _EXPLAIN_SUGGESTION = {
     "insufficient_context": ["Ask one thing at a time, naming the medicine or condition."],
     "input_blocked": ["Rephrase the question as a plain clinical question."],
     "unsupported_language": ["Ask the question in English, or in a language this installation supports."],
+    "proposal_unverifiable": ["Name one medicine and give each amount with its unit and period, for example "
+                              "'15 mg twice daily for 7 days'.",
+                              "Ask what the source gives to see the documented regimen."],
 }
 
 
@@ -269,6 +278,12 @@ STAGE_EXPLAIN = {
         "one more search aimed at it, kept to the topic the question names. "
         "Catches questions about things the corpus never mentions, before "
         "generation.",
+    "proposal check":
+        "When the question proposes a regimen ('Is 15 mg twice a day okay for X?'), its dose, frequency, route, "
+        "duration, daily maximum and timing are read out and compared, part by part, with what the sources "
+        "say about that medicine. Any difference gives a 'No' that names both; every part matching gives a "
+        "'Yes'; a part that cannot be read or checked (no unit, an unknown or second medicine, a source that "
+        "contradicts itself) refuses the question rather than guessing. No model is involved.",
     "generate":
         "The question and the retrieved sources are sent to the LLM, which must "
         "return structured JSON: a list of claims, each citing the source ids it "
@@ -620,8 +635,27 @@ def verify_claims(question: str, claims, sources: list[dict], patient: PatientCo
         return refuse("claim_ungrounded", f"a claim could not be grounded: \"{ungrounded[0]}\"",
                       "A statement could not be grounded in the sources.")
     if not dose_ok:
-        return refuse("dose_unsupported", dose_detail, dose_detail.capitalize() + ".")
+        return refuse("dose_unsupported", dose_detail, dose_detail[:1].upper() + dose_detail[1:] + ".")
     return Verification("answer", None, None, "", claims, findings, trace, ungrounded, dose_ok, dose_detail)
+
+
+_DECIMAL_COMMA = re.compile(
+    r"(?<![\d,.])(?:0,(\d+)|(\d{1,3}),(\d{1,2}))(?!\d)(?=\s*(?:mg|mcg|µg|ug|g|ml|l|milli|micro|gram|litre|liter|units?)\b)",
+    re.IGNORECASE)
+
+
+_ROUTE_PHRASES = ((re.compile(r"\b(?:by mouth|per os|via the oral route|by the oral route)\b", re.I), "orally"),
+                  (re.compile(r"\b(?:on|to) the skin\b", re.I), "topically"),
+                  (re.compile(r"\bunder the skin\b", re.I), "subcutaneously"))
+
+
+def _decimal_commas(text: str) -> str:
+    """"0,5 mg" is half a milligram, not "5 mg": a decimal comma is written as a point, and a route written as a
+    phrase ("by mouth") as the route's own word, before any check reads it."""
+    text = _DECIMAL_COMMA.sub(lambda m: f"0.{m.group(1)}" if m.group(1) else f"{m.group(2)}.{m.group(3)}", text)
+    for pattern, word in _ROUTE_PHRASES:
+        text = pattern.sub(word, text)
+    return text
 
 
 def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: int | None,
@@ -726,7 +760,7 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                        refused_reason=rate.reason, reason_code="rate_limited", claims=[], sources=[],
                        trace=trace, llm_used=False, timer=timer, extras=extras)
 
-    query = redacted.strip()
+    query = _decimal_commas(redacted.strip())
 
     # --- 2. Retrieve -------------------------------------------------------
     results = retrieval.search(query, cfg.top_k)
@@ -816,6 +850,10 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         ))
     if not covered:
         reason = cover_detail
+        if cover_code in ("stated_value_unsupported", "form_unsupported"):
+            found = proposal.evaluate(query)
+            if found is not None:
+                extras["proposal_check"] = found.check
         _skip_after(trace, "source coverage")
         return _finish(decision="refuse",
                        answer_text=REFUSAL_PREFIX
@@ -823,17 +861,44 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
                        "do not cover.",
                        refused_reason=reason, reason_code=cover_code,
                        explanation=_explain(cover_code, reason, cover_report.get("uncovered") if cover_code == "term_not_covered" else None),
+                       reason_params=({"terms": cover_report.get("uncovered") or []} if cover_code == "term_not_covered"
+                                      else {"detail": reason}),
                        claims=[], sources=sources,
                        trace=trace, llm_used=False, timer=timer, extras=extras)
+
+    # --- 4b. A proposed regimen ----------------------------------------------
+    proposed = proposal.evaluate(query)
+    if proposed is not None:
+        extras["proposal_check"] = proposed.check
+        unusable = proposed.check.status == "unverifiable" or not proposed.claims
+        detail = {"match": "the proposal matches the source", "mismatch": "the proposal differs from the source",
+                  "unverifiable": "the proposal cannot be checked against the source"}[proposed.check.status]
+        trace.append(TraceStep(
+            name="proposal check", status="pass" if proposed.check.status == "match"
+            else "warn" if proposed.check.status == "mismatch" else "fail",
+            detail=detail, ms=timer.lap_ms(), data=proposed.check.model_dump()))
+        if unusable:
+            message = proposed.message or proposal.unverifiable_message(proposed.check, None)
+            _skip_after(trace, "source coverage")
+            return _finish(decision="refuse", answer_text=REFUSAL_PREFIX + message, refused_reason=message,
+                           reason_code="proposal_unverifiable", claims=[], sources=sources, trace=trace,
+                           llm_used=False, timer=timer, extras=extras,
+                           reason_params={"dimensions": [{"name": d.name, "code": d.code, "reason": d.reason}
+                                                         for d in proposed.check.dimensions
+                                                         if d.status == "unverifiable"]})
 
     # --- 5. Generate -------------------------------------------------------
     provider = None if cfg.force_extractive else llm.active_provider()
     extras["provider"] = provider
-    llm_answer = None if provider is None else llm.generate_llm(
-        query, source_records, cfg.temperature)
-    llm_used = llm_answer is not None
-    if not llm_used:
-        llm_answer = llm.generate_extractive(query, results, cfg.retrieval_min_score)
+    if proposed is not None:
+        llm_answer = LLMAnswer(insufficient_context=False, claims=proposed.claims)
+        llm_used = False
+    else:
+        llm_answer = None if provider is None else llm.generate_llm(
+            query, source_records, cfg.temperature)
+        llm_used = llm_answer is not None
+        if not llm_used:
+            llm_answer = llm.generate_extractive(query, results, cfg.retrieval_min_score)
     extras["llm_raw"] = llm_answer.model_dump()
     # An extractive answer may cite a passage of the topic that retrieval ranked
     # below the cut. It is a source of the answer like any other: show it, and
@@ -855,7 +920,8 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
     trace.append(TraceStep(
         name="generate",
         status="pass" if llm_used else "info",
-        detail=(f"{'local' if provider['kind'] == 'local' else 'cloud'} model "
+        detail=("the cited source sentences for the proposal, no model" if proposed is not None
+                else f"{'local' if provider['kind'] == 'local' else 'cloud'} model "
                 f"{provider['model']} produced cited claims" if llm_used
                 else ("naive extractive, model bypassed" if cfg.force_extractive
                       else ("extractive fallback: the model call failed" if provider
@@ -890,15 +956,29 @@ def _run(raw_query: str, settings: "Settings | None", client_id: str, user_id: i
         return _finish(decision="refuse", answer_text=REFUSAL_PREFIX + verdict.message,
                        refused_reason=verdict.refused_reason, reason_code=verdict.reason_code,
                        claims=verdict.claims, sources=sources, trace=trace, llm_used=llm_used, timer=timer,
-                       extras=extras, patient_findings=verdict.findings if verdict.reason_code == "patient_unsafe" else None)
+                       extras=extras, patient_findings=verdict.findings if verdict.reason_code == "patient_unsafe" else None,
+                       reason_params=_verdict_params(verdict))
     claims, findings = verdict.claims, verdict.findings
 
     # --- Answer ------------------------------------------------------------
     answer_text = _assemble_answer(claims)
+    if proposed is not None:
+        answer_text = f"{proposed.lead} {answer_text}"
     return _finish(decision="answer", answer_text=answer_text,
                    refused_reason=None, claims=claims, sources=sources,
                    trace=trace, llm_used=llm_used, timer=timer, extras=extras,
                    patient_findings=findings)
+
+
+def _verdict_params(verdict: "Verification") -> dict:
+    if verdict.reason_code == "patient_unsafe":
+        blocking = next((f for f in verdict.findings if f.severity == "block"), None)
+        return {"rule": blocking.rule, "code": blocking.code, **blocking.params} if blocking else {}
+    if verdict.reason_code == "dose_unsupported":
+        return {"detail": verdict.dose_detail}
+    if verdict.reason_code == "claim_ungrounded":
+        return {"claims": verdict.ungrounded[:3]}
+    return {}
 
 
 def _assemble_answer(claims: list[Claim]) -> str:

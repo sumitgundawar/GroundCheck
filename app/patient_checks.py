@@ -61,9 +61,10 @@ class Review:
     def blocking(self) -> PatientFinding | None:
         return next((f for f in self.findings if f.severity == "block"), None)
 
-    def add(self, severity, code, medicine, message, rule_id="", source=""):
+    def add(self, severity, code, medicine, message, rule_id="", source="", params=None):
         self.findings.append(PatientFinding(severity=severity, code=code, medicine=medicine.name,
-                                            message=message, rule_id=rule_id, source=source))
+                                            message=message, rule_id=rule_id, source=source,
+                                            rule=rule_id or code, params={"medicine": medicine.name, **(params or {})}))
 
 
 def creatinine_clearance(patient: PatientContext) -> float | None:
@@ -146,12 +147,13 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
         for allergy in patient.allergies:
             if _matches(allergy, [med.name, *med.aliases, *med.classes, *med.allergy_groups]):
                 result.add(stop, "allergy", med, f"The patient is allergic to {allergy}, and {med.name} is ruled out "
-                           f"for that allergy.", source=", ".join(med.source_ids[:2]))
+                           f"for that allergy.", source=", ".join(med.source_ids[:2]), params={"allergy": allergy})
                 break
         for condition in patient.conditions:
             if _matches(condition, med.contraindicated_conditions):
                 result.add(stop, "contraindicated_condition", med,
-                           f"{med.name} is contraindicated in {condition}.", source=", ".join(med.source_ids[:2]))
+                           f"{med.name} is contraindicated in {condition}.", source=", ".join(med.source_ids[:2]),
+                           params={"condition": condition})
                 break
 
         # Interactions and duplicates with current medicines
@@ -180,11 +182,13 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                 label = other.name if other else text
                 severity = {"contraindicated": stop, "major": "warn", "moderate": "info"}[rule.severity]
                 result.add(severity, f"interaction_{rule.severity}", med,
-                           f"{med.name} with {label}: {rule.note or rule.severity}", rule.id, rule.source)
+                           f"{med.name} with {label}: {rule.note or rule.severity}", rule.id, rule.source,
+                           {"other": label, "severity": rule.severity, "note": rule.note or ""})
             if other is not None and other is not med and set(map(_singular, other.classes)) & set(map(_singular, med.classes)):
                 shared = sorted(set(other.classes) & set(med.classes)) or other.classes
                 result.add("warn", "duplicate_class", med,
-                           f"The patient already takes {other.name}, which is also one of the {shared[0]}.")
+                           f"The patient already takes {other.name}, which is also one of the {shared[0]}.",
+                           params={"other": other.name, "class": shared[0]})
 
         if med.high_alert:
             result.add("warn", "high_alert", med, f"{med.name} is a high-alert medicine: use an independent double check.")
@@ -211,7 +215,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             if (rule.above is not None and value > rule.above) or (rule.below is not None and value < rule.below):
                 severity = stop if rule.action == "avoid" else "warn"
                 result.add(severity, f"lab_{rule.lab}", med, f"{rule.note} The patient's {rule.lab} is {_fmt(value)}.",
-                           rule.id, rule.source)
+                           rule.id, rule.source, {"lab": rule.lab, "value": value, "note": rule.note})
 
         if not dose_question and not prescribing:
             # Asking what a medicine is isn't asking to give it, so nothing here
@@ -223,7 +227,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                                                     and patient.age_years < med.paediatric_min_age)):
                 result.add("warn", "paediatric_not_covered", med,
                            f"The formulary has no dosing for {med.name} in a patient aged "
-                           f"{_fmt(patient.age_years)}: this answer is about adults.")
+                           f"{_fmt(patient.age_years)}: this answer is about adults.", params={"age": patient.age_years})
             continue
 
         # Missing data needed before a dose can be given
@@ -249,11 +253,13 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                 med.paediatric_dose is None or (med.paediatric_min_age is not None
                                                 and patient.age_years < med.paediatric_min_age)):
             result.add("block", "paediatric_not_covered", med,
-                       f"The formulary has no dosing for {med.name} in a patient aged {_fmt(patient.age_years)}.")
+                       f"The formulary has no dosing for {med.name} in a patient aged {_fmt(patient.age_years)}.",
+                       params={"age": patient.age_years})
             continue
         if missing:
             result.add("block", "missing_data", med,
-                       f"To check a dose of {med.name} for this patient, GroundCheckHealth needs their {', '.join(missing)}.")
+                       f"To check a dose of {med.name} for this patient, GroundCheckHealth needs their {', '.join(missing)}.",
+                       params={"missing": list(missing)})
             continue
 
         # Children
@@ -262,11 +268,13 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             if med.paediatric_dose is None or (med.paediatric_min_age is not None
                                                and patient.age_years < med.paediatric_min_age):
                 result.add("block", "paediatric_not_covered", med,
-                           f"The formulary has no dosing for {med.name} in a patient aged {_fmt(patient.age_years)}.")
+                           f"The formulary has no dosing for {med.name} in a patient aged {_fmt(patient.age_years)}.",
+                           params={"age": patient.age_years})
                 continue
             if patient.weight_kg is None:
                 result.add("block", "missing_data", med,
-                           f"To calculate a dose of {med.name} for a child, GroundCheckHealth needs their weight.")
+                           f"To calculate a dose of {med.name} for a child, GroundCheckHealth needs their weight.",
+                           params={"missing": ["weight"]})
                 continue
             dose = med.paediatric_dose
             amount = dose.per_kg * patient.weight_kg
@@ -277,11 +285,14 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             if too_high is not None or amounts:
                 result.add("block", "paediatric_dose", med,
                            f"The {subject} gives an adult dose. For this child the formulary gives {_fmt(round(capped, 2))} "
-                           f"{dose.unit} {dose.frequency} ({calc}).", source="Formulary")
+                           f"{dose.unit} {dose.frequency} ({calc}).", source="Formulary",
+                           params={"amount": round(capped, 2), "unit": dose.unit, "frequency": dose.frequency,
+                                   "stated": too_high})
             else:
                 result.add("info", "paediatric_dose", med,
                            f"For this child the formulary gives {_fmt(round(capped, 2))} {dose.unit} {dose.frequency} "
-                           f"({calc}).", source="Formulary")
+                           f"({calc}).", source="Formulary",
+                           params={"amount": round(capped, 2), "unit": dose.unit, "frequency": dose.frequency})
             continue
 
         limit = med.adult_dose
@@ -296,7 +307,8 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                             *[(r, f"liver function is Child-Pugh class {patient.child_pugh}") for r in hepatic[:1]]]:
             if rule.action == "avoid":
                 result.add("block", "renal" if hasattr(rule, "egfr_below") else "hepatic", med,
-                           f"{rule.note} The patient's {where}.", rule.id, rule.source)
+                           f"{rule.note} The patient's {where}.", rule.id, rule.source,
+                           {"measure": measure, "value": kidney, "child_pugh": patient.child_pugh, "note": rule.note})
             elif rule.action == "reduce" and rule.dose:
                 limit = rule.dose
                 too_high = _exceeds(amounts, rule.dose.amount, rule.dose.unit)
@@ -304,10 +316,13 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                            "renal_dose" if hasattr(rule, "egfr_below") else "hepatic_dose", med,
                            (f"The {subject}'s {_fmt(too_high)} {rule.dose.unit} is too high: the patient's {where}. "
                             if too_high is not None else "") +
-                           f"{rule.note} The formulary gives {_dose_text(rule.dose)}.", rule.id, rule.source)
+                           f"{rule.note} The formulary gives {_dose_text(rule.dose)}.", rule.id, rule.source,
+                           {"stated": too_high, "unit": rule.dose.unit, "measure": measure, "value": kidney,
+                            "child_pugh": patient.child_pugh, "dose": _dose_text(rule.dose), "note": rule.note})
             else:
                 result.add("warn", "renal_caution" if hasattr(rule, "egfr_below") else "hepatic_caution", med,
-                           f"{rule.note} The patient's {where}.", rule.id, rule.source)
+                           f"{rule.note} The patient's {where}.", rule.id, rule.source,
+                           {"measure": measure, "value": kidney, "child_pugh": patient.child_pugh, "note": rule.note})
 
         # Weight-based adult dosing
         if med.weight_dose:
@@ -324,9 +339,12 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
             if too_high is not None:
                 result.add("block", "dose_above_maximum", med,
                            f"The {subject}'s {_fmt(too_high)} {dose.unit} is above this patient's maximum for "
-                           f"{med.name}. {calculated}", source="Formulary")
+                           f"{med.name}. {calculated}", source="Formulary",
+                           params={"stated": too_high, "unit": dose.unit, "amount": round(capped, 2),
+                                   "frequency": dose.frequency})
             else:
-                result.add("info", "weight_dose", med, calculated, source="Formulary")
+                result.add("info", "weight_dose", med, calculated, source="Formulary",
+                           params={"amount": round(capped, 2), "unit": dose.unit, "frequency": dose.frequency})
         elif limit and limit.max_daily:
             daily_factor = _DOSES_PER_DAY.get(limit.frequency or "", 1)
             too_high = _exceeds(amounts, limit.max_daily / daily_factor, limit.unit)
@@ -334,6 +352,7 @@ def review(query: str, claims: list[Claim], patient: PatientContext | None, subj
                                                 if f.medicine == med.name):
                 result.add("block", "dose_above_maximum", med,
                            f"The {subject}'s {_fmt(too_high)} {limit.unit} is above the maximum for {med.name} "
-                           f"({_dose_text(limit)}).", source=", ".join(med.source_ids[:1]))
+                           f"({_dose_text(limit)}).", source=", ".join(med.source_ids[:1]),
+                           params={"stated": too_high, "unit": limit.unit, "dose": _dose_text(limit)})
 
     return result

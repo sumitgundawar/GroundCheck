@@ -24,7 +24,7 @@ ReasonCode = Literal[
     "input_blocked", "rate_limited", "no_relevant_source", "term_not_covered",
     "population_not_covered", "stated_value_unsupported", "form_unsupported",
     "limit_not_stated", "combination_forbidden", "insufficient_context",
-    "claim_ungrounded", "dose_unsupported", "patient_unsafe", "unsupported_language",
+    "claim_ungrounded", "dose_unsupported", "patient_unsafe", "unsupported_language", "proposal_unverifiable",
 ]
 
 
@@ -105,6 +105,8 @@ class PatientFinding(BaseModel):
     message: str
     rule_id: str = ""
     source: str = ""
+    rule: str = ""
+    params: dict = {}
 
 
 class AskRequest(BaseModel):
@@ -177,6 +179,26 @@ class Redaction(BaseModel):
     redacted_query: str = ""
 
 
+class ProposalDimension(BaseModel):
+    """One part of a proposed regimen and how it compares with the source."""
+    name: Literal["dose", "frequency", "duration", "route", "max_daily", "timing", "drug", "proposal"]
+    status: Literal["match", "mismatch", "unverifiable"]
+    proposed: str | None = None
+    documented: str | None = None
+    source_id: str | None = None
+    reason: str | None = None
+    code: str | None = None
+
+
+class ProposalCheck(BaseModel):
+    """What a question that proposes a regimen was found to say, compared with
+    the source: `match` (every part is the source's), `mismatch` (a part
+    differs) or `unverifiable` (a part cannot be read or checked)."""
+    status: Literal["match", "mismatch", "unverifiable"]
+    dimensions: list[ProposalDimension] = []
+    drug: str | None = None
+
+
 class AskResponse(BaseModel):
     decision: Decision
     # `decision` collapses "refused after checking" and "never checked" into
@@ -196,6 +218,8 @@ class AskResponse(BaseModel):
     review: Review = Review()
     explanation: Explanation = Explanation()
     redaction: Redaction = Redaction()
+    proposal_check: ProposalCheck | None = None
+    reason_params: dict = {}
 
 
 # --- The structured output the LLM is required to return -------------------

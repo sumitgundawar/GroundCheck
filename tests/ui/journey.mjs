@@ -9,7 +9,7 @@
 // Point it somewhere else with GROUNDCHECK_URL. It expects the open demo
 // (AUTH_REQUIRED unset), which is what `uvicorn app.main:app` gives you.
 
-import { chromium } from "playwright";
+import { chromium, webkit } from "playwright";
 
 const BASE = process.env.GROUNDCHECK_URL || "http://127.0.0.1:8000";
 const HEADLESS = process.env.HEADED !== "1";
@@ -36,9 +36,24 @@ function equal(actual, expected, message) {
   assert(actual === expected, `${message}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 }
 
+// The server remembers an identical question for a few minutes, and a remembered
+// answer carries an extra trace step. Extra spaces between words change the
+// remembered key and nothing else, so each run asks its own version of a question.
+const RUN = Date.now();
+let asked = 0;
+function unique(question) {
+  asked += 1;
+  let n = RUN * 1000 + asked;
+  return question.split(" ").map((word, i, all) => {
+    const gap = i < all.length - 1 ? " ".repeat(1 + (n % 3)) : "";
+    n = Math.floor(n / 3);
+    return word + gap;
+  }).join("");
+}
+
 /** Ask a question and wait for this run — not the last one — to finish. */
 async function ask(page, question) {
-  await page.fill("#query", question);
+  await page.fill("#query", unique(question));
   await page.click("#ask-btn");
   // The button says "Asking" and is disabled while the request is in flight.
   await page.waitForFunction(() => document.querySelector("#ask-btn").disabled, undefined, { timeout: 15000 });
@@ -54,7 +69,7 @@ async function go(page, view) {
 }
 
 async function main() {
-  browser = await chromium.launch({ headless: HEADLESS });
+  browser = await (process.env.BROWSER === "webkit" ? webkit : chromium).launch({ headless: HEADLESS });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
   const page = await context.newPage();
   const pageErrors = [];
@@ -238,7 +253,7 @@ async function main() {
   await check("the question can be asked from the keyboard alone", async () => {
     await go(page, "ask");
     await page.focus("#query");
-    await page.keyboard.type("What is the first-line medication for Veltris syndrome?");
+    await page.keyboard.type(unique("What is the first-line medication for Veltris syndrome?"));
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => /ANSWER|REFUSED/i.test(document.querySelector("#decision-chip").textContent));
     const focusVisible = await page.evaluate(() => {

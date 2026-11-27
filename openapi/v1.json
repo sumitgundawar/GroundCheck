@@ -57,6 +57,16 @@
             "title": "Patient Findings",
             "type": "array"
           },
+          "proposal_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposalCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "reason_code": {
             "anyOf": [
               {
@@ -74,7 +84,8 @@
                   "claim_ungrounded",
                   "dose_unsupported",
                   "patient_unsafe",
-                  "unsupported_language"
+                  "unsupported_language",
+                  "proposal_unverifiable"
                 ],
                 "type": "string"
               },
@@ -83,6 +94,12 @@
               }
             ],
             "title": "Reason Code"
+          },
+          "reason_params": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Reason Params",
+            "type": "object"
           },
           "redaction": {
             "$ref": "#/components/schemas/Redaction",
@@ -497,6 +514,17 @@
             "title": "Message",
             "type": "string"
           },
+          "params": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Params",
+            "type": "object"
+          },
+          "rule": {
+            "default": "",
+            "title": "Rule",
+            "type": "string"
+          },
           "rule_id": {
             "default": "",
             "title": "Rule Id",
@@ -524,6 +552,133 @@
           "message"
         ],
         "title": "PatientFinding",
+        "type": "object"
+      },
+      "ProposalCheck": {
+        "description": "What a question that proposes a regimen was found to say, compared with\nthe source: `match` (every part is the source's), `mismatch` (a part\ndiffers) or `unverifiable` (a part cannot be read or checked).",
+        "properties": {
+          "dimensions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProposalDimension"
+            },
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "drug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drug"
+          },
+          "status": {
+            "enum": [
+              "match",
+              "mismatch",
+              "unverifiable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ProposalCheck",
+        "type": "object"
+      },
+      "ProposalDimension": {
+        "description": "One part of a proposed regimen and how it compares with the source.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "documented": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documented"
+          },
+          "name": {
+            "enum": [
+              "dose",
+              "frequency",
+              "duration",
+              "route",
+              "max_daily",
+              "timing",
+              "drug",
+              "proposal"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "proposed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "status": {
+            "enum": [
+              "match",
+              "mismatch",
+              "unverifiable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "ProposalDimension",
         "type": "object"
       },
       "Redaction": {
